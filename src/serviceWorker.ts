@@ -11,7 +11,7 @@
 // opt-in, read https://bit.ly/CRA-PWA
 
 const isLocalhost = Boolean(
-  window.location.hostname === "pixus.local"
+  window.location.hostname === "pixhub.local"
 )
 
 interface Config {
