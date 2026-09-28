@@ -4,11 +4,16 @@ import { InventoryItem } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 
+import { PurchaseBill } from '../models/purchase.ts';
+import { StockAdjustment } from '../models/item.ts';
+
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
   PARTIES: 'gst_parties',
   ITEMS: 'gst_items',
   INVOICES: 'gst_invoices',
+  PURCHASES: 'gst_purchases',
+  ADJUSTMENTS: 'gst_stock_adjustments',
   VOUCHERS: 'gst_vouchers',
 };
 
@@ -242,6 +247,109 @@ class StorageService {
     this.set(STORAGE_KEYS.INVOICES, list);
   }
 
+  // Purchases
+  getPurchases(): PurchaseBill[] {
+    return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, [
+      {
+        id: 'PUR-001',
+        billNumber: 'BILL-SUP-8821',
+        date: new Date().toISOString().split('T')[0],
+        supplierId: 'PTY-101',
+        supplierName: 'National Hardware & Electronics Ltd',
+        supplierGstin: '27AAACS1429B1ZV',
+        supplierAddress: 'MIDC Phase II, Pune',
+        supplierStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        itcEligibility: 'ELIGIBLE_INPUTS',
+        isRcm: false,
+        items: [
+          {
+            name: 'Thermal Receipt Printer 80mm USB+BT',
+            hsnSacCode: '844332',
+            unit: 'PCS',
+            quantity: 10,
+            unitPrice: 2800,
+            taxableAmount: 28000,
+            gstRate: 18,
+            cgstAmount: 2520,
+            sgstAmount: 2520,
+            igstAmount: 0,
+            cessAmount: 0,
+            totalAmount: 33040,
+          },
+        ],
+        totalGrossAmount: 28000,
+        totalDiscount: 0,
+        totalTaxableAmount: 28000,
+        totalCgst: 2520,
+        totalSgst: 2520,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 5040,
+        roundOff: 0,
+        grandTotal: 33040,
+        paymentMode: 'NET_BANKING',
+        paymentStatus: 'PAID',
+        paidAmount: 33040,
+        balanceAmount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  savePurchase(bill: PurchaseBill): void {
+    const list = this.getPurchases();
+    const idx = list.findIndex((b) => b.id === bill.id);
+    if (idx >= 0) {
+      list[idx] = bill;
+    } else {
+      list.unshift(bill);
+    }
+    this.set(STORAGE_KEYS.PURCHASES, list);
+
+    // Increase stock levels for purchased items
+    const items = this.getItems();
+    for (const line of bill.items) {
+      if (line.itemId) {
+        const match = items.find((itm) => itm.id === line.itemId);
+        if (match) {
+          match.currentStock += line.quantity;
+          this.saveItem(match);
+        }
+      }
+    }
+  }
+
+  deletePurchase(id: string): void {
+    const list = this.getPurchases().filter((b) => b.id !== id);
+    this.set(STORAGE_KEYS.PURCHASES, list);
+  }
+
+  // Stock Adjustments
+  getStockAdjustments(): StockAdjustment[] {
+    return this.get<StockAdjustment[]>(STORAGE_KEYS.ADJUSTMENTS, []);
+  }
+
+  saveStockAdjustment(adj: StockAdjustment): void {
+    const list = this.getStockAdjustments();
+    list.unshift(adj);
+    this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+
+    // Update item stock
+    const items = this.getItems();
+    const match = items.find((i) => i.id === adj.itemId);
+    if (match) {
+      if (adj.type === 'STOCK_IN') {
+        match.currentStock += adj.quantity;
+      } else {
+        match.currentStock = Math.max(0, match.currentStock - adj.quantity);
+      }
+      this.saveItem(match);
+    }
+  }
+
   // Vouchers
   getVouchers(): Voucher[] {
     return this.get<Voucher[]>(STORAGE_KEYS.VOUCHERS, []);
@@ -255,3 +363,4 @@ class StorageService {
 }
 
 export const db = new StorageService();
+

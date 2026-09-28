@@ -9,12 +9,14 @@ import {
   FileSpreadsheet,
   Settings,
   Layers,
+  ShoppingBag,
 } from 'lucide-react';
 
 export type NavTab =
   | 'dashboard'
   | 'pos'
-  | 'invoices'
+  | 'sales'
+  | 'purchases'
   | 'inventory'
   | 'parties'
   | 'accounting'
@@ -31,20 +33,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const menuItems: Array<{ id: NavTab; label: string; icon: React.ReactNode }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { id: 'pos', label: 'POS Quick Bill', icon: <ShoppingCart size={18} /> },
-    { id: 'invoices', label: 'Invoices (B2B/B2C)', icon: <Receipt size={18} /> },
+    { id: 'sales', label: 'Sales Hub', icon: <Receipt size={18} /> },
+    { id: 'purchases', label: 'Purchases & ITC', icon: <ShoppingBag size={18} /> },
     { id: 'inventory', label: 'Stock & Items', icon: <Package size={18} /> },
-    { id: 'parties', label: 'Parties (Customers)', icon: <Users size={18} /> },
-    { id: 'accounting', label: 'Daybook & Ledger', icon: <BookOpen size={18} /> },
-    { id: 'reports', label: 'GSTR-1 Reports', icon: <FileSpreadsheet size={18} /> },
+    { id: 'parties', label: 'Parties Ledger', icon: <Users size={18} /> },
+    { id: 'accounting', label: 'Daybook & Accounts', icon: <BookOpen size={18} /> },
+    { id: 'reports', label: 'GST & Financials', icon: <FileSpreadsheet size={18} /> },
     { id: 'stitch', label: 'Stitch UI Screens', icon: <Layers size={18} /> },
-    { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
+    { id: 'settings', label: 'Business Profile', icon: <Settings size={18} /> },
   ];
 
   return (
     <aside style={{
-      width: '230px',
-      backgroundColor: '#1e293b',
-      borderRight: '1px solid #334155',
+      width: '240px',
+      backgroundColor: '#131b2e',
+      borderRight: '1px solid #273754',
       display: 'flex',
       flexDirection: 'column',
       padding: '1rem 0.75rem',
@@ -56,9 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
         color: '#64748b',
-        fontWeight: 600,
+        fontWeight: 700,
       }}>
-        GST Accounting System
+        Vyapar Fintech Core
       </div>
 
       {menuItems.map((item) => {
@@ -72,15 +75,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               alignItems: 'center',
               gap: '0.75rem',
               padding: '0.625rem 0.75rem',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: isActive ? '#2563eb' : 'transparent',
+              borderRadius: '8px',
+              border: isActive ? '1px solid rgba(37, 99, 235, 0.4)' : '1px solid transparent',
+              backgroundColor: isActive ? '#1e3a8a' : 'transparent',
               color: isActive ? '#ffffff' : '#94a3b8',
               cursor: 'pointer',
-              fontWeight: isActive ? 600 : 500,
-              fontSize: '0.875rem',
+              fontWeight: isActive ? 700 : 500,
+              fontSize: '0.85rem',
               textAlign: 'left',
-              transition: 'background-color 0.15s, color 0.15s',
+              transition: 'all 0.15s ease-in-out',
             }}
           >
             {item.icon}
@@ -89,19 +92,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         );
       })}
 
-      <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #334155' }}>
+      <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #273754' }}>
         <div style={{
-          backgroundColor: '#0f172a',
+          backgroundColor: '#0a0f1d',
           padding: '0.75rem',
-          borderRadius: '6px',
+          borderRadius: '8px',
           fontSize: '0.75rem',
           color: '#94a3b8',
+          border: '1px solid #1d2a42',
         }}>
-          <div style={{ fontWeight: 600, color: '#f8fafc', marginBottom: '2px' }}>
-            GST India v2.0
+          <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: '2px' }}>
+            GST India • Vyapar 2.0
           </div>
-          <div>Offline First • SQLite/Sync</div>
-          <div style={{ color: '#10b981', marginTop: '4px' }}>● Ready (Local DB)</div>
+          <div>Offline First • SQLite / Sync</div>
+          <div style={{ color: '#6cf8bb', marginTop: '4px', fontWeight: 600 }}>● Core Ready</div>
         </div>
       </div>
     </aside>

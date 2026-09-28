@@ -17,6 +17,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   onClose,
 }) => {
   const [viewMode, setViewMode] = useState<'A4' | 'THERMAL'>('A4');
+  const [thermalWidth, setThermalWidth] = useState<32 | 48>(48); // 32 = 58mm, 48 = 80mm
 
   const handlePrint = () => {
     window.print();
@@ -24,7 +25,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   const handleShareWhatsApp = () => {
     const text = encodeURIComponent(
-      `Dear ${invoice.partyName},\nThank you for doing business with ${company.businessName}.\nYour GST Tax Invoice #${invoice.invoiceNumber} for amount ${formatINR(invoice.grandTotal)} is generated.\nDate: ${formatDate(invoice.date)}`
+      `Dear ${invoice.partyName},\nThank you for doing business with ${company.businessName}.\nYour GST Tax Invoice #${invoice.invoiceNumber} for amount ${formatINR(invoice.grandTotal)} is generated.\nDate: ${formatDate(invoice.date)}\nTaxable: ${formatINR(invoice.totalTaxableAmount)} | GST Tax: ${formatINR(invoice.totalTax)}\nView/Pay: ${company.upiId ? 'UPI ' + company.upiId : 'Cash/Bank'}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
@@ -50,7 +51,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     grandTotal: invoice.grandTotal,
     upiId: company.upiId,
     terms: company.termsAndConditions,
-  });
+  }, thermalWidth);
+
+  const upiQrUrl = company.upiId
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(
+        `upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(company.businessName)}&am=${invoice.grandTotal}&cu=INR`
+      )}`
+    : null;
 
   return (
     <div style={{
@@ -120,8 +127,40 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 fontWeight: 600,
               }}
             >
-              <Receipt size={15} /> 58mm/80mm Thermal POS
+              <Receipt size={15} /> Thermal POS
             </button>
+            {viewMode === 'THERMAL' && (
+              <div style={{ display: 'flex', backgroundColor: '#0f172a', borderRadius: '4px', border: '1px solid #334155' }}>
+                <button
+                  onClick={() => setThermalWidth(32)}
+                  style={{
+                    backgroundColor: thermalWidth === 32 ? '#3b82f6' : 'transparent',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  58mm
+                </button>
+                <button
+                  onClick={() => setThermalWidth(48)}
+                  style={{
+                    backgroundColor: thermalWidth === 48 ? '#3b82f6' : 'transparent',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  80mm
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -280,17 +319,26 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
               {/* Totals & Tax Breakup */}
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginTop: '0.5rem' }}>
-                <div style={{ border: '1px solid #cbd5e1', padding: '0.75rem', borderRadius: '4px' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>BANK DETAILS & UPI</div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}><strong>Bank:</strong> {company.bankName}</div>
-                  <div style={{ fontSize: '0.8rem' }}><strong>A/C No:</strong> {company.accountNumber}</div>
-                  <div style={{ fontSize: '0.8rem' }}><strong>IFSC:</strong> {company.ifscCode}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#059669', fontWeight: 600 }}><strong>UPI:</strong> {company.upiId}</div>
+                <div style={{ border: '1px solid #cbd5e1', padding: '0.75rem', borderRadius: '4px', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>BANK DETAILS & UPI</div>
+                    <div style={{ fontSize: '0.8rem', marginTop: '4px' }}><strong>Bank:</strong> {company.bankName}</div>
+                    <div style={{ fontSize: '0.8rem' }}><strong>A/C No:</strong> {company.accountNumber}</div>
+                    <div style={{ fontSize: '0.8rem' }}><strong>IFSC:</strong> {company.ifscCode}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#00875a', fontWeight: 600 }}><strong>UPI:</strong> {company.upiId}</div>
 
-                  <div style={{ marginTop: '0.75rem', fontSize: '0.75rem' }}>
-                    <strong>Total In Words:</strong>
-                    <div style={{ fontStyle: 'italic', color: '#334155' }}>{invoice.amountInWords}</div>
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                      <strong>Total In Words:</strong>
+                      <div style={{ fontStyle: 'italic', color: '#334155' }}>{invoice.amountInWords}</div>
+                    </div>
                   </div>
+
+                  {upiQrUrl && (
+                    <div style={{ textAlign: 'center', backgroundColor: '#f8fafc', padding: '6px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <img src={upiQrUrl} alt="UPI Dynamic QR" style={{ width: '90px', height: '90px', display: 'block' }} />
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#00875a', marginTop: '2px' }}>Scan & Pay UPI</div>
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', padding: '0.75rem', borderRadius: '4px' }}>

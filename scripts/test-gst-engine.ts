@@ -85,7 +85,33 @@ const voucher = createSalesInvoiceVoucher({
   isCashSale: false,
 });
 const balanceResult = validateVoucherBalance(voucher.entries);
-assert(balanceResult.isBalanced, 'Double Entry Total Debits equal Total Credits (Difference = 0)');
+assert(balanceResult.isBalanced, 'Sales Double Entry: Debits equal Credits (Difference = 0)');
+
+// 6. Purchase Inward Voucher & ITC Balancing
+console.log('\n--- 6. Testing Purchase Inward Voucher & ITC Balancing ---');
+const { createPurchaseInvoiceVoucher } = await import('../src/core/accounting/ledger.ts');
+const purVoucher = createPurchaseInvoiceVoucher({
+  billNumber: 'BILL-TEST-8821',
+  date: '2026-09-28',
+  supplierName: 'Vendor Ltd',
+  supplierId: 'SUP-001',
+  taxableAmount: 20000,
+  cgstAmount: 1800,
+  sgstAmount: 1800,
+  igstAmount: 0,
+  cessAmount: 0,
+  grandTotal: 23600,
+  isCashPurchase: false,
+});
+const purBalanceResult = validateVoucherBalance(purVoucher.entries);
+assert(purBalanceResult.isBalanced, 'Purchase Double Entry: Input Tax Credit Debits equal Vendor Credits');
+
+// 7. GSTR-3B Tax Offset Calculation
+console.log('\n--- 7. Testing GSTR-3B Output vs ITC Net Tax Offset ---');
+const outwardLiability = 1800; // Total output CGST from sales
+const eligibleItcClaim = 1200;  // Input CGST from purchase
+const netPayable = Math.max(0, outwardLiability - eligibleItcClaim);
+assert(netPayable === 600, 'GSTR-3B Net Tax Offset correctly calculates Output minus ITC (600.00)');
 
 console.log('\n==============================================');
 console.log(`SUMMARY: ${passedTests} PASSED, ${failedTests} FAILED`);

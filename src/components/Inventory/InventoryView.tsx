@@ -1,24 +1,31 @@
 import React, { useState } from 'react';
-import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
+import { InventoryItem, UnitOfMeasurement, StockAdjustment, StockAdjustmentType } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { COMMON_HSN_CODES } from '../../core/gst/hsnCatalog.ts';
-import { Search, Plus, AlertTriangle, Edit, Trash2, X, Check } from 'lucide-react';
+import { Search, Plus, AlertTriangle, Edit, Trash2, X, Check, Boxes } from 'lucide-react';
 
 interface InventoryViewProps {
   items: InventoryItem[];
   onSaveItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
+  onSaveAdjustment?: (adj: StockAdjustment) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   items,
   onSaveItem,
   onDeleteItem,
+  onSaveAdjustment,
 }) => {
   const [search, setSearch] = useState('');
   const [onlyLowStock, setOnlyLowStock] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [adjItemId, setAdjItemId] = useState(items[0]?.id || '');
+  const [adjType, setAdjType] = useState<StockAdjustmentType>('STOCK_IN');
+  const [adjQty, setAdjQty] = useState(1);
+  const [adjReason, setAdjReason] = useState('');
 
   const filtered = items.filter((item) => {
     const matchesSearch =
@@ -78,24 +85,44 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={openNewItem}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            backgroundColor: '#2563eb',
-            color: '#fff',
-            border: 'none',
-            padding: '0.5rem 0.85rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-          }}
-        >
-          <Plus size={15} /> Add Item / Service
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => setIsAdjustmentModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              backgroundColor: '#1d2a42',
+              color: '#60a5fa',
+              border: '1px solid #273754',
+              padding: '0.5rem 0.85rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+            }}
+          >
+            <Boxes size={15} /> Stock Adjustment
+          </button>
+          <button
+            onClick={openNewItem}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              backgroundColor: '#00875a',
+              color: '#fff',
+              border: 'none',
+              padding: '0.5rem 0.85rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+            }}
+          >
+            <Plus size={15} /> Add Item / Service
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -322,12 +349,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Opening / Current Stock</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Current Stock Qty</label>
                   <input
                     type="number"
                     min="0"
                     value={editingItem.currentStock}
                     onChange={(e) => setEditingItem({ ...editingItem, currentStock: Number(e.target.value) })}
+                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Batch Number (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. BATCH-2026-X1"
+                    value={editingItem.batchNumber || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, batchNumber: e.target.value })}
+                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Expiry Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={editingItem.expiryDate || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, expiryDate: e.target.value })}
                     style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
                   />
                 </div>
@@ -343,9 +393,136 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '0.4rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ backgroundColor: '#00875a', color: '#fff', border: 'none', padding: '0.4rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Adjustment Modal */}
+      {isAdjustmentModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(10, 15, 29, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60,
+          padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: '#162035',
+            borderRadius: '12px',
+            border: '1px solid #273754',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
+                Record Stock Movement / Adjustment
+              </h3>
+              <button onClick={() => setIsAdjustmentModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const itm = items.find((i) => i.id === adjItemId) || items[0];
+                if (itm && onSaveAdjustment) {
+                  onSaveAdjustment({
+                    id: `ADJ-${Date.now()}`,
+                    itemId: itm.id,
+                    itemName: itm.name,
+                    type: adjType,
+                    quantity: adjQty,
+                    date: new Date().toISOString().split('T')[0],
+                    reason: adjReason || 'Manual adjustment',
+                    createdAt: new Date().toISOString(),
+                  });
+                }
+                setIsAdjustmentModalOpen(false);
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Select Item</label>
+                <select
+                  value={adjItemId}
+                  onChange={(e) => setAdjItemId(e.target.value)}
+                  style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                >
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>{i.name} (Current: {i.currentStock} {i.unit})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Movement Type</label>
+                  <select
+                    value={adjType}
+                    onChange={(e) => setAdjType(e.target.value as StockAdjustmentType)}
+                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  >
+                    <option value="STOCK_IN">Stock In (+ Increase)</option>
+                    <option value="STOCK_OUT">Stock Out (- Decrease)</option>
+                    <option value="WASTAGE">Wastage / Damage (-)</option>
+                    <option value="CORRECTION">Audit Correction</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={adjQty}
+                    onChange={(e) => setAdjQty(Number(e.target.value))}
+                    required
+                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Reason / Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Godown unloading, transfer, breakage"
+                  value={adjReason}
+                  onChange={(e) => setAdjReason(e.target.value)}
+                  style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAdjustmentModalOpen(false)}
+                  style={{ backgroundColor: 'transparent', border: '1px solid #273754', color: '#94a3b8', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#00875a', color: '#fff', border: 'none', padding: '0.4rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Confirm Stock Movement
                 </button>
               </div>
             </form>
