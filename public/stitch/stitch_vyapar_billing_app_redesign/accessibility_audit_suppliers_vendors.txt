@@ -1,0 +1,137 @@
+# Accessibility Audit Report (WCAG 2.1 AA)
+
+**Target Screen:** Suppliers & Vendors (Simplified) (`{{DATA:SCREEN:SCREEN_2}}`)  
+**Design System:** Vyapar Modern Fintech  
+**Device Context:** Mobile (~390px viewport)  
+**Standard Evaluated:** WCAG 2.1 Level AA & Mobile Accessibility Guidelines  
+
+---
+
+## Executive Summary
+The **Suppliers & Vendors (Simplified)** screen provides a clean visual hierarchy, legible primary typography, and intuitive placement of common ledger actions. However, the technical accessibility evaluation reveals critical opportunities for improvement in semantic HTML, ARIA state communication, touch target sizing, color contrast on subtle status badges, and screen reader announcements.
+
+- **Overall Compliance Grade:** **B- (Needs Remediation)**
+- **Total Issues Identified:** 8
+- **Critical (Blockers):** 2
+- **Moderate (WCAG AA Failures):** 4
+- **Minor / Best Practice:** 2
+
+---
+
+## Detailed Findings & WCAG 2.1 AA Violations
+
+### 1. Missing Accessible Names & Labels on Icon-Only Buttons (Critical)
+- **WCAG Criteria:** 1.1.1 Non-text Content (Level A), 4.1.2 Name, Role, Value (Level A)
+- **Observed:**
+  - Header actions (hamburger menu, search icon, QR/barcode scanner, notification bell) and vendor card quick-action triggers (WhatsApp icon button `chat`) are implemented as `<button>` or `<a>` elements containing only Google Material Symbols icon text (`<span class="material-symbols-outlined">...</span>`).
+  - Without an `aria-label` or visually hidden text (`sr-only`), a screen reader announces either the icon ligature text (e.g., *"qr code scanner button"*, *"chat button"*) or merely *"button"*, leaving sight-impaired users without context on what vendor or action is being triggered.
+- **Recommendation:**
+  - Add explicit `aria-label`s to every icon button:
+    ```html
+    <!-- Header buttons -->
+    <button aria-label="Open main menu">...</button>
+    <button aria-label="Scan vendor QR or barcode">...</button>
+    <button aria-label="Notifications (1 new)">...</button>
+
+    <!-- Card action -->
+    <button aria-label="Send WhatsApp message to Kisan Agro Mills">
+      <span class="material-symbols-outlined" aria-hidden="true">chat</span>
+    </button>
+    ```
+
+---
+
+### 2. Form Input Lacks Programmatic Labeling (Critical)
+- **WCAG Criteria:** 1.3.1 Info and Relationships (Level A), 3.3.2 Labels or Instructions (Level A), 4.1.2 Name, Role, Value (Level A)
+- **Observed:**
+  - The search field uses a placeholder (`placeholder="Search supplier, GSTIN, phone..."`) without an associated `<label>` or `aria-label`.
+  - Placeholder text is not a replacement for an accessible label; assistive technologies may drop placeholders once text is typed, and placeholder contrast often fails readability standards.
+- **Recommendation:**
+  - Pair the search input with an explicit `aria-label` or an accessible `<label class="sr-only">`:
+    ```html
+    <label for="vendor-search" class="sr-only">Search supplier, GSTIN, or phone number</label>
+    <input id="vendor-search" type="search" placeholder="Search supplier, GSTIN, phone..." aria-label="Search supplier, GSTIN, or phone" />
+    ```
+
+---
+
+### 3. Segmented Tab Navigation & Filter Chips Missing ARIA Roles (Moderate)
+- **WCAG Criteria:** 4.1.2 Name, Role, Value (Level A)
+- **Observed:**
+  - The top switch (**Customers 48** vs **Suppliers 18**) and the horizontal filter chips (**All (18)**, **Overdue (2)**, **Settled (11)**) visually function as tabs/filter controls, but are marked up as plain generic `<div>` or styled buttons without tablist semantics or selection state indications (`aria-selected="true"` / `aria-pressed="true"`).
+- **Recommendation:**
+  - For the primary segment switch, apply `role="tablist"` and `role="tab"`:
+    ```html
+    <div role="tablist" aria-label="Party type">
+      <button role="tab" aria-selected="false" tabindex="-1">Customers <span class="sr-only">(48 contacts)</span></button>
+      <button role="tab" aria-selected="true" tabindex="0">Suppliers <span class="sr-only">(18 contacts)</span></button>
+    </div>
+    ```
+  - For filter chips, use `role="group"` with `aria-pressed="true|false"` on individual toggle buttons.
+
+---
+
+### 4. Color Contrast Ratios on Status Badges and Small Text (Moderate)
+- **WCAG Criteria:** 1.4.3 Contrast (Minimum) (Level AA - requires 4.5:1 for normal text, 3:1 for large text)
+- **Observed:**
+  - **"Due in 3d" / "Due Tomorrow" Badges:** Dark amber/yellow text on pastel amber/yellow background tint (~3.2:1 contrast ratio), which falls short of the required 4.5:1 for small text (<18pt/14pt bold).
+  - **Overdue Badge Tint:** Light red pill with red text (`#B91C1C` on `#FEE2E2`) is borderline (~4.1:1 when rendered in 11px font size).
+  - **Secondary Metadata:** The bill date and reference code (`PB-042 • 22 Oct`) rendered in light slate gray against `#ffffff` card surface measures ~3.8:1 under bright outdoor sunlight conditions.
+- **Recommendation:**
+  - Darken badge text colors:
+    - Amber badge: `#78350F` (Amber 900) on `#FEF3C7` (Amber 100) yields **7.4:1**.
+    - Overdue badge: `#991B1B` (Red 800) on `#FEE2E2` (Red 100) yields **6.8:1**.
+  - Increase metadata font color to a darker neutral (`#475569` or darker) to reliably exceed **5.2:1**.
+
+---
+
+### 5. Touch Target Minimum Size on Micro-Actions (Moderate)
+- **WCAG Criteria:** 2.5.5 Target Size (Level AAA) / 2.5.8 Target Size (Minimum - WCAG 2.2 Level AA: 24x24px with 48x48px spacing)
+- **Observed:**
+  - The WhatsApp icon button beside "Pay Now" has a visual container of approximately 36x36px. On mobile devices with finger tapping, this can lead to accidental touches of the adjacent "Pay Now" primary button.
+  - The filter settings button next to the search input (`tune` icon) has minimal padding, risking missed taps.
+- **Recommendation:**
+  - Ensure all clickable touch bounding boxes are at least **44x44px** (or 48x48px per Material / iOS Human Interface Guidelines) using transparent padding or `min-h-[44px] min-w-[44px] inline-flex items-center justify-center`.
+
+---
+
+### 6. Information Conveyed Solely Through Color/Icons (Moderate)
+- **WCAG Criteria:** 1.4.1 Use of Color (Level A)
+- **Observed:**
+  - In the filter chips and total payables card, status indicators use a colored dot (`• 18,400 Overdue`, `• Settled (11)`) where color is a primary carrier of urgency. While textual numbers are present, screen readers encounter unannounced bullet symbols (`•`).
+- **Recommendation:**
+  - Wrap decorative bullet dots with `aria-hidden="true"` and include descriptive prefix text for assistive technology (e.g., `<span class="sr-only">Status: </span>`).
+
+---
+
+### 7. Heading Hierarchy & Landmark Structure (Minor)
+- **WCAG Criteria:** 1.3.1 Info and Relationships (Level A), 2.4.6 Headings and Labels (Level AA)
+- **Observed:**
+  - The screen jumps directly into supplier cards without a designated semantic `<h1>` or `<h2>` for page sections (e.g. "Total Payables", "Suppliers List").
+- **Recommendation:**
+  - Structure the document with proper headings:
+    - `<h1>Suppliers & Vendors</h1>` (accessible in header)
+    - `<h2 class="sr-only">Financial Summary</h2>`
+    - `<h2 class="sr-only">Supplier Directory</h2>`
+    - `<h3>Kisan Agro Mills</h3>` for individual supplier cards.
+
+---
+
+### 8. Fixed Bottom Navigation Bar Landmark (Minor)
+- **WCAG Criteria:** 1.3.1 Info and Relationships (Level A), 2.4.1 Bypass Blocks (Level A)
+- **Observed:**
+  - Bottom tab navigation should be wrapped inside a `<nav aria-label="Main navigation">` with `aria-current="page"` indicating the active tab ("Parties").
+- **Recommendation:**
+  - Add `aria-current="page"` to the Parties tab icon and label.
+
+---
+
+## Action Plan & Remediation Roadmap
+
+| Priority | Item | Effort | Impact |
+|:---|:---|:---|:---|
+| **P0 (Immediate)** | Add `aria-label` to all icon buttons (header icons & WhatsApp action) | Low | Eliminates major blind spots for screen reader users |
+| **P0 (Immediate)** | Add programmatic label to Search input (`aria-label`) | Low | Fixes core form control accessibility failure |
+| **P1 (High)** | Adjust text colors in Overdue and Due Soon badges for 4.5:1 contrast | Low | Improves legibility under direct sunlight and for low-vision users |
+| **P1 (High)** | Expand touch targets of micro-buttons to 44x44px minimum | Medium | Prevents mis-taps on high-stakes financial triggers ("Pay Now") |
+| **P2 (Medium)** | Implement `role="tablist"` / `aria-selected` on segment & filter chips | Medium | Full keyboard and screen reader parity for ledger filtering |

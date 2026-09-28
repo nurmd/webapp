@@ -19,6 +19,7 @@ import { PartiesView } from './components/Parties/PartiesView.tsx';
 import { Gstr1View } from './components/Reports/Gstr1View.tsx';
 import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
+import { StitchShowcaseView } from './components/StitchShowcase/StitchShowcaseView.tsx';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -167,6 +168,10 @@ export const App: React.FC = () => {
 
           {activeTab === 'reports' && (
             <Gstr1View invoices={invoices} />
+          )}
+
+          {activeTab === 'stitch' && (
+            <StitchShowcaseView />
           )}
 
           {activeTab === 'settings' && (

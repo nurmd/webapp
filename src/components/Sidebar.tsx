@@ -8,6 +8,7 @@ import {
   BookOpen,
   FileSpreadsheet,
   Settings,
+  Layers,
 } from 'lucide-react';
 
 export type NavTab =
@@ -18,6 +19,7 @@ export type NavTab =
   | 'parties'
   | 'accounting'
   | 'reports'
+  | 'stitch'
   | 'settings';
 
 interface SidebarProps {
@@ -34,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'parties', label: 'Parties (Customers)', icon: <Users size={18} /> },
     { id: 'accounting', label: 'Daybook & Ledger', icon: <BookOpen size={18} /> },
     { id: 'reports', label: 'GSTR-1 Reports', icon: <FileSpreadsheet size={18} /> },
+    { id: 'stitch', label: 'Stitch UI Screens', icon: <Layers size={18} /> },
     { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
   ];
 

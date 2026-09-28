@@ -1,0 +1,312 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "tertiary": "#000000", "error": "#ba1a1a", "inverse-primary": "#bac7e1", "on-tertiary-container": "#b87500", "on-primary": "#ffffff", "tertiary-fixed": "#ffddb8", "outline": "#75777d", "on-tertiary": "#ffffff", "surface-bright": "#f9f9ff", "on-error": "#ffffff", "on-secondary": "#ffffff", "surface-container": "#e7eeff", "on-primary-fixed-variant": "#3a475c", "secondary-fixed-dim": "#4edea3", "outline-variant": "#c5c6cd", "surface-container-low": "#f0f3ff", "surface-tint": "#525f75", "on-tertiary-fixed-variant": "#653e00", "on-primary-container": "#77849c", "secondary-fixed": "#6ffbbe", "surface-dim": "#cfdaf2", "on-tertiary-fixed": "#2a1700", "inverse-surface": "#263143", "inverse-on-surface": "#ecf1ff", "secondary": "#006c49", "on-background": "#111c2d", "tertiary-container": "#2a1700", "primary": "#000000", "on-secondary-fixed-variant": "#005236", "on-surface": "#111c2d", "surface-variant": "#d8e3fb", "on-surface-variant": "#44474c", "primary-fixed": "#d6e3fe", "on-secondary-container": "#00714d", "on-error-container": "#93000a", "secondary-container": "#6cf8bb", "tertiary-fixed-dim": "#ffb95f", "surface-container-lowest": "#ffffff", "background": "#f9f9ff", "error-container": "#ffdad6", "on-primary-fixed": "#0e1c2f", "primary-fixed-dim": "#bac7e1", "primary-container": "#0e1c2f", "surface-container-highest": "#d8e3fb", "surface-container-high": "#dee8ff", "surface": "#f9f9ff", "on-secondary-fixed": "#002113" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "1.5rem", "space-lg": "1rem", "space-md": "0.75rem", "space-sm": "0.5rem", "margin-mobile": "0.75rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "margin": "1rem", "gutter": "1rem" }, fontFamily: { "label-md": ["Inter"], "label-sm": ["Inter"], "body-lg": ["Inter"], "body-sm": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "currency-display": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "body-md": ["Inter"], "tabular-data": ["Inter"], "currency-display-mobile": ["Plus Jakarta Sans"] }, fontSize: { "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "600" }], "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "currency-display": ["28px", { "lineHeight": "34px", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "headline-lg": ["30px", { "lineHeight": "38px", "fontWeight": "700" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "tabular-data": ["14px", { "lineHeight": "20px", "fontWeight": "500" }], "currency-display-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "800" }] } } } };</script><style>@layer base{html,body{width:100%;margin:0;padding:0;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] pt-safe"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0 flex-1"><button aria-label="Open navigation menu" class="w-10 h-10 -ml-1 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full transition-colors flex-shrink-0" type="button"><span class="material-symbols-outlined text-[24px]">menu</span></button><button class="flex items-center gap-space-xs text-left min-w-0 py-space-xs px-space-xs rounded-lg active:bg-surface-container-low transition-colors" type="button"><div class="flex flex-col min-w-0"><div class="flex items-center gap-1"><span class="font-label-md text-label-md text-on-surface truncate">Shree Balaji Enterprises</span><span class="material-symbols-outlined text-secondary text-[16px] flex-shrink-0">verified</span></div><span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-0.5">GSTIN Active <span class="material-symbols-outlined text-[14px]">expand_more</span></span></div></button></div><div class="flex items-center gap-1 flex-shrink-0"><button aria-label="Search transactions" class="w-11 h-11 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined text-[22px]">search</span></button><button aria-label="Scan QR or Barcode" class="w-11 h-11 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined text-[22px]">qr_code_scanner</span></button><button aria-label="Notifications" class="w-11 h-11 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full relative transition-colors"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface-container-lowest"></span></button><button aria-label="Merchant Profile" class="w-11 h-11 flex items-center justify-center pl-1 rounded-full"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHQnhLvqmEfaOAQk6av0jXh3mBY6fbOh5VH1L9aVr8pZ20Tc6bg0TV9vvU4W7-XqoCqiYq0bYdmK8pqlqHjBT0CAbLAShpmbsGfXElbOzyVX-MP3AegfdblUINzkrbrUb_vu8tepPjWzHE342uFzOpsGUOpHIc2Sv_XcA6cCPqrxJ0MT4kHUQGLQuQO8u20nDtHNnQv77u6q3lWTyH9gUPAZk0ChHqDlZX6XSAG74YYyws90GQGVCy"></button></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-surface min-h-screen"><div class="flex flex-col w-full px-margin-mobile gap-space-md">
+<!-- GST & Compliance Alert Banner -->
+<section class="w-full bg-surface-container-high rounded-xl p-space-sm flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-full bg-surface-container-lowest flex items-center justify-center flex-shrink-0 text-secondary shadow-sm">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<span class="font-label-md text-label-md text-on-surface">GSTR-1 Due in 6 days</span>
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Liability: <strong class="font-label-md text-on-surface">₹14,820</strong></span>
+</div>
+</div>
+</div>
+<button class="text-secondary font-label-md text-label-md px-space-xs py-1 rounded-lg active:bg-secondary-container/40 transition-colors flex-shrink-0 flex items-center gap-0.5" type="button">
+<span class="">Summary</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</section>
+<!-- Business Health Pulse Cards -->
+<section class="flex flex-col gap-space-sm">
+<!-- Today's Primary Sales & Collections -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+            TODAY'S TOTAL SALES
+            <span class="material-symbols-outlined text-[15px] text-outline">insights</span>
+</span>
+<div class="flex items-baseline gap-2 mt-0.5">
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-surface tracking-tight">₹48,250</span>
+<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[13px]">trending_up</span>
+              +14.2%
+            </span>
+</div>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+</div>
+</div>
+<!-- Collections Breakdown Split Bar -->
+<div class="pt-space-xs flex flex-col gap-1.5">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface-variant">Collections: <span class="font-label-md text-on-surface">₹36,500</span></span>
+<span class="text-secondary font-label-sm">75.6% Collected</span>
+</div>
+<div class="w-full h-2 rounded-full bg-surface-container overflow-hidden flex">
+<div class="bg-secondary h-full rounded-l-full" style="width: 67%;"></div>
+<div class="bg-secondary-container h-full" style="width: 33%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm pt-0.5">
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+            UPI/Online: <strong class="text-on-surface">₹24,500</strong>
+</span>
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary-container"></span>
+            Cash: <strong class="text-on-surface">₹12,000</strong>
+</span>
+</div>
+</div>
+</div>
+<!-- Dual Metric Cards: Receivable vs Payable -->
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- You'll Receive -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">To Collect</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<span class="font-currency-display-mobile text-currency-display-mobile text-secondary tracking-tight">₹1,84,200</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">From 14 parties</span>
+</div>
+<button class="mt-space-sm pt-space-xs flex items-center justify-between text-secondary font-label-sm text-label-sm active:opacity-75 transition-opacity" type="button">
+<span class="">Remind Parties</span>
+<span class="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+</button>
+</div>
+<!-- You'll Pay -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">To Pay</span>
+<span class="w-2 h-2 rounded-full bg-error"></span>
+</div>
+<span class="font-currency-display-mobile text-currency-display-mobile text-error tracking-tight">₹62,400</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">To 6 suppliers (7d)</span>
+</div>
+<button class="mt-space-sm pt-space-xs flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm active:text-on-surface transition-colors" type="button">
+<span class="">Pay Suppliers</span>
+<span class="material-symbols-outlined text-[16px]">payments</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Quick Action Grid -->
+<section class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between px-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Quick Actions</span>
+<span class="font-label-sm text-label-sm text-secondary">Customise</span>
+</div>
+<div class="grid grid-cols-4 gap-space-xs">
+<!-- Add Bill -->
+<button class="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm active:scale-95 transition-transform" type="button">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/50 text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">receipt_long</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface text-center leading-tight">Sale Bill</span>
+</button>
+<!-- Add Purchase -->
+<button class="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm active:scale-95 transition-transform" type="button">
+<div class="w-12 h-12 rounded-xl bg-surface-container text-on-primary-fixed-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">shopping_bag</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface text-center leading-tight">Purchase</span>
+</button>
+<!-- Record Expense -->
+<button class="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm active:scale-95 transition-transform" type="button">
+<div class="w-12 h-12 rounded-xl bg-surface-container-high text-on-surface flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">sell</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface text-center leading-tight">Expense</span>
+</button>
+<!-- Quick Payment In -->
+<button class="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm active:scale-95 transition-transform" type="button">
+<div class="w-12 h-12 rounded-xl bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">qr_code_2</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface text-center leading-tight">Payment In</span>
+</button>
+</div>
+</section>
+<!-- Inventory Health Alert Card -->
+<section class="w-full bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-error-container text-on-error-container flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[20px]">warning</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">3 Items Low in Stock</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Immediate restock recommended</span>
+</div>
+</div>
+<button class="px-space-md py-1.5 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm active:bg-surface-container transition-colors" type="button">
+        Reorder All
+      </button>
+</div>
+<!-- Micro Stock List -->
+<div class="flex flex-col gap-1.5 pt-space-xs">
+<div class="flex items-center justify-between py-1 px-space-xs rounded-lg bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-2 truncate">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+<span class="text-on-surface truncate">Basmati Rice Royal (25kg)</span>
+</div>
+<span class="font-label-sm text-label-sm text-error flex-shrink-0">2 bags left</span>
+</div>
+<div class="flex items-center justify-between py-1 px-space-xs rounded-lg bg-surface-container-low font-body-sm text-body-sm">
+<div class="flex items-center gap-2 truncate">
+<span class="w-1.5 h-1.5 rounded-full bg-on-tertiary-container"></span>
+<span class="text-on-surface truncate">Mustard Pure Oil 1L Pouch</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-tertiary-container flex-shrink-0">4 units left</span>
+</div>
+</div>
+</section>
+<!-- Store Live Pulse / Visual Context Banner -->
+<section class="w-full rounded-xl overflow-hidden bg-surface-container-lowest shadow-sm flex flex-col">
+<div class="relative w-full h-28 bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A clean, organized modern Indian Kirana and FMCG distribution warehouse with neat shelves of packaged goods and digital barcode scanners bathed in soft morning daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZDsj9OmEER2-eONlCLzInWQ5mwSkk4IRuDQysBhHkED0-inEtUTE7KDd6borqL0baQVgUtiuUsbHSlMkpB8dKi28ukdHz2dfFej0w9XTbZHJ3yML1_q_nCRa8MPOx9tv_XOU3CQ4JKKbGKGS_Lr9yqgz1nsMba0HPVzU8fvTNxrhL15Gmaoj66tZilSqisM9kz5yUWUF0RqaA5OgCtTvv9A41M4beHLf_aMKMMVkvoYsVbyz9l45x">
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/30 to-transparent"></div>
+<div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface">Store Counter Active</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container-lowest/90 px-2 py-0.5 rounded-full shadow-sm">POS Synced</span>
+</div>
+</div>
+</section>
+<!-- Recent Transactions Feed -->
+<section class="flex flex-col gap-space-sm pb-space-lg">
+<div class="flex items-center justify-between px-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface">Recent Transactions</span>
+<button class="text-secondary font-label-md text-label-md active:opacity-75" type="button">View Ledger</button>
+</div>
+<!-- Segmented Filter Pills -->
+<div class="flex items-center gap-space-xs overflow-x-auto pb-1 no-scrollbar">
+<button class="px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-sm text-label-sm shadow-sm flex-shrink-0" type="button">
+        All
+      </button>
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm shadow-sm active:bg-surface-container flex-shrink-0" type="button">
+        Sales (₹48.2k)
+      </button>
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm shadow-sm active:bg-surface-container flex-shrink-0" type="button">
+        Purchases
+      </button>
+<button class="px-3.5 py-1.5 rounded-full bg-surface-container-lowest text-on-surface-variant font-label-sm text-label-sm shadow-sm active:bg-surface-container flex-shrink-0" type="button">
+        Returns
+      </button>
+</div>
+<!-- Transaction List -->
+<div class="flex flex-col gap-space-xs">
+<!-- TX 1: Mehta Traders -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-secondary-container/50 text-secondary flex items-center justify-center font-label-md text-label-md flex-shrink-0">
+            MT
+          </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface truncate">Mehta Traders</span>
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="">INV-2024-089</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="">10:45 AM</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 gap-1">
+<span class="font-tabular-data text-tabular-data text-on-surface font-semibold">₹18,400</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            Paid (UPI)
+          </span>
+</div>
+</div>
+<!-- TX 2: Sharma Provisions -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed text-on-tertiary-fixed flex items-center justify-center font-label-md text-label-md flex-shrink-0">
+            SP
+          </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface truncate">Sharma Provisions</span>
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="">INV-2024-088</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="">Yesterday</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 gap-1">
+<span class="font-tabular-data text-tabular-data text-on-surface font-semibold">₹9,650</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-on-tertiary-container"></span>
+            Due in 3d
+          </span>
+</div>
+</div>
+<!-- TX 3: Kisan Agro Mills -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-surface-container text-on-primary-fixed-variant flex items-center justify-center font-label-md text-label-md flex-shrink-0">
+            KA
+          </div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1 truncate">
+<span class="font-label-md text-label-md text-on-surface truncate">Kisan Agro Mills</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">outbound</span>
+</div>
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="">PUR-412</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="">22 Oct</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 gap-1">
+<span class="font-tabular-data text-tabular-data text-error font-semibold">-₹32,000</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+            Paid Out
+          </span>
+</div>
+</div>
+<!-- TX 4: Apex Electricals -->
+<div class="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-error-container text-on-error-container flex items-center justify-center font-label-md text-label-md flex-shrink-0">
+            AE
+          </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md text-on-surface truncate">Apex Electricals</span>
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="">INV-2024-087</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="">20 Oct</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 gap-1">
+<span class="font-tabular-data text-tabular-data text-on-surface font-semibold">₹4,200</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+            Overdue
+          </span>
+</div>
+</div>
+</div>
+</section>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-4px_16px_rgba(11,25,44,0.06)]" data-active-classes="text-secondary"><div class="h-16 px-space-xs flex items-center justify-around relative"><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-12 active:scale-95 transition-all text-secondary" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[22px]">dashboard</span><span class="font-label-sm text-label-sm">Dashboard</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-12 text-on-surface-variant active:scale-95 transition-all" data-path="parties" href="#"><span class="material-symbols-outlined text-[22px]">group</span><span class="font-label-sm text-label-sm">Parties</span></a><div class="flex flex-col items-center justify-center -mt-5 relative z-10"><a class="w-12 h-12 rounded-full bg-secondary text-on-secondary shadow-[0_4px_12px_rgba(0,108,73,0.35)] flex items-center justify-center active:scale-95 transition-transform" data-path="create-invoice" href="#"><span class="material-symbols-outlined text-[26px]">add</span></a><span class="font-label-sm text-label-sm text-on-surface mt-1">Add Bill</span></div><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-12 text-on-surface-variant active:scale-95 transition-all" data-path="inventory-items" href="#"><span class="material-symbols-outlined text-[22px]">inventory_2</span><span class="font-label-sm text-label-sm">Items</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] h-12 text-on-surface-variant active:scale-95 transition-all" data-path="business-reports" href="#"><span class="material-symbols-outlined text-[22px]">analytics</span><span class="font-label-sm text-label-sm">Reports</span></a></div></nav>
+
+</body></html>

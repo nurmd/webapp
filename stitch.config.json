@@ -1,0 +1,107 @@
+{
+  "projectId": "5973526274439406288",
+  "projectUrl": "https://stitch.withgoogle.com/projects/5973526274439406288?pli=1",
+  "name": "Vyapar Billing App Redesign - Modern Fintech",
+  "linkedAt": "2026-09-28T16:47:00Z",
+  "archive": "stitch_vyapar_billing_app_redesign.zip",
+  "basePath": "/stitch/stitch_vyapar_billing_app_redesign",
+  "designSystem": {
+    "name": "Vyapar Modern Fintech",
+    "themeFile": "public/stitch/stitch_vyapar_billing_app_redesign/vyapar_modern_fintech/DESIGN.md",
+    "colors": {
+      "surface": "#f9f9ff",
+      "surfaceContainer": "#e7eeff",
+      "surfaceContainerHighest": "#d8e3fb",
+      "primary": "#000000",
+      "primaryContainer": "#0e1c2f",
+      "secondary": "#006c49",
+      "secondaryContainer": "#6cf8bb",
+      "error": "#ba1a1a"
+    },
+    "typography": {
+      "headings": "Plus Jakarta Sans",
+      "body": "Inter",
+      "currency": "Plus Jakarta Sans Bold"
+    }
+  },
+  "screens": [
+    {
+      "id": "vyapar_dashboard",
+      "title": "Vyapar Dashboard (Sales, Cashflow & Quick Actions)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/vyapar_dashboard/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/vyapar_dashboard/screen.png"
+    },
+    {
+      "id": "create_gst_invoice_1",
+      "title": "Create GST Invoice (Standard Layout)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_1/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_1/screen.png"
+    },
+    {
+      "id": "create_invoice_table_view",
+      "title": "Create Invoice (Table Grid Mode)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/create_invoice_table_view/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/create_invoice_table_view/screen.png"
+    },
+    {
+      "id": "create_gst_invoice_executive_dark",
+      "title": "Create GST Invoice (Executive Dark Theme)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_executive_dark/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_executive_dark/screen.png"
+    },
+    {
+      "id": "create_gst_invoice_modern_retail_neo_brutalist",
+      "title": "Create GST Invoice (Retail Neo-Brutalist)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_modern_retail_neo_brutalist/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/create_gst_invoice_modern_retail_neo_brutalist/screen.png"
+    },
+    {
+      "id": "select_customer_party",
+      "title": "Select Customer / Party Modal",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/select_customer_party/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/select_customer_party/screen.png"
+    },
+    {
+      "id": "parties_ledger",
+      "title": "Parties Ledger (Customers & Outstanding)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/parties_ledger/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/parties_ledger/screen.png"
+    },
+    {
+      "id": "inventory_stock",
+      "title": "Inventory & Stock Catalog",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/inventory_stock/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/inventory_stock/screen.png"
+    },
+    {
+      "id": "sales_hub",
+      "title": "Sales Hub (Quotations, Orders, Invoices)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/sales_hub/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/sales_hub/screen.png"
+    },
+    {
+      "id": "purchases_hub",
+      "title": "Purchases Hub (Purchase Bills & POs)",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/purchases_hub/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/purchases_hub/screen.png"
+    },
+    {
+      "id": "suppliers_vendors",
+      "title": "Suppliers & Vendors Directory",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/suppliers_vendors/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/suppliers_vendors/screen.png"
+    },
+    {
+      "id": "business_reports",
+      "title": "Business Reports & GSTR Analytics",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/business_reports/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/business_reports/screen.png"
+    },
+    {
+      "id": "navigation_menu_hub",
+      "title": "Navigation & More Hub",
+      "html": "/stitch/stitch_vyapar_billing_app_redesign/navigation_menu_hub/code.html",
+      "screenPng": "/stitch/stitch_vyapar_billing_app_redesign/navigation_menu_hub/screen.png"
+    }
+  ]
+}
