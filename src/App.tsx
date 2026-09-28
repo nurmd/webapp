@@ -5,6 +5,7 @@ import { Party } from './models/party.ts';
 import { InventoryItem, StockAdjustment } from './models/item.ts';
 import { Invoice } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
+import { Expense } from './models/expense.ts';
 import { Voucher } from './core/accounting/voucherTypes.ts';
 import { createSalesInvoiceVoucher, createPurchaseInvoiceVoucher } from './core/accounting/ledger.ts';
 
@@ -13,13 +14,14 @@ import { Sidebar, NavTab } from './components/Sidebar.tsx';
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
 import { SalesHubView } from './components/Sales/SalesHubView.tsx';
 import { PurchasesHubView } from './components/Purchases/PurchasesHubView.tsx';
+import { ExpensesView } from './components/Expenses/ExpensesView.tsx';
 import { CreateInvoiceModal } from './components/Invoicing/CreateInvoiceModal.tsx';
 import { TableGridInvoiceModal } from './components/Invoicing/TableGridInvoiceModal.tsx';
 import { InvoicePreviewModal } from './components/Invoicing/InvoicePreviewModal.tsx';
 import { QuickBillingView } from './components/POS/QuickBillingView.tsx';
 import { InventoryView } from './components/Inventory/InventoryView.tsx';
 import { PartiesView } from './components/Parties/PartiesView.tsx';
-import { Gstr1View } from './components/Reports/Gstr1View.tsx';
+import { BusinessReportsView } from './components/Reports/BusinessReportsView.tsx';
 import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
 import { StitchShowcaseView } from './components/StitchShowcase/StitchShowcaseView.tsx';
@@ -31,6 +33,7 @@ export const App: React.FC = () => {
   const [items, setItems] = useState<InventoryItem[]>(db.getItems());
   const [invoices, setInvoices] = useState<Invoice[]>(db.getInvoices());
   const [purchases, setPurchases] = useState<PurchaseBill[]>(db.getPurchases());
+  const [expenses, setExpenses] = useState<Expense[]>(db.getExpenses());
   const [vouchers, setVouchers] = useState<Voucher[]>(db.getVouchers());
 
   // Modals state
@@ -45,6 +48,7 @@ export const App: React.FC = () => {
     setItems(db.getItems());
     setInvoices(db.getInvoices());
     setPurchases(db.getPurchases());
+    setExpenses(db.getExpenses());
     setVouchers(db.getVouchers());
   };
 
@@ -109,6 +113,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSaveExpense = (newExpense: Expense) => {
+    db.saveExpense(newExpense);
+    refreshData();
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    if (window.confirm('Delete this expense voucher?')) {
+      db.deleteExpense(id);
+      refreshData();
+    }
+  };
+
   const handleSaveParty = (party: Party) => {
     db.saveParty(party);
     refreshData();
@@ -167,6 +183,7 @@ export const App: React.FC = () => {
               onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
               onQuickPos={() => setActiveTab('pos')}
               onViewInvoice={setPreviewInvoice}
+              onNavigateToTab={(tab) => setActiveTab(tab as NavTab)}
             />
           )}
 
@@ -185,6 +202,7 @@ export const App: React.FC = () => {
               onOpenTableGridInvoice={() => setIsTableGridInvoiceOpen(true)}
               onViewInvoice={setPreviewInvoice}
               onDeleteInvoice={handleDeleteInvoice}
+              onQuickPos={() => setActiveTab('pos')}
             />
           )}
 
@@ -196,6 +214,14 @@ export const App: React.FC = () => {
               itemsCatalog={items}
               onSavePurchase={handleSavePurchase}
               onDeletePurchase={handleDeletePurchase}
+            />
+          )}
+
+          {activeTab === 'expenses' && (
+            <ExpensesView
+              expenses={expenses}
+              onSaveExpense={handleSaveExpense}
+              onDeleteExpense={handleDeleteExpense}
             />
           )}
 
@@ -221,7 +247,14 @@ export const App: React.FC = () => {
           )}
 
           {activeTab === 'reports' && (
-            <Gstr1View invoices={invoices} purchases={purchases} />
+            <BusinessReportsView
+              company={company}
+              invoices={invoices}
+              purchases={purchases}
+              expenses={expenses}
+              items={items}
+              parties={parties}
+            />
           )}
 
           {activeTab === 'stitch' && (

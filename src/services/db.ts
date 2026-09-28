@@ -6,6 +6,7 @@ import { Voucher } from '../core/accounting/voucherTypes.ts';
 
 import { PurchaseBill } from '../models/purchase.ts';
 import { StockAdjustment } from '../models/item.ts';
+import { Expense } from '../models/expense.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -13,6 +14,7 @@ const STORAGE_KEYS = {
   ITEMS: 'gst_items',
   INVOICES: 'gst_invoices',
   PURCHASES: 'gst_purchases',
+  EXPENSES: 'gst_expenses',
   ADJUSTMENTS: 'gst_stock_adjustments',
   VOUCHERS: 'gst_vouchers',
 };
@@ -359,6 +361,101 @@ class StorageService {
     const list = this.getVouchers();
     list.unshift(voucher);
     this.set(STORAGE_KEYS.VOUCHERS, list);
+  }
+
+  // Expenses
+  getExpenses(): Expense[] {
+    return this.get<Expense[]>(STORAGE_KEYS.EXPENSES, [
+      {
+        id: 'EXP-001',
+        category: 'Rent & Utilities',
+        title: 'Office & Warehouse Rent (Oct 2024)',
+        amount: 25000,
+        taxableAmount: 21186.44,
+        gstRate: 18,
+        taxAmount: 3813.56,
+        cgstAmount: 1906.78,
+        sgstAmount: 1906.78,
+        igstAmount: 0,
+        date: '2024-10-01',
+        paymentMode: 'BANK_TRANSFER',
+        vendorName: 'Pinnacle Commercial Spaces',
+        vendorGstin: '27AABCP1234D1ZZ',
+        voucherNumber: 'VR-24-089',
+        itcEligible: true,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'EXP-002',
+        category: 'Electricity & Water',
+        title: 'MSEDCL Commercial Power Bill',
+        amount: 4200,
+        taxableAmount: 4200,
+        gstRate: 0,
+        taxAmount: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        date: '2024-10-05',
+        paymentMode: 'UPI',
+        vendorName: 'MSEDCL Maharashtra',
+        voucherNumber: 'EB-88219',
+        itcEligible: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'EXP-003',
+        category: 'Tea, Coffee & Refreshments',
+        title: 'Staff Pantry & Client Hospitality',
+        amount: 1850,
+        taxableAmount: 1761.9,
+        gstRate: 5,
+        taxAmount: 88.1,
+        cgstAmount: 44.05,
+        sgstAmount: 44.05,
+        igstAmount: 0,
+        date: '2024-10-08',
+        paymentMode: 'CASH',
+        vendorName: 'Sai Daily Needs',
+        itcEligible: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'EXP-004',
+        category: 'Packaging & Courier',
+        title: 'Bluedart Priority Parcel Express',
+        amount: 3450,
+        taxableAmount: 2923.73,
+        gstRate: 18,
+        taxAmount: 526.27,
+        cgstAmount: 263.14,
+        sgstAmount: 263.14,
+        igstAmount: 0,
+        date: '2024-10-12',
+        paymentMode: 'UPI',
+        vendorName: 'Blue Dart Express Ltd',
+        vendorGstin: '27AAACB0012A1ZX',
+        voucherNumber: 'BD-PUN-9921',
+        itcEligible: true,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  saveExpense(expense: Expense): void {
+    const list = this.getExpenses();
+    const idx = list.findIndex((e) => e.id === expense.id);
+    if (idx >= 0) {
+      list[idx] = expense;
+    } else {
+      list.unshift(expense);
+    }
+    this.set(STORAGE_KEYS.EXPENSES, list);
+  }
+
+  deleteExpense(id: string): void {
+    const list = this.getExpenses().filter((e) => e.id !== id);
+    this.set(STORAGE_KEYS.EXPENSES, list);
   }
 }
 

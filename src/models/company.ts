@@ -17,4 +17,5 @@ export interface CompanyProfile {
   upiId?: string;
   termsAndConditions?: string;
   invoicePrefix?: string;
+  logoUrl?: string;
 }

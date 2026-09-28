@@ -10,6 +10,7 @@ import {
   Settings,
   Layers,
   ShoppingBag,
+  Wallet,
 } from 'lucide-react';
 
 export type NavTab =
@@ -17,6 +18,7 @@ export type NavTab =
   | 'pos'
   | 'sales'
   | 'purchases'
+  | 'expenses'
   | 'inventory'
   | 'parties'
   | 'accounting'
@@ -35,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'pos', label: 'POS Quick Bill', icon: <ShoppingCart size={18} /> },
     { id: 'sales', label: 'Sales Hub', icon: <Receipt size={18} /> },
     { id: 'purchases', label: 'Purchases & ITC', icon: <ShoppingBag size={18} /> },
+    { id: 'expenses', label: 'Expenses & Overhead', icon: <Wallet size={18} /> },
     { id: 'inventory', label: 'Stock & Items', icon: <Package size={18} /> },
     { id: 'parties', label: 'Parties Ledger', icon: <Users size={18} /> },
     { id: 'accounting', label: 'Daybook & Accounts', icon: <BookOpen size={18} /> },
@@ -52,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       flexDirection: 'column',
       padding: '1rem 0.75rem',
       gap: '0.25rem',
+      flexShrink: 0,
     }}>
       <div style={{
         padding: '0.25rem 0.5rem 0.75rem 0.5rem',
@@ -64,33 +68,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
         Vyapar Fintech Core
       </div>
 
-      {menuItems.map((item) => {
-        const isActive = activeTab === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => onTabChange(item.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.625rem 0.75rem',
-              borderRadius: '8px',
-              border: isActive ? '1px solid rgba(37, 99, 235, 0.4)' : '1px solid transparent',
-              backgroundColor: isActive ? '#1e3a8a' : 'transparent',
-              color: isActive ? '#ffffff' : '#94a3b8',
-              cursor: 'pointer',
-              fontWeight: isActive ? 700 : 500,
-              fontSize: '0.85rem',
-              textAlign: 'left',
-              transition: 'all 0.15s ease-in-out',
-            }}
-          >
-            {item.icon}
-            {item.label}
-          </button>
-        );
-      })}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto', flex: 1 }}>
+        {menuItems.map((item) => {
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onTabChange(item.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.625rem 0.75rem',
+                borderRadius: '8px',
+                border: isActive ? '1px solid rgba(37, 99, 235, 0.4)' : '1px solid transparent',
+                backgroundColor: isActive ? '#1e3a8a' : 'transparent',
+                color: isActive ? '#ffffff' : '#94a3b8',
+                cursor: 'pointer',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '0.85rem',
+                textAlign: 'left',
+                transition: 'all 0.15s ease-in-out',
+              }}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #273754' }}>
         <div style={{

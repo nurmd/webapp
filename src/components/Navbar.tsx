@@ -1,6 +1,6 @@
 import React from 'react';
 import { CompanyProfile } from '../models/company.ts';
-import { ShieldCheck, Monitor, Smartphone, Globe, Plus, ShoppingCart } from 'lucide-react';
+import { ShieldCheck, Monitor, Smartphone, Globe, Plus, ShoppingCart, Bell, Search, CheckCircle2 } from 'lucide-react';
 
 interface NavbarProps {
   company: CompanyProfile;
@@ -14,28 +14,28 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0.875rem 1.5rem',
-      backgroundColor: '#1e293b',
+      padding: '0.75rem 1.5rem',
+      backgroundColor: '#0f172a',
       borderBottom: '1px solid #334155',
+      flexShrink: 0,
+      gap: '1rem',
+      flexWrap: 'wrap',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{
-          width: '38px',
-          height: '38px',
-          borderRadius: '8px',
-          backgroundColor: '#2563eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 'bold',
-          color: '#ffffff',
-          fontSize: '1.2rem',
-        }}>
-          ₹
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        {/* Brand Logo from Stitch */}
+        <img
+          src="/logo.svg"
+          alt="Vyapar Modern Logo"
+          style={{ width: '38px', height: '38px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+          onError={(e) => {
+            // Fallback if SVG fails to load
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
+
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <h1 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
               {company.businessName}
             </h1>
             <span style={{
@@ -43,29 +43,30 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
               alignItems: 'center',
               gap: '0.25rem',
               fontSize: '0.75rem',
-              backgroundColor: '#1e3a8a',
-              color: '#93c5fd',
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              color: '#34d399',
               padding: '0.15rem 0.5rem',
               borderRadius: '9999px',
-              fontWeight: 500,
+              fontWeight: 700,
+              border: '1px solid rgba(16, 185, 129, 0.3)',
             }}>
-              <ShieldCheck size={12} />
-              GSTIN: {company.gstin}
+              <CheckCircle2 size={12} />
+              GSTIN Active: {company.gstin}
             </span>
           </div>
           <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-            {company.address} • Phone: {company.phone}
+            {company.address} • Ph: {company.phone}
           </div>
         </div>
       </div>
 
       {/* Cross-Platform Badges & Quick Action Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#1e293b',
           padding: '0.35rem 0.75rem',
           borderRadius: '6px',
           border: '1px solid #334155',
@@ -76,8 +77,8 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
             <Globe size={13} /> Web
           </span>
           <span>•</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80' }} title="Android & iOS">
-            <Smartphone size={13} /> Mobile
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#4ade80' }} title="Android APK">
+            <Smartphone size={13} /> Android
           </span>
           <span>•</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#c084fc' }} title="Linux & Windows">
@@ -97,8 +98,8 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
             padding: '0.5rem 0.85rem',
             borderRadius: '6px',
             cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.875rem',
+            fontWeight: 700,
+            fontSize: '0.85rem',
           }}
         >
           <ShoppingCart size={16} />
@@ -117,13 +118,29 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
             padding: '0.5rem 0.85rem',
             borderRadius: '6px',
             cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '0.875rem',
+            fontWeight: 700,
+            fontSize: '0.85rem',
           }}
         >
           <Plus size={16} />
           New Invoice
         </button>
+
+        {/* Profile Avatar from Stitch */}
+        <img
+          src="/avatar.png"
+          alt="Merchant Profile"
+          style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: '2px solid #3b82f6',
+          }}
+          onError={(e) => {
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
       </div>
     </header>
   );
