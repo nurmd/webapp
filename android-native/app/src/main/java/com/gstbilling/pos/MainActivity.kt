@@ -10,11 +10,14 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import java.io.ByteArrayInputStream
 
 class MainActivity : Activity() {
 
@@ -27,13 +30,16 @@ class MainActivity : Activity() {
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
         webView = WebView(this)
+        webView.setBackgroundColor(0xFF0A0F1D.toInt())
+
         val container = FrameLayout(this)
+        container.setBackgroundColor(0xFF0A0F1D.toInt())
         container.fitsSystemWindows = true
         container.addView(webView)
         setContentView(container)
 
         setupWebView()
-        webView.loadUrl("file:///android_asset/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }
 
     private fun setupWebView() {
@@ -52,6 +58,7 @@ class MainActivity : Activity() {
         settings.cacheMode = WebSettings.LOAD_DEFAULT
 
         webView.webViewClient = object : WebViewClient() {
+            @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                 if (url == null) return false
                 if (url.startsWith("upi://") ||
@@ -72,9 +79,54 @@ class MainActivity : Activity() {
                 }
                 return false
             }
+
+            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                val url = request?.url ?: return null
+                if (url.host == "appassets.androidplatform.net") {
+                    var path = url.path ?: "index.html"
+                    if (path.startsWith("/")) path = path.substring(1)
+                    if (path.isEmpty()) path = "index.html"
+
+                    try {
+                        val inputStream = assets.open(path)
+                        val mimeType = when {
+                            path.endsWith(".html") -> "text/html"
+                            path.endsWith(".js") -> "application/javascript"
+                            path.endsWith(".mjs") -> "application/javascript"
+                            path.endsWith(".css") -> "text/css"
+                            path.endsWith(".svg") -> "image/svg+xml"
+                            path.endsWith(".png") -> "image/png"
+                            path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+                            path.endsWith(".json") -> "application/json"
+                            path.endsWith(".woff2") -> "font/woff2"
+                            path.endsWith(".woff") -> "font/woff"
+                            path.endsWith(".ttf") -> "font/ttf"
+                            else -> "application/octet-stream"
+                        }
+                        return WebResourceResponse(mimeType, "UTF-8", inputStream)
+                    } catch (e: Exception) {
+                        return WebResourceResponse(
+                            "text/plain",
+                            "UTF-8",
+                            404,
+                            "Not Found",
+                            null,
+                            ByteArrayInputStream("Asset not found: $path".toByteArray())
+                        )
+                    }
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
         }
 
-        webView.webChromeClient = object : WebChromeClient() {}
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                if (consoleMessage != null) {
+                    android.util.Log.d("GSTBillingJS", "${consoleMessage.sourceId()}:${consoleMessage.lineNumber()} -- ${consoleMessage.message()}")
+                }
+                return super.onConsoleMessage(consoleMessage)
+            }
+        }
 
         webView.addJavascriptInterface(AndroidBridge(this, vibrator), "AndroidBridge")
     }
