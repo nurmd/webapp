@@ -22,6 +22,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [activeItemDetail, setActiveItemDetail] = useState<InventoryItem | null>(null);
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
   const [adjQty, setAdjQty] = useState<number>(1);
@@ -46,6 +47,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const lowStockItems = items.filter((i) => i.currentStock <= i.minStockAlert);
   const lowStockCount = lowStockItems.length;
   const categories = Array.from(new Set(items.map((i) => i.category)));
+
+  // Format Valuation for Stitch headline
+  const formattedStockValueDisplay =
+    totalStockValue >= 100000
+      ? `₹${(totalStockValue / 100000).toFixed(2)} Lakh`
+      : formatINR(totalStockValue);
 
   const filtered = items.filter((item) => {
     const matchesSearch =
@@ -82,7 +89,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleOpenEdit = (item: InventoryItem) => {
     setEditingItem(item);
-    setItemType(item.unit === 'HOURS' ? 'SERVICE' : 'PRODUCT');
+    setItemType(item.unit === 'HOURS' || item.unit === 'DAYS' ? 'SERVICE' : 'PRODUCT');
     setName(item.name);
     setSku(item.sku || '');
     setBarcode(item.barcode || '');
@@ -95,6 +102,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setCurrentStock(item.currentStock);
     setMinStockAlert(item.minStockAlert);
     setIsModalOpen(true);
+    setActiveItemDetail(null);
   };
 
   const handleSaveItemForm = (e: React.FormEvent) => {
@@ -141,175 +149,175 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     onSaveAdjustment(adj);
     setAdjustmentItem(null);
     setAdjQty(1);
+    setActiveItemDetail(null);
   };
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto bg-surface min-h-screen">
-      {/* 1. Top Stock Value & Financial Valuation Summary (Stitch inventory_stock_simplified tactile card) */}
-      <section className="px-margin-mobile pt-space-sm pb-space-xs">
-        <div className="bg-primary-container text-on-primary rounded-xl p-space-md shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-wider">
-                Total Stock Value
-              </span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="font-currency-display-mobile text-[22px] font-bold text-on-primary">
-                  {formatINR(totalStockValue)}
+    <div className="flex flex-col w-full pb-24 bg-surface min-h-screen">
+      <div className="flex flex-col w-full max-w-4xl mx-auto">
+        {/* Top Stock Value & Financial Valuation Summary (Tactile Fintech Card) */}
+        <section className="px-margin-mobile pt-space-sm pb-space-xs">
+          <div className="bg-primary-container text-on-primary rounded-xl p-space-md shadow-sm relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-wider">
+                  Total Stock Value
                 </span>
-                <span className="font-body-sm text-body-sm text-on-primary-container">
-                  · {items.length} Items
-                </span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="font-currency-display-mobile text-[22px] font-bold text-on-primary">
+                    {formattedStockValueDisplay}
+                  </span>
+                  <span className="font-body-sm text-body-sm text-on-primary-container">
+                    · {items.length} Items
+                  </span>
+                </div>
               </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setFilterLowStockOnly(!filterLowStockOnly);
-                setSelectedCategory('ALL');
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
-                filterLowStockOnly
-                  ? 'bg-secondary text-on-secondary shadow-sm'
-                  : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-on-tertiary-container animate-pulse" />
-              <span>{lowStockCount} Need Restock</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. Sticky Search & Quick Scan Input Area (Stitch simplified) */}
-      <section className="px-margin-mobile pt-space-sm pb-space-xs">
-        <div className="flex items-center gap-space-xs">
-          <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/15">
-            <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
-              search
-            </span>
-            <input
-              type="search"
-              placeholder="Search items, SKU, or HSN code..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
-            />
-            {onScanBarcodeClick && (
               <button
                 type="button"
-                onClick={onScanBarcodeClick}
-                aria-label="Scan Item Barcode"
-                className="w-10 h-10 mr-1 flex items-center justify-center rounded-lg text-primary active:bg-surface-container-low transition-colors cursor-pointer"
+                onClick={() => {
+                  setFilterLowStockOnly(!filterLowStockOnly);
+                  setSelectedCategory('ALL');
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
+                  filterLowStockOnly
+                    ? 'bg-secondary text-on-secondary shadow-sm'
+                    : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
+                }`}
               >
-                <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-on-tertiary-container animate-pulse" />
+                <span>{lowStockCount} Need Restock</span>
               </button>
-            )}
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setFilterLowStockOnly(!filterLowStockOnly)}
-            aria-label="Filter Options"
-            className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm border border-outline-variant/15 active:bg-surface-container-low transition-colors cursor-pointer ${
-              filterLowStockOnly ? 'border-secondary text-secondary' : ''
-            }`}
-          >
-            <span className="material-symbols-outlined text-[20px]">tune</span>
-          </button>
-        </div>
-      </section>
+        </section>
 
-      {/* 3. Horizontal Scrollable Category Pills (Stitch simplified) */}
-      <section className="pt-space-xs pb-space-xs">
-        <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCategory('ALL');
-              setFilterLowStockOnly(false);
-            }}
-            className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-              selectedCategory === 'ALL' && !filterLowStockOnly
-                ? 'bg-primary text-on-primary'
-                : 'bg-surface-container-lowest text-on-surface-variant'
-            }`}
-          >
-            <span>All Items</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-surface-container-lowest/25 text-[10px]">
-              {items.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setFilterLowStockOnly(true);
-              setSelectedCategory('ALL');
-            }}
-            className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-              filterLowStockOnly
-                ? 'bg-primary text-on-primary'
-                : 'bg-surface-container-lowest text-on-surface-variant'
-            }`}
-          >
-            Low Stock ({lowStockCount})
-          </button>
-
-          {categories.map((cat) => (
+        {/* Sticky Search & Quick Scan Input Area */}
+        <section className="px-margin-mobile pt-space-sm pb-space-xs">
+          <div className="flex items-center gap-space-xs">
+            <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm">
+              <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
+                search
+              </span>
+              <input
+                className="w-full h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
+                placeholder="Search items, SKU, or HSN code..."
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {onScanBarcodeClick && (
+                <button
+                  aria-label="Scan Item Barcode"
+                  className="w-10 h-10 mr-1 flex items-center justify-center rounded-lg text-primary active:bg-surface-container-low transition-colors cursor-pointer"
+                  type="button"
+                  onClick={onScanBarcodeClick}
+                >
+                  <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+                </button>
+              )}
+            </div>
             <button
-              key={cat}
+              aria-label="Filter Options"
+              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
+                filterLowStockOnly ? 'border border-secondary text-secondary' : ''
+              }`}
+              type="button"
+              onClick={() => setFilterLowStockOnly(!filterLowStockOnly)}
+            >
+              <span className="material-symbols-outlined text-[20px]">tune</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Horizontal Scrollable Category Pills */}
+        <section className="pt-space-xs pb-space-xs">
+          <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
+            <button
+              className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
+                selectedCategory === 'ALL' && !filterLowStockOnly
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-lowest text-on-surface-variant active:bg-surface-container-low'
+              }`}
               type="button"
               onClick={() => {
-                setSelectedCategory(cat);
+                setSelectedCategory('ALL');
                 setFilterLowStockOnly(false);
               }}
+            >
+              <span>All Items</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-surface-container-lowest/25 text-[10px]">
+                {items.length}
+              </span>
+            </button>
+
+            <button
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                selectedCategory === cat && !filterLowStockOnly
+                filterLowStockOnly
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container-lowest text-on-surface-variant'
               }`}
+              type="button"
+              onClick={() => {
+                setFilterLowStockOnly(true);
+                setSelectedCategory('ALL');
+              }}
             >
-              {cat}
+              Low Stock ({lowStockCount})
             </button>
-          ))}
-        </div>
-      </section>
 
-      {/* 4. Inventory Line Items Feed (Stitch simplified cards) */}
-      <section className="px-margin-mobile flex flex-col gap-space-sm pb-28">
-        {filtered.length === 0 ? (
-          <div className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant border border-outline-variant/15">
-            <span className="material-symbols-outlined text-[36px] text-outline mb-2">
-              inventory_2
-            </span>
-            <p className="font-headline-sm text-sm font-semibold">No stock items match your search.</p>
-            <p className="text-body-sm text-outline mt-1">Tap + Add New Item to create an inventory item.</p>
-          </div>
-        ) : (
-          filtered.map((item) => {
-            const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
-            const isOut = item.currentStock <= 0;
-            const itemStockValue = item.currentStock * item.purchasePrice;
-
-            return (
-              <div
-                key={item.id}
-                className="w-full bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/15 p-space-md flex flex-col gap-2 hover:border-secondary/40 transition-colors"
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
+                  selectedCategory === cat && !filterLowStockOnly
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-lowest text-on-surface-variant'
+                }`}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setFilterLowStockOnly(false);
+                }}
               >
-                {/* Main Row: Image/Icon, Title, Price, Stock & Valuation */}
-                <div className="flex items-center justify-between gap-space-sm">
+                {cat}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* Inventory Line Items Feed (Exact simplified Stitch layout) */}
+        <section className="px-margin-mobile flex flex-col gap-space-sm pb-28">
+          {filtered.length === 0 ? (
+            <div className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant">
+              <span className="material-symbols-outlined text-[36px] text-outline mb-2">
+                inventory_2
+              </span>
+              <p className="font-headline-sm text-sm font-semibold">No stock items match your search.</p>
+              <p className="text-body-sm text-outline mt-1">Tap + Add New Item to create an inventory item.</p>
+            </div>
+          ) : (
+            filtered.map((item) => {
+              const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
+              const isOut = item.currentStock <= 0;
+              const itemStockValue = item.currentStock * item.purchasePrice;
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => setActiveItemDetail(item)}
+                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex items-center justify-between gap-space-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                >
                   <div className="flex items-center gap-space-sm min-w-0 flex-1">
-                    {/* Item Avatar Thumbnail */}
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-surface-container-low flex-shrink-0 flex items-center justify-center border border-outline-variant/15">
-                      <span className="material-symbols-outlined text-secondary text-[26px]">
+                    {/* Thumbnail */}
+                    <div className="w-16 h-16 rounded-lg bg-surface-container-low flex-shrink-0 overflow-hidden flex items-center justify-center">
+                      <span className="material-symbols-outlined text-secondary text-[28px]">
                         inventory_2
                       </span>
                     </div>
 
-                    {/* Details Column */}
+                    {/* Information Column */}
                     <div className="flex flex-col min-w-0 flex-1">
-                      <h3 className="font-headline-sm text-[15px] sm:text-[16px] text-on-surface truncate font-semibold">
+                      <h3 className="font-headline-sm text-[16px] text-on-surface truncate font-semibold">
                         {item.name}
                       </h3>
 
@@ -330,7 +338,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Stock Badge */}
                       <div className="mt-1 flex items-center gap-1.5">
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
@@ -362,112 +369,150 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                   {/* Stock Value Column */}
                   <div className="flex flex-col items-end justify-center flex-shrink-0 text-right">
-                    <span className="font-label-sm text-[11px] text-outline uppercase tracking-wider">
-                      Stock Value
-                    </span>
+                    <span className="font-label-sm text-[11px] text-outline uppercase">Stock Value</span>
                     <span className="font-tabular-data text-body-md font-bold text-on-surface mt-0.5">
                       {formatINR(itemStockValue)}
                     </span>
                   </div>
                 </div>
+              );
+            })
+          )}
+        </section>
 
-                {/* Sub-Actions & Meta Row */}
-                <div className="flex items-center justify-between pt-2 border-t border-outline-variant/15 text-xs">
-                  <div className="flex items-center gap-1.5 text-on-surface-variant flex-wrap">
-                    <span className="font-mono text-[11px] text-secondary font-semibold">
-                      {item.sku}
-                    </span>
-                    <span>•</span>
-                    <span className="text-[11px]">HSN: {item.hsnSacCode}</span>
-                    <span>•</span>
-                    <span className="text-[11px]">GST: {item.gstRate}%</span>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAdjustmentItem(item);
-                        setAdjType('STOCK_IN');
-                        setAdjQty(1);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-secondary-container text-on-secondary-container font-bold text-xs flex items-center gap-0.5 active:scale-95 cursor-pointer"
-                      title="Stock In"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">add</span>
-                      <span>Stock In</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAdjustmentItem(item);
-                        setAdjType('STOCK_OUT');
-                        setAdjQty(1);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-xs flex items-center gap-0.5 active:scale-95 cursor-pointer"
-                      title="Stock Out"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">remove</span>
-                      <span>Out</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEdit(item)}
-                      className="w-7 h-7 rounded-lg text-on-surface-variant hover:text-on-surface flex items-center justify-center cursor-pointer"
-                      title="Edit Item"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onDeleteItem(item.id)}
-                      className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
-                      title="Delete Item"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </section>
-
-      {/* 5. Sticky Bottom Floating Action Center (Stitch simplified) */}
-      <div className="fixed bottom-20 left-0 right-0 z-40 px-margin-mobile pointer-events-none">
-        <div className="max-w-md mx-auto flex items-center justify-end gap-space-xs pointer-events-auto">
-          <button
-            onClick={handleOpenAdd}
-            className="h-12 px-5 rounded-full bg-secondary text-on-secondary shadow-lg flex items-center gap-2 font-label-md text-label-md active:scale-95 transition-transform cursor-pointer"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">add_box</span>
-            <span>Add New Item</span>
-          </button>
-          {onScanBarcodeClick && (
+        {/* Sticky Bottom Floating Action Center */}
+        <div className="fixed bottom-20 left-0 right-0 z-40 px-margin-mobile pointer-events-none">
+          <div className="max-w-md mx-auto flex items-center justify-end gap-space-xs pointer-events-auto">
             <button
-              onClick={onScanBarcodeClick}
-              aria-label="Scan New Barcode"
-              className="w-12 h-12 rounded-full bg-primary-container text-on-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+              onClick={handleOpenAdd}
+              className="h-12 px-5 rounded-full bg-secondary text-on-secondary shadow-lg flex items-center gap-2 font-label-md text-label-md active:scale-95 transition-transform cursor-pointer"
               type="button"
             >
-              <span className="material-symbols-outlined text-[20px] text-secondary-fixed">
-                qr_code_scanner
-              </span>
+              <span className="material-symbols-outlined text-[20px]">add_box</span>
+              <span>Add New Item</span>
             </button>
-          )}
+            {onScanBarcodeClick && (
+              <button
+                onClick={onScanBarcodeClick}
+                aria-label="Scan New Barcode"
+                className="w-12 h-12 rounded-full bg-primary-container text-on-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px] text-secondary-fixed">
+                  qr_code_scanner
+                </span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 6. Add / Edit Item Modal (Adapted directly from Stitch add_inventory_item/code.html) */}
+      {/* Item Quick Action & Stock Adjustment Bottom Sheet */}
+      {activeItemDetail && (
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+                  <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+                </div>
+                <div>
+                  <h3 className="font-headline-sm text-base font-bold text-on-surface">
+                    {activeItemDetail.name}
+                  </h3>
+                  <p className="text-xs text-on-surface-variant font-mono">
+                    {activeItemDetail.sku} • HSN: {activeItemDetail.hsnSacCode}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveItemDetail(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-surface-container-low">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-outline font-semibold uppercase">Sale Price</span>
+                <span className="text-sm font-bold text-on-surface">{formatINR(activeItemDetail.salePrice)}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-outline font-semibold uppercase">Current Stock</span>
+                <span className="text-sm font-bold text-secondary">
+                  {activeItemDetail.currentStock} {activeItemDetail.unit}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-outline font-semibold uppercase">Stock Value</span>
+                <span className="text-sm font-bold text-on-surface">
+                  {formatINR(activeItemDetail.currentStock * activeItemDetail.purchasePrice)}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions Grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdjustmentItem(activeItemDetail);
+                  setAdjType('STOCK_IN');
+                  setAdjQty(1);
+                  setActiveItemDetail(null);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span>Stock In</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAdjustmentItem(activeItemDetail);
+                  setAdjType('STOCK_OUT');
+                  setAdjQty(1);
+                  setActiveItemDetail(null);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">remove</span>
+                <span>Stock Out</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenEdit(activeItemDetail)}
+                className="py-2.5 px-3 rounded-xl bg-surface-container-high text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                <span>Edit Details</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteItem(activeItemDetail.id);
+                  setActiveItemDetail(null);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-error/10 text-error font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Item Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3">
           <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-lg shadow-xl border border-outline-variant/30 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
-            {/* Modal Header */}
             <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
@@ -653,7 +698,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               </div>
 
-              {/* Section 3: Stock & Inventory Tracking (only for Product) */}
+              {/* Section 3: Stock & Inventory Tracking */}
               {itemType === 'PRODUCT' && (
                 <div className="bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/20 flex flex-col gap-2.5">
                   <span className="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">
@@ -682,7 +727,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         onChange={(e) => setUnit(e.target.value as UnitOfMeasurement)}
                         className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                       >
-                        {['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'BOX', 'BAG', 'MTR', 'ROLL', 'PACK'].map(
+                        {['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'BOX', 'BAG', 'MTR', 'PKT', 'SET'].map(
                           (u) => (
                             <option key={u} value={u}>
                               {u}
@@ -729,7 +774,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* 7. Stock Adjustment Sheet / Modal */}
+      {/* Stock Adjustment Modal */}
       {adjustmentItem && (
         <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-3.5">
