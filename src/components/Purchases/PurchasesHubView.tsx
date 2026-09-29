@@ -334,16 +334,16 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                 key={bill.id}
                 className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-secondary/40"
               >
-                <div className="flex items-start justify-between gap-space-sm">
-                  <div className="flex items-center gap-space-sm min-w-0">
+                <div className="flex items-start justify-between gap-2 sm:gap-space-sm">
+                  <div className="flex items-center gap-2 sm:gap-space-sm min-w-0 flex-1">
                     <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center flex-shrink-0 font-bold text-secondary text-base">
                       {bill.supplierName.charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-label-md text-xs sm:text-label-md text-on-surface font-semibold truncate">
                         {bill.supplierName}
                       </span>
-                      <div className="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-body-sm">
+                      <div className="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-[11px] sm:text-xs">
                         <span>{bill.billNumber}</span>
                         <span className="w-1 h-1 rounded-full bg-outline-variant" />
                         <span>{formatDate(bill.date)}</span>
@@ -351,16 +351,16 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0">
+                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
                     <span
-                      className={`font-headline-sm text-headline-sm font-bold ${
+                      className={`font-headline-sm text-xs sm:text-base font-bold whitespace-nowrap ${
                         isUnpaid ? 'text-error' : 'text-on-surface'
                       }`}
                     >
                       {formatINR(bill.grandTotal)}
                     </span>
                     <span
-                      className={`font-label-sm text-label-sm px-2 py-0.5 rounded-full mt-0.5 flex items-center gap-0.5 font-bold ${
+                      className={`font-label-sm text-[10px] sm:text-label-sm px-2 py-0.5 rounded-full mt-0.5 flex items-center gap-0.5 font-bold whitespace-nowrap ${
                         isUnpaid
                           ? 'text-error bg-error-container/60'
                           : isPartial

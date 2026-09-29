@@ -289,29 +289,29 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-2 hover:border-secondary/40 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-sm text-[16px] text-on-surface font-bold truncate">
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="font-headline-sm text-sm sm:text-[16px] text-on-surface font-bold truncate">
                       {inv.partyName}
                     </span>
-                    <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                    <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-on-surface-variant mt-0.5 flex-wrap">
                       <span className="font-semibold text-secondary">{inv.invoiceNumber}</span>
                       <span>•</span>
                       <span>{formatDate(inv.date)}</span>
                       {inv.partyGstin && (
                         <>
                           <span>•</span>
-                          <span className="text-[11px] text-on-surface-variant font-mono">{inv.partyGstin}</span>
+                          <span className="text-[10px] sm:text-[11px] text-on-surface-variant font-mono truncate">{inv.partyGstin}</span>
                         </>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0">
-                    <span className="font-tabular-data text-[17px] font-extrabold text-on-surface">
+                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
+                    <span className="font-tabular-data text-xs sm:text-[17px] font-extrabold text-on-surface whitespace-nowrap">
                       {formatINR(inv.grandTotal)}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
+                      className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 whitespace-nowrap ${
                         isPaid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'
                       }`}
                     >

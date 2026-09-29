@@ -39,17 +39,17 @@ async function runTests() {
 
   // 2. GitHub OTA Release & Version Code Logic
   console.log('\n--- 2. Testing GitHub OTA Release Resolution & Version Code ---');
-  assert(CURRENT_APP_VERSION === '1.0.4', 'Current App Version is initialized to 1.0.4');
+  assert(CURRENT_APP_VERSION === '1.0.5', 'Current App Version is initialized to 1.0.5');
   assert(updateService.getGitHubRepo() === 'nurmd/webapp', 'Default GitHub repo points to nurmd/webapp');
-  assert(updateService.calculateVersionCode('1.0.4') === 10004, 'Calculates versionCode 10004 for 1.0.4');
+  assert(updateService.calculateVersionCode('1.0.5') === 10005, 'Calculates versionCode 10005 for 1.0.5');
   assert(updateService.calculateVersionCode('1.1.0') === 10100, 'Calculates versionCode 10100 for 1.1.0');
   
   const updateInfo = await updateService.checkForUpdates();
-  assert(updateInfo.currentVersion === '1.0.4', 'Current version reported matches 1.0.4');
+  assert(updateInfo.currentVersion === '1.0.5', 'Current version reported matches 1.0.5');
   assert(!!updateInfo.latestRelease, 'Latest release retrieved from GitHub OTA channel');
   assert(updateInfo.latestRelease?.apkUrl.includes('.apk') === true, 'APK download URL points to valid APK asset');
   assert(Array.isArray(updateInfo.latestRelease?.releaseNotes) && (updateInfo.latestRelease?.releaseNotes.length || 0) > 0, 'Release notes array populated');
-  assert(updateService.isNewer('1.0.5', updateInfo.currentVersion) === true, 'Newer patch version triggers update');
+  assert(updateService.isNewer('1.0.6', updateInfo.currentVersion) === true, 'Newer patch version triggers update');
 
   // 2b. SHA-256 Cryptographic Checksum & Integrity Logic
   console.log('\n--- 2b. Testing Checksum Integrity & Internal Download Logic ---');

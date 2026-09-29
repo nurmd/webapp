@@ -341,24 +341,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div
                   key={inv.id}
-                  className="p-space-md flex items-center justify-between hover:bg-surface-container-low/40 transition-colors"
+                  className="p-3 sm:p-space-md flex items-center justify-between gap-2 hover:bg-surface-container-low/40 transition-colors"
                 >
-                  <div className="flex items-center gap-space-sm min-w-0">
+                  <div className="flex items-center gap-2.5 sm:gap-space-sm min-w-0 flex-1">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                         isPaid ? 'bg-secondary-container/60 text-secondary' : 'bg-error-container/60 text-error'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[20px]">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                         {isPaid ? 'check_circle' : 'pending_actions'}
                       </span>
                     </div>
 
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-label-md text-label-md text-on-surface font-bold truncate">
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-label-md text-xs sm:text-label-md text-on-surface font-bold truncate">
                         {inv.partyName}
                       </span>
-                      <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                      <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-on-surface-variant truncate">
                         <span>{inv.invoiceNumber}</span>
                         <span>•</span>
                         <span>{formatDate(inv.date)}</span>
@@ -366,13 +366,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-space-sm flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
                     <div className="flex flex-col items-end">
-                      <span className="font-tabular-data text-[15px] font-extrabold text-on-surface">
+                      <span className="font-tabular-data text-xs sm:text-[15px] font-extrabold text-on-surface whitespace-nowrap">
                         {formatINR(inv.grandTotal)}
                       </span>
                       <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap ${
                           isPaid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'
                         }`}
                       >

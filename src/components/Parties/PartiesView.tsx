@@ -359,10 +359,10 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                 onClick={() => setSelectedPartyForLedger(party)}
                 className="party-card bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/20 flex flex-col gap-3 active:bg-surface-container-low transition-all cursor-pointer hover:border-secondary/40"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <div
-                      className={`w-11 h-11 rounded-full flex items-center justify-center font-headline-sm text-headline-sm flex-shrink-0 font-bold ${
+                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-headline-sm text-sm sm:text-headline-sm flex-shrink-0 font-bold ${
                         isReceivable || isPayable
                           ? 'bg-error-container text-on-error-container'
                           : 'bg-secondary-container text-on-secondary-container'
@@ -370,29 +370,29 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                     >
                       {party.name.charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex flex-col min-w-0">
+                    <div className="flex flex-col min-w-0 flex-1">
                       <div className="flex items-center gap-1">
-                        <span className="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">
+                        <span className="font-headline-sm text-sm sm:text-base text-on-surface truncate font-semibold">
                           {party.name}
                         </span>
                         {party.gstin && (
                           <span
-                            className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0"
+                            className="material-symbols-outlined text-[15px] sm:text-[16px] text-secondary flex-shrink-0"
                             style={{ fontVariationSettings: "'FILL' 1" }}
                           >
                             verified
                           </span>
                         )}
                       </div>
-                      <span className="text-on-surface-variant font-body-sm text-body-sm truncate">
+                      <span className="text-on-surface-variant font-body-sm text-[11px] sm:text-xs truncate">
                         {party.billingAddress || party.phone}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0">
+                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
                     <span
-                      className={`font-currency-display-mobile text-currency-display-mobile tracking-tight font-extrabold ${
+                      className={`font-currency-display-mobile text-xs sm:text-base tracking-tight font-extrabold whitespace-nowrap ${
                         isReceivable
                           ? 'text-error'
                           : isPayable
@@ -403,7 +403,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       {formatINR(Math.abs(party.currentBalance))}
                     </span>
                     <span
-                      className={`font-label-sm text-label-sm px-2 py-0.5 rounded-md mt-0.5 font-bold ${
+                      className={`font-label-sm text-[10px] sm:text-label-sm px-2 py-0.5 rounded-md mt-0.5 font-bold whitespace-nowrap ${
                         isReceivable
                           ? 'text-error bg-error-container/60'
                           : isPayable
