@@ -27,7 +27,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [adjQty, setAdjQty] = useState<number>(1);
   const [adjReason, setAdjReason] = useState('New inventory arrival');
 
-  // Form State
+  // Form State (Product vs Service, Basic, Pricing, Stock)
+  const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -40,7 +41,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [currentStock, setCurrentStock] = useState<number>(10);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
 
-  // Metrics
+  // Financial Metrics (Tactile Fintech Card)
   const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
   const lowStockItems = items.filter((i) => i.currentStock <= i.minStockAlert);
   const lowStockCount = lowStockItems.length;
@@ -64,6 +65,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleOpenAdd = () => {
     setEditingItem(null);
+    setItemType('PRODUCT');
     setName('');
     setSku(`SKU-${Date.now().toString().slice(-4)}`);
     setBarcode('');
@@ -80,6 +82,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleOpenEdit = (item: InventoryItem) => {
     setEditingItem(item);
+    setItemType(item.unit === 'HOURS' ? 'SERVICE' : 'PRODUCT');
     setName(item.name);
     setSku(item.sku || '');
     setBarcode(item.barcode || '');
@@ -105,12 +108,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       barcode: barcode.trim() || undefined,
       hsnSacCode: hsn.trim() || '844332',
       category: category.trim() || 'General',
-      unit,
+      unit: itemType === 'SERVICE' ? 'HOURS' : unit,
       salePrice: Number(salePrice),
       purchasePrice: Number(purchasePrice),
       gstRate: Number(gstRate),
-      currentStock: Number(currentStock),
-      minStockAlert: Number(minStockAlert),
+      currentStock: itemType === 'SERVICE' ? 9999 : Number(currentStock),
+      minStockAlert: itemType === 'SERVICE' ? 0 : Number(minStockAlert),
       createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -141,16 +144,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-3 gap-space-sm">
-      {/* 1. Top Stock Value & Valuation Summary (Stitch inventory_stock_simplified tactile card) */}
-      <section className="pt-space-xs">
-        <div className="bg-primary-container text-on-primary rounded-2xl p-space-md shadow-sm relative overflow-hidden">
+    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto bg-surface min-h-screen">
+      {/* 1. Top Stock Value & Financial Valuation Summary (Stitch inventory_stock_simplified tactile card) */}
+      <section className="px-margin-mobile pt-space-sm pb-space-xs">
+        <div className="bg-primary-container text-on-primary rounded-xl p-space-md shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-wider">
                 Total Stock Value
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
+              <div className="flex items-baseline gap-1 mt-0.5">
                 <span className="font-currency-display-mobile text-[22px] font-bold text-on-primary">
                   {formatINR(totalStockValue)}
                 </span>
@@ -161,16 +164,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 setFilterLowStockOnly(!filterLowStockOnly);
                 setSelectedCategory('ALL');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
                 filterLowStockOnly
                   ? 'bg-secondary text-on-secondary shadow-sm'
                   : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
               }`}
-              type="button"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-on-tertiary-container animate-pulse" />
               <span>{lowStockCount} Need Restock</span>
@@ -180,9 +183,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       </section>
 
       {/* 2. Sticky Search & Quick Scan Input Area (Stitch simplified) */}
-      <section className="pt-space-xs">
+      <section className="px-margin-mobile pt-space-sm pb-space-xs">
         <div className="flex items-center gap-space-xs">
-          <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20">
+          <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/15">
             <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
               search
             </span>
@@ -191,7 +194,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               placeholder="Search items, SKU, or HSN code..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
+              className="w-full h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
             />
             {onScanBarcodeClick && (
               <button
@@ -206,11 +209,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => {
-              setFilterLowStockOnly(!filterLowStockOnly);
-            }}
+            onClick={() => setFilterLowStockOnly(!filterLowStockOnly)}
             aria-label="Filter Options"
-            className={`w-11 h-11 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm border border-outline-variant/20 active:bg-surface-container-low transition-colors cursor-pointer ${
+            className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm border border-outline-variant/15 active:bg-surface-container-low transition-colors cursor-pointer ${
               filterLowStockOnly ? 'border-secondary text-secondary' : ''
             }`}
           >
@@ -221,7 +222,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
       {/* 3. Horizontal Scrollable Category Pills (Stitch simplified) */}
       <section className="pt-space-xs pb-space-xs">
-        <div className="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
           <button
             type="button"
             onClick={() => {
@@ -275,11 +276,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </section>
 
-      {/* 4. Simplified Inventory Line Items Feed (Stitch simplified) */}
-      <section className="flex flex-col gap-2.5">
+      {/* 4. Inventory Line Items Feed (Stitch simplified cards) */}
+      <section className="px-margin-mobile flex flex-col gap-space-sm pb-28">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-sm">
-            No inventory items found.
+          <div className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant border border-outline-variant/15">
+            <span className="material-symbols-outlined text-[36px] text-outline mb-2">
+              inventory_2
+            </span>
+            <p className="font-headline-sm text-sm font-semibold">No stock items match your search.</p>
+            <p className="text-body-sm text-outline mt-1">Tap + Add New Item to create an inventory item.</p>
           </div>
         ) : (
           filtered.map((item) => {
@@ -290,14 +295,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             return (
               <div
                 key={item.id}
-                className="w-full bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/20 p-space-md flex flex-col gap-2.5 hover:border-secondary/40 transition-colors"
+                className="w-full bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/15 p-space-md flex flex-col gap-2 hover:border-secondary/40 transition-colors"
               >
+                {/* Main Row: Image/Icon, Title, Price, Stock & Valuation */}
                 <div className="flex items-center justify-between gap-space-sm">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-14 h-14 rounded-xl bg-surface-container-low flex-shrink-0 flex items-center justify-center text-secondary font-bold text-lg border border-outline-variant/20">
-                      {item.name.charAt(0).toUpperCase()}
+                  <div className="flex items-center gap-space-sm min-w-0 flex-1">
+                    {/* Item Avatar Thumbnail */}
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-surface-container-low flex-shrink-0 flex items-center justify-center border border-outline-variant/15">
+                      <span className="material-symbols-outlined text-secondary text-[26px]">
+                        inventory_2
+                      </span>
                     </div>
 
+                    {/* Details Column */}
                     <div className="flex flex-col min-w-0 flex-1">
                       <h3 className="font-headline-sm text-[15px] sm:text-[16px] text-on-surface truncate font-semibold">
                         {item.name}
@@ -305,9 +315,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                       <div className="flex items-center gap-2 mt-0.5 text-body-sm">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[11px] font-label-sm uppercase">
-                            Sale:
-                          </span>
+                          <span className="text-outline text-[11px] font-label-sm uppercase">Sale:</span>
                           <span className="font-headline-sm text-body-md font-bold text-on-surface">
                             {formatINR(item.salePrice)}
                           </span>
@@ -315,15 +323,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </div>
                         <span className="text-outline-variant">•</span>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[11px] font-label-sm uppercase">
-                            Buy:
-                          </span>
+                          <span className="text-outline text-[11px] font-label-sm uppercase">Buy:</span>
                           <span className="font-tabular-data text-body-sm font-semibold text-on-surface-variant">
                             {formatINR(item.purchasePrice)}
                           </span>
                         </div>
                       </div>
 
+                      {/* Stock Badge */}
                       <div className="mt-1 flex items-center gap-1.5">
                         <span
                           className={`w-1.5 h-1.5 rounded-full ${
@@ -353,6 +360,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                   </div>
 
+                  {/* Stock Value Column */}
                   <div className="flex flex-col items-end justify-center flex-shrink-0 text-right">
                     <span className="font-label-sm text-[11px] text-outline uppercase tracking-wider">
                       Stock Value
@@ -363,9 +371,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 </div>
 
-                {/* Sub-actions toolbar */}
+                {/* Sub-Actions & Meta Row */}
                 <div className="flex items-center justify-between pt-2 border-t border-outline-variant/15 text-xs">
-                  <div className="flex items-center gap-2 text-on-surface-variant">
+                  <div className="flex items-center gap-1.5 text-on-surface-variant flex-wrap">
                     <span className="font-mono text-[11px] text-secondary font-semibold">
                       {item.sku}
                     </span>
@@ -455,142 +463,265 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       </div>
 
-      {/* Add / Edit Item Modal */}
+      {/* 6. Add / Edit Item Modal (Adapted directly from Stitch add_inventory_item/code.html) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl border border-outline-variant/30 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-headline-sm text-lg font-bold text-on-surface">
-              {editingItem ? 'Edit Product Item' : 'Add New Product Item'}
-            </h3>
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3">
+          <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-lg shadow-xl border border-outline-variant/30 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
+                <h3 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface">
+                  {editingItem ? 'Edit Inventory Item' : 'Add Inventory Item'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
 
-            <form onSubmit={handleSaveItemForm} className="flex flex-col gap-3 text-xs">
-              <div>
-                <label className="block font-bold text-on-surface-variant mb-1">Item Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Fortune Sunlite Oil 1L"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                />
+            <form onSubmit={handleSaveItemForm} className="flex flex-col gap-3.5 text-xs">
+              {/* Type Selector: Product vs Service */}
+              <div className="p-1 rounded-xl bg-surface-container-high flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setItemType('PRODUCT')}
+                  className={`flex-1 py-2 rounded-lg font-label-md text-label-md text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    itemType === 'PRODUCT'
+                      ? 'bg-surface-container-lowest text-on-surface shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">
+                    inventory_2
+                  </span>
+                  <span>Product (Goods)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemType('SERVICE')}
+                  className={`flex-1 py-2 rounded-lg font-label-md text-label-md text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    itemType === 'SERVICE'
+                      ? 'bg-surface-container-lowest text-on-surface shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">
+                    room_service
+                  </span>
+                  <span>Service</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">SKU Code</label>
-                  <input
-                    type="text"
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
+              {/* Section 1: Basic Details Card */}
+              <div className="bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/20 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">
+                    Basic Details
+                  </span>
+                  <span className="font-label-sm text-[10px] text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+                    Mandatory
+                  </span>
                 </div>
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Barcode (EAN/UPC)</label>
-                  <input
-                    type="text"
-                    placeholder="Scan or enter barcode"
-                    value={barcode}
-                    onChange={(e) => setBarcode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">HSN/SAC Code</label>
+                  <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                    Item Name <span className="text-error">*</span>
+                  </label>
                   <input
                     type="text"
-                    value={hsn}
-                    onChange={(e) => setHsn(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Sale Price (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
                     required
-                    value={salePrice || ''}
-                    onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                    placeholder="e.g. Basmati Rice Royal Premium 5kg"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface font-body-md text-sm placeholder:text-outline focus:outline-none focus:border-secondary"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Purchase (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={purchasePrice || ''}
-                    onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      Category
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Groceries"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      HSN / SAC Code
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 100630"
+                      value={hsn}
+                      onChange={(e) => setHsn(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      SKU Code
+                    </label>
+                    <input
+                      type="text"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      Barcode (EAN/UPC)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Scan or enter"
+                      value={barcode}
+                      onChange={(e) => setBarcode(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Pricing & GST Tax Rates */}
+              <div className="bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/20 flex flex-col gap-2.5">
+                <span className="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">
+                  Pricing &amp; Tax Slabs
+                </span>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      Sale Price (₹) <span className="text-error">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={salePrice || ''}
+                      onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                      className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-sm font-bold focus:outline-none focus:border-secondary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      Purchase Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={purchasePrice || ''}
+                      onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+                      className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-sm focus:outline-none focus:border-secondary"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">GST Rate (%)</label>
-                  <select
-                    value={gstRate}
-                    onChange={(e) => setGstRate(parseInt(e.target.value, 10))}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  >
-                    {[0, 5, 12, 18, 28].map((r) => (
-                      <option key={r} value={r}>
-                        {r}%
-                      </option>
+                  <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
+                    GST Tax Rate Slab
+                  </label>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[0, 5, 12, 18, 28].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setGstRate(rate)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          gstRate === rate
+                            ? 'bg-secondary text-on-secondary shadow-sm'
+                            : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container'
+                        }`}
+                      >
+                        {rate}%
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Current Stock</label>
-                  <input
-                    type="number"
-                    value={currentStock || ''}
-                    onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">Low Stock Alert</label>
-                  <input
-                    type="number"
-                    value={minStockAlert || ''}
-                    onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-              </div>
+              {/* Section 3: Stock & Inventory Tracking (only for Product) */}
+              {itemType === 'PRODUCT' && (
+                <div className="bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/20 flex flex-col gap-2.5">
+                  <span className="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">
+                    Stock &amp; Inventory Units
+                  </span>
 
-              <div className="flex justify-end gap-2 mt-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                        Current Stock
+                      </label>
+                      <input
+                        type="number"
+                        value={currentStock || ''}
+                        onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
+                        className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                        Unit
+                      </label>
+                      <select
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value as UnitOfMeasurement)}
+                        className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                      >
+                        {['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'BOX', 'BAG', 'MTR', 'ROLL', 'PACK'].map(
+                          (u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                        Min Alert
+                      </label>
+                      <input
+                        type="number"
+                        value={minStockAlert || ''}
+                        onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
+                        className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold hover:bg-surface-container transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer active:scale-95"
+                  className="px-5 py-2.5 rounded-full bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer flex items-center gap-1.5"
                 >
-                  {editingItem ? 'Update Item' : 'Save Item'}
+                  <span className="material-symbols-outlined text-[16px]">check</span>
+                  <span>{editingItem ? 'Update Item' : 'Save Item'}</span>
                 </button>
               </div>
             </form>
@@ -598,42 +729,53 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
       )}
 
-      {/* Stock Adjustment Modal */}
+      {/* 7. Stock Adjustment Sheet / Modal */}
       {adjustmentItem && (
         <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-4">
-            <h3 className="font-headline-sm text-base font-bold text-on-surface">
-              Adjust Stock: {adjustmentItem.name}
-            </h3>
+          <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-3.5">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <h3 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface">
+                Adjust Stock: {adjustmentItem.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAdjustmentItem(null)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
 
             <form onSubmit={handleApplyAdjustment} className="flex flex-col gap-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setAdjType('STOCK_IN')}
-                  className={`py-2 rounded-xl font-bold cursor-pointer transition-colors ${
+                  className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 ${
                     adjType === 'STOCK_IN'
-                      ? 'bg-secondary text-on-secondary'
+                      ? 'bg-secondary text-on-secondary shadow-sm'
                       : 'bg-surface-container text-on-surface'
                   }`}
                 >
-                  + Stock In
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>Stock In</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdjType('STOCK_OUT')}
-                  className={`py-2 rounded-xl font-bold cursor-pointer transition-colors ${
+                  className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1 ${
                     adjType === 'STOCK_OUT'
-                      ? 'bg-error text-on-error'
+                      ? 'bg-error text-on-error shadow-sm'
                       : 'bg-surface-container text-on-surface'
                   }`}
                 >
-                  - Stock Out
+                  <span className="material-symbols-outlined text-[16px]">remove</span>
+                  <span>Stock Out</span>
                 </button>
               </div>
 
               <div>
-                <label className="block font-bold text-on-surface-variant mb-1">
+                <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
                   Quantity ({adjustmentItem.unit})
                 </label>
                 <input
@@ -642,21 +784,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   required
                   value={adjQty}
                   onChange={(e) => setAdjQty(parseFloat(e.target.value) || 1)}
-                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-base font-bold focus:outline-none"
+                  className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-base font-bold focus:outline-none focus:border-secondary"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-on-surface-variant mb-1">Reason / Note</label>
+                <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                  Reason / Note
+                </label>
                 <input
                   type="text"
                   value={adjReason}
                   onChange={(e) => setAdjReason(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none"
+                  className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 mt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant/20">
                 <button
                   type="button"
                   onClick={() => setAdjustmentItem(null)}
@@ -666,7 +810,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer active:scale-95"
+                  className="px-5 py-2 rounded-full bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm cursor-pointer active:scale-95"
                 >
                   Apply Stock
                 </button>

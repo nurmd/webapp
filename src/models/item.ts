@@ -9,7 +9,9 @@ export type UnitOfMeasurement =
   | 'BOX'
   | 'PKT'
   | 'SET'
-  | 'BAG';
+  | 'BAG'
+  | 'HOURS'
+  | 'DAYS';
 
 export interface InventoryItem {
   id: string;

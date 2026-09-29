@@ -16,8 +16,8 @@ export interface AppReleaseInfo {
   isMandatory?: boolean;
 }
 
-export const CURRENT_APP_VERSION = '1.0.1';
-export const CURRENT_VERSION_CODE = 10001;
+export const CURRENT_APP_VERSION = '1.0.2';
+export const CURRENT_VERSION_CODE = 10002;
 export const DEFAULT_GITHUB_REPO = 'nurmd/webapp';
 
 class UpdateService {
