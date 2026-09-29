@@ -1,6 +1,7 @@
 import React from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { rbac, UserProfile } from '../../services/rbac.ts';
+import { CURRENT_APP_VERSION } from '../../services/updateService.ts';
 
 export type AppTab =
   | 'dashboard'
@@ -193,7 +194,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           )}
 
           <div className="text-[11px] text-on-surface-variant font-medium">
-            GST Billing &amp; Accounting v1.0.0
+            GST Billing &amp; Accounting v{CURRENT_APP_VERSION}
           </div>
           <div className="text-[10px] text-secondary font-semibold">
             ● 100% Offline Capable • Native Storage
