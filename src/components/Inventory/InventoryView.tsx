@@ -305,34 +305,37 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div
                   key={item.id}
                   onClick={() => setActiveItemDetail(item)}
-                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex items-center justify-between gap-space-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center justify-between gap-2 sm:gap-space-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
                 >
-                  <div className="flex items-center gap-space-sm min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5 sm:gap-space-sm min-w-0 flex-1">
                     {/* Thumbnail */}
-                    <div className="w-16 h-16 rounded-lg bg-surface-container-low flex-shrink-0 overflow-hidden flex items-center justify-center">
-                      <span className="material-symbols-outlined text-secondary text-[28px]">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-surface-container-low flex-shrink-0 overflow-hidden flex items-center justify-center">
+                      <span className="material-symbols-outlined text-secondary text-[24px] sm:text-[28px]">
                         inventory_2
                       </span>
                     </div>
 
                     {/* Information Column */}
                     <div className="flex flex-col min-w-0 flex-1">
-                      <h3 className="font-headline-sm text-[16px] text-on-surface truncate font-semibold">
+                      <h3 className="font-headline-sm text-sm sm:text-[16px] text-on-surface truncate font-semibold">
                         {item.name}
                       </h3>
 
-                      <div className="flex items-center gap-2 mt-0.5 text-body-sm">
+                      {/* Sale and Buy Pricing with Responsive Wrap */}
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-0.5 text-xs">
                         <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[11px] font-label-sm uppercase">Sale:</span>
-                          <span className="font-headline-sm text-body-md font-bold text-on-surface">
+                          <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Sale:</span>
+                          <span className="font-headline-sm text-xs sm:text-body-md font-bold text-on-surface">
                             {formatINR(item.salePrice)}
                           </span>
-                          <span className="text-outline text-[11px]">/{item.unit.toLowerCase()}</span>
+                          <span className="text-outline text-[10px]">/{item.unit.toLowerCase()}</span>
                         </div>
-                        <span className="text-outline-variant">•</span>
+
+                        <span className="text-outline-variant text-[10px] hidden sm:inline">•</span>
+
                         <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[11px] font-label-sm uppercase">Buy:</span>
-                          <span className="font-tabular-data text-body-sm font-semibold text-on-surface-variant">
+                          <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
+                          <span className="font-tabular-data text-xs font-semibold text-on-surface-variant">
                             {formatINR(item.purchasePrice)}
                           </span>
                         </div>
@@ -340,7 +343,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
                       <div className="mt-1 flex items-center gap-1.5">
                         <span
-                          className={`w-1.5 h-1.5 rounded-full ${
+                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                             isOut
                               ? 'bg-error'
                               : isLow
@@ -349,7 +352,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           }`}
                         />
                         <span
-                          className={`font-label-sm text-label-sm font-semibold ${
+                          className={`font-label-sm text-[11px] font-semibold truncate ${
                             isOut
                               ? 'text-error'
                               : isLow
@@ -367,10 +370,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Stock Value Column */}
-                  <div className="flex flex-col items-end justify-center flex-shrink-0 text-right">
-                    <span className="font-label-sm text-[11px] text-outline uppercase">Stock Value</span>
-                    <span className="font-tabular-data text-body-md font-bold text-on-surface mt-0.5">
+                  {/* Stock Value Column with Fixed Width and Whitespace Protection */}
+                  <div className="flex flex-col items-end justify-center flex-shrink-0 text-right pl-2 min-w-[72px] sm:min-w-[85px]">
+                    <span className="font-label-sm text-[10px] sm:text-[11px] text-outline uppercase font-semibold tracking-wider whitespace-nowrap">
+                      Stock Value
+                    </span>
+                    <span className="font-tabular-data text-xs sm:text-body-md font-bold text-on-surface mt-0.5 whitespace-nowrap">
                       {formatINR(itemStockValue)}
                     </span>
                   </div>
