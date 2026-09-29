@@ -94,7 +94,37 @@ class PouchService {
     this.notifySyncState({ status: 'connecting', remoteUrl: remoteUrl.trim(), error: undefined });
 
     try {
-      const remoteDB = new PouchDB(remoteUrl.trim());
+      let cleanUrl = remoteUrl.trim();
+      let authConfig: { username?: string; password?: string } | undefined;
+
+      try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.username || parsed.password) {
+          authConfig = {
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          };
+          parsed.username = '';
+          parsed.password = '';
+          cleanUrl = parsed.toString();
+        }
+      } catch {
+        // Retain cleanUrl as-is if unparseable
+      }
+
+      const remoteDB = new PouchDB(cleanUrl, {
+        skip_setup: true,
+        auth: authConfig?.username ? { username: authConfig.username, password: authConfig.password || '' } : undefined,
+        fetch: authConfig?.username
+          ? (url: string | URL | Request, opts?: RequestInit) => {
+              const headers = new Headers(opts?.headers || {});
+              if (!headers.has('Authorization')) {
+                headers.set('Authorization', 'Basic ' + btoa(`${authConfig!.username}:${authConfig!.password || ''}`));
+              }
+              return fetch(url, { ...opts, headers });
+            }
+          : undefined,
+      });
 
       this.syncHandler = PouchDB.sync(this.localDB, remoteDB, {
         live: true,
