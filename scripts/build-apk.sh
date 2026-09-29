@@ -63,6 +63,7 @@ aapt2 link -I /system/framework/framework-res.apk \
 # 5. Compile Kotlin Sources & DEX
 echo "[5/6] Compiling Kotlin application sources & DEX bytecode..."
 kotlinc -cp "$ANDROID_JAR" \
+  app/src/main/java/com/gstbilling/pos/GenericFileProvider.kt \
   app/src/main/java/com/gstbilling/pos/MainActivity.kt \
   -d build/app-classes
 
@@ -91,11 +92,18 @@ apksigner sign \
 echo "Verifying static keystore signature on output APK..."
 apksigner verify --verbose "$FINAL_APK" | grep -E "Verifies|Signer #1" || true
 
+# Generate SHA-256 checksum for cryptographic verification and OTA releases
+echo "Calculating SHA-256 checksum for APK verification..."
+APK_SHA256=$(sha256sum "$FINAL_APK" | awk '{print $1}')
+echo "$APK_SHA256  GSTBilling-Vyapar.apk" > "$FINAL_APK.sha256"
+echo "Generated Checksum: $APK_SHA256"
+
 # Copy to device Downloads if storage access exists
 DOWNLOADS_DIR="/data/data/com.termux/files/home/storage/downloads"
 if [ -d "$DOWNLOADS_DIR" ]; then
   cp "$FINAL_APK" "$DOWNLOADS_DIR/GSTBilling-Vyapar.apk"
-  echo "Copied APK to Downloads: $DOWNLOADS_DIR/GSTBilling-Vyapar.apk"
+  cp "$FINAL_APK.sha256" "$DOWNLOADS_DIR/GSTBilling-Vyapar.apk.sha256"
+  echo "Copied APK & SHA256 to Downloads: $DOWNLOADS_DIR/GSTBilling-Vyapar.apk"
 fi
 
 echo ""

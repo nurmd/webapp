@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -18,6 +19,12 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
 
 class MainActivity : Activity() {
 
@@ -26,6 +33,9 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Clean up temporary update APK from previous session if install was completed
+        cleanTempApk()
 
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
@@ -40,6 +50,21 @@ class MainActivity : Activity() {
 
         setupWebView()
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // If user returned after an update, ensure temp APK is cleaned
+        cleanTempApk()
+    }
+
+    private fun cleanTempApk() {
+        try {
+            val tempApk = File(cacheDir, "temp_update.apk")
+            if (tempApk.exists()) {
+                tempApk.delete()
+            }
+        } catch (_: Exception) {}
     }
 
     private fun setupWebView() {
@@ -128,7 +153,7 @@ class MainActivity : Activity() {
             }
         }
 
-        webView.addJavascriptInterface(AndroidBridge(this, vibrator), "AndroidBridge")
+        webView.addJavascriptInterface(AndroidBridge(this, webView, vibrator), "AndroidBridge")
     }
 
     override fun onBackPressed() {
@@ -140,7 +165,14 @@ class MainActivity : Activity() {
     }
 }
 
-class AndroidBridge(private val context: Context, private val vibrator: Vibrator?) {
+class AndroidBridge(
+    private val context: Context,
+    private val webView: WebView,
+    private val vibrator: Vibrator?
+) {
+    private var downloadThread: Thread? = null
+    @Volatile private var isDownloading = false
+
     @JavascriptInterface
     fun showToast(msg: String) {
         (context as? Activity)?.runOnUiThread {
@@ -185,5 +217,172 @@ class AndroidBridge(private val context: Context, private val vibrator: Vibrator
             }
         }
     }
-}
 
+    @JavascriptInterface
+    fun clearTempApk(): Boolean {
+        return try {
+            val tempApk = File(context.cacheDir, "temp_update.apk")
+            if (tempApk.exists()) tempApk.delete() else true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun cancelInternalDownload() {
+        isDownloading = false
+        downloadThread?.interrupt()
+        downloadThread = null
+        clearTempApk()
+    }
+
+    @JavascriptInterface
+    fun startInternalDownload(apkUrl: String, expectedSha256: String) {
+        if (isDownloading) {
+            showToast("Download already in progress")
+            return
+        }
+
+        // On Android 8.0+, verify unknown app installation permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!context.packageManager.canRequestPackageInstalls()) {
+                (context as? Activity)?.runOnUiThread {
+                    Toast.makeText(context, "Please allow 'Install unknown apps' permission to update Vyapar PRO", Toast.LENGTH_LONG).show()
+                    val permissionIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(permissionIntent)
+                    dispatchJs("window.onOtaError && window.onOtaError('Permission needed: Please enable Install Unknown Apps and tap Retry.', true);")
+                }
+                return
+            }
+        }
+
+        isDownloading = true
+        downloadThread = Thread {
+            var tempFile: File? = null
+            try {
+                tempFile = File(context.cacheDir, "temp_update.apk")
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
+
+                var currentUrl = apkUrl
+                var conn: HttpURLConnection? = null
+                var redirects = 0
+
+                // Follow CDN / GitHub redirects
+                while (redirects < 6) {
+                    val urlObj = URL(currentUrl)
+                    conn = urlObj.openConnection() as HttpURLConnection
+                    conn.instanceFollowRedirects = true
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 30000
+                    conn.setRequestProperty("User-Agent", "GSTBilling-Vyapar-Android")
+                    conn.connect()
+                    val code = conn.responseCode
+                    if (code == HttpURLConnection.HTTP_MOVED_PERM ||
+                        code == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        code == 307 || code == 308
+                    ) {
+                        val location = conn.getHeaderField("Location")
+                        conn.disconnect()
+                        if (location != null) {
+                            currentUrl = location
+                            redirects++
+                            continue
+                        }
+                    }
+                    break
+                }
+
+                if (conn == null || conn.responseCode !in 200..299) {
+                    val status = conn?.responseCode ?: -1
+                    conn?.disconnect()
+                    throw IOException("HTTP server returned error: status $status")
+                }
+
+                val contentLength = conn.contentLengthLong
+                val digest = MessageDigest.getInstance("SHA-256")
+                val buffer = ByteArray(8192)
+                var bytesRead = 0
+                var totalBytesRead = 0L
+                var lastProgressUpdate = 0L
+
+                FileOutputStream(tempFile).use { output ->
+                    conn.inputStream.use { input ->
+                        while (isDownloading) {
+                            bytesRead = input.read(buffer)
+                            if (bytesRead == -1) break
+                            output.write(buffer, 0, bytesRead)
+                            digest.update(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressUpdate > 120 || totalBytesRead == contentLength) {
+                                lastProgressUpdate = now
+                                val percent = if (contentLength > 0) ((totalBytesRead * 100) / contentLength).toInt() else -1
+                                dispatchJs("window.onOtaProgress && window.onOtaProgress($percent, $totalBytesRead, $contentLength);")
+                            }
+                        }
+                    }
+                }
+
+                if (!isDownloading) {
+                    tempFile.delete()
+                    return@Thread
+                }
+
+                // Calculate final SHA-256 hash
+                val calculatedHash = digest.digest().joinToString("") { "%02x".format(it) }
+                val targetHash = expectedSha256.trim().lowercase()
+
+                if (targetHash.isNotEmpty()) {
+                    if (!calculatedHash.equals(targetHash, ignoreCase = true)) {
+                        // Checksum mismatch! Delete corrupt temp APK and notify for retry
+                        tempFile.delete()
+                        val msg = "Checksum verification failed! Expected: ${targetHash.take(10)}... Got: ${calculatedHash.take(10)}..."
+                        dispatchJs("window.onOtaError && window.onOtaError('$msg', true);")
+                        return@Thread
+                    }
+                }
+
+                // Checksum verified successfully!
+                dispatchJs("window.onOtaSuccess && window.onOtaSuccess('$calculatedHash');")
+
+                // Launch package installer using GenericFileProvider
+                (context as? Activity)?.runOnUiThread {
+                    try {
+                        val contentUri = Uri.parse("content://com.gstbilling.pos.fileprovider/temp_update.apk")
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(contentUri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Error launching installer: ${e.message}", Toast.LENGTH_LONG).show()
+                        dispatchJs("window.onOtaError && window.onOtaError('Failed to launch installer: ${e.message}', true);")
+                    }
+                }
+            } catch (e: Exception) {
+                tempFile?.delete()
+                if (isDownloading) {
+                    val safeErr = (e.message ?: "Network error").replace("'", "\\'")
+                    dispatchJs("window.onOtaError && window.onOtaError('Download error: $safeErr', true);")
+                }
+            } finally {
+                isDownloading = false
+                downloadThread = null
+            }
+        }
+        downloadThread?.start()
+    }
+
+    private fun dispatchJs(script: String) {
+        (context as? Activity)?.runOnUiThread {
+            webView.evaluateJavascript(script, null)
+        }
+    }
+}
