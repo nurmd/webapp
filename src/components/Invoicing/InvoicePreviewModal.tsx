@@ -3,21 +3,29 @@ import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { formatThermalReceiptText } from '../../core/printer/escpos.ts';
-import { X, Printer, Share2, Receipt, FileText } from 'lucide-react';
+import { X, Printer, Share2, Receipt, FileText, Smartphone, Download } from 'lucide-react';
+import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
+import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
+import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
+import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
   company: CompanyProfile;
   onClose: () => void;
+  onEditInvoice?: (invoice: Invoice) => void;
 }
 
 export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   invoice,
   company,
   onClose,
+  onEditInvoice,
 }) => {
   const [viewMode, setViewMode] = useState<'A4' | 'THERMAL'>('A4');
   const [thermalWidth, setThermalWidth] = useState<32 | 48>(48); // 32 = 58mm, 48 = 80mm
+  const [isThermalModalOpen, setIsThermalModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
 
   const handlePrint = () => {
     window.print();
@@ -60,102 +68,46 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     : null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 60,
-      padding: '1rem',
-    }}>
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '8px',
-        border: '1px solid #334155',
-        width: '100%',
-        maxWidth: '850px',
-        maxHeight: '94vh',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+    <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Modal Controls Toolbar */}
-        <div className="no-print" style={{
-          padding: '0.75rem 1.25rem',
-          borderBottom: '1px solid #334155',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#0f172a',
-        }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="no-print px-5 py-3 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low flex-wrap gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setViewMode('A4')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                backgroundColor: viewMode === 'A4' ? '#2563eb' : '#1e293b',
-                color: '#fff',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-label-sm text-xs font-semibold transition-all ${
+                viewMode === 'A4'
+                  ? 'bg-secondary text-on-secondary shadow-sm'
+                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+              }`}
             >
-              <FileText size={15} /> A4 Tax Invoice
+              <FileText size={14} /> A4 Tax Invoice
             </button>
             <button
               onClick={() => setViewMode('THERMAL')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                backgroundColor: viewMode === 'THERMAL' ? '#2563eb' : '#1e293b',
-                color: '#fff',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-label-sm text-xs font-semibold transition-all ${
+                viewMode === 'THERMAL'
+                  ? 'bg-secondary text-on-secondary shadow-sm'
+                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+              }`}
             >
-              <Receipt size={15} /> Thermal POS
+              <Receipt size={14} /> Thermal POS
             </button>
             {viewMode === 'THERMAL' && (
-              <div style={{ display: 'flex', backgroundColor: '#0f172a', borderRadius: '4px', border: '1px solid #334155' }}>
+              <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30">
                 <button
                   onClick={() => setThermalWidth(32)}
-                  style={{
-                    backgroundColor: thermalWidth === 32 ? '#3b82f6' : 'transparent',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2 py-0.5 text-[11px] rounded font-medium ${
+                    thermalWidth === 32 ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant'
+                  }`}
                 >
                   58mm
                 </button>
                 <button
                   onClick={() => setThermalWidth(48)}
-                  style={{
-                    backgroundColor: thermalWidth === 48 ? '#3b82f6' : 'transparent',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2 py-0.5 text-[11px] rounded font-medium ${
+                    thermalWidth === 48 ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant'
+                  }`}
                 >
                   80mm
                 </button>
@@ -163,54 +115,64 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {onEditInvoice && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEditInvoice(invoice);
+                }}
+                className="inline-flex items-center gap-1 bg-secondary text-on-secondary px-2.5 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:bg-secondary/90 transition-all active:scale-95"
+                title="Edit and update invoice"
+              >
+                <span className="material-symbols-outlined text-[15px]">edit_document</span> Edit
+              </button>
+            )}
             <button
-              onClick={handleShareWhatsApp}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                backgroundColor: '#25D366',
-                color: '#fff',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
+              onClick={() => setIsThermalModalOpen(true)}
+              className="inline-flex items-center gap-1 bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:bg-surface-container-highest transition-all active:scale-95 border border-outline-variant/30"
+              title="Print directly to 58mm/80mm Bluetooth or USB thermal printer"
             >
-              <Share2 size={15} /> WhatsApp
+              <Receipt size={14} className="text-secondary" /> ESC/POS
+            </button>
+            <button
+              onClick={() => downloadEWayBillJson(company, invoice)}
+              className="inline-flex items-center gap-1 bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:bg-surface-container-highest transition-all active:scale-95 border border-outline-variant/30"
+              title="Download official NIC E-Way Bill Bulk Upload JSON"
+            >
+              <Download size={14} className="text-blue-500" /> E-Way JSON
+            </button>
+            <button
+              onClick={() => downloadEInvoiceJson(company, invoice)}
+              className="inline-flex items-center gap-1 bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:bg-surface-container-highest transition-all active:scale-95 border border-outline-variant/30"
+              title="Download official IRP E-Invoice v1.1 JSON"
+            >
+              <Download size={14} className="text-purple-500" /> E-Inv JSON
+            </button>
+            <button
+              onClick={() => setIsWhatsAppModalOpen(true)}
+              className="inline-flex items-center gap-1 bg-[#25D366] text-white px-3 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:opacity-90 transition-all active:scale-95"
+            >
+              <Share2 size={14} /> WhatsApp
             </button>
             <button
               onClick={handlePrint}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                padding: '0.4rem 0.8rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-              }}
+              className="inline-flex items-center gap-1 bg-secondary text-on-secondary px-3 py-1.5 rounded-xl font-label-sm text-xs font-bold shadow-sm hover:bg-secondary/90 transition-all active:scale-95"
             >
-              <Printer size={15} /> Print
+              <Printer size={14} /> Print
             </button>
             <button
               onClick={onClose}
-              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.25rem' }}
+              aria-label="Close"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors ml-1"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Printable Invoice Container */}
-        <div style={{ overflowY: 'auto', padding: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+        <div className="overflow-y-auto p-4 sm:p-6 flex justify-center bg-surface-dim/40 flex-1">
           {viewMode === 'THERMAL' ? (
             /* Thermal Receipt Preview */
             <div style={{
@@ -399,6 +361,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           )}
         </div>
       </div>
+
+      {isThermalModalOpen && (
+        <ThermalPrintModal
+          invoice={invoice}
+          company={company}
+          onClose={() => setIsThermalModalOpen(false)}
+        />
+      )}
+
+      {isWhatsAppModalOpen && (
+        <WhatsAppShareModal
+          invoice={invoice}
+          company={company}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

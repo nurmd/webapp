@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { db } from './services/db.ts';
+import { pouch } from './services/pouchdb.ts';
 import { CompanyProfile } from './models/company.ts';
 import { Party } from './models/party.ts';
 import { InventoryItem, StockAdjustment } from './models/item.ts';
@@ -7,10 +8,17 @@ import { Invoice } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
 import { Expense } from './models/expense.ts';
 import { Voucher } from './core/accounting/voucherTypes.ts';
-import { createSalesInvoiceVoucher, createPurchaseInvoiceVoucher } from './core/accounting/ledger.ts';
+import {
+  createSalesInvoiceVoucher,
+  createPurchaseInvoiceVoucher,
+  createPaymentReceiptVoucher,
+  createPaymentOutVoucher,
+} from './core/accounting/ledger.ts';
 
-import { Navbar } from './components/Navbar.tsx';
-import { Sidebar, NavTab } from './components/Sidebar.tsx';
+import { Header } from './components/Shell/Header.tsx';
+import { Drawer, AppTab } from './components/Shell/Drawer.tsx';
+import { BottomNav } from './components/Shell/BottomNav.tsx';
+
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
 import { SalesHubView } from './components/Sales/SalesHubView.tsx';
 import { PurchasesHubView } from './components/Purchases/PurchasesHubView.tsx';
@@ -25,9 +33,17 @@ import { BusinessReportsView } from './components/Reports/BusinessReportsView.ts
 import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
 import { StitchShowcaseView } from './components/StitchShowcase/StitchShowcaseView.tsx';
+import { rbac, UserProfile } from './services/rbac.ts';
+import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
+import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeUser, setActiveUser] = useState<UserProfile>(rbac.getActiveUser());
+  const [isRoleSwitchOpen, setIsRoleSwitchOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
   const [company, setCompany] = useState<CompanyProfile>(db.getCompany());
   const [parties, setParties] = useState<Party[]>(db.getParties());
   const [items, setItems] = useState<InventoryItem[]>(db.getItems());
@@ -39,6 +55,7 @@ export const App: React.FC = () => {
   // Modals state
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
   const [isTableGridInvoiceOpen, setIsTableGridInvoiceOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
 
   // Sync state on change
@@ -51,6 +68,14 @@ export const App: React.FC = () => {
     setExpenses(db.getExpenses());
     setVouchers(db.getVouchers());
   };
+
+  React.useEffect(() => {
+    // Listen for PouchDB data changes (local or synced from remote CouchDB)
+    const unsub = pouch.subscribeDataChange(() => {
+      refreshData();
+    });
+    return unsub;
+  }, []);
 
   const handleSaveInvoice = (newInvoice: Invoice) => {
     db.saveInvoice(newInvoice);
@@ -74,7 +99,13 @@ export const App: React.FC = () => {
     refreshData();
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
+    setEditingInvoice(null);
     setPreviewInvoice(newInvoice);
+  };
+
+  const handleEditInvoice = (inv: Invoice) => {
+    setEditingInvoice(inv);
+    setIsTableGridInvoiceOpen(true);
   };
 
   const handleSavePurchase = (newBill: PurchaseBill) => {
@@ -100,6 +131,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteInvoice = (id: string) => {
+    if (!rbac.canDeleteInvoice(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete invoices. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (window.confirm('Delete this invoice?')) {
       db.deleteInvoice(id);
       refreshData();
@@ -127,6 +163,81 @@ export const App: React.FC = () => {
 
   const handleSaveParty = (party: Party) => {
     db.saveParty(party);
+    refreshData();
+  };
+
+  const handleRecordPartyPayment = (
+    party: Party,
+    amount: number,
+    paymentMode: string,
+    notes: string
+  ) => {
+    const isCustomer = party.type === 'CUSTOMER';
+    const newBal = isCustomer
+      ? party.currentBalance - amount
+      : party.currentBalance + amount;
+
+    const updatedParty: Party = {
+      ...party,
+      currentBalance: newBal,
+      updatedAt: new Date().toISOString(),
+    };
+    db.saveParty(updatedParty);
+
+    const docId = Date.now().toString().slice(-6);
+    if (isCustomer) {
+      // 1. Create Double-Entry Receipt Voucher
+      const voucher = createPaymentReceiptVoucher({
+        receiptNumber: `RCPT-${docId}`,
+        date: new Date().toISOString().split('T')[0],
+        customerName: party.name,
+        customerId: party.id,
+        amount,
+        paymentMode,
+        narration: notes || `Payment received from ${party.name}`,
+      });
+      db.saveVoucher(voucher);
+
+      // 2. FIFO settlement across unpaid invoices for this customer
+      let remaining = amount;
+      const unpaidInvoices = db
+        .getInvoices()
+        .filter(
+          (inv) =>
+            (inv.partyId === party.id || inv.partyName.toLowerCase() === party.name.toLowerCase()) &&
+            inv.balanceAmount > 0
+        )
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      for (const inv of unpaidInvoices) {
+        if (remaining <= 0) break;
+        const settleAmt = Math.min(remaining, inv.balanceAmount);
+        const newPaid = inv.paidAmount + settleAmt;
+        const newBalInv = inv.grandTotal - newPaid;
+        const updatedInv: Invoice = {
+          ...inv,
+          paidAmount: newPaid,
+          balanceAmount: Math.max(0, newBalInv),
+          paymentStatus: newBalInv <= 0.01 ? 'PAID' : 'PARTIAL',
+          updatedAt: new Date().toISOString(),
+        };
+        db.saveInvoice(updatedInv);
+        remaining -= settleAmt;
+      }
+    } else {
+      // Create Double-Entry Payment Out Voucher
+      const voucher = createPaymentOutVoucher({
+        voucherNumber: `PYMT-${docId}`,
+        date: new Date().toISOString().split('T')[0],
+        supplierName: party.name,
+        supplierId: party.id,
+        amount,
+        paymentMode,
+        narration: notes || `Payment disbursed to ${party.name}`,
+      });
+      db.saveVoucher(voucher);
+    }
+
     refreshData();
   };
 
@@ -159,116 +270,154 @@ export const App: React.FC = () => {
     refreshData();
   };
 
+  const handleSelectTab = (tab: AppTab) => {
+    if (!rbac.canAccessTab(tab, activeUser.role)) {
+      setIsRoleSwitchOpen(true);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      {/* Top Navbar */}
-      <Navbar
+    <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased flex flex-col selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+      {/* Top App Header */}
+      <Header
         company={company}
+        activeUser={activeUser}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
         onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
-        onQuickPos={() => setActiveTab('pos')}
+        onSearchClick={() => handleSelectTab('sales')}
+        onBarcodeClick={() => handleSelectTab('pos')}
+        onProfileClick={() => setIsRoleSwitchOpen(true)}
       />
 
-      {/* Main Container */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Navigation Sidebar */}
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Slide-out Navigation Drawer */}
+      <Drawer
+        isOpen={isDrawerOpen}
+        activeTab={activeTab}
+        company={company}
+        activeUser={activeUser}
+        onClose={() => setIsDrawerOpen(false)}
+        onSelectTab={handleSelectTab}
+        onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
+        onCheckUpdate={() => setIsUpdateModalOpen(true)}
+      />
 
-        {/* View Routing */}
-        <main style={{ flex: 1, overflowY: 'auto', backgroundColor: '#0a0f1d' }}>
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              invoices={invoices}
-              items={items}
-              parties={parties}
-              onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
-              onQuickPos={() => setActiveTab('pos')}
-              onViewInvoice={setPreviewInvoice}
-              onNavigateToTab={(tab) => setActiveTab(tab as NavTab)}
-            />
-          )}
+      {/* Main Scrollable View Area with safe-area padding */}
+      <main className="flex-1 w-full pt-16 pb-20">
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            company={company}
+            invoices={invoices}
+            items={items}
+            parties={parties}
+            onNewInvoice={() => {
+              setEditingInvoice(null);
+              setIsTableGridInvoiceOpen(true);
+            }}
+            onQuickPos={() => setActiveTab('pos')}
+            onViewInvoice={setPreviewInvoice}
+            onNavigateTab={setActiveTab}
+          />
+        )}
 
-          {activeTab === 'pos' && (
-            <QuickBillingView
-              company={company}
-              items={items}
-              onCompleteSale={handleSaveInvoice}
-            />
-          )}
+        {activeTab === 'pos' && (
+          <QuickBillingView
+            company={company}
+            items={items}
+            onCompleteSale={handleSaveInvoice}
+          />
+        )}
 
-          {activeTab === 'sales' && (
-            <SalesHubView
-              invoices={invoices}
-              onOpenStandardInvoice={() => setIsStandardInvoiceOpen(true)}
-              onOpenTableGridInvoice={() => setIsTableGridInvoiceOpen(true)}
-              onViewInvoice={setPreviewInvoice}
-              onDeleteInvoice={handleDeleteInvoice}
-              onQuickPos={() => setActiveTab('pos')}
-            />
-          )}
+        {activeTab === 'sales' && (
+          <SalesHubView
+            company={company}
+            invoices={invoices}
+            onOpenStandardInvoice={() => setIsStandardInvoiceOpen(true)}
+            onOpenTableGridInvoice={() => {
+              setEditingInvoice(null);
+              setIsTableGridInvoiceOpen(true);
+            }}
+            onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onQuickPos={() => setActiveTab('pos')}
+          />
+        )}
 
-          {activeTab === 'purchases' && (
-            <PurchasesHubView
-              purchases={purchases}
-              parties={parties}
-              company={company}
-              itemsCatalog={items}
-              onSavePurchase={handleSavePurchase}
-              onDeletePurchase={handleDeletePurchase}
-            />
-          )}
+        {activeTab === 'purchases' && (
+          <PurchasesHubView
+            purchases={purchases}
+            parties={parties}
+            company={company}
+            itemsCatalog={items}
+            onSavePurchase={handleSavePurchase}
+            onDeletePurchase={handleDeletePurchase}
+          />
+        )}
 
-          {activeTab === 'expenses' && (
-            <ExpensesView
-              expenses={expenses}
-              onSaveExpense={handleSaveExpense}
-              onDeleteExpense={handleDeleteExpense}
-            />
-          )}
+        {activeTab === 'expenses' && (
+          <ExpensesView
+            expenses={expenses}
+            onSaveExpense={handleSaveExpense}
+            onDeleteExpense={handleDeleteExpense}
+          />
+        )}
 
-          {activeTab === 'inventory' && (
-            <InventoryView
-              items={items}
-              onSaveItem={handleSaveItem}
-              onDeleteItem={handleDeleteItem}
-              onSaveAdjustment={handleSaveAdjustment}
-            />
-          )}
+        {activeTab === 'inventory' && (
+          <InventoryView
+            items={items}
+            onSaveItem={handleSaveItem}
+            onDeleteItem={handleDeleteItem}
+            onSaveAdjustment={handleSaveAdjustment}
+          />
+        )}
 
-          {activeTab === 'parties' && (
-            <PartiesView
-              parties={parties}
-              onSaveParty={handleSaveParty}
-              onDeleteParty={handleDeleteParty}
-            />
-          )}
+        {activeTab === 'parties' && (
+          <PartiesView
+            parties={parties}
+            invoices={invoices}
+            purchases={purchases}
+            onSaveParty={handleSaveParty}
+            onDeleteParty={handleDeleteParty}
+            onRecordPartyPayment={handleRecordPartyPayment}
+            onViewInvoice={setPreviewInvoice}
+          />
+        )}
 
-          {activeTab === 'accounting' && (
-            <DaybookView vouchers={vouchers} />
-          )}
+        {activeTab === 'accounting' && (
+          <DaybookView vouchers={vouchers} />
+        )}
 
-          {activeTab === 'reports' && (
-            <BusinessReportsView
-              company={company}
-              invoices={invoices}
-              purchases={purchases}
-              expenses={expenses}
-              items={items}
-              parties={parties}
-            />
-          )}
+        {activeTab === 'reports' && (
+          <BusinessReportsView
+            company={company}
+            invoices={invoices}
+            purchases={purchases}
+            expenses={expenses}
+            items={items}
+            parties={parties}
+          />
+        )}
 
-          {activeTab === 'stitch' && (
-            <StitchShowcaseView />
-          )}
+        {activeTab === 'stitch' && (
+          <StitchShowcaseView />
+        )}
 
-          {activeTab === 'settings' && (
-            <CompanySettingsView
-              company={company}
-              onSave={handleSaveCompany}
-            />
-          )}
-        </main>
-      </div>
+        {activeTab === 'settings' && (
+          <CompanySettingsView
+            company={company}
+            onSave={handleSaveCompany}
+          />
+        )}
+      </main>
+
+      {/* Modern Touch Bottom Navigation */}
+      <BottomNav
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
+      />
 
       {/* Modals */}
       {isStandardInvoiceOpen && (
@@ -286,7 +435,11 @@ export const App: React.FC = () => {
           company={company}
           parties={parties}
           itemsCatalog={items}
-          onClose={() => setIsTableGridInvoiceOpen(false)}
+          initialInvoice={editingInvoice}
+          onClose={() => {
+            setIsTableGridInvoiceOpen(false);
+            setEditingInvoice(null);
+          }}
           onSave={handleSaveInvoice}
           onAddNewParty={() => setActiveTab('parties')}
         />
@@ -297,8 +450,27 @@ export const App: React.FC = () => {
           invoice={previewInvoice}
           company={company}
           onClose={() => setPreviewInvoice(null)}
+          onEditInvoice={handleEditInvoice}
         />
       )}
+
+      {/* 4-Digit PIN Security Role Switch Modal */}
+      <RoleSwitchModal
+        isOpen={isRoleSwitchOpen}
+        onClose={() => setIsRoleSwitchOpen(false)}
+        onRoleChanged={(newUser) => {
+          setActiveUser(newUser);
+          if (!rbac.canAccessTab(activeTab, newUser.role)) {
+            setActiveTab('dashboard');
+          }
+        }}
+      />
+
+      {/* App Auto-Update Modal */}
+      <AppUpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
     </div>
   );
 };

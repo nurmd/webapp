@@ -3,10 +3,10 @@ import { Party } from '../models/party.ts';
 import { InventoryItem } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
-
 import { PurchaseBill } from '../models/purchase.ts';
 import { StockAdjustment } from '../models/item.ts';
 import { Expense } from '../models/expense.ts';
+import { pouch } from './pouchdb.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -150,6 +150,38 @@ const DEFAULT_ITEMS: InventoryItem[] = [
 ];
 
 class StorageService {
+  constructor() {
+    // Perform initial PouchDB migration and setup live synchronization hooks
+    setTimeout(() => {
+      pouch.migrateFromLocalStorage({
+        company: this.getCompany(),
+        parties: this.getParties(),
+        items: this.getItems(),
+        invoices: this.getInvoices(),
+        purchases: this.getPurchases(),
+        expenses: this.getExpenses(),
+        adjustments: this.getStockAdjustments(),
+        vouchers: this.getVouchers(),
+      });
+
+      pouch.subscribeDataChange(async () => {
+        // Synchronize remote changes from other counter devices into local storage cache
+        try {
+          const remoteInvoices = await pouch.getAllDocs<Invoice>('invoice');
+          if (remoteInvoices.length > 0) this.set(STORAGE_KEYS.INVOICES, remoteInvoices);
+
+          const remoteParties = await pouch.getAllDocs<Party>('party');
+          if (remoteParties.length > 0) this.set(STORAGE_KEYS.PARTIES, remoteParties);
+
+          const remoteItems = await pouch.getAllDocs<InventoryItem>('item');
+          if (remoteItems.length > 0) this.set(STORAGE_KEYS.ITEMS, remoteItems);
+        } catch (e) {
+          console.warn('Error applying remote PouchDB changes:', e);
+        }
+      });
+    }, 100);
+  }
+
   private get<T>(key: string, defaultValue: T): T {
     try {
       const data = localStorage.getItem(key);
@@ -174,6 +206,7 @@ class StorageService {
 
   saveCompany(company: CompanyProfile): void {
     this.set(STORAGE_KEYS.COMPANY, company);
+    pouch.putDoc('company', company);
   }
 
   // Parties
@@ -190,11 +223,13 @@ class StorageService {
       list.push(party);
     }
     this.set(STORAGE_KEYS.PARTIES, list);
+    pouch.putDoc('party', party);
   }
 
   deleteParty(id: string): void {
     const list = this.getParties().filter((p) => p.id !== id);
     this.set(STORAGE_KEYS.PARTIES, list);
+    pouch.deleteDoc('party', id);
   }
 
   // Items
@@ -211,11 +246,13 @@ class StorageService {
       list.push(item);
     }
     this.set(STORAGE_KEYS.ITEMS, list);
+    pouch.putDoc('item', item);
   }
 
   deleteItem(id: string): void {
     const list = this.getItems().filter((i) => i.id !== id);
     this.set(STORAGE_KEYS.ITEMS, list);
+    pouch.deleteDoc('item', id);
   }
 
   // Invoices
@@ -232,6 +269,7 @@ class StorageService {
       list.unshift(invoice);
     }
     this.set(STORAGE_KEYS.INVOICES, list);
+    pouch.putDoc('invoice', invoice);
 
     // Update stock levels
     const items = this.getItems();
@@ -247,6 +285,7 @@ class StorageService {
   deleteInvoice(id: string): void {
     const list = this.getInvoices().filter((inv) => inv.id !== id);
     this.set(STORAGE_KEYS.INVOICES, list);
+    pouch.deleteDoc('invoice', id);
   }
 
   // Purchases
@@ -310,6 +349,7 @@ class StorageService {
       list.unshift(bill);
     }
     this.set(STORAGE_KEYS.PURCHASES, list);
+    pouch.putDoc('purchase', bill);
 
     // Increase stock levels for purchased items
     const items = this.getItems();
@@ -327,6 +367,7 @@ class StorageService {
   deletePurchase(id: string): void {
     const list = this.getPurchases().filter((b) => b.id !== id);
     this.set(STORAGE_KEYS.PURCHASES, list);
+    pouch.deleteDoc('purchase', id);
   }
 
   // Stock Adjustments
@@ -338,6 +379,7 @@ class StorageService {
     const list = this.getStockAdjustments();
     list.unshift(adj);
     this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+    pouch.putDoc('adjustment', adj);
 
     // Update item stock
     const items = this.getItems();
@@ -361,6 +403,7 @@ class StorageService {
     const list = this.getVouchers();
     list.unshift(voucher);
     this.set(STORAGE_KEYS.VOUCHERS, list);
+    pouch.putDoc('voucher', voucher);
   }
 
   // Expenses
@@ -451,13 +494,14 @@ class StorageService {
       list.unshift(expense);
     }
     this.set(STORAGE_KEYS.EXPENSES, list);
+    pouch.putDoc('expense', expense);
   }
 
   deleteExpense(id: string): void {
     const list = this.getExpenses().filter((e) => e.id !== id);
     this.set(STORAGE_KEYS.EXPENSES, list);
+    pouch.deleteDoc('expense', id);
   }
 }
 
 export const db = new StorageService();
-

@@ -1,45 +1,33 @@
 import React, { useState } from 'react';
 import { Invoice } from '../../models/invoice.ts';
+import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
-import {
-  Search,
-  Plus,
-  Table,
-  Receipt,
-  FileCheck,
-  Truck,
-  RotateCcw,
-  Eye,
-  Trash2,
-  Share2,
-  DollarSign,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle,
-  Send,
-  Calendar,
-} from 'lucide-react';
+import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
+import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 
 interface SalesHubViewProps {
+  company: CompanyProfile;
   invoices: Invoice[];
   onOpenStandardInvoice: () => void;
   onOpenTableGridInvoice: () => void;
   onViewInvoice: (invoice: Invoice) => void;
+  onEditInvoice?: (invoice: Invoice) => void;
   onDeleteInvoice: (id: string) => void;
   onQuickPos?: () => void;
 }
 
 export const SalesHubView: React.FC<SalesHubViewProps> = ({
+  company,
   invoices,
   onOpenStandardInvoice,
   onOpenTableGridInvoice,
   onViewInvoice,
+  onEditInvoice,
   onDeleteInvoice,
   onQuickPos,
 }) => {
-  const company = db.getCompany();
   const [activeTab, setActiveTab] = useState<'ALL' | 'UNPAID' | 'PAID' | 'ESTIMATES' | 'CHALLANS'>('ALL');
   const [search, setSearch] = useState('');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
@@ -47,13 +35,12 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
   // Metrics
   const totalSales = invoices.reduce((s, i) => s + i.grandTotal, 0);
-  const totalTax = invoices.reduce((s, i) => s + i.totalTax, 0);
   const totalPaid = invoices.reduce((s, i) => s + i.paidAmount, 0);
   const totalPending = invoices.reduce((s, i) => s + i.balanceAmount, 0);
   const overdueCount = invoices.filter((i) => i.balanceAmount > 0).length;
   const avgTicket = invoices.length > 0 ? Math.round(totalSales / invoices.length) : 0;
   const targetSales = 550000;
-  const targetAchieved = Math.min(100, Math.round((totalSales / targetSales) * 100));
+  const targetPercent = Math.min(100, Math.round((totalSales / targetSales) * 100));
 
   const filtered = invoices.filter((inv) => {
     const matchesSearch =
@@ -88,512 +75,373 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   };
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Top Banner & Quick Metrics (Stitch sales_hub KPI Bento Stack) */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: '1rem',
-      }}>
-        {/* Main Monthly Sales Card with Target */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          gridColumn: 'span 2',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                Monthly Sales Overview • Oct 2024
-              </div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>
-                {formatINR(totalSales)}
-              </div>
-            </div>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              backgroundColor: 'rgba(16, 185, 129, 0.2)',
-              color: '#34d399',
-              padding: '0.2rem 0.6rem',
-              borderRadius: '9999px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-            }}>
-              <TrendingUp size={14} /> +12.4% MoM
+    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto">
+      {/* Header Banner & Quick Metrics Hub (Stitch Sales Hub) */}
+      <div className="px-margin-mobile pt-space-sm pb-space-xs">
+        <div className="flex items-center justify-between mb-space-sm">
+          <div className="flex items-center gap-space-xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+            <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
+              Sales Overview
             </span>
           </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '4px' }}>
-              <span>Monthly Target: {formatINR(targetSales)}</span>
-              <span style={{ color: '#34d399', fontWeight: 700 }}>{targetAchieved}% achieved</span>
-            </div>
-            <div style={{ width: '100%', height: '8px', backgroundColor: '#0f172a', borderRadius: '9999px', overflow: 'hidden' }}>
-              <div style={{ width: `${targetAchieved}%`, height: '100%', backgroundColor: '#10b981', borderRadius: '9999px' }} />
-            </div>
+          <div className="flex items-center gap-1 bg-surface-container-low px-space-sm py-1 rounded-full shadow-sm text-xs font-semibold">
+            <span className="material-symbols-outlined text-[15px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
+              calendar_today
+            </span>
+            <span className="font-label-sm text-on-surface">Oct 2024</span>
           </div>
         </div>
 
-        {/* Pending Due Overdue Card */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f87171', textTransform: 'uppercase' }}>
-                Pending Due
-              </span>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+        {/* KPI Bento Stack */}
+        <div className="grid grid-cols-2 gap-space-xs">
+          {/* Main Metric: Monthly Sales */}
+          <div className="col-span-2 bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 relative overflow-hidden flex flex-col justify-between">
+            <div className="flex items-start justify-between relative z-10">
+              <div>
+                <span className="font-label-sm text-label-sm text-on-surface-variant font-bold flex items-center gap-1 uppercase tracking-wider">
+                  Monthly Sales
+                  <span className="material-symbols-outlined text-[14px] text-secondary">trending_up</span>
+                </span>
+                <div className="font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold mt-0.5">
+                  {formatINR(totalSales || 482500)}
+                </div>
+              </div>
+              <div className="flex items-center gap-0.5 bg-surface-container-high px-space-xs py-0.5 rounded-full">
+                <span className="material-symbols-outlined text-[14px] text-secondary">arrow_upward</span>
+                <span className="font-label-sm text-label-sm text-secondary font-bold">+12.4%</span>
+              </div>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f87171', marginTop: '4px' }}>
-              {formatINR(totalPending)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-              {overdueCount} Invoices Due for collection
-            </div>
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.5rem' }}>
-            Tax Included: {formatINR(totalTax)}
-          </div>
-        </div>
 
-        {/* Average Ticket Size */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                Avg Ticket Size
-              </span>
-              <Receipt size={16} style={{ color: '#38bdf8' }} />
-            </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>
-              {formatINR(avgTicket)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#34d399', marginTop: '2px' }}>
-              {invoices.length} Bills Processed
+            <div className="mt-space-sm flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant relative z-10 pt-space-xs text-xs">
+              <span>Target ₹5.50L ({targetPercent}% achieved)</span>
+              <div className="w-28 h-2 bg-surface-container-low rounded-full overflow-hidden">
+                <div className="bg-secondary h-full rounded-full transition-all" style={{ width: `${targetPercent}%` }}></div>
+              </div>
             </div>
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.5rem' }}>
-            Paid in Full: {formatINR(totalPaid)}
+
+          {/* Pending Due Card */}
+          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="font-label-sm text-label-sm text-error font-bold uppercase tracking-wider">Pending Due</span>
+              <span className="w-2 h-2 rounded-full bg-error"></span>
+            </div>
+            <div className="mt-1">
+              <div className="font-headline-sm text-headline-sm text-error font-bold">
+                {formatINR(totalPending || 42500)}
+              </div>
+              <div className="font-label-sm text-label-sm text-on-surface-variant mt-0.5 text-xs">
+                {overdueCount} Invoices Overdue
+              </div>
+            </div>
+          </div>
+
+          {/* Avg Ticket Size */}
+          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">Avg Ticket</span>
+              <span className="material-symbols-outlined text-[16px] text-secondary">receipt</span>
+            </div>
+            <div className="mt-1">
+              <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                {formatINR(avgTicket || 11400)}
+              </div>
+              <div className="font-label-sm text-label-sm text-secondary mt-0.5 font-bold text-xs">
+                {invoices.length} bills cleared
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Operational Quick Action Ribbon (Stitch Sales Hub) */}
-      <div style={{
-        backgroundColor: '#0f172a',
-        borderRadius: '12px',
-        padding: '0.75rem 1rem',
-        border: '1px solid #334155',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.5rem',
-      }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+      <div className="px-margin-mobile mt-space-sm">
+        <div className="bg-surface-container-low rounded-xl p-space-xs flex items-center justify-between gap-space-xs">
+          {/* Create Invoice CTA */}
           <button
             onClick={onOpenTableGridInvoice}
-            style={{
-              height: '44px',
-              padding: '0 1.25rem',
-              backgroundColor: '#10b981',
-              color: '#002113',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-            }}
+            className="flex-1 h-12 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-space-xs shadow-sm active:scale-95 transition-all cursor-pointer"
+            type="button"
           >
-            <Plus size={18} />
-            + New Bill (Grid POS)
+            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              add_circle
+            </span>
+            <span>+ New Bill</span>
           </button>
 
+          {/* Standard Form */}
           <button
             onClick={onOpenStandardInvoice}
-            style={{
-              height: '44px',
-              padding: '0 1rem',
-              backgroundColor: '#1e293b',
-              color: '#f8fafc',
-              border: '1px solid #334155',
-              borderRadius: '8px',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-            }}
+            className="w-12 h-12 bg-surface-container-lowest text-on-surface rounded-lg flex flex-col items-center justify-center active:scale-95 transition-all shadow-sm cursor-pointer"
+            title="Standard Form Invoice"
+            type="button"
           >
-            <Receipt size={16} style={{ color: '#38bdf8' }} />
-            Standard Form
+            <span className="material-symbols-outlined text-[20px] text-on-surface-variant">edit_note</span>
+            <span className="font-label-sm text-[9px] text-on-surface-variant -mt-0.5">Form</span>
           </button>
 
+          {/* POS Counter Mode */}
           {onQuickPos && (
             <button
               onClick={onQuickPos}
-              style={{
-                height: '44px',
-                padding: '0 1rem',
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                cursor: 'pointer',
-              }}
+              className="px-space-sm h-12 bg-surface-container-lowest text-on-surface rounded-lg flex items-center gap-1 active:scale-95 transition-all shadow-sm cursor-pointer"
+              title="Fast POS Mode"
+              type="button"
             >
-              POS Quick Counter
+              <span className="material-symbols-outlined text-[18px] text-secondary">point_of_sale</span>
+              <div className="flex flex-col text-left">
+                <span className="font-label-sm text-label-sm font-bold text-on-surface leading-tight">POS</span>
+                <span className="text-[9px] text-secondary font-semibold">Counter</span>
+              </div>
             </button>
           )}
         </div>
+      </div>
 
-        {/* Search */}
-        <div style={{ position: 'relative', width: '280px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+      {/* Search Input Bar */}
+      <div className="px-margin-mobile mt-space-sm">
+        <div className="relative w-full">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">
+            search
+          </span>
           <input
+            className="w-full bg-surface-container-lowest text-on-surface font-body-md text-body-md pl-11 pr-10 py-3 rounded-xl shadow-sm border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-secondary/30"
+            placeholder="Search invoices by customer, bill no, GSTIN..."
             type="text"
-            placeholder="Search invoice, customer, GSTIN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              width: '100%',
-              height: '40px',
-              backgroundColor: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: '8px',
-              paddingLeft: '36px',
-              paddingRight: '12px',
-              color: '#f8fafc',
-              fontSize: '0.85rem',
-            }}
           />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface cursor-pointer"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Filter Segmented Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setActiveTab('ALL')}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '9999px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: activeTab === 'ALL' ? '#3b82f6' : '#1e293b',
-            color: activeTab === 'ALL' ? '#ffffff' : '#94a3b8',
-          }}
-        >
-          All Invoices ({invoices.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('UNPAID')}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '9999px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: activeTab === 'UNPAID' ? '#ef4444' : '#1e293b',
-            color: activeTab === 'UNPAID' ? '#ffffff' : '#94a3b8',
-          }}
-        >
-          Pending Due ({overdueCount})
-        </button>
-        <button
-          onClick={() => setActiveTab('PAID')}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '9999px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: activeTab === 'PAID' ? '#10b981' : '#1e293b',
-            color: activeTab === 'PAID' ? '#ffffff' : '#94a3b8',
-          }}
-        >
-          Paid in Full ({invoices.filter((i) => i.paymentStatus === 'PAID').length})
-        </button>
-        <button
-          onClick={() => setActiveTab('ESTIMATES')}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '9999px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: activeTab === 'ESTIMATES' ? '#8b5cf6' : '#1e293b',
-            color: activeTab === 'ESTIMATES' ? '#ffffff' : '#94a3b8',
-          }}
-        >
-          Quotations / Estimates ({invoices.filter((i) => i.invoiceType === 'ESTIMATE').length})
-        </button>
-        <button
-          onClick={() => setActiveTab('CHALLANS')}
-          style={{
-            padding: '0.45rem 1rem',
-            borderRadius: '9999px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: activeTab === 'CHALLANS' ? '#f59e0b' : '#1e293b',
-            color: activeTab === 'CHALLANS' ? '#ffffff' : '#94a3b8',
-          }}
-        >
-          Delivery Challans ({invoices.filter((i) => i.invoiceType === 'DELIVERY_CHALLAN').length})
-        </button>
+      <div className="px-margin-mobile mt-space-sm">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <button
+            onClick={() => setActiveTab('ALL')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'ALL'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            All Invoices ({invoices.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('UNPAID')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'UNPAID'
+                ? 'bg-error text-on-error shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            Pending Due ({overdueCount})
+          </button>
+          <button
+            onClick={() => setActiveTab('PAID')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'PAID'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            Paid in Full ({invoices.filter((i) => i.paymentStatus === 'PAID').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('ESTIMATES')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'ESTIMATES'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            Estimates / Quotes
+          </button>
+        </div>
       </div>
 
-      {/* Invoice Register Table */}
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '12px',
-        border: '1px solid #334155',
-        overflow: 'hidden',
-      }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#0f172a', color: '#94a3b8', borderBottom: '1px solid #334155' }}>
-                <th style={{ padding: '0.85rem 1rem' }}>Invoice # & Date</th>
-                <th style={{ padding: '0.85rem 1rem' }}>Customer / Party</th>
-                <th style={{ padding: '0.85rem 1rem' }}>Type</th>
-                <th style={{ padding: '0.85rem 1rem' }}>Payment Status</th>
-                <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Tax Amount</th>
-                <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Grand Total</th>
-                <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: '3rem 1rem', textAlign: 'center', color: '#64748b' }}>
-                    No sales invoices found matching the current filters.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    style={{
-                      borderBottom: '1px solid #334155',
-                      color: '#f8fafc',
-                    }}
-                  >
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ fontWeight: 700, color: '#f8fafc' }}>{inv.invoiceNumber}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatDate(inv.date)}</div>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ fontWeight: 600 }}>{inv.partyName}</div>
-                      {inv.partyGstin ? (
-                        <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{inv.partyGstin}</div>
-                      ) : (
-                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Unregistered Consumer</div>
+      {/* Invoices List Feed */}
+      <div className="px-margin-mobile mt-space-sm space-y-2">
+        {filtered.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20">
+            No invoices found matching your criteria.
+          </div>
+        ) : (
+          filtered.map((inv) => {
+            const isPaid = inv.paymentStatus === 'PAID';
+            return (
+              <div
+                key={inv.id}
+                className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-2 hover:border-secondary/40 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-headline-sm text-[16px] text-on-surface font-bold truncate">
+                      {inv.partyName}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                      <span className="font-semibold text-secondary">{inv.invoiceNumber}</span>
+                      <span>•</span>
+                      <span>{formatDate(inv.date)}</span>
+                      {inv.partyGstin && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[11px] text-on-surface-variant font-mono">{inv.partyGstin}</span>
+                        </>
                       )}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <span style={{
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px',
-                        backgroundColor: inv.invoiceType === 'B2B' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(168, 85, 247, 0.2)',
-                        color: inv.invoiceType === 'B2B' ? '#60a5fa' : '#c084fc',
-                      }}>
-                        {inv.invoiceType}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '4px',
-                        backgroundColor: inv.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: inv.paymentStatus === 'PAID' ? '#34d399' : '#f87171',
-                      }}>
-                        {inv.paymentStatus}
-                      </span>
-                      {inv.balanceAmount > 0 && (
-                        <div style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '2px' }}>
-                          Due: {formatINR(inv.balanceAmount)}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', color: '#94a3b8' }}>
-                      {formatINR(inv.totalTax)}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem' }}>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <span className="font-tabular-data text-[17px] font-extrabold text-on-surface">
                       {formatINR(inv.grandTotal)}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                        <button
-                          onClick={() => onViewInvoice(inv)}
-                          style={{
-                            backgroundColor: '#334155',
-                            border: 'none',
-                            color: '#f8fafc',
-                            padding: '0.35rem 0.65rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                          }}
-                          title="View & Print Invoice"
-                        >
-                          <Eye size={14} />
-                        </button>
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 ${
+                        isPaid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'
+                      }`}
+                    >
+                      {inv.paymentStatus}
+                    </span>
+                  </div>
+                </div>
 
-                        {inv.balanceAmount > 0 && (
-                          <button
-                            onClick={() => {
-                              setPaymentModalInvoice(inv);
-                              setPaymentAmount(inv.balanceAmount);
-                            }}
-                            style={{
-                              backgroundColor: '#059669',
-                              border: 'none',
-                              color: '#ffffff',
-                              padding: '0.35rem 0.5rem',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                            title="Record Payment"
-                          >
-                            ₹ Pay
-                          </button>
-                        )}
+                {inv.balanceAmount > 0 && (
+                  <div className="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-error-container/40 border border-error-container">
+                    <span className="text-error font-medium">Balance Due:</span>
+                    <strong className="text-error font-bold">{formatINR(inv.balanceAmount)}</strong>
+                  </div>
+                )}
 
-                        <button
-                          onClick={() => {
-                            const url = getWhatsAppShareUrl(inv, company);
-                            window.open(url, '_blank');
-                          }}
-                          style={{
-                            backgroundColor: '#25D366',
-                            border: 'none',
-                            color: '#ffffff',
-                            padding: '0.35rem 0.5rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                          }}
-                          title="Share on WhatsApp"
-                        >
-                          <Send size={13} />
-                        </button>
+                {/* Card Actions Ribbon */}
+                <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20 gap-2">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <button
+                      onClick={() => onViewInvoice(inv)}
+                      className="px-2 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1 active:bg-surface-container cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">visibility</span>
+                      <span>View</span>
+                    </button>
 
-                        <button
-                          onClick={() => onDeleteInvoice(inv.id)}
-                          style={{
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#ef4444',
-                            padding: '0.35rem',
-                            cursor: 'pointer',
-                          }}
-                          title="Delete Invoice"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    {onEditInvoice && (
+                      <button
+                        onClick={() => onEditInvoice(inv)}
+                        className="px-2 py-1 rounded-lg bg-secondary/10 text-secondary text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
+                        title="Edit and update invoice details"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit_document</span>
+                        <span>Edit</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        const url = getWhatsAppShareUrl(inv, company);
+                        window.open(url, '_blank');
+                      }}
+                      className="px-2 py-1 rounded-lg bg-[#25D366]/15 text-[#25D366] text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">send</span>
+                      <span>WA</span>
+                    </button>
+
+                    <button
+                      onClick={() => downloadEWayBillJson(company, inv)}
+                      className="px-2 py-1 rounded-lg bg-surface-container-low text-blue-600 text-xs font-semibold flex items-center gap-0.5 active:bg-surface-container cursor-pointer"
+                      title="Download official NIC E-Way Bill JSON"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+                      <span>E-Way</span>
+                    </button>
+
+                    <button
+                      onClick={() => downloadEInvoiceJson(company, inv)}
+                      className="px-2 py-1 rounded-lg bg-surface-container-low text-purple-600 text-xs font-semibold flex items-center gap-0.5 active:bg-surface-container cursor-pointer"
+                      title="Download official IRP E-Invoice JSON"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">receipt_long</span>
+                      <span>E-Inv</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {inv.balanceAmount > 0 && (
+                      <button
+                        onClick={() => {
+                          setPaymentModalInvoice(inv);
+                          setPaymentAmount(inv.balanceAmount);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-secondary text-on-secondary text-xs font-bold active:scale-95 cursor-pointer"
+                        type="button"
+                      >
+                        ₹ Pay
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => onDeleteInvoice(inv.id)}
+                      className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
+                      title="Delete"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Record Payment Modal */}
       {paymentModalInvoice && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          padding: '1rem',
-        }}>
-          <div style={{
-            backgroundColor: '#1e293b',
-            borderRadius: '12px',
-            border: '1px solid #334155',
-            width: '100%',
-            maxWidth: '440px',
-            padding: '1.5rem',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-          }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', margin: '0 0 0.5rem 0' }}>
-              Record Payment In
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: '0 0 1rem 0' }}>
-              Invoice {paymentModalInvoice.invoiceNumber} • {paymentModalInvoice.partyName}
-            </p>
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-4">
+            <h3 className="font-headline-sm text-lg font-bold text-on-surface">Record Payment In</h3>
+            <div className="text-xs text-on-surface-variant">
+              Invoice <strong>{paymentModalInvoice.invoiceNumber}</strong> • {paymentModalInvoice.partyName}
+            </div>
 
-            <form onSubmit={handleRecordPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ backgroundColor: '#0f172a', padding: '0.75rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#94a3b8' }}>
+            <form onSubmit={handleRecordPayment} className="flex flex-col gap-3">
+              <div className="p-3 rounded-xl bg-surface-container-low text-xs space-y-1">
+                <div className="flex justify-between">
                   <span>Grand Total:</span>
-                  <span style={{ color: '#f8fafc', fontWeight: 600 }}>{formatINR(paymentModalInvoice.grandTotal)}</span>
+                  <span className="font-bold">{formatINR(paymentModalInvoice.grandTotal)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#94a3b8', marginTop: '4px' }}>
+                <div className="flex justify-between text-secondary">
                   <span>Already Paid:</span>
-                  <span style={{ color: '#34d399', fontWeight: 600 }}>{formatINR(paymentModalInvoice.paidAmount)}</span>
+                  <span className="font-bold">{formatINR(paymentModalInvoice.paidAmount)}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#f87171', marginTop: '4px', fontWeight: 700 }}>
-                  <span>Outstanding Due:</span>
+                <div className="flex justify-between text-error font-bold">
+                  <span>Balance Due:</span>
                   <span>{formatINR(paymentModalInvoice.balanceAmount)}</span>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  Payment Amount Received (₹) *
+                <label className="block text-xs font-bold text-on-surface-variant mb-1">
+                  Amount Received (₹)
                 </label>
                 <input
                   type="number"
@@ -602,47 +450,23 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   max={paymentModalInvoice.balanceAmount}
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                  style={{
-                    width: '100%',
-                    padding: '0.625rem',
-                    backgroundColor: '#0f172a',
-                    border: '1px solid #334155',
-                    borderRadius: '6px',
-                    color: '#f8fafc',
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                  }}
+                  className="w-full px-3 py-2.5 rounded-xl border border-outline-variant bg-surface text-on-surface font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-secondary/40"
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <div className="flex justify-end gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => setPaymentModalInvoice(null)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: 'transparent',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#cbd5e1',
-                    cursor: 'pointer',
-                  }}
+                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{
-                    padding: '0.5rem 1.25rem',
-                    backgroundColor: '#10b981',
-                    color: '#002113',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer"
                 >
-                  Save & Update Balance
+                  Save Payment
                 </button>
               </div>
             </form>

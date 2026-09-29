@@ -191,3 +191,100 @@ export function createPurchaseInvoiceVoucher(params: {
   };
 }
 
+/**
+ * Generates automated Double-Entry Journal Voucher for Payment Received (Receipt Voucher / Payment In).
+ * Debit: Cash/Bank Account
+ * Credit: Customer Ledger Account
+ */
+export function createPaymentReceiptVoucher(params: {
+  receiptNumber: string;
+  date: string;
+  customerName: string;
+  customerId: string;
+  amount: number;
+  paymentMode: string;
+  referenceNo?: string;
+  narration?: string;
+}): Voucher {
+  const accountId = params.paymentMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
+  const accountName = params.paymentMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
+
+  const entries: JournalEntryLine[] = [
+    {
+      accountId,
+      accountName,
+      debit: params.amount,
+      credit: 0,
+      narration: `Payment received via ${params.paymentMode}`,
+    },
+    {
+      accountId: params.customerId,
+      accountName: params.customerName,
+      debit: 0,
+      credit: params.amount,
+      narration: params.narration || `Receipt against dues #${params.receiptNumber}`,
+    },
+  ];
+
+  return {
+    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    voucherNumber: `VCH-RCPT-${params.receiptNumber}`,
+    voucherType: 'RECEIPT',
+    date: params.date,
+    referenceNo: params.referenceNo || params.receiptNumber,
+    entries,
+    narration: params.narration || `Payment received from ${params.customerName} via ${params.paymentMode}`,
+    totalAmount: params.amount,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Generates automated Double-Entry Journal Voucher for Payment Made (Payment Out).
+ * Debit: Supplier Ledger Account
+ * Credit: Cash/Bank Account
+ */
+export function createPaymentOutVoucher(params: {
+  voucherNumber: string;
+  date: string;
+  supplierName: string;
+  supplierId: string;
+  amount: number;
+  paymentMode: string;
+  referenceNo?: string;
+  narration?: string;
+}): Voucher {
+  const accountId = params.paymentMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
+  const accountName = params.paymentMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
+
+  const entries: JournalEntryLine[] = [
+    {
+      accountId: params.supplierId,
+      accountName: params.supplierName,
+      debit: params.amount,
+      credit: 0,
+      narration: params.narration || `Payment made towards dues #${params.voucherNumber}`,
+    },
+    {
+      accountId,
+      accountName,
+      debit: 0,
+      credit: params.amount,
+      narration: `Paid via ${params.paymentMode}`,
+    },
+  ];
+
+  return {
+    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    voucherNumber: `VCH-PYMT-${params.voucherNumber}`,
+    voucherType: 'PAYMENT',
+    date: params.date,
+    referenceNo: params.referenceNo || params.voucherNumber,
+    entries,
+    narration: params.narration || `Payment disbursed to ${params.supplierName} via ${params.paymentMode}`,
+    totalAmount: params.amount,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+

@@ -7,7 +7,6 @@ import { calculateInvoice, InvoiceItemCalculationInput } from '../../core/gst/ca
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
-import { X, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface CreateInvoiceModalProps {
   company: CompanyProfile;
@@ -62,18 +61,17 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     if (p) {
       setCustomerName(p.name);
       setCustomerGstin(p.gstin || '');
-      setCustomerAddress(p.billingAddress);
+      setCustomerAddress(p.billingAddress || '');
       setPosStateCode(p.stateCode);
-      setInvoiceType(p.gstin ? 'B2B' : 'B2CS');
+      setInvoiceType(p.gstin && p.gstin.length === 15 ? 'B2B' : 'B2CS');
     }
   };
 
-  // Add line item
   const addLine = () => {
     setLines([
       ...lines,
       {
-        itemId: 'CUSTOM',
+        itemId: 'CUSTOM-' + Date.now(),
         name: '',
         hsnSacCode: '998313',
         quantity: 1,
@@ -91,34 +89,36 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
   const updateLine = (index: number, field: string, value: any) => {
     const updated = [...lines];
-    if (field === 'catalogSelect') {
-      const itm = itemsCatalog.find((i) => i.id === value);
-      if (itm) {
-        updated[index] = {
-          itemId: itm.id,
-          name: itm.name,
-          hsnSacCode: itm.hsnSacCode,
-          quantity: 1,
-          unitPrice: itm.salePrice,
-          discountPercent: 0,
-          gstRate: itm.gstRate,
-        };
-      }
-    } else {
-      (updated[index] as any)[field] = value;
-    }
+    (updated[index] as any)[field] = value;
     setLines(updated);
   };
 
-  // Compute live GST calculation using Core GST Engine
-  const calculationInputs: InvoiceItemCalculationInput[] = lines.map((l) => ({
+  const handleSelectItemFromCatalog = (index: number, itemId: string) => {
+    const item = itemsCatalog.find((i) => i.id === itemId);
+    if (item) {
+      const updated = [...lines];
+      updated[index] = {
+        itemId: item.id,
+        name: item.name,
+        hsnSacCode: item.hsnSacCode,
+        quantity: 1,
+        unitPrice: item.salePrice,
+        discountPercent: 0,
+        gstRate: item.gstRate,
+      };
+      setLines(updated);
+    }
+  };
+
+  // Perform live GST calculation
+  const calcInputs: InvoiceItemCalculationInput[] = lines.map((l) => ({
     quantity: Number(l.quantity) || 1,
     unitPrice: Number(l.unitPrice) || 0,
     discountPercent: Number(l.discountPercent) || 0,
     gstRate: Number(l.gstRate) || 0,
   }));
 
-  const calcSummary = calculateInvoice(company.stateCode, posStateCode, calculationInputs);
+  const calcSummary = calculateInvoice(company.stateCode, posStateCode, calcInputs);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,7 +127,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const calcItem = calcSummary.items[idx];
       return {
         itemId: l.itemId,
-        name: l.name,
+        name: l.name || 'Custom Item',
         hsnSacCode: l.hsnSacCode,
         unit: 'PCS',
         quantity: l.quantity,
@@ -144,7 +144,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     });
 
     const newInvoice: Invoice = {
-      id: `INV-${Date.now()}`,
+      id: 'INV-' + Date.now(),
       invoiceNumber: `${company.invoicePrefix || 'INV-'}${Math.floor(1000 + Math.random() * 9000)}`,
       invoiceType,
       date: invoiceDate,
@@ -181,74 +181,45 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const isIntra = company.stateCode === posStateCode;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.8)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
-      padding: '1rem',
-    }}>
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '8px',
-        border: '1px solid #334155',
-        width: '100%',
-        maxWidth: '920px',
-        maxHeight: '92vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-      }}>
+    <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div style={{
-          padding: '1rem 1.5rem',
-          borderBottom: '1px solid #334155',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-              Generate Tax Invoice
-            </h2>
-            <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              Tax Regime: {isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
+        <div className="px-5 py-3.5 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center font-bold text-base shadow-sm">
+              <span className="material-symbols-outlined text-[20px]">post_add</span>
+            </div>
+            <div>
+              <h2 className="font-headline-sm text-[16px] font-bold text-on-surface leading-tight">
+                Generate Standard Tax Invoice
+              </h2>
+              <div className="text-[12px] text-on-surface-variant">
+                Regime: {isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            aria-label="Close"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+            type="button"
           >
-            <X size={20} />
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 flex-1">
           {/* Party and Date Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.35rem' }}>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
                 Select Customer / Party
               </label>
               <select
                 value={selectedPartyId}
                 onChange={(e) => handlePartySelect(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                }}
+                className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none shadow-sm"
               >
                 {parties.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -259,21 +230,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.35rem' }}>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
                 Place of Supply (State)
               </label>
               <select
                 value={posStateCode}
                 onChange={(e) => setPosStateCode(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                }}
+                className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none shadow-sm"
               >
                 {getStateList().map((s) => (
                   <option key={s.code} value={s.code}>
@@ -284,43 +247,27 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.35rem' }}>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
                 Invoice Date
               </label>
               <input
                 type="date"
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                }}
+                className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none shadow-sm"
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '0.35rem' }}>
+              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
                 Payment Mode
               </label>
               <select
                 value={paymentMode}
                 onChange={(e) => setPaymentMode(e.target.value as PaymentMode)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  backgroundColor: '#0f172a',
-                  border: '1px solid #334155',
-                  color: '#fff',
-                  borderRadius: '6px',
-                  fontSize: '0.85rem',
-                }}
+                className="w-full bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none shadow-sm font-semibold text-secondary"
               >
-                <option value="CASH">Cash</option>
+                <option value="CASH">Cash Drawer</option>
                 <option value="UPI">UPI / QR Code</option>
                 <option value="CARD">Debit / Credit Card</option>
                 <option value="NET_BANKING">Bank Transfer (NEFT/RTGS)</option>
@@ -329,105 +276,89 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
           </div>
 
-          {/* Line Items Table */}
-          <div style={{ backgroundColor: '#0f172a', borderRadius: '6px', padding: '0.75rem', border: '1px solid #334155' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#f8fafc' }}>Itemized Tax Lines</span>
+          {/* Line Items Container */}
+          <div className="bg-surface-container-low rounded-xl p-3 border border-outline-variant/30">
+            <div className="flex justify-between items-center mb-3">
+              <span className="font-label-md text-sm font-bold text-on-surface">
+                Itemized Tax Lines ({lines.length})
+              </span>
               <button
                 type="button"
                 onClick={addLine}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem',
-                  backgroundColor: '#334155',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '0.35rem 0.65rem',
-                  borderRadius: '4px',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                }}
+                className="inline-flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/30 text-on-surface font-label-sm text-[12px] font-semibold px-2.5 py-1 rounded-lg hover:bg-surface-container transition-colors shadow-sm"
               >
-                <Plus size={14} /> Add Line
+                <span className="material-symbols-outlined text-[16px] text-secondary">add</span>
+                <span>Add Line</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="flex flex-col gap-2">
               {lines.map((l, idx) => {
                 const itemCalc = calcSummary.items[idx];
                 return (
                   <div
                     key={idx}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 30px',
-                      gap: '0.5rem',
-                      alignItems: 'center',
-                      backgroundColor: '#1e293b',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                    }}
+                    className="grid grid-cols-12 gap-2 items-center bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/20 shadow-sm"
                   >
-                    <div>
-                      <select
-                        onChange={(e) => updateLine(idx, 'catalogSelect', e.target.value)}
-                        style={{ width: '100%', marginBottom: '4px', backgroundColor: '#0f172a', color: '#94a3b8', border: '1px solid #334155', fontSize: '0.75rem', padding: '3px', borderRadius: '4px' }}
-                      >
-                        <option value="">-- Choose from Catalog --</option>
-                        {itemsCatalog.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name} ({cat.hsnSacCode})
-                          </option>
-                        ))}
-                      </select>
+                    <div className="col-span-12 sm:col-span-4">
                       <input
                         type="text"
-                        placeholder="Description"
+                        placeholder="Item name / description"
                         value={l.name}
                         onChange={(e) => updateLine(idx, 'name', e.target.value)}
                         required
-                        style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', fontSize: '0.8rem', borderRadius: '4px' }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2.5 py-1.5 text-xs rounded-lg outline-none font-medium"
                       />
+                      <select
+                        onChange={(e) => handleSelectItemFromCatalog(idx, e.target.value)}
+                        className="bg-transparent text-[11px] text-secondary font-medium outline-none mt-0.5 cursor-pointer"
+                      >
+                        <option value="">Quick pick from catalog...</option>
+                        {itemsCatalog.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name} (₹{cat.salePrice})
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div>
+                    <div className="col-span-4 sm:col-span-2">
                       <input
                         type="text"
                         placeholder="HSN"
                         value={l.hsnSacCode}
                         onChange={(e) => updateLine(idx, 'hsnSacCode', e.target.value)}
-                        style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '6px', fontSize: '0.8rem', borderRadius: '4px' }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-center outline-none font-mono"
                       />
                     </div>
 
-                    <div>
+                    <div className="col-span-4 sm:col-span-1">
                       <input
                         type="number"
                         placeholder="Qty"
                         min="1"
                         value={l.quantity}
                         onChange={(e) => updateLine(idx, 'quantity', Number(e.target.value))}
-                        style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '6px', fontSize: '0.8rem', borderRadius: '4px' }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-right outline-none font-semibold"
                       />
                     </div>
 
-                    <div>
+                    <div className="col-span-4 sm:col-span-2">
                       <input
                         type="number"
                         placeholder="Rate ₹"
                         min="0"
                         value={l.unitPrice}
                         onChange={(e) => updateLine(idx, 'unitPrice', Number(e.target.value))}
-                        style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '6px', fontSize: '0.8rem', borderRadius: '4px' }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-right outline-none font-semibold"
                       />
                     </div>
 
-                    <div>
+                    <div className="col-span-5 sm:col-span-1">
                       <select
                         value={l.gstRate}
                         onChange={(e) => updateLine(idx, 'gstRate', Number(e.target.value))}
-                        style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '6px', fontSize: '0.8rem', borderRadius: '4px' }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1.5 text-xs rounded-lg text-center outline-none"
                       >
                         <option value={0}>0%</option>
                         <option value={5}>5%</option>
@@ -437,17 +368,19 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       </select>
                     </div>
 
-                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', textAlign: 'right' }}>
+                    <div className="col-span-5 sm:col-span-1 font-tabular-data text-xs font-bold text-on-surface text-right">
                       {formatINR(itemCalc?.totalAmount || 0)}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => removeLine(idx)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="col-span-2 sm:col-span-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => removeLine(idx)}
+                        className="text-outline hover:text-error transition-colors p-1"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -455,106 +388,73 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           </div>
 
           {/* Tax Breakdown Summary Card */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '1rem',
-            backgroundColor: '#0f172a',
-            padding: '1rem',
-            borderRadius: '6px',
-            border: '1px solid #334155',
-          }}>
-            <div style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/30">
+            <div className="flex flex-col gap-1 text-xs text-on-surface-variant">
               <div>
-                <strong>Amount in Words:</strong>
-                <div style={{ color: '#cbd5e1', fontStyle: 'italic', marginTop: '2px' }}>
+                <strong className="text-on-surface">Amount in Words:</strong>
+                <div className="italic text-on-surface mt-0.5 font-medium">
                   {amountInWords(calcSummary.grandTotal)}
                 </div>
               </div>
-              <div style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                ● Supplier GSTIN: <span style={{ color: '#93c5fd' }}>{company.gstin} ({company.stateCode})</span>
+              <div className="mt-2 text-[11px]">
+                ● Supplier GSTIN: <strong className="text-secondary">{company.gstin} ({company.stateCode})</strong>
               </div>
-              <div style={{ fontSize: '0.75rem' }}>
-                ● Recipient State: <span style={{ color: '#86efac' }}>{posStateCode} ({GST_STATES[posStateCode]?.name})</span>
+              <div className="text-[11px]">
+                ● Recipient State: <strong className="text-on-surface">{posStateCode} ({GST_STATES[posStateCode]?.name})</strong>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.875rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+            <div className="flex flex-col gap-1 text-xs">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Taxable Value:</span>
-                <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
+                <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalTaxableAmount)}</span>
               </div>
 
               {calcSummary.isIntraState ? (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                  <div className="flex justify-between text-on-surface-variant">
                     <span>CGST:</span>
-                    <span>{formatINR(calcSummary.totalCgst)}</span>
+                    <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalCgst)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                  <div className="flex justify-between text-on-surface-variant">
                     <span>SGST:</span>
-                    <span>{formatINR(calcSummary.totalSgst)}</span>
+                    <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalSgst)}</span>
                   </div>
                 </>
               ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                <div className="flex justify-between text-on-surface-variant">
                   <span>IGST (Inter-State):</span>
-                  <span>{formatINR(calcSummary.totalIgst)}</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalIgst)}</span>
                 </div>
               )}
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Round Off:</span>
-                <span>{calcSummary.roundOff > 0 ? `+${calcSummary.roundOff}` : calcSummary.roundOff}</span>
+                <span className="font-tabular-data text-on-surface">{calcSummary.roundOff > 0 ? `+${calcSummary.roundOff}` : calcSummary.roundOff}</span>
               </div>
 
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                color: '#f8fafc',
-                fontWeight: 700,
-                fontSize: '1.1rem',
-                borderTop: '1px solid #334155',
-                paddingTop: '0.5rem',
-              }}>
+              <div className="flex justify-between font-bold text-base border-t border-outline-variant/30 pt-2 mt-1 text-on-surface">
                 <span>Total Invoice Value:</span>
-                <span style={{ color: '#38bdf8' }}>{formatINR(calcSummary.grandTotal)}</span>
+                <span className="font-currency-display text-secondary">{formatINR(calcSummary.grandTotal)}</span>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div className="flex justify-end gap-3 mt-1">
             <button
               type="button"
               onClick={onClose}
-              style={{
-                backgroundColor: 'transparent',
-                border: '1px solid #334155',
-                color: '#94a3b8',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
+              className="px-4 py-2 rounded-xl border border-outline-variant/40 text-on-surface font-label-md text-sm hover:bg-surface-container transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                backgroundColor: '#2563eb',
-                color: '#fff',
-                border: 'none',
-                padding: '0.5rem 1.25rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
+              className="inline-flex items-center gap-1.5 bg-secondary text-on-secondary font-label-md text-sm font-bold px-5 py-2.5 rounded-xl shadow-md hover:bg-secondary/90 active:scale-95 transition-all"
             >
-              <CheckCircle2 size={16} /> Save & Generate Tax Invoice
+              <span className="material-symbols-outlined text-[18px]">verified</span>
+              <span>Save & Generate Invoice</span>
             </button>
           </div>
         </form>

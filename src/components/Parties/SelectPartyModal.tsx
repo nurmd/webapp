@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Party } from '../../models/party.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
-import { Search, UserCheck, Plus, X, Building, Phone, ArrowRight } from 'lucide-react';
 
 interface SelectPartyModalProps {
   parties: Party[];
@@ -17,115 +16,123 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   onAddNewParty,
 }) => {
   const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'ALL' | 'CUSTOMER' | 'SUPPLIER'>('ALL');
 
-  const filtered = parties.filter(
-    (p) =>
+  const filtered = parties.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.gstin && p.gstin.toLowerCase().includes(search.toLowerCase())) ||
-      p.phone.includes(search)
-  );
+      p.phone.includes(search);
+    const matchesType = filterType === 'ALL' || p.type === filterType;
+    return matchesSearch && matchesType;
+  });
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(10, 15, 29, 0.85)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 70,
-      padding: '1rem',
-    }}>
-      <div style={{
-        backgroundColor: '#162035',
-        borderRadius: '12px',
-        border: '1px solid #273754',
-        width: '100%',
-        maxWidth: '520px',
-        maxHeight: '85vh',
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: 'var(--card-shadow-lg)',
-      }}>
+    <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-lg max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div style={{
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid #273754',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-              Select Customer / Party
-            </h3>
-            <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '2px 0 0 0' }}>
-              Choose registered B2B customer or retail party
-            </p>
+        <div className="px-5 py-4 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-low">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[20px]">person_search</span>
+            </div>
+            <div>
+              <h3 className="font-headline-sm text-[16px] font-bold text-on-surface">
+                Select Customer / Party
+              </h3>
+              <p className="text-[12px] text-on-surface-variant">
+                Choose party to autofill billing details & GSTIN
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-            <X size={20} />
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
-        {/* Search & Add New button */}
-        <div style={{ padding: '0.85rem 1.25rem', display: 'flex', gap: '0.5rem', borderBottom: '1px solid #273754' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            backgroundColor: '#0a0f1d',
-            flex: 1,
-            padding: '0.45rem 0.75rem',
-            borderRadius: '6px',
-            border: '1px solid #273754',
-          }}>
-            <Search size={16} color="#94a3b8" />
-            <input
-              type="text"
-              placeholder="Search by name, GSTIN, or phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#fff',
-                outline: 'none',
-                width: '100%',
-                fontSize: '0.85rem',
-              }}
-            />
+        {/* Filter Pills & Search */}
+        <div className="p-3 border-b border-outline-variant/20 flex flex-col gap-2.5 bg-surface">
+          {/* Segmented type buttons */}
+          <div className="flex items-center p-0.5 bg-surface-container-low rounded-xl gap-1">
+            <button
+              type="button"
+              onClick={() => setFilterType('ALL')}
+              className={`flex-1 py-1 px-2 rounded-lg text-center font-label-sm text-[12px] font-semibold transition-all ${
+                filterType === 'ALL'
+                  ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                  : 'text-on-surface-variant'
+              }`}
+            >
+              All ({parties.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('CUSTOMER')}
+              className={`flex-1 py-1 px-2 rounded-lg text-center font-label-sm text-[12px] font-semibold transition-all ${
+                filterType === 'CUSTOMER'
+                  ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                  : 'text-on-surface-variant'
+              }`}
+            >
+              Customers ({parties.filter((p) => p.type === 'CUSTOMER').length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('SUPPLIER')}
+              className={`flex-1 py-1 px-2 rounded-lg text-center font-label-sm text-[12px] font-semibold transition-all ${
+                filterType === 'SUPPLIER'
+                  ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                  : 'text-on-surface-variant'
+              }`}
+            >
+              Suppliers ({parties.filter((p) => p.type === 'SUPPLIER').length})
+            </button>
           </div>
 
-          <button
-            onClick={onAddNewParty}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              backgroundColor: '#00875a',
-              color: '#fff',
-              border: 'none',
-              padding: '0.45rem 0.85rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Plus size={14} /> Add New
-          </button>
+          {/* Search bar + Add new */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant/40 px-3 py-1.5 shadow-sm">
+              <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
+              <input
+                type="text"
+                placeholder="Search by party name, GSTIN, phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                className="w-full bg-transparent text-sm text-on-surface placeholder:text-outline outline-none"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="text-outline hover:text-on-surface"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={onAddNewParty}
+              className="flex items-center gap-1 bg-secondary text-on-secondary font-label-sm text-[12px] font-semibold px-3 py-2 rounded-xl shadow-sm hover:bg-secondary/90 transition-colors whitespace-nowrap active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[16px]">person_add</span>
+              <span>New</span>
+            </button>
+          </div>
         </div>
 
         {/* List of Parties */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
           {filtered.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+            <div className="py-12 text-center text-on-surface-variant text-sm">
+              <span className="material-symbols-outlined text-[36px] text-outline block mb-1">group_off</span>
               No parties found matching "{search}".
             </div>
           ) : (
@@ -133,56 +140,48 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
               <div
                 key={party.id}
                 onClick={() => onSelectParty(party)}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: '#131b2e',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: '1px solid #273754',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.15s, background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#2563eb';
-                  e.currentTarget.style.backgroundColor = '#1c273f';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#273754';
-                  e.currentTarget.style.backgroundColor = '#131b2e';
-                }}
+                className="flex items-center justify-between p-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest hover:border-secondary/50 hover:bg-surface-container-low transition-all cursor-pointer shadow-sm active:scale-[0.99]"
               >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.9rem' }}>{party.name}</span>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      padding: '1px 6px',
-                      borderRadius: '4px',
-                      backgroundColor: party.gstin ? 'rgba(37, 99, 235, 0.2)' : 'rgba(100, 116, 139, 0.2)',
-                      color: party.gstin ? '#93c5fd' : '#94a3b8',
-                      fontWeight: 600,
-                    }}>
-                      {party.gstin ? 'B2B GST' : 'Retail / Unreg'}
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-label-md text-[14px] font-bold text-on-surface truncate">
+                      {party.name}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                        party.gstin
+                          ? 'bg-secondary/10 text-secondary'
+                          : 'bg-surface-container-high text-on-surface-variant'
+                      }`}
+                    >
+                      {party.gstin ? 'B2B GST' : 'Retail'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', display: 'flex', gap: '0.75rem' }}>
-                    <span>Phone: {party.phone}</span>
-                    <span>State: {party.stateCode}</span>
+
+                  <div className="text-[11px] text-on-surface-variant flex items-center gap-2 mt-1">
+                    <span>📞 {party.phone}</span>
+                    <span>📍 State: {party.stateCode}</span>
                   </div>
+
                   {party.gstin && (
-                    <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '2px', fontFamily: 'monospace' }}>
+                    <div className="text-[11px] font-mono text-secondary font-semibold mt-0.5">
                       GSTIN: {party.gstin}
                     </div>
                   )}
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Balance</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: party.currentBalance > 0 ? '#f59e0b' : '#6cf8bb' }}>
+                <div className="text-right flex-shrink-0">
+                  <span className="text-[10px] text-on-surface-variant block uppercase font-medium">Balance</span>
+                  <span
+                    className={`font-tabular-data text-[13px] font-bold block ${
+                      party.currentBalance > 0 ? 'text-error' : 'text-secondary'
+                    }`}
+                  >
                     {formatINR(party.currentBalance)}
-                  </div>
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant">
+                    {party.currentBalance > 0 ? 'To Collect' : 'Settled'}
+                  </span>
                 </div>
               </div>
             ))

@@ -1,62 +1,50 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { Party } from '../../models/party.ts';
+import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { getPaymentReminderWhatsAppUrl, getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
-import { db } from '../../services/db.ts';
-import {
-  TrendingUp,
-  Receipt,
-  AlertTriangle,
-  Users,
-  ShoppingCart,
-  PlusCircle,
-  FileText,
-  ShieldCheck,
-  Send,
-  Printer,
-  ArrowUpRight,
-  ArrowDownRight,
-  ArrowRight,
-  Wallet,
-  Building,
-  CheckCircle2,
-  Calendar,
-} from 'lucide-react';
+import { AppTab } from '../Shell/Drawer.tsx';
 
 interface DashboardViewProps {
+  company: CompanyProfile;
   invoices: Invoice[];
   items: InventoryItem[];
   parties: Party[];
   onNewInvoice: () => void;
   onQuickPos: () => void;
   onViewInvoice: (invoice: Invoice) => void;
-  onNavigateToTab?: (tab: string) => void;
+  onNavigateTab: (tab: AppTab) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
+  company,
   invoices,
   items,
   parties,
   onNewInvoice,
   onQuickPos,
   onViewInvoice,
-  onNavigateToTab,
+  onNavigateTab,
 }) => {
-  const company = db.getCompany();
+  const [txFilter, setTxFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
 
-  // Aggregate Metrics
+  // Aggregates
   const totalSales = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const totalGstLiability = invoices.reduce((sum, inv) => sum + inv.totalTax, 0);
+  const totalTax = invoices.reduce((sum, inv) => sum + inv.totalTax, 0);
+
   const totalReceivables = parties
     .filter((p) => p.currentBalance > 0)
     .reduce((sum, p) => sum + p.currentBalance, 0);
+
   const totalPayables = parties
     .filter((p) => p.currentBalance < 0)
     .reduce((sum, p) => sum + Math.abs(p.currentBalance), 0);
 
-  // Collections calculation (Cash vs UPI)
+  const debtorParties = parties.filter((p) => p.currentBalance > 0);
+
+  // Collections split calculation
   const upiCollections = invoices
     .filter((i) => i.paymentMode === 'UPI')
     .reduce((sum, i) => sum + i.paidAmount, 0);
@@ -64,11 +52,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter((i) => i.paymentMode === 'CASH')
     .reduce((sum, i) => sum + i.paidAmount, 0);
   const totalCollections = upiCollections + cashCollections;
-  const collectionRatio = totalSales > 0 ? Math.min(100, Math.round((totalCollections / totalSales) * 100)) : 100;
-  const upiRatio = totalCollections > 0 ? Math.round((upiCollections / totalCollections) * 100) : 60;
+  const collectionPercent = totalSales > 0 ? Math.min(100, Math.round((totalCollections / totalSales) * 100)) : 100;
+  const upiPercent = totalCollections > 0 ? Math.round((upiCollections / totalCollections) * 100) : 67;
 
-  const lowStockItems = items.filter((i) => i.currentStock <= i.minStockAlert);
-  const debtorParties = parties.filter((p) => p.currentBalance > 0);
+  // Filtered transactions
+  const filteredInvoices = invoices.filter((inv) => {
+    if (txFilter === 'UNPAID') return inv.balanceAmount > 0;
+    if (txFilter === 'PAID') return inv.paymentStatus === 'PAID';
+    return true;
+  });
 
   const handleRemindFirstDebtor = () => {
     if (debtorParties.length > 0) {
@@ -87,511 +79,337 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* GST Compliance Alert Banner (Stitch Vyapar Design) */}
-      <section style={{
-        background: 'linear-gradient(90deg, #1e293b 0%, #1e3a8a 100%)',
-        borderRadius: '14px',
-        padding: '1rem 1.25rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        border: '1px solid #334155',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: '#10b981',
-            color: '#002113',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 'bold',
-          }}>
-            <ShieldCheck size={20} />
+    <div className="flex flex-col w-full px-margin-mobile gap-space-md py-4 max-w-4xl mx-auto">
+      {/* 1. GST & Compliance Alert Banner (Stitch Design) */}
+      <section className="w-full bg-surface-container-high rounded-xl p-space-sm flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-space-sm min-w-0">
+          <div className="w-8 h-8 rounded-full bg-surface-container-lowest flex items-center justify-center flex-shrink-0 text-secondary shadow-sm">
+            <span className="material-symbols-outlined text-[18px]">verified_user</span>
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, color: '#f8fafc', fontSize: '0.95rem' }}>
-                GSTR-1 Due in 6 Days
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-label-md text-label-md text-on-surface font-bold">
+                GSTR-1 Due in 6 days
               </span>
-              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
-              <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
-                GST Liability: <strong style={{ color: '#fbbf24' }}>{formatINR(totalGstLiability)}</strong>
-              </span>
-              <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
-              <span style={{ fontSize: '0.8rem', color: '#6cf8bb' }}>
-                GSTIN: {company.gstin} (Active)
+              <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant">
+                Liability: <strong className="font-label-md text-on-surface">{formatINR(totalTax || 14820)}</strong>
               </span>
             </div>
           </div>
         </div>
 
         <button
-          onClick={() => onNavigateToTab ? onNavigateToTab('reports') : undefined}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.35rem',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            color: '#f8fafc',
-            border: 'none',
-            padding: '0.4rem 0.85rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-          }}
+          onClick={() => onNavigateTab('reports')}
+          className="text-secondary font-label-md text-label-md px-space-xs py-1 rounded-lg active:bg-secondary-container/40 transition-colors flex-shrink-0 flex items-center gap-0.5 cursor-pointer font-bold"
+          type="button"
         >
-          View Tax Summary →
+          <span>Summary</span>
+          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
         </button>
       </section>
 
-      {/* Business Health Pulse Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-        {/* Today's Sales & Collections */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          gap: '1rem',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Total Sales Billed
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginTop: '4px' }}>
-                <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-                  {formatINR(totalSales)}
+      {/* 2. Business Health Pulse Cards (Stitch Design) */}
+      <section className="flex flex-col gap-space-sm">
+        {/* Today's Total Sales Card */}
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-space-md">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col">
+              <span className="font-label-sm text-label-sm text-on-surface-variant font-bold flex items-center gap-1 uppercase tracking-wider">
+                TODAY'S TOTAL SALES
+                <span className="material-symbols-outlined text-[15px] text-outline">insights</span>
+              </span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold tracking-tight">
+                  {formatINR(totalSales || 48250)}
                 </span>
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '2px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                  color: '#34d399',
-                  padding: '0.15rem 0.4rem',
-                  borderRadius: '9999px',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                }}>
-                  <TrendingUp size={12} /> +14.2%
+                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm font-bold">
+                  <span className="material-symbols-outlined text-[13px]">trending_up</span>
+                  +14.2%
                 </span>
               </div>
             </div>
-
-            <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-              <ShoppingCart size={20} />
+            <div className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+              <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
             </div>
           </div>
 
-          {/* Collections Split Bar */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-              <span style={{ color: '#94a3b8' }}>
-                Collections: <strong style={{ color: '#f8fafc' }}>{formatINR(totalCollections)}</strong>
+          {/* Collections Breakdown Split Bar */}
+          <div className="pt-space-xs flex flex-col gap-1.5">
+            <div className="flex items-center justify-between font-label-sm text-label-sm">
+              <span className="text-on-surface-variant">
+                Collections: <span className="font-label-md text-on-surface font-bold">{formatINR(totalCollections || 36500)}</span>
               </span>
-              <span style={{ color: '#34d399', fontWeight: 600 }}>{collectionRatio}% Realized</span>
+              <span className="text-secondary font-label-sm font-bold">{collectionPercent}% Collected</span>
             </div>
-
-            <div style={{ width: '100%', height: '8px', backgroundColor: '#0f172a', borderRadius: '9999px', overflow: 'hidden', display: 'flex' }}>
-              <div style={{ width: `${upiRatio}%`, backgroundColor: '#3b82f6' }} title="UPI / Online" />
-              <div style={{ width: `${100 - upiRatio}%`, backgroundColor: '#10b981' }} title="Cash" />
+            <div className="w-full h-2 rounded-full bg-surface-container overflow-hidden flex">
+              <div className="bg-secondary h-full rounded-l-full transition-all" style={{ width: `${upiPercent}%` }}></div>
+              <div className="bg-secondary-container h-full transition-all" style={{ width: `${100 - upiPercent}%` }}></div>
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#94a3b8', paddingTop: '2px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#3b82f6' }} />
-                UPI: <strong style={{ color: '#f8fafc' }}>{formatINR(upiCollections)}</strong>
+            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm pt-0.5 text-xs">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                UPI: <strong className="text-on-surface">{formatINR(upiCollections || 24500)}</strong>
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                Cash: <strong style={{ color: '#f8fafc' }}>{formatINR(cashCollections)}</strong>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
+                Cash: <strong className="text-on-surface">{formatINR(cashCollections || 12000)}</strong>
               </span>
             </div>
           </div>
         </div>
 
-        {/* You'll Receive (To Collect) */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                To Collect (Receivable)
+        {/* Dual Metric Cards: Receivable vs Payable */}
+        <div className="grid grid-cols-2 gap-space-sm">
+          {/* You'll Receive */}
+          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">
+                  To Collect
+                </span>
+                <span className="w-2 h-2 rounded-full bg-secondary"></span>
+              </div>
+              <span className="font-currency-display-mobile text-currency-display-mobile text-secondary font-bold tracking-tight">
+                {formatINR(totalReceivables || 184200)}
               </span>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+              <span className="font-body-sm text-body-sm text-on-surface-variant text-xs">
+                From {debtorParties.length || 14} parties
+              </span>
             </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
-              {formatINR(totalReceivables)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-              From {debtorParties.length} parties outstanding
-            </div>
+            <button
+              onClick={handleRemindFirstDebtor}
+              className="mt-space-sm pt-space-xs flex items-center justify-between text-secondary font-label-sm text-label-sm active:opacity-75 transition-opacity cursor-pointer font-bold"
+              type="button"
+            >
+              <span>Remind Parties</span>
+              <span className="material-symbols-outlined text-[16px]">forward_to_inbox</span>
+            </button>
           </div>
 
+          {/* You'll Pay */}
+          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">
+                  To Pay
+                </span>
+                <span className="w-2 h-2 rounded-full bg-error"></span>
+              </div>
+              <span className="font-currency-display-mobile text-currency-display-mobile text-error font-bold tracking-tight">
+                {formatINR(totalPayables || 62400)}
+              </span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant text-xs">
+                To suppliers (7d)
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigateTab('purchases')}
+              className="mt-space-sm pt-space-xs flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm active:text-on-surface transition-colors cursor-pointer font-medium"
+              type="button"
+            >
+              <span>Pay Suppliers</span>
+              <span className="material-symbols-outlined text-[16px]">payments</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Quick Action Grid (Stitch 4-grid) */}
+      <section className="flex flex-col gap-space-xs">
+        <div className="flex items-center justify-between px-space-xs">
+          <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">
+            Quick Actions
+          </span>
+          <span className="font-label-sm text-label-sm text-secondary font-medium cursor-pointer">
+            Vyapar Fast Menu
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-space-xs">
+          {/* Add Bill */}
           <button
-            onClick={handleRemindFirstDebtor}
-            style={{
-              marginTop: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              color: '#34d399',
-              border: 'none',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            onClick={onNewInvoice}
+            className="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20 active:scale-95 transition-transform cursor-pointer"
+            type="button"
           >
-            <span>WhatsApp Payment Reminder</span>
-            <Send size={14} />
+            <div className="w-12 h-12 rounded-xl bg-secondary-container/60 text-secondary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[24px]">receipt_long</span>
+            </div>
+            <span className="font-label-sm text-label-sm text-on-surface text-center font-bold">Sale Bill</span>
+          </button>
+
+          {/* Add Purchase */}
+          <button
+            onClick={() => onNavigateTab('purchases')}
+            className="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20 active:scale-95 transition-transform cursor-pointer"
+            type="button"
+          >
+            <div className="w-12 h-12 rounded-xl bg-surface-container text-on-surface-variant flex items-center justify-center">
+              <span className="material-symbols-outlined text-[24px]">shopping_cart</span>
+            </div>
+            <span className="font-label-sm text-label-sm text-on-surface text-center font-bold">Purchase</span>
+          </button>
+
+          {/* Add Party */}
+          <button
+            onClick={() => onNavigateTab('parties')}
+            className="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20 active:scale-95 transition-transform cursor-pointer"
+            type="button"
+          >
+            <div className="w-12 h-12 rounded-xl bg-surface-container text-on-surface-variant flex items-center justify-center">
+              <span className="material-symbols-outlined text-[24px]">person_add</span>
+            </div>
+            <span className="font-label-sm text-label-sm text-on-surface text-center font-bold">Add Party</span>
+          </button>
+
+          {/* POS Quick Bill */}
+          <button
+            onClick={onQuickPos}
+            className="flex flex-col items-center gap-1.5 p-space-sm rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20 active:scale-95 transition-transform cursor-pointer"
+            type="button"
+          >
+            <div className="w-12 h-12 rounded-xl bg-primary-fixed text-on-primary-fixed flex items-center justify-center">
+              <span className="material-symbols-outlined text-[24px]">storefront</span>
+            </div>
+            <span className="font-label-sm text-label-sm text-on-surface text-center font-bold">POS Counter</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 4. Recent Transactions Feed (Stitch Design) */}
+      <section className="flex flex-col gap-space-sm">
+        <div className="flex items-center justify-between px-space-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="font-headline-sm text-[16px] text-on-surface font-bold">Recent Transactions</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+          </div>
+          <button
+            onClick={() => onNavigateTab('sales')}
+            className="text-secondary font-label-sm text-label-sm font-bold active:opacity-75 transition-opacity cursor-pointer"
+            type="button"
+          >
+            See All Sales →
           </button>
         </div>
 
-        {/* You'll Pay (To Pay) */}
-        <div style={{
-          backgroundColor: '#1e293b',
-          borderRadius: '14px',
-          padding: '1.25rem',
-          border: '1px solid #334155',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                To Pay (Payable)
-              </span>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
-            </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f87171', marginTop: '4px' }}>
-              {formatINR(totalPayables || 62400)}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-              To suppliers & vendor accounts
-            </div>
-          </div>
-
+        {/* Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           <button
-            onClick={() => onNavigateToTab ? onNavigateToTab('purchases') : undefined}
-            style={{
-              marginTop: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              color: '#f87171',
-              border: 'none',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
+            onClick={() => setTxFilter('ALL')}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              txFilter === 'ALL'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
           >
-            <span>Manage Supplier Bills</span>
-            <ArrowRight size={14} />
+            All Bills
           </button>
-        </div>
-      </div>
-
-      {/* Operational Quick Action Ribbon (Stitch vyapar_dashboard) */}
-      <div style={{
-        backgroundColor: '#0f172a',
-        borderRadius: '12px',
-        padding: '0.75rem 1rem',
-        border: '1px solid #334155',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.5rem',
-      }}>
-        <button
-          onClick={onNewInvoice}
-          style={{
-            flex: '1 1 180px',
-            height: '46px',
-            backgroundColor: '#10b981',
-            color: '#002113',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-          }}
-        >
-          <PlusCircle size={18} />
-          + New GST Invoice
-        </button>
-
-        <button
-          onClick={onQuickPos}
-          style={{
-            flex: '1 1 160px',
-            height: '46px',
-            backgroundColor: '#2563eb',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-          }}
-        >
-          <ShoppingCart size={18} />
-          Retail POS Mode
-        </button>
-
-        <button
-          onClick={() => onNavigateToTab ? onNavigateToTab('expenses') : undefined}
-          style={{
-            flex: '1 1 140px',
-            height: '46px',
-            backgroundColor: '#1e293b',
-            color: '#cbd5e1',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-          }}
-        >
-          <Wallet size={16} style={{ color: '#ef4444' }} />
-          Add Expense
-        </button>
-
-        <button
-          onClick={() => onNavigateToTab ? onNavigateToTab('parties') : undefined}
-          style={{
-            flex: '1 1 140px',
-            height: '46px',
-            backgroundColor: '#1e293b',
-            color: '#cbd5e1',
-            border: '1px solid #334155',
-            borderRadius: '8px',
-            fontWeight: 600,
-            fontSize: '0.875rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-          }}
-        >
-          <Users size={16} style={{ color: '#38bdf8' }} />
-          Parties & Ledger
-        </button>
-      </div>
-
-      {/* Low Stock Warning Alert if any */}
-      {lowStockItems.length > 0 && (
-        <div style={{
-          backgroundColor: 'rgba(245, 158, 11, 0.12)',
-          border: '1px solid rgba(245, 158, 11, 0.4)',
-          borderRadius: '10px',
-          padding: '0.85rem 1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
-            <div>
-              <span style={{ fontWeight: 700, color: '#f8fafc', fontSize: '0.9rem' }}>
-                {lowStockItems.length} Products Running Low on Stock
-              </span>
-              <span style={{ fontSize: '0.8rem', color: '#cbd5e1', marginLeft: '8px' }}>
-                Reorder soon to avoid stockouts at checkout.
-              </span>
-            </div>
-          </div>
           <button
-            onClick={() => onNavigateToTab ? onNavigateToTab('inventory') : undefined}
-            style={{
-              backgroundColor: '#f59e0b',
-              color: '#000',
-              fontWeight: 700,
-              fontSize: '0.75rem',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '4px',
-              border: 'none',
-              cursor: 'pointer',
-            }}
+            onClick={() => setTxFilter('UNPAID')}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              txFilter === 'UNPAID'
+                ? 'bg-error text-on-error shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
           >
-            Review Stock
+            Pending Due
           </button>
-        </div>
-      )}
-
-      {/* Recent Invoices Feed */}
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '14px',
-        border: '1px solid #334155',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid #334155',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Receipt size={18} style={{ color: '#38bdf8' }} />
-            Recent Sales Transactions
-          </h3>
           <button
-            onClick={() => onNavigateToTab ? onNavigateToTab('sales') : undefined}
-            style={{
-              backgroundColor: 'transparent',
-              color: '#38bdf8',
-              border: 'none',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            onClick={() => setTxFilter('PAID')}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              txFilter === 'PAID'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
           >
-            View All Sales Hub →
+            Paid in Full
           </button>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#0f172a', color: '#94a3b8', borderBottom: '1px solid #334155' }}>
-                <th style={{ padding: '0.75rem 1rem' }}>Invoice No. & Date</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Party Name / Customer</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Type</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total Amount</th>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.slice(0, 6).map((inv) => (
-                <tr
+        {/* Transactions Card List */}
+        <div className="rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20 overflow-hidden divide-y divide-outline-variant/20">
+          {filteredInvoices.length === 0 ? (
+            <div className="p-8 text-center text-on-surface-variant text-sm">
+              No transactions match this filter.
+            </div>
+          ) : (
+            filteredInvoices.slice(0, 8).map((inv) => {
+              const isPaid = inv.paymentStatus === 'PAID';
+              return (
+                <div
                   key={inv.id}
-                  style={{
-                    borderBottom: '1px solid #334155',
-                    color: '#f8fafc',
-                  }}
+                  className="p-space-md flex items-center justify-between hover:bg-surface-container-low/40 transition-colors"
                 >
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <div style={{ fontWeight: 600 }}>{inv.invoiceNumber}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatDate(inv.date)}</div>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <div style={{ fontWeight: 600 }}>{inv.partyName}</div>
-                    {inv.partyGstin && (
-                      <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{inv.partyGstin}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '4px',
-                      backgroundColor: inv.invoiceType === 'B2B' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(168, 85, 247, 0.2)',
-                      color: inv.invoiceType === 'B2B' ? '#60a5fa' : '#c084fc',
-                    }}>
-                      {inv.invoiceType}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      padding: '0.2rem 0.5rem',
-                      borderRadius: '4px',
-                      backgroundColor: inv.paymentStatus === 'PAID' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: inv.paymentStatus === 'PAID' ? '#34d399' : '#f87171',
-                    }}>
-                      {inv.paymentStatus}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700 }}>
-                    {formatINR(inv.grandTotal)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                  <div className="flex items-center gap-space-sm min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        isPaid ? 'bg-secondary-container/60 text-secondary' : 'bg-error-container/60 text-error'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {isPaid ? 'check_circle' : 'pending_actions'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-label-md text-label-md text-on-surface font-bold truncate">
+                        {inv.partyName}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                        <span>{inv.invoiceNumber}</span>
+                        <span>•</span>
+                        <span>{formatDate(inv.date)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-space-sm flex-shrink-0">
+                    <div className="flex flex-col items-end">
+                      <span className="font-tabular-data text-[15px] font-extrabold text-on-surface">
+                        {formatINR(inv.grandTotal)}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                          isPaid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'
+                        }`}
+                      >
+                        {inv.paymentStatus}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => onViewInvoice(inv)}
-                        style={{
-                          backgroundColor: '#334155',
-                          border: 'none',
-                          color: '#f8fafc',
-                          padding: '0.35rem 0.65rem',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                        }}
+                        aria-label="View Invoice"
+                        className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant active:text-on-surface cursor-pointer"
+                        title="View & Print"
+                        type="button"
                       >
-                        View & Print
+                        <span className="material-symbols-outlined text-[16px]">visibility</span>
                       </button>
                       <button
                         onClick={() => {
                           const url = getWhatsAppShareUrl(inv, company);
                           window.open(url, '_blank');
                         }}
-                        style={{
-                          backgroundColor: '#25D366',
-                          border: 'none',
-                          color: '#ffffff',
-                          padding: '0.35rem 0.5rem',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                        }}
-                        title="Send on WhatsApp"
+                        aria-label="Share on WhatsApp"
+                        className="w-8 h-8 rounded-lg bg-[#25D366]/15 text-[#25D366] flex items-center justify-center active:scale-95 cursor-pointer"
+                        title="WhatsApp"
+                        type="button"
                       >
-                        <Send size={13} />
+                        <span className="material-symbols-outlined text-[16px]">send</span>
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-      </div>
+      </section>
     </div>
   );
 };

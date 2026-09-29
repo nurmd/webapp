@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { InventoryItem, UnitOfMeasurement, StockAdjustment, StockAdjustmentType } from '../../models/item.ts';
+import { InventoryItem, StockAdjustment, UnitOfMeasurement } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
-import { COMMON_HSN_CODES } from '../../core/gst/hsnCatalog.ts';
-import { Search, Plus, AlertTriangle, Edit, Trash2, X, Check, Boxes } from 'lucide-react';
 
 interface InventoryViewProps {
   items: InventoryItem[];
   onSaveItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
-  onSaveAdjustment?: (adj: StockAdjustment) => void;
+  onSaveAdjustment: (adj: StockAdjustment) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -17,289 +15,389 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onDeleteItem,
   onSaveAdjustment,
 }) => {
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [onlyLowStock, setOnlyLowStock] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
-  const [adjItemId, setAdjItemId] = useState(items[0]?.id || '');
-  const [adjType, setAdjType] = useState<StockAdjustmentType>('STOCK_IN');
-  const [adjQty, setAdjQty] = useState(1);
-  const [adjReason, setAdjReason] = useState('');
+  const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
+  const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
+  const [adjQty, setAdjQty] = useState<number>(1);
+  const [adjReason, setAdjReason] = useState('New inventory arrival');
+
+  // New Item State
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
+  const [hsn, setHsn] = useState('');
+  const [category, setCategory] = useState('Hardware');
+  const [unit, setUnit] = useState<UnitOfMeasurement>('PCS');
+  const [salePrice, setSalePrice] = useState<number>(0);
+  const [purchasePrice, setPurchasePrice] = useState<number>(0);
+  const [gstRate, setGstRate] = useState<number>(18);
+  const [currentStock, setCurrentStock] = useState<number>(10);
+  const [minStockAlert, setMinStockAlert] = useState<number>(5);
+
+  // Metrics
+  const totalStockValue = items.reduce((s, i) => s + (i.currentStock * i.purchasePrice), 0);
+  const lowStockCount = items.filter((i) => i.currentStock <= i.minStockAlert).length;
+  const categories = Array.from(new Set(items.map((i) => i.category)));
 
   const filtered = items.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.hsnSacCode.includes(search) ||
-      (item.sku && item.sku.toLowerCase().includes(search.toLowerCase()));
+      (item.sku && item.sku.toLowerCase().includes(search.toLowerCase())) ||
+      item.hsnSacCode.includes(search);
 
-    const matchesLowStock = onlyLowStock ? item.currentStock <= item.minStockAlert : true;
-    return matchesSearch && matchesLowStock;
+    if (selectedCategory !== 'ALL') return matchesSearch && item.category === selectedCategory;
+    return matchesSearch;
   });
 
-  const openNewItem = () => {
-    setEditingItem({
-      id: `ITM-${Date.now()}`,
-      name: '',
-      sku: '',
-      barcode: '',
-      hsnSacCode: '844332',
-      category: 'General',
-      unit: 'PCS',
-      salePrice: 0,
-      purchasePrice: 0,
-      gstRate: 18,
-      currentStock: 0,
-      minStockAlert: 5,
+  const handleCreateItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    const newItem: InventoryItem = {
+      id: 'ITM-' + Date.now(),
+      name: name.trim(),
+      sku: sku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
+      hsnSacCode: hsn.trim() || '844332',
+      category,
+      unit,
+      salePrice,
+      purchasePrice,
+      gstRate,
+      currentStock,
+      minStockAlert,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    });
-    setIsModalOpen(true);
-  };
+    };
 
-  const openEditItem = (item: InventoryItem) => {
-    setEditingItem({ ...item });
-    setIsModalOpen(true);
-  };
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingItem || !editingItem.name) return;
-    onSaveItem({
-      ...editingItem,
-      updatedAt: new Date().toISOString(),
-    });
+    onSaveItem(newItem);
     setIsModalOpen(false);
+    // Reset
+    setName('');
+    setSku('');
+    setHsn('');
+    setSalePrice(0);
+    setPurchasePrice(0);
+    setCurrentStock(10);
+  };
+
+  const handleApplyAdjustment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustmentItem || adjQty <= 0) return;
+
+    const adj: StockAdjustment = {
+      id: 'ADJ-' + Date.now(),
+      itemId: adjustmentItem.id,
+      itemName: adjustmentItem.name,
+      type: adjType,
+      quantity: adjQty,
+      reason: adjReason,
+      date: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+    };
+
+    onSaveAdjustment(adj);
+    setAdjustmentItem(null);
+    setAdjQty(1);
   };
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-            Inventory & Services Catalog
-          </h2>
-          <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-            Goods, HSN/SAC classification, tax rates, and stock alerts
+    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto px-margin-mobile py-4 gap-space-sm">
+      {/* Top Banner: Metrics (Stitch inventory_stock) */}
+      <div className="grid grid-cols-3 gap-space-xs">
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+          <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">
+            Stock Valuation
+          </span>
+          <div className="font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold mt-0.5">
+            {formatINR(totalStockValue)}
           </div>
+          <span className="text-[11px] text-secondary font-semibold mt-1">Asset Cost Value</span>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={() => setIsAdjustmentModalOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: '#1d2a42',
-              color: '#60a5fa',
-              border: '1px solid #273754',
-              padding: '0.5rem 0.85rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-            }}
-          >
-            <Boxes size={15} /> Stock Adjustment
-          </button>
-          <button
-            onClick={openNewItem}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: '#00875a',
-              color: '#fff',
-              border: 'none',
-              padding: '0.5rem 0.85rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-            }}
-          >
-            <Plus size={15} /> Add Item / Service
-          </button>
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+          <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">
+            Total Products
+          </span>
+          <div className="font-currency-display-mobile text-currency-display-mobile text-secondary font-extrabold mt-0.5">
+            {items.length}
+          </div>
+          <span className="text-[11px] text-on-surface-variant mt-1">Active Catalog SKUs</span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+          <span className="font-label-sm text-label-sm text-error font-bold uppercase tracking-wider">
+            Low Stock Alerts
+          </span>
+          <div className="font-currency-display-mobile text-currency-display-mobile text-error font-extrabold mt-0.5">
+            {lowStockCount}
+          </div>
+          <span className="text-[11px] text-error font-semibold mt-1">Reorder Required</span>
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{
-        display: 'flex',
-        gap: '0.75rem',
-        alignItems: 'center',
-        backgroundColor: '#1e293b',
-        padding: '0.75rem',
-        borderRadius: '8px',
-        border: '1px solid #334155',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, backgroundColor: '#0f172a', padding: '0.4rem 0.75rem', borderRadius: '6px', border: '1px solid #334155' }}>
-          <Search size={16} color="#94a3b8" />
+      {/* Action Bar & Search */}
+      <div className="flex items-center gap-2 mt-2">
+        <div className="relative flex-1">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">
+            search
+          </span>
           <input
             type="text"
-            placeholder="Search items by name, HSN code, or SKU..."
+            placeholder="Search items by name, SKU, HSN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: '0.85rem' }}
+            className="w-full bg-surface-container-lowest text-on-surface text-sm pl-11 pr-4 py-2.5 rounded-xl shadow-sm border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30"
           />
         </div>
 
         <button
-          onClick={() => setOnlyLowStock(!onlyLowStock)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            backgroundColor: onlyLowStock ? '#ef4444' : '#0f172a',
-            color: '#fff',
-            border: '1px solid #334155',
-            padding: '0.45rem 0.75rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-          }}
+          onClick={() => setIsModalOpen(true)}
+          className="h-10 px-4 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+          type="button"
         >
-          <AlertTriangle size={14} color={onlyLowStock ? '#fff' : '#f59e0b'} />
-          Low Stock Only
+          <span className="material-symbols-outlined text-[18px]">add_box</span>
+          <span>+ Add Item</span>
         </button>
       </div>
 
-      {/* Items Table */}
-      <div style={{
-        backgroundColor: '#1e293b',
-        borderRadius: '8px',
-        border: '1px solid #334155',
-        overflow: 'hidden',
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#0f172a', color: '#94a3b8', borderBottom: '1px solid #334155' }}>
-              <th style={{ padding: '0.75rem 1rem' }}>Item Name</th>
-              <th style={{ padding: '0.75rem 1rem' }}>HSN / SAC</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Category</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Unit</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Sale Price</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>GST Rate</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Current Stock</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((item) => (
-              <tr key={item.id} style={{ borderBottom: '1px solid #334155' }}>
-                <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#f8fafc' }}>
-                  {item.name}
-                  {item.sku && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>SKU: {item.sku}</div>}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', color: '#93c5fd' }}>
-                  {item.hsnSacCode}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
-                  {item.category}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
-                  {item.unit}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#f8fafc' }}>
-                  {formatINR(item.salePrice)}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                  <span style={{ backgroundColor: '#1e3a8a', color: '#93c5fd', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                    {item.gstRate}%
-                  </span>
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: item.currentStock <= item.minStockAlert ? '#ef4444' : '#10b981' }}>
-                  {item.currentStock} {item.unit}
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => openEditItem(item)}
-                      style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer' }}
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteItem(item.id)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Category Filter Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <button
+          onClick={() => setSelectedCategory('ALL')}
+          className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            selectedCategory === 'ALL'
+              ? 'bg-secondary text-on-secondary shadow-sm'
+              : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+          }`}
+          type="button"
+        >
+          All Items ({items.length})
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              selectedCategory === cat
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            {cat} ({items.filter((i) => i.category === cat).length})
+          </button>
+        ))}
       </div>
 
-      {/* Edit / Create Item Modal */}
-      {isModalOpen && editingItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50,
-          padding: '1rem',
-        }}>
-          <div style={{
-            backgroundColor: '#1e293b',
-            borderRadius: '8px',
-            border: '1px solid #334155',
-            width: '100%',
-            maxWidth: '560px',
-            padding: '1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
-                {editingItem.id.startsWith('ITM-') ? 'Add Item / Service' : 'Edit Item'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
+      {/* Items List */}
+      <div className="space-y-2 mt-1">
+        {filtered.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20">
+            No inventory items found.
+          </div>
+        ) : (
+          filtered.map((item) => {
+            const isLow = item.currentStock <= item.minStockAlert;
+            return (
+              <div
+                key={item.id}
+                className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-2 hover:border-secondary/40 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface-variant flex-shrink-0">
+                      <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+                    </div>
 
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-headline-sm text-sm text-on-surface font-bold truncate">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                        <span className="font-mono text-secondary font-semibold">{item.sku}</span>
+                        <span>•</span>
+                        <span>HSN {item.hsnSacCode}</span>
+                        <span>•</span>
+                        <span className="text-[11px] bg-surface-container px-1.5 py-0.2 rounded font-medium">
+                          {item.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end flex-shrink-0">
+                    <span className="font-tabular-data text-[16px] font-extrabold text-on-surface">
+                      {formatINR(item.salePrice)}
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant">
+                      Cost: {formatINR(item.purchasePrice)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold text-[11px] flex items-center gap-1 ${
+                        isLow
+                          ? 'bg-error-container text-on-error-container'
+                          : 'bg-secondary-container text-on-secondary-container'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${isLow ? 'bg-error' : 'bg-secondary'}`}
+                      />
+                      {item.currentStock} {item.unit} in stock
+                    </span>
+                    <span className="text-on-surface-variant font-medium">
+                      GST {item.gstRate}%
+                    </span>
+                  </div>
+
+                  {/* Stock In / Out Adjustment Actions */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        setAdjustmentItem(item);
+                        setAdjType('STOCK_IN');
+                        setAdjQty(1);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-secondary-container text-on-secondary-container font-bold text-xs flex items-center gap-0.5 active:scale-95 cursor-pointer"
+                      title="Add Stock"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">add</span>
+                      <span>Stock In</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setAdjustmentItem(item);
+                        setAdjType('STOCK_OUT');
+                        setAdjQty(1);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-surface-container-low text-on-surface-variant font-bold text-xs flex items-center gap-0.5 active:scale-95 cursor-pointer"
+                      title="Reduce Stock"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">remove</span>
+                      <span>Stock Out</span>
+                    </button>
+
+                    <button
+                      onClick={() => onDeleteItem(item.id)}
+                      className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
+                      title="Delete Item"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Add Item Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl border border-outline-variant/30 flex flex-col gap-4">
+            <h3 className="font-headline-sm text-lg font-bold text-on-surface">Add Inventory Product</h3>
+
+            <form onSubmit={handleCreateItem} className="flex flex-col gap-3 text-xs">
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Item Name *</label>
+                <label className="block font-bold text-on-surface-variant mb-1">Product Name *</label>
                 <input
                   type="text"
                   required
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                  style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  placeholder="e.g. Thermal Printer 80mm"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>HSN / SAC Code</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">SKU / Item Code</label>
                   <input
                     type="text"
-                    required
-                    value={editingItem.hsnSacCode}
-                    onChange={(e) => setEditingItem({ ...editingItem, hsnSacCode: e.target.value })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                    placeholder="PRN-80"
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>GST Rate (%)</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">HSN / SAC Code</label>
+                  <input
+                    type="text"
+                    placeholder="844332"
+                    value={hsn}
+                    onChange={(e) => setHsn(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">Category</label>
+                  <input
+                    type="text"
+                    placeholder="Hardware / Consumables"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">Unit of Measure</label>
                   <select
-                    value={editingItem.gstRate}
-                    onChange={(e) => setEditingItem({ ...editingItem, gstRate: Number(e.target.value) })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  >
+                    <option value="PCS">PCS (Pieces)</option>
+                    <option value="BOX">BOX (Boxes)</option>
+                    <option value="KG">KG (Kilograms)</option>
+                    <option value="MTR">MTR (Meters)</option>
+                    <option value="NOS">NOS (Numbers)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">Sale Price (₹)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={salePrice || ''}
+                    onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">Purchase Price</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={purchasePrice || ''}
+                    onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">GST Rate</label>
+                  <select
+                    value={gstRate}
+                    onChange={(e) => setGstRate(parseFloat(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   >
                     <option value={0}>0%</option>
                     <option value={5}>5%</option>
@@ -310,92 +408,40 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Unit</label>
-                  <select
-                    value={editingItem.unit}
-                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value as UnitOfMeasurement })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  >
-                    {['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'MTR', 'BOX', 'PKT', 'SET', 'BAG'].map((u) => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Category</label>
-                  <input
-                    type="text"
-                    value={editingItem.category}
-                    onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Sale Price (₹)</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">Current Stock Qty</label>
                   <input
                     type="number"
-                    min="0"
-                    step="0.01"
-                    value={editingItem.salePrice}
-                    onChange={(e) => setEditingItem({ ...editingItem, salePrice: Number(e.target.value) })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                    value={currentStock || ''}
+                    onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Current Stock Qty</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">Low Stock Alert at</label>
                   <input
                     type="number"
-                    min="0"
-                    value={editingItem.currentStock}
-                    onChange={(e) => setEditingItem({ ...editingItem, currentStock: Number(e.target.value) })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                    value={minStockAlert || ''}
+                    onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Batch Number (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. BATCH-2026-X1"
-                    value={editingItem.batchNumber || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, batchNumber: e.target.value })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Expiry Date (Optional)</label>
-                  <input
-                    type="date"
-                    value={editingItem.expiryDate || ''}
-                    onChange={(e) => setEditingItem({ ...editingItem, expiryDate: e.target.value })}
-                    style={{ width: '100%', backgroundColor: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div className="flex justify-end gap-2 mt-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  style={{ backgroundColor: 'transparent', border: '1px solid #334155', color: '#94a3b8', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}
+                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ backgroundColor: '#00875a', color: '#fff', border: 'none', padding: '0.4rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer"
                 >
-                  Save Item
+                  Save Product
                 </button>
               </div>
             </form>
@@ -404,125 +450,54 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       )}
 
       {/* Stock Adjustment Modal */}
-      {isAdjustmentModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 15, 29, 0.85)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 60,
-          padding: '1rem',
-        }}>
-          <div style={{
-            backgroundColor: '#162035',
-            borderRadius: '12px',
-            border: '1px solid #273754',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '1.5rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: '#f8fafc' }}>
-                Record Stock Movement / Adjustment
-              </h3>
-              <button onClick={() => setIsAdjustmentModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
+      {adjustmentItem && (
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-4">
+            <h3 className="font-headline-sm text-lg font-bold text-on-surface">
+              {adjType === 'STOCK_IN' ? 'Stock In (Add Inventory)' : 'Stock Out (Reduce Inventory)'}
+            </h3>
+            <div className="text-xs text-on-surface-variant">
+              Item: <strong>{adjustmentItem.name}</strong> • Current Stock: {adjustmentItem.currentStock} {adjustmentItem.unit}
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const itm = items.find((i) => i.id === adjItemId) || items[0];
-                if (itm && onSaveAdjustment) {
-                  onSaveAdjustment({
-                    id: `ADJ-${Date.now()}`,
-                    itemId: itm.id,
-                    itemName: itm.name,
-                    type: adjType,
-                    quantity: adjQty,
-                    date: new Date().toISOString().split('T')[0],
-                    reason: adjReason || 'Manual adjustment',
-                    createdAt: new Date().toISOString(),
-                  });
-                }
-                setIsAdjustmentModalOpen(false);
-              }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
-            >
+            <form onSubmit={handleApplyAdjustment} className="flex flex-col gap-3 text-xs">
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Select Item</label>
-                <select
-                  value={adjItemId}
-                  onChange={(e) => setAdjItemId(e.target.value)}
-                  style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                >
-                  {items.map((i) => (
-                    <option key={i.id} value={i.id}>{i.name} (Current: {i.currentStock} {i.unit})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Movement Type</label>
-                  <select
-                    value={adjType}
-                    onChange={(e) => setAdjType(e.target.value as StockAdjustmentType)}
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  >
-                    <option value="STOCK_IN">Stock In (+ Increase)</option>
-                    <option value="STOCK_OUT">Stock Out (- Decrease)</option>
-                    <option value="WASTAGE">Wastage / Damage (-)</option>
-                    <option value="CORRECTION">Audit Correction</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Quantity</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={adjQty}
-                    onChange={(e) => setAdjQty(Number(e.target.value))}
-                    required
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Reason / Remarks</label>
+                <label className="block font-bold text-on-surface-variant mb-1">Quantity ({adjustmentItem.unit}) *</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Godown unloading, transfer, breakage"
-                  value={adjReason}
-                  onChange={(e) => setAdjReason(e.target.value)}
-                  style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px' }}
+                  type="number"
+                  required
+                  min="1"
+                  value={adjQty}
+                  onChange={(e) => setAdjQty(parseFloat(e.target.value) || 1)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-outline-variant bg-surface text-on-surface text-lg font-extrabold focus:outline-none focus:ring-2 focus:ring-secondary/40"
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Reason / Note</label>
+                <input
+                  type="text"
+                  value={adjReason}
+                  onChange={(e) => setAdjReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => setIsAdjustmentModalOpen(false)}
-                  style={{ backgroundColor: 'transparent', border: '1px solid #273754', color: '#94a3b8', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}
+                  onClick={() => setAdjustmentItem(null)}
+                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ backgroundColor: '#00875a', color: '#fff', border: 'none', padding: '0.4rem 1rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                  className={`px-5 py-2 rounded-xl font-bold text-xs shadow-sm cursor-pointer ${
+                    adjType === 'STOCK_IN' ? 'bg-secondary text-on-secondary' : 'bg-error text-on-error'
+                  }`}
                 >
-                  Confirm Stock Movement
+                  Update Stock
                 </button>
               </div>
             </form>

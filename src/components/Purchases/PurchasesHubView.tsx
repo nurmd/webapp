@@ -5,18 +5,6 @@ import { CompanyProfile } from '../../models/company.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { getStateList } from '../../core/gst/stateCodes.ts';
-import {
-  Search,
-  Plus,
-  ShoppingBag,
-  TrendingDown,
-  ShieldCheck,
-  AlertOctagon,
-  Trash2,
-  X,
-  CheckCircle2,
-} from 'lucide-react';
 
 interface PurchasesHubViewProps {
   purchases: PurchaseBill[];
@@ -38,7 +26,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // New Purchase Bill Form State
+  // Form State
   const suppliers = parties.filter((p) => p.type === 'SUPPLIER' || p.type === 'CUSTOMER');
   const [selectedSupplierId, setSelectedSupplierId] = useState(suppliers[0]?.id || '');
   const [billNumber, setBillNumber] = useState(`BILL-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -58,96 +46,82 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
       itemId: itemsCatalog[0]?.id || '',
       name: itemsCatalog[0]?.name || 'Purchased Raw Material',
       hsnSacCode: itemsCatalog[0]?.hsnSacCode || '844332',
-      quantity: 5,
-      unitPrice: 2000,
-      gstRate: 18,
+      quantity: 10,
+      unitPrice: itemsCatalog[0]?.purchasePrice || 1000,
+      gstRate: itemsCatalog[0]?.gstRate || 18,
     },
   ]);
 
-  const addLine = () => {
-    setLines([...lines, { itemId: '', name: '', hsnSacCode: '844332', quantity: 1, unitPrice: 0, gstRate: 18 }]);
-  };
-
-  const removeLine = (idx: number) => {
-    if (lines.length === 1) return;
-    setLines(lines.filter((_, i) => i !== idx));
-  };
-
-  const updateLine = (idx: number, field: string, val: any) => {
-    const updated = [...lines];
-    (updated[idx] as any)[field] = val;
-    setLines(updated);
-  };
-
-  // Metrics
+  // Aggregates
   const totalPurchases = purchases.reduce((s, p) => s + p.grandTotal, 0);
-  const eligibleItc = purchases
+  const totalItcClaimable = purchases
     .filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5')
     .reduce((s, p) => s + p.totalTax, 0);
-  const ineligibleItc = purchases
-    .filter((p) => p.itcEligibility === 'INELIGIBLE_17_5')
-    .reduce((s, p) => s + p.totalTax, 0);
-  const totalPayables = purchases.reduce((s, p) => s + p.balanceAmount, 0);
 
-  // Live calculation
-  const calcInputs = lines.map((l) => ({
-    quantity: Number(l.quantity) || 1,
-    unitPrice: Number(l.unitPrice) || 0,
-    gstRate: Number(l.gstRate) || 0,
-  }));
-  const calcSummary = calculateInvoice(supplierStateCode, company.stateCode, calcInputs);
+  const filtered = purchases.filter((p) =>
+    p.billNumber.toLowerCase().includes(search.toLowerCase()) ||
+    p.supplierName.toLowerCase().includes(search.toLowerCase()) ||
+    (p.supplierGstin && p.supplierGstin.toLowerCase().includes(search.toLowerCase()))
+  );
 
-  const handleSaveBill = (e: React.FormEvent) => {
+  const handleCreatePurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    const sup = suppliers.find((p) => p.id === selectedSupplierId) || suppliers[0];
+    const sup = parties.find((p) => p.id === selectedSupplierId) || suppliers[0];
+    const supState = supplierStateCode || sup?.stateCode || company.stateCode;
+    const isIntra = supState === company.stateCode;
 
-    const billItems = lines.map((l, idx) => {
-      const calcItem = calcSummary.items[idx];
-      return {
-        itemId: l.itemId || undefined,
-        name: l.name,
-        hsnSacCode: l.hsnSacCode,
-        unit: 'PCS' as const,
+    const calc = calculateInvoice(
+      company.stateCode,
+      supState,
+      lines.map((l) => ({
         quantity: l.quantity,
         unitPrice: l.unitPrice,
-        taxableAmount: calcItem.taxableAmount,
         gstRate: l.gstRate,
-        cgstAmount: calcItem.cgstAmount,
-        sgstAmount: calcItem.sgstAmount,
-        igstAmount: calcItem.igstAmount,
-        cessAmount: calcItem.cessAmount,
-        totalAmount: calcItem.totalAmount,
-      };
-    });
+      }))
+    );
 
     const newBill: PurchaseBill = {
-      id: `PUR-${Date.now()}`,
-      billNumber,
-      date: billDate,
+      id: 'PUR-' + Date.now(),
+      billNumber: billNumber.trim(),
       supplierId: sup?.id || 'SUP-001',
-      supplierName: sup?.name || 'Local Supplier',
+      supplierName: sup?.name || 'Local Vendor',
       supplierGstin: sup?.gstin,
-      supplierAddress: sup?.billingAddress || 'Supplier City',
-      supplierStateCode,
+      supplierAddress: sup?.billingAddress || '',
+      supplierStateCode: supState,
       placeOfSupplyStateCode: company.stateCode,
-      isIntraState: calcSummary.isIntraState,
-      items: billItems,
+      isIntraState: isIntra,
+      date: billDate,
+      items: lines.map((l, idx) => ({
+        itemId: l.itemId,
+        name: l.name,
+        hsnSacCode: l.hsnSacCode,
+        unit: 'PCS',
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        taxableAmount: calc.items[idx]?.taxableAmount || l.quantity * l.unitPrice,
+        gstRate: l.gstRate,
+        cgstAmount: calc.items[idx]?.cgstAmount || 0,
+        sgstAmount: calc.items[idx]?.sgstAmount || 0,
+        igstAmount: calc.items[idx]?.igstAmount || 0,
+        cessAmount: 0,
+        totalAmount: calc.items[idx]?.totalAmount || 0,
+      })),
       itcEligibility,
       isRcm: false,
-      totalGrossAmount: calcSummary.totalGrossAmount,
-      totalDiscount: 0,
-      totalTaxableAmount: calcSummary.totalTaxableAmount,
-      totalCgst: calcSummary.totalCgst,
-      totalSgst: calcSummary.totalSgst,
-      totalIgst: calcSummary.totalIgst,
-      totalCess: calcSummary.totalCess,
-      totalTax: calcSummary.totalTax,
-      roundOff: calcSummary.roundOff,
-      grandTotal: calcSummary.grandTotal,
+      totalGrossAmount: calc.totalGrossAmount,
+      totalDiscount: calc.totalDiscount,
+      totalTaxableAmount: calc.totalTaxableAmount,
+      totalCgst: calc.totalCgst,
+      totalSgst: calc.totalSgst,
+      totalIgst: calc.totalIgst,
+      totalCess: 0,
+      totalTax: calc.totalTax,
+      roundOff: calc.roundOff,
+      grandTotal: calc.grandTotal,
+      paidAmount: calc.grandTotal,
+      balanceAmount: 0,
       paymentMode: 'NET_BANKING',
       paymentStatus: 'PAID',
-      paidAmount: calcSummary.grandTotal,
-      balanceAmount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -156,328 +130,257 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
     setIsModalOpen(false);
   };
 
-  const filtered = purchases.filter(
-    (p) =>
-      p.billNumber.toLowerCase().includes(search.toLowerCase()) ||
-      p.supplierName.toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Banner */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: '#162035',
-        padding: '1.25rem 1.5rem',
-        borderRadius: '12px',
-        border: '1px solid #273754',
-        flexWrap: 'wrap',
-        gap: '1rem',
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-            Purchases & Input Tax Credit (ITC) Hub
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: '4px 0 0 0' }}>
-            Vendor bills, stock intake, and GSTR-3B Input Tax Credit reconciliation
-          </p>
+    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto px-margin-mobile py-4 gap-space-sm">
+      {/* Top Banner: Metrics (Stitch purchases_hub) */}
+      <div className="grid grid-cols-2 gap-space-xs">
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+          <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">
+            Total Inward Purchases
+          </span>
+          <div className="font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold mt-0.5">
+            {formatINR(totalPurchases)}
+          </div>
+          <span className="text-[11px] text-on-surface-variant mt-1">
+            {purchases.length} Supplier Bills Logged
+          </span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
+          <span className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">
+            Eligible Input Tax Credit (ITC)
+          </span>
+          <div className="font-currency-display-mobile text-currency-display-mobile text-secondary font-extrabold mt-0.5">
+            {formatINR(totalItcClaimable)}
+          </div>
+          <span className="text-[11px] text-secondary font-semibold mt-1">
+            Claimable against sales GST
+          </span>
+        </div>
+      </div>
+
+      {/* Action Bar & Search */}
+      <div className="flex items-center gap-2 mt-2">
+        <div className="relative flex-1">
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">
+            search
+          </span>
+          <input
+            type="text"
+            placeholder="Search purchases by supplier, bill no..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-surface-container-lowest text-on-surface text-sm pl-11 pr-4 py-2.5 rounded-xl shadow-sm border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30"
+          />
         </div>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            backgroundColor: '#00875a',
-            color: '#fff',
-            border: 'none',
-            padding: '0.55rem 1.1rem',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 700,
-            fontSize: '0.85rem',
-          }}
+          className="h-10 px-4 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+          type="button"
         >
-          <Plus size={16} /> Record Purchase Bill
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          <span>+ Record Purchase</span>
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div style={{ backgroundColor: '#162035', padding: '1.1rem', borderRadius: '8px', border: '1px solid #273754' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Total Inward Purchases</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>{formatINR(totalPurchases)}</div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>{purchases.length} vendor bills recorded</div>
-        </div>
-
-        <div style={{ backgroundColor: '#162035', padding: '1.1rem', borderRadius: '8px', border: '1px solid #273754' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Claimable ITC (GSTR-3B)</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#6cf8bb', marginTop: '4px' }}>{formatINR(eligibleItc)}</div>
-          <div style={{ fontSize: '0.75rem', color: '#6cf8bb', marginTop: '2px' }}>Offsets outward GST liability</div>
-        </div>
-
-        <div style={{ backgroundColor: '#162035', padding: '1.1rem', borderRadius: '8px', border: '1px solid #273754' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Blocked / Ineligible ITC</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: ineligibleItc > 0 ? '#ef4444' : '#94a3b8', marginTop: '4px' }}>
-            {formatINR(ineligibleItc)}
+      {/* Purchases List */}
+      <div className="space-y-2 mt-1">
+        {filtered.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20">
+            No purchase records found.
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Section 17(5) blocked credits</div>
-        </div>
+        ) : (
+          filtered.map((bill) => (
+            <div
+              key={bill.id}
+              className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex items-center justify-between gap-3 hover:border-secondary/40 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant flex-shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+                </div>
 
-        <div style={{ backgroundColor: '#162035', padding: '1.1rem', borderRadius: '8px', border: '1px solid #273754' }}>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Vendor Payables</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: totalPayables > 0 ? '#f59e0b' : '#6cf8bb', marginTop: '4px' }}>
-            {formatINR(totalPayables)}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Outstanding to creditors</div>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        backgroundColor: '#162035',
-        padding: '0.5rem 0.85rem',
-        borderRadius: '8px',
-        border: '1px solid #273754',
-      }}>
-        <Search size={16} color="#94a3b8" />
-        <input
-          type="text"
-          placeholder="Search by vendor bill # or supplier name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ background: 'none', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: '0.85rem' }}
-        />
-      </div>
-
-      {/* Purchase Bills Table */}
-      <div style={{ backgroundColor: '#162035', borderRadius: '8px', border: '1px solid #273754', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#0a0f1d', color: '#94a3b8', borderBottom: '1px solid #273754' }}>
-              <th style={{ padding: '0.75rem 1rem' }}>Bill #</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Date</th>
-              <th style={{ padding: '0.75rem 1rem' }}>Supplier / Vendor</th>
-              <th style={{ padding: '0.75rem 1rem' }}>ITC Category</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Taxable</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Input GST (ITC)</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Bill Total</th>
-              <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p) => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #1d2a42' }}>
-                <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#60a5fa' }}>{p.billNumber}</td>
-                <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{formatDate(p.date)}</td>
-                <td style={{ padding: '0.75rem 1rem', color: '#f8fafc', fontWeight: 600 }}>
-                  {p.supplierName}
-                  {p.supplierGstin && <div style={{ fontSize: '0.7rem', color: '#38bdf8' }}>GSTIN: {p.supplierGstin}</div>}
-                </td>
-                <td style={{ padding: '0.75rem 1rem' }}>
-                  <span style={{
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    backgroundColor: p.itcEligibility === 'INELIGIBLE_17_5' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0, 135, 90, 0.2)',
-                    color: p.itcEligibility === 'INELIGIBLE_17_5' ? '#fca5a5' : '#6cf8bb',
-                  }}>
-                    {p.itcEligibility.replace('_', ' ')}
+                <div className="flex flex-col min-w-0">
+                  <span className="font-headline-sm text-sm text-on-surface font-bold truncate">
+                    {bill.supplierName}
                   </span>
-                </td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', color: '#cbd5e1' }}>{formatINR(p.totalTaxableAmount)}</td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#6cf8bb' }}>{formatINR(p.totalTax)}</td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#f8fafc' }}>{formatINR(p.grandTotal)}</td>
-                <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                  <button
-                    onClick={() => onDeletePurchase(p.id)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <div className="flex items-center gap-1.5 text-xs text-on-surface-variant mt-0.5">
+                    <span className="font-semibold text-secondary">{bill.billNumber}</span>
+                    <span>•</span>
+                    <span>{formatDate(bill.date)}</span>
+                    {bill.supplierGstin && (
+                      <>
+                        <span>•</span>
+                        <span className="text-[11px] font-mono">{bill.supplierGstin}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex flex-col items-end">
+                  <span className="font-tabular-data text-[15px] font-extrabold text-on-surface">
+                    {formatINR(bill.grandTotal)}
+                  </span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+                    ITC: {formatINR(bill.totalTax)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => onDeletePurchase(bill.id)}
+                  className="w-8 h-8 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
+                  title="Delete"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Record Purchase Modal */}
       {isModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(10, 15, 29, 0.9)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 70,
-          padding: '1rem',
-        }}>
-          <div style={{
-            backgroundColor: '#162035',
-            borderRadius: '12px',
-            border: '1px solid #273754',
-            width: '100%',
-            maxWidth: '850px',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}>
-            <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #273754', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-                Record Vendor Purchase Bill (Input Tax Credit)
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl border border-outline-variant/30 flex flex-col gap-4">
+            <h3 className="font-headline-sm text-lg font-bold text-on-surface">Record Supplier Purchase</h3>
 
-            <form onSubmit={handleSaveBill} style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Supplier / Vendor</label>
-                  <select
-                    value={selectedSupplierId}
-                    onChange={(e) => {
-                      setSelectedSupplierId(e.target.value);
-                      const s = suppliers.find((p) => p.id === e.target.value);
-                      if (s) setSupplierStateCode(s.stateCode);
-                    }}
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}
-                  >
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.stateCode})</option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={handleCreatePurchase} className="flex flex-col gap-3 text-xs">
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Select Supplier *</label>
+                <select
+                  value={selectedSupplierId}
+                  onChange={(e) => {
+                    setSelectedSupplierId(e.target.value);
+                    const match = parties.find((p) => p.id === e.target.value);
+                    if (match) setSupplierStateCode(match.stateCode);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                >
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Vendor Bill #</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">Supplier Bill # *</label>
                   <input
                     type="text"
                     required
                     value={billNumber}
                     onChange={(e) => setBillNumber(e.target.value)}
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>Bill Date</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">Bill Date</label>
                   <input
                     type="date"
-                    required
                     value={billDate}
                     onChange={(e) => setBillDate(e.target.value)}
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
                 </div>
+              </div>
 
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Item Purchased</label>
+                <input
+                  type="text"
+                  value={lines[0]?.name}
+                  onChange={(e) => {
+                    const updated = [...lines];
+                    updated[0].name = e.target.value;
+                    setLines(updated);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '3px' }}>ITC Eligibility</label>
+                  <label className="block font-bold text-on-surface-variant mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={lines[0]?.quantity}
+                    onChange={(e) => {
+                      const updated = [...lines];
+                      updated[0].quantity = parseFloat(e.target.value) || 1;
+                      setLines(updated);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">Cost Rate (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={lines[0]?.unitPrice}
+                    onChange={(e) => {
+                      const updated = [...lines];
+                      updated[0].unitPrice = parseFloat(e.target.value) || 0;
+                      setLines(updated);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">GST %</label>
                   <select
-                    value={itcEligibility}
-                    onChange={(e) => setItcEligibility(e.target.value as ItcEligibility)}
-                    style={{ width: '100%', backgroundColor: '#0a0f1d', border: '1px solid #273754', color: '#fff', padding: '0.5rem', borderRadius: '4px', fontSize: '0.85rem' }}
+                    value={lines[0]?.gstRate}
+                    onChange={(e) => {
+                      const updated = [...lines];
+                      updated[0].gstRate = parseFloat(e.target.value);
+                      setLines(updated);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   >
-                    <option value="ELIGIBLE_INPUTS">Eligible - Inputs (Goods)</option>
-                    <option value="ELIGIBLE_CAPITAL_GOODS">Eligible - Capital Goods</option>
-                    <option value="ELIGIBLE_SERVICES">Eligible - Input Services</option>
-                    <option value="INELIGIBLE_17_5">Ineligible - Blocked Sec 17(5)</option>
+                    <option value={0}>0%</option>
+                    <option value={5}>5%</option>
+                    <option value={12}>12%</option>
+                    <option value={18}>18%</option>
+                    <option value={28}>28%</option>
                   </select>
                 </div>
               </div>
 
-              {/* Items */}
-              <div style={{ backgroundColor: '#0a0f1d', padding: '0.75rem', borderRadius: '6px', border: '1px solid #273754' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>Purchased Items & Raw Materials</span>
-                  <button type="button" onClick={addLine} style={{ backgroundColor: '#2563eb', color: '#fff', border: 'none', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer' }}>
-                    + Add Item
-                  </button>
-                </div>
-
-                {lines.map((l, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 30px', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Item name"
-                      value={l.name}
-                      onChange={(e) => updateLine(idx, 'name', e.target.value)}
-                      required
-                      style={{ backgroundColor: '#162035', border: '1px solid #273754', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '0.8rem' }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="HSN"
-                      value={l.hsnSacCode}
-                      onChange={(e) => updateLine(idx, 'hsnSacCode', e.target.value)}
-                      style={{ backgroundColor: '#162035', border: '1px solid #273754', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '0.8rem' }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      min="1"
-                      value={l.quantity}
-                      onChange={(e) => updateLine(idx, 'quantity', Number(e.target.value))}
-                      style={{ backgroundColor: '#162035', border: '1px solid #273754', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '0.8rem' }}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Rate ₹"
-                      min="0"
-                      value={l.unitPrice}
-                      onChange={(e) => updateLine(idx, 'unitPrice', Number(e.target.value))}
-                      style={{ backgroundColor: '#162035', border: '1px solid #273754', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '0.8rem' }}
-                    />
-                    <select
-                      value={l.gstRate}
-                      onChange={(e) => updateLine(idx, 'gstRate', Number(e.target.value))}
-                      style={{ backgroundColor: '#162035', border: '1px solid #273754', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '0.8rem' }}
-                    >
-                      <option value={0}>0%</option>
-                      <option value={5}>5%</option>
-                      <option value={12}>12%</option>
-                      <option value={18}>18%</option>
-                      <option value={28}>28%</option>
-                    </select>
-                    <button type="button" onClick={() => removeLine(idx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Input Tax Credit (ITC)</label>
+                <select
+                  value={itcEligibility}
+                  onChange={(e) => setItcEligibility(e.target.value as ItcEligibility)}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                >
+                  <option value="ELIGIBLE_INPUTS">Eligible - Goods / Raw Materials</option>
+                  <option value="ELIGIBLE_SERVICES">Eligible - Business Services</option>
+                  <option value="ELIGIBLE_CAPITAL_GOODS">Eligible - Capital Assets</option>
+                  <option value="INELIGIBLE_17_5">Blocked u/s 17(5) - Ineligible</option>
+                </select>
               </div>
 
-              {/* Summary */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0a0f1d', padding: '0.75rem 1rem', borderRadius: '6px' }}>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Taxable: {formatINR(calcSummary.totalTaxableAmount)}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6cf8bb' }}>Input Tax Credit (ITC): {formatINR(calcSummary.totalTax)}</div>
-                </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc' }}>
-                  Total Bill: {formatINR(calcSummary.grandTotal)}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button type="button" onClick={() => setIsModalOpen(false)} style={{ backgroundColor: 'transparent', border: '1px solid #273754', color: '#94a3b8', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}>
+              <div className="flex justify-end gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
+                >
                   Cancel
                 </button>
-                <button type="submit" style={{ backgroundColor: '#00875a', color: '#fff', border: 'none', padding: '0.5rem 1.25rem', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}>
-                  <CheckCircle2 size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
-                  Save Purchase & Claim ITC
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer"
+                >
+                  Save Inward Bill
                 </button>
               </div>
             </form>
