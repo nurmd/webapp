@@ -111,11 +111,12 @@ class RbacService {
 
   // Permission Check Helpers
   public canAccessTab(tab: string, role: UserRole = this.activeUser.role): boolean {
+    if (tab === 'menu') return true;
     if (role === 'OWNER') return true;
 
     if (role === 'CASHIER') {
-      // Cashier only does POS counter, simple sales, dashboard, and inventory view
-      const allowed = ['dashboard', 'pos', 'sales', 'inventory'];
+      // Cashier only does POS counter, simple sales, dashboard, inventory view, and menu hub
+      const allowed = ['dashboard', 'pos', 'sales', 'inventory', 'menu'];
       return allowed.includes(tab);
     }
 

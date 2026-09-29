@@ -27,39 +27,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             className="material-symbols-outlined text-[24px]"
             style={{ fontVariationSettings: activeTab === 'dashboard' ? "'FILL' 1" : "'FILL' 0" }}
           >
-            dashboard
+            home
           </span>
           <span className="text-[11px] font-medium mt-0.5">Home</span>
         </button>
-
-        {/* Sales */}
-        <button
-          onClick={() => onSelectTab('sales')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-            activeTab === 'sales' ? 'text-secondary font-bold' : 'text-on-surface-variant'
-          }`}
-          type="button"
-        >
-          <span
-            className="material-symbols-outlined text-[24px]"
-            style={{ fontVariationSettings: activeTab === 'sales' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            point_of_sale
-          </span>
-          <span className="text-[11px] font-medium mt-0.5">Sales</span>
-        </button>
-
-        {/* Center Floating Action Button (+ New Bill) */}
-        <div className="relative -top-5 flex items-center justify-center flex-1">
-          <button
-            onClick={onNewInvoice}
-            aria-label="Create New Invoice"
-            className="w-14 h-14 rounded-full bg-secondary text-on-secondary shadow-[0_4px_16px_rgba(0,108,73,0.35)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer border-4 border-surface"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[28px]">add</span>
-          </button>
-        </div>
 
         {/* Parties */}
         <button
@@ -78,7 +49,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <span className="text-[11px] font-medium mt-0.5">Parties</span>
         </button>
 
-        {/* Inventory */}
+        {/* Center Floating Action Button (+ Add Bill) */}
+        <div className="relative -top-5 flex items-center justify-center flex-1">
+          <button
+            onClick={onNewInvoice}
+            aria-label="Create New Invoice"
+            className="w-13 h-13 rounded-full bg-secondary text-on-secondary shadow-[0_4px_16px_rgba(0,108,73,0.35)] flex items-center justify-center active:scale-95 transition-transform cursor-pointer border-4 border-surface"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[28px]">add</span>
+          </button>
+        </div>
+
+        {/* Items / Stock */}
         <button
           onClick={() => onSelectTab('inventory')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
@@ -92,7 +75,24 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           >
             inventory_2
           </span>
-          <span className="text-[11px] font-medium mt-0.5">Stock</span>
+          <span className="text-[11px] font-medium mt-0.5">Items</span>
+        </button>
+
+        {/* More / Menu Hub */}
+        <button
+          onClick={() => onSelectTab('menu')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
+            activeTab === 'menu' ? 'text-secondary font-bold' : 'text-on-surface-variant'
+          }`}
+          type="button"
+        >
+          <span
+            className="material-symbols-outlined text-[24px]"
+            style={{ fontVariationSettings: activeTab === 'menu' ? "'FILL' 1" : "'FILL' 0" }}
+          >
+            grid_view
+          </span>
+          <span className="text-[11px] font-medium mt-0.5">More</span>
         </button>
       </div>
     </nav>

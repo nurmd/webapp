@@ -16,6 +16,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   onSave,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>({ ...company });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
 
@@ -24,6 +27,30 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [updateRelease, setUpdateRelease] = useState<AppReleaseInfo | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
+
+  // Sync state
+  const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
+  const [syncUrlInput, setSyncUrlInput] = useState(syncState.remoteUrl || '');
+  const [isSyncConfigOpen, setIsSyncConfigOpen] = useState(false);
+  const [isSyncStarting, setIsSyncStarting] = useState(false);
+
+  // App preferences
+  const [appLanguage, setAppLanguage] = useState('English (India)');
+  const [isAppLockEnabled, setIsAppLockEnabled] = useState(true);
+
+  useEffect(() => {
+    setProfile({ ...company });
+  }, [company]);
+
+  useEffect(() => {
+    const unsub = pouch.subscribeSync((state) => {
+      setSyncState(state);
+      if (state.remoteUrl && !syncUrlInput) {
+        setSyncUrlInput(state.remoteUrl);
+      }
+    });
+    return unsub;
+  }, []);
 
   const handleCheckForUpdates = async () => {
     setIsUpdateChecking(true);
@@ -44,21 +71,6 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
-  // Sync state
-  const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
-  const [syncUrlInput, setSyncUrlInput] = useState(syncState.remoteUrl || '');
-  const [isSyncStarting, setIsSyncStarting] = useState(false);
-
-  useEffect(() => {
-    const unsub = pouch.subscribeSync((state) => {
-      setSyncState(state);
-      if (state.remoteUrl && !syncUrlInput) {
-        setSyncUrlInput(state.remoteUrl);
-      }
-    });
-    return unsub;
-  }, []);
-
   const handleStartSync = () => {
     if (!syncUrlInput.trim()) {
       pouch.stopSync();
@@ -66,7 +78,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
     setIsSyncStarting(true);
     pouch.startSync(syncUrlInput.trim());
-    setTimeout(() => setIsSyncStarting(false), 800);
+    setTimeout(() => {
+      setIsSyncStarting(false);
+      setIsSyncConfigOpen(false);
+    }, 800);
   };
 
   const handleStopSync = () => {
@@ -96,417 +111,857 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(profile);
     setSavedNotice(true);
+    setIsEditModalOpen(false);
     setTimeout(() => setSavedNotice(false), 3000);
   };
 
+  const stateName = getStateList().find((s) => s.code === profile.stateCode)?.name || 'Maharashtra';
+
   return (
-    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto px-margin-mobile py-4 gap-space-sm">
-      {/* Header Banner */}
-      <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm border border-outline-variant/30 flex items-center justify-between">
-        <div>
-          <h2 className="font-headline-sm text-lg font-bold text-on-surface">
-            Business Profile & GST Settings
-          </h2>
-          <p className="text-xs text-on-surface-variant mt-0.5">
-            Configures tax identification, print headers, bank accounts & UPI Dynamic QR
-          </p>
+    <div className="flex flex-col w-full px-margin-mobile pb-28 pt-2 max-w-3xl mx-auto gap-space-md">
+      {/* Toast Notice */}
+      {savedNotice && (
+        <div className="fixed top-20 left-4 right-4 z-50 max-w-md mx-auto bg-secondary text-on-secondary px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-fade-in font-bold text-xs">
+          <span className="material-symbols-outlined text-[20px]">check_circle</span>
+          <span>Business settings updated successfully!</span>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
-          <span className="material-symbols-outlined text-[22px]">settings</span>
-        </div>
-      </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 shadow-sm flex flex-col gap-5">
-        {/* Legal Entity Details */}
-        <div>
-          <div className="flex items-center gap-1.5 pb-2 border-b border-outline-variant/20 mb-3">
-            <span className="material-symbols-outlined text-secondary text-[18px]">domain</span>
-            <h3 className="font-label-md text-sm font-bold text-on-surface">
-              Legal Business Entity
-            </h3>
-          </div>
+      {/* 1. Merchant Identity Card (Stitch business_settings_profile) */}
+      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col gap-4 relative overflow-hidden">
+        {/* Subtle Ambient Corner Accent */}
+        <div className="absolute -right-12 -top-12 w-36 h-36 bg-secondary-fixed/40 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Legal Business Name *
-              </label>
-              <input
-                type="text"
-                required
-                value={profile.businessName}
-                onChange={(e) => setProfile({ ...profile, businessName: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-semibold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Trade Name (Brand Name)
-              </label>
-              <input
-                type="text"
-                value={profile.tradeName || ''}
-                onChange={(e) => setProfile({ ...profile, tradeName: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-medium"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* GSTIN & State */}
-        <div>
-          <div className="flex items-center gap-1.5 pb-2 border-b border-outline-variant/20 mb-3">
-            <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
-            <h3 className="font-label-md text-sm font-bold text-on-surface">
-              GSTIN & Registered State
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                GSTIN (15 Digits) *
-              </label>
-              <input
-                type="text"
-                required
-                maxLength={15}
-                value={profile.gstin}
-                onChange={(e) => handleGstinChange(e.target.value)}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono font-bold uppercase tracking-wider text-secondary"
-              />
-              {feedback && (
-                <div
-                  className={`text-[11px] mt-1 font-medium ${
-                    feedback.startsWith('Valid') ? 'text-secondary' : 'text-error'
-                  }`}
-                >
-                  {feedback}
-                </div>
+        <div className="flex items-start gap-3.5 relative">
+          {/* Store Avatar / Logo */}
+          <div className="relative flex-shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-center text-secondary font-bold text-2xl shadow-sm overflow-hidden">
+              {profile.logoUrl ? (
+                <img src={profile.logoUrl} alt="Store Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span>{profile.businessName.charAt(0) || 'V'}</span>
               )}
             </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Home State *
-              </label>
-              <select
-                value={profile.stateCode}
-                onChange={(e) => setProfile({ ...profile, stateCode: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-              >
-                {getStateList().map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.code} - {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-              Registered Address
-            </label>
-            <textarea
-              rows={2}
-              value={profile.address}
-              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Contact Phone
-              </label>
-              <input
-                type="text"
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={profile.email}
-                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Banking and UPI QR */}
-        <div>
-          <div className="flex items-center gap-1.5 pb-2 border-b border-outline-variant/20 mb-3">
-            <span className="material-symbols-outlined text-secondary text-[18px]">account_balance</span>
-            <h3 className="font-label-md text-sm font-bold text-on-surface">
-              Bank Details & UPI Payment QR
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Bank Name
-              </label>
-              <input
-                type="text"
-                value={profile.bankName || ''}
-                onChange={(e) => setProfile({ ...profile, bankName: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                Account Number
-              </label>
-              <input
-                type="text"
-                value={profile.accountNumber || ''}
-                onChange={(e) => setProfile({ ...profile, accountNumber: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                IFSC Code
-              </label>
-              <input
-                type="text"
-                value={profile.ifscCode || ''}
-                onChange={(e) => setProfile({ ...profile, ifscCode: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                UPI ID (Prints Dynamic QR on bills)
-              </label>
-              <input
-                type="text"
-                placeholder="merchant@okhdfcbank"
-                value={profile.upiId || ''}
-                onChange={(e) => setProfile({ ...profile, upiId: e.target.value })}
-                className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono text-secondary"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Cloud & Multi-Counter Sync (CouchDB / PouchDB) */}
-        <div className="p-4 bg-surface-container-low/50 rounded-2xl border border-outline-variant/30 flex flex-col gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20 flex-wrap gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-secondary text-[20px]">cloud_sync</span>
-              <div>
-                <h3 className="font-label-md text-sm font-bold text-on-surface">
-                  Offline-First &amp; Multi-Counter Sync (CouchDB / PouchDB)
-                </h3>
-                <p className="text-[11px] text-on-surface-variant">
-                  Continuous 2-way live sync across multiple store counters or remote backup
-                </p>
-              </div>
-            </div>
-
-            {/* Live Status Pill */}
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all"
-              style={{
-                backgroundColor:
-                  syncState.status === 'synced' ? 'rgba(0,108,73,0.1)' :
-                  syncState.status === 'syncing' ? 'rgba(30,136,229,0.1)' :
-                  syncState.status === 'connecting' ? 'rgba(245,158,11,0.1)' :
-                  syncState.status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(100,116,139,0.1)',
-                borderColor:
-                  syncState.status === 'synced' ? 'rgba(0,108,73,0.3)' :
-                  syncState.status === 'syncing' ? 'rgba(30,136,229,0.3)' :
-                  syncState.status === 'connecting' ? 'rgba(245,158,11,0.3)' :
-                  syncState.status === 'error' ? 'rgba(239,68,68,0.3)' : 'rgba(100,116,139,0.3)',
-                color:
-                  syncState.status === 'synced' ? '#006c49' :
-                  syncState.status === 'syncing' ? '#1e88e5' :
-                  syncState.status === 'connecting' ? '#d97706' :
-                  syncState.status === 'error' ? '#dc2626' : '#64748b',
-              }}
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              aria-label="Upload Store Logo"
+              className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md active:scale-90 transition-transform cursor-pointer"
             >
-              <span className={`w-2 h-2 rounded-full ${
-                syncState.status === 'synced' ? 'bg-[#006c49] animate-pulse' :
-                syncState.status === 'syncing' ? 'bg-[#1e88e5] animate-ping' :
-                syncState.status === 'connecting' ? 'bg-[#d97706] animate-pulse' :
-                syncState.status === 'error' ? 'bg-[#dc2626]' : 'bg-[#64748b]'
-              }`} />
-              <span className="uppercase text-[10px] tracking-wider">
-                {syncState.status === 'synced' ? 'Live Synced' :
-                 syncState.status === 'syncing' ? 'Syncing...' :
-                 syncState.status === 'connecting' ? 'Connecting...' :
-                 syncState.status === 'error' ? 'Sync Error' : 'Local Offline Mode'}
+              <span className="material-symbols-outlined text-[13px]">photo_camera</span>
+            </button>
+          </div>
+
+          {/* Business Name & Verification */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h2 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
+                {profile.businessName || 'Vyapar Store'}
+              </h2>
+            </div>
+            <p className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+              {profile.tradeName || 'Wholesale & Retail Groceries'}
+            </p>
+            {/* Verification Pill */}
+            <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              <span>GST Portal Verified</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Essential Metadata Grid */}
+        <div className="bg-surface-container-low/70 rounded-xl p-3.5 flex flex-col gap-2 text-xs">
+          <div className="flex items-center justify-between text-on-surface">
+            <span className="text-on-surface-variant font-medium">GSTIN</span>
+            <span className="font-tabular-data tracking-wider font-bold text-on-surface">
+              {profile.gstin || '27AAAAA0000A1Z5'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-on-surface">
+            <span className="text-on-surface-variant font-medium">Taxpayer Status</span>
+            <span className="text-secondary font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              Active • Regular
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between text-on-surface">
+            <span className="text-on-surface-variant font-medium">Contact Phone</span>
+            <span className="font-medium text-on-surface">{profile.phone || '+91 98000 00000'}</span>
+          </div>
+
+          <div className="flex items-center justify-between text-on-surface">
+            <span className="text-on-surface-variant font-medium">UPI Payment VPA</span>
+            <span className="font-mono text-secondary font-bold truncate max-w-[200px]">
+              {profile.upiId || 'Not Configured'}
+            </span>
+          </div>
+
+          <div className="pt-1.5 border-t border-outline-variant/20 flex items-start gap-1.5 text-on-surface-variant">
+            <span className="material-symbols-outlined text-[15px] flex-shrink-0 mt-0.5 text-secondary">
+              location_on
+            </span>
+            <p className="text-[11px] leading-tight text-on-surface-variant line-clamp-2">
+              {profile.address || 'Shop No. 1, Main Market Road'}, {stateName} - {profile.pincode || '411001'}
+            </p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="h-10 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[17px]">edit</span>
+            <span>Edit Profile</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsQrModalOpen(true)}
+            className="h-10 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[17px]">qr_code_2</span>
+            <span>Store QR</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 2. Store Data Protected / Sync Pulse Banner (Stitch Design) */}
+      <section className="bg-secondary-container/60 text-on-secondary-container rounded-2xl p-4 shadow-sm border border-secondary/20 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm">
+              <span className="material-symbols-outlined text-[22px]">cloud_done</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
+                Store Data Protected
+              </span>
+              <span className="text-[11px] text-on-secondary-container/80 truncate">
+                {(syncState.status === 'synced' || syncState.status === 'syncing')
+                  ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
+                  : '100% Offline-First IndexedDB Storage Ready'}
               </span>
             </div>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-              Remote CouchDB / Cloudant URL
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="text"
-                placeholder="https://admin:password@couchdb.yourstore.com/vyapar_store"
-                value={syncUrlInput}
-                onChange={(e) => setSyncUrlInput(e.target.value)}
-                className="flex-1 bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-xs text-on-surface font-mono outline-none focus:border-secondary"
-              />
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={handleStartSync}
-                  disabled={isSyncStarting}
-                  className="px-4 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {isSyncStarting ? 'sync' : 'sync_saved_locally'}
-                  </span>
-                  <span>{syncState.remoteUrl ? 'Re-Sync' : 'Connect'}</span>
-                </button>
-
-                {syncState.remoteUrl && (
-                  <button
-                    type="button"
-                    onClick={handleStopSync}
-                    className="px-3 py-2.5 bg-error-container text-on-error-container rounded-xl text-xs font-bold hover:bg-error-container/80 transition-all cursor-pointer flex items-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">link_off</span>
-                    <span>Disconnect</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {syncState.error && (
-              <div className="text-[11px] text-error font-medium mt-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">error</span>
-                <span>{syncState.error}</span>
-              </div>
-            )}
-
-            {syncState.lastSyncedAt && (
-              <div className="text-[10px] text-on-surface-variant mt-1">
-                Last synchronized: {new Date(syncState.lastSyncedAt).toLocaleTimeString()}
-              </div>
-            )}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleStartSync}
+              className="px-3 py-1.5 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer"
+            >
+              {isSyncStarting ? 'Syncing...' : 'Sync Now'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSyncConfigOpen(!isSyncConfigOpen)}
+              className="w-8 h-8 rounded-xl bg-secondary/15 flex items-center justify-center text-on-secondary-container hover:bg-secondary/25 transition-colors cursor-pointer"
+              title="Configure Remote CouchDB URL"
+            >
+              <span className="material-symbols-outlined text-[18px]">tune</span>
+            </button>
           </div>
         </div>
 
-        {/* Software & In-App Updates */}
-        <div className="p-4 bg-surface-container-low/50 rounded-2xl border border-outline-variant/30 flex flex-col gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20 flex-wrap gap-2">
+        {/* Collapsible Sync Settings */}
+        {isSyncConfigOpen && (
+          <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2 animate-fade-in">
+            <label className="text-[11px] font-bold text-on-secondary-container">
+              Remote CouchDB / Cloudflare Tunnel URL:
+            </label>
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-secondary text-[22px]">system_update</span>
-              <div>
-                <h3 className="font-label-md text-sm font-bold text-on-surface">
-                  Software Updates &amp; GitHub OTA Channel
-                </h3>
-                <p className="text-[11px] text-on-surface-variant">
-                  Current Installed Version: <strong className="text-secondary font-mono">v{CURRENT_APP_VERSION} (PRO)</strong>
-                  <span className="mx-1">•</span>
-                  <span>Static Keystore Signed</span>
-                </p>
+              <input
+                type="text"
+                placeholder="https://admin:pass@sync.example.com/vyapar_store"
+                value={syncUrlInput}
+                onChange={(e) => setSyncUrlInput(e.target.value)}
+                className="flex-1 bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"
+              />
+              <button
+                type="button"
+                onClick={handleStartSync}
+                className="px-3 py-2 bg-secondary text-on-secondary rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Connect
+              </button>
+              {syncState.remoteUrl && (
+                <button
+                  type="button"
+                  onClick={handleStopSync}
+                  className="px-3 py-2 bg-error text-on-error rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 3. In-App OTA Update Channel Card */}
+      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-secondary flex-shrink-0">
+            <span className="material-symbols-outlined text-[22px]">system_update</span>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-headline-sm text-sm font-bold text-on-surface">App Updates & OTA</span>
+              <span className="bg-secondary text-on-secondary text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                v{CURRENT_APP_VERSION}
+              </span>
+            </div>
+            <span className="text-[11px] text-on-surface-variant truncate">
+              {updateStatusText || 'Automatic GitHub releases OTA channel'}
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleCheckForUpdates}
+          disabled={isUpdateChecking}
+          className="px-3.5 py-2 bg-surface-container text-on-surface hover:bg-surface-container-high rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex-shrink-0 flex items-center gap-1 active:scale-95"
+        >
+          <span className="material-symbols-outlined text-[16px]">
+            {isUpdateChecking ? 'progress_activity' : 'refresh'}
+          </span>
+          <span>{isUpdateChecking ? 'Checking...' : 'Check Update'}</span>
+        </button>
+      </section>
+
+      {/* GROUP 1: Tax & Legal Compliance (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1 flex items-center justify-between">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Tax & Legal Compliance
+          </h3>
+          <span className="font-label-sm text-[11px] text-secondary font-bold">GST Mode: Regular</span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Item 1: GST & Tax Rates */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('tax_rates')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">account_balance</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">GST & Tax Rates</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                Slab rates 0%, 5%, 12%, 18%, 28% • RCM & Cess Ready
               </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+
+          {/* Item 2: State & Place of Supply */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('place_of_supply')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">map</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">State & Place of Supply</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                {stateName} ({profile.stateCode}) • Auto CGST+SGST / IGST Engine
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+
+          {/* Item 3: E-Way Bill & E-Invoice */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('eway_bill')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">local_shipping</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-label-md text-sm font-bold text-on-surface">E-Way Bill & E-Invoice API</span>
+                <span className="px-1.5 py-0.2 rounded bg-secondary-container text-on-secondary-container text-[10px] font-bold">
+                  Active
+                </span>
+              </div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                Threshold ₹50,000 • Official NIC Portal JSON v1.1
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+      {/* GROUP 2: Invoicing & Printing Setup (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Billing & Printing Setup
+          </h3>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Thermal Printing */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('printing')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">print</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes & Thermal Printing</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                3-inch (80mm) & 2-inch (58mm) Thermal Active • Modern A4
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+
+          {/* Invoice Series Numbering */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('prefix_series')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">pin</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Prefix & Invoice Series</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                Prefix: {profile.invoicePrefix || 'INV-2024-'} • Retail POS & Tax Bills
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+
+          {/* Automated WhatsApp */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('whatsapp_alerts')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-secondary flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">chat</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Automated WhatsApp & SMS Alerts</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                Instant bill PDF share • Dynamic UPI Payment Reminders
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+      {/* GROUP 3: Banking & UPI Payments (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1 flex items-center justify-between">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Payments & Banking
+          </h3>
+          <span className="font-label-sm text-[11px] text-on-surface-variant font-bold">Default UPI Linked</span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Bank Accounts & Default UPI QR */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('banking_upi')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">account_balance_wallet</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Bank Accounts & Default UPI QR</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                {profile.bankName || 'HDFC Bank'} • UPI: {profile.upiId || 'Not Configured'}
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+      {/* GROUP 4: Staff Roles & Permissions (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Staff Access & Protection
+          </h3>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('staff_roles')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">group</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Staff Roles & Permissions</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                3 Roles: Owner (Full PIN), Cashier (Bill Only), CA (Audit & Books)
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+      {/* GROUP 5: Device, Language & App Lock (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Device & Language
+          </h3>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Language Selector */}
+          <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px]">translate</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-label-md text-sm font-bold text-on-surface">App Language</div>
+                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">{appLanguage}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {(['English (India)', 'हिंदी (Hindi)'] as const).map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => setAppLanguage(lang)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    appLanguage === lang
+                      ? 'bg-secondary text-on-secondary shadow-sm'
+                      : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                  }`}
+                >
+                  {lang.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Biometric / PIN Lock Toggle */}
+          <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px]">fingerprint</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-label-md text-sm font-bold text-on-surface">App Lock & 4-Digit PIN</div>
+                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                  Protect invoice deletions & role switching with PIN
+                </div>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={isAppLockEnabled}
+                onChange={(e) => setIsAppLockEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      {/* Version Footnote */}
+      <div className="text-center py-4 space-y-1">
+        <p className="text-xs font-bold text-outline">
+          Vyapar PRO Books • v{CURRENT_APP_VERSION}
+        </p>
+        <p className="text-[11px] text-outline-variant">
+          100% Offline-First Multi-Device Architecture
+        </p>
+      </div>
+
+      {/* ================= MODALS & DRAWERS ================= */}
+
+      {/* 1. Edit Business Profile Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-outline-variant/30">
+            {/* Header */}
+            <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary text-[24px]">store</span>
+                <h3 className="font-headline-sm text-base font-bold text-on-surface">Edit Business Profile</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <form onSubmit={handleSaveProfile} className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-on-surface block mb-1">Business / Registered Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={profile.businessName}
+                  onChange={(e) => setProfile({ ...profile, businessName: e.target.value })}
+                  className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-on-surface block mb-1">Trade Name / Slogan</label>
+                <input
+                  type="text"
+                  value={profile.tradeName || ''}
+                  onChange={(e) => setProfile({ ...profile, tradeName: e.target.value })}
+                  className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-on-surface block mb-1">GSTIN (15 Digits)</label>
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={profile.gstin}
+                    onChange={(e) => handleGstinChange(e.target.value)}
+                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-mono font-bold uppercase outline-none"
+                  />
+                  {feedback && <p className="text-[10px] text-secondary font-medium mt-1">{feedback}</p>}
+                </div>
+
+                <div>
+                  <label className="font-bold text-on-surface block mb-1">State / POS Code</label>
+                  <select
+                    value={profile.stateCode}
+                    onChange={(e) => setProfile({ ...profile, stateCode: e.target.value })}
+                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                  >
+                    {getStateList().map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-on-surface block mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    value={profile.phone}
+                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-on-surface block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={profile.email}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-on-surface block mb-1">Registered Address</label>
+                <textarea
+                  rows={2}
+                  value={profile.address}
+                  onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                  className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-outline-variant/20 space-y-3">
+                <h4 className="font-bold text-secondary text-xs uppercase">Banking & Payment Setup</h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-on-surface block mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC Bank"
+                      value={profile.bankName || ''}
+                      onChange={(e) => setProfile({ ...profile, bankName: e.target.value })}
+                      className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-on-surface block mb-1">Account Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 50200012345678"
+                      value={profile.accountNumber || ''}
+                      onChange={(e) => setProfile({ ...profile, accountNumber: e.target.value })}
+                      className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-on-surface block mb-1">IFSC Code</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. HDFC0001234"
+                      value={profile.ifscCode || ''}
+                      onChange={(e) => setProfile({ ...profile, ifscCode: e.target.value.toUpperCase() })}
+                      className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-mono uppercase font-bold outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-on-surface block mb-1">Default UPI VPA / ID</label>
+                    <input
+                      type="text"
+                      placeholder="merchant@upi"
+                      value={profile.upiId || ''}
+                      onChange={(e) => setProfile({ ...profile, upiId: e.target.value.trim() })}
+                      className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-on-surface block mb-1">Invoice Numbering Prefix</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. INV-2024-"
+                    value={profile.invoicePrefix || ''}
+                    onChange={(e) => setProfile({ ...profile, invoicePrefix: e.target.value.trim() })}
+                    className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-outline-variant/20 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-md hover:bg-secondary/90 active:scale-95 transition-all"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Store UPI QR Code Modal */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant/30 text-center flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-secondary text-on-secondary flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-[28px]">qr_code_2</span>
+            </div>
+            <h3 className="font-headline-sm text-base font-bold text-on-surface">{profile.businessName}</h3>
+            <p className="text-xs text-on-surface-variant font-medium">Scan with any UPI App to Pay</p>
+
+            {/* QR Mock / Box */}
+            <div className="w-48 h-48 rounded-2xl bg-surface p-3 border-2 border-dashed border-secondary/40 flex flex-col items-center justify-center shadow-inner my-2">
+              <span className="material-symbols-outlined text-6xl text-secondary">qr_code_2</span>
+              <span className="text-[11px] font-mono text-outline font-bold mt-1">
+                {profile.upiId || 'merchant@upi'}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-outline font-semibold">
+              This QR code is automatically embedded onto thermal receipts and PDF invoices.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setIsQrModalOpen(false)}
+              className="w-full py-2.5 mt-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-md cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Sub-feature Info Modals */}
+      {activeSubModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-md w-full p-5 shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <h4 className="font-headline-sm text-sm font-bold text-on-surface capitalize">
+                {activeSubModal.replace('_', ' ')}
+              </h4>
+              <button
+                onClick={() => setActiveSubModal(null)}
+                className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-on-surface-variant space-y-2 py-2">
+              {activeSubModal === 'tax_rates' && (
+                <>
+                  <p className="font-semibold text-on-surface">Standard GST Tax Slabs Configured:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>0% (Exempt: Essential Food, Unbranded grains)</li>
+                    <li>5% (Standard: Tea, Spices, Sugar, Edible Oils)</li>
+                    <li>12% (Standard: Processed food, butter, ghee)</li>
+                    <li>18% (Standard: Household goods, soap, stationery, electronics)</li>
+                    <li>28% (Luxury & Sin: Pan masala, premium goods)</li>
+                  </ul>
+                  <p className="text-secondary font-bold pt-1">
+                    Reverse Charge Mechanism (RCM) and Compensation Cess can be toggled on per item.
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'place_of_supply' && (
+                <>
+                  <p className="font-semibold text-on-surface">State Tax Engine (Intra vs. Inter-state):</p>
+                  <p>
+                    When party state equals <strong>{stateName} ({profile.stateCode})</strong>, the app automatically bifurcates tax into <strong>CGST (50%)</strong> and <strong>SGST (50%)</strong>.
+                  </p>
+                  <p>
+                    For different states, <strong>IGST (100%)</strong> is automatically applied according to Indian GST law.
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'eway_bill' && (
+                <>
+                  <p className="font-semibold text-on-surface">Government NIC E-Way Bill Integration:</p>
+                  <p>
+                    Consignments exceeding <strong>₹50,000</strong> invoice value automatically generate compliant JSON payloads for direct upload to <code>ewaybillgst.gov.in</code>.
+                  </p>
+                  <p className="text-secondary font-bold">
+                    Vehicle Number, Transporter ID, and Distance (km) fields are ready on B2B invoices.
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'printing' && (
+                <>
+                  <p className="font-semibold text-on-surface">Thermal & Document Printing Formats:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li><strong>3-Inch (80mm) ESC/POS</strong>: Standard high-speed POS receipt printer.</li>
+                    <li><strong>2-Inch (58mm) Mobile Bluetooth</strong>: Portable battery-powered thermal printers.</li>
+                    <li><strong>A4 Modern Laser</strong>: Detailed GST tax invoice with full company stamp & signature.</li>
+                  </ul>
+                </>
+              )}
+
+              {activeSubModal === 'prefix_series' && (
+                <>
+                  <p className="font-semibold text-on-surface">Invoice Numbering Configuration:</p>
+                  <p>
+                    Current series starts with: <code>{profile.invoicePrefix || 'INV-2024-'}</code> followed by 4-digit incremental counters.
+                  </p>
+                  <p>
+                    You can change your custom invoice prefix anytime via the <strong>Edit Profile</strong> button.
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'whatsapp_alerts' && (
+                <>
+                  <p className="font-semibold text-on-surface">Automated WhatsApp Reminders:</p>
+                  <p>
+                    One-tap customer ledger sharing generates polite, vernacular payment reminders in English and Hindi (हिंदी) with a dynamic UPI pay link pre-populated with your VPA (<code>{profile.upiId || 'Not set'}</code>).
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'banking_upi' && (
+                <>
+                  <p className="font-semibold text-on-surface">Bank & Dynamic UPI QR Setup:</p>
+                  <p>
+                    Linked Bank: <strong>{profile.bankName || 'Not set'}</strong> ({profile.accountNumber || 'No A/C'})
+                  </p>
+                  <p>
+                    IFSC: <strong>{profile.ifscCode || 'None'}</strong>
+                  </p>
+                  <p>
+                    UPI VPA: <strong>{profile.upiId || 'None'}</strong>
+                  </p>
+                </>
+              )}
+
+              {activeSubModal === 'staff_roles' && (
+                <>
+                  <p className="font-semibold text-on-surface">Role-Based Access Control (RBAC):</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li><strong>Business Owner</strong>: Full administrative privileges, invoice deletion, settings & updates.</li>
+                    <li><strong>Cashier / POS Staff</strong>: Quick billing, scan & print only. No invoice deletion.</li>
+                    <li><strong>Chartered Accountant (CA)</strong>: Read-only access to GSTR reports, balance sheet, and daybook.</li>
+                  </ul>
+                  <p className="text-secondary font-bold pt-1">
+                    Switch roles anytime via the top-right profile icon or drawer using your 4-digit security PIN.
+                  </p>
+                </>
+              )}
             </div>
 
             <button
               type="button"
-              disabled={isUpdateChecking}
-              onClick={handleCheckForUpdates}
-              className="px-4 py-2 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              onClick={() => setActiveSubModal(null)}
+              className="w-full py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">
-                {isUpdateChecking ? 'sync' : 'refresh'}
-              </span>
-              <span>{isUpdateChecking ? 'Checking...' : 'Check GitHub Releases'}</span>
+              Close
             </button>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
-                <span className="text-on-surface font-semibold">Static Keystore</span>
-              </div>
-              <span className="text-[10px] font-mono bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full font-bold">
-                Valid to 2054
-              </span>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-secondary">cloud_download</span>
-                <span className="text-on-surface font-semibold">OTA Source</span>
-              </div>
-              <span className="text-[10px] font-mono text-on-surface-variant font-bold">
-                nurmd/webapp
-              </span>
-            </div>
-          </div>
-
-          {updateStatusText && (
-            <div className="text-xs font-medium text-secondary flex items-center gap-1.5 bg-secondary/10 p-2.5 rounded-xl border border-secondary/20">
-              <span className="material-symbols-outlined text-[16px]">info</span>
-              <span>{updateStatusText}</span>
-            </div>
-          )}
         </div>
+      )}
 
-        {/* Invoice Default Terms & Conditions */}
-        <div>
-          <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-            Invoice Default Terms & Conditions
-          </label>
-          <textarea
-            rows={3}
-            value={profile.termsAndConditions || ''}
-            onChange={(e) => setProfile({ ...profile, termsAndConditions: e.target.value })}
-            className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-          />
-        </div>
-
-        {/* Save Bar */}
-        <div className="flex items-center justify-between pt-3 border-t border-outline-variant/20 flex-wrap gap-2">
-          {savedNotice ? (
-            <span className="text-secondary text-xs font-semibold flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
-              <span>Company profile updated successfully!</span>
-            </span>
-          ) : (
-            <span />
-          )}
-
-          <button
-            type="submit"
-            className="inline-flex items-center gap-1.5 bg-secondary text-on-secondary font-label-md text-sm font-bold px-6 py-2.5 rounded-xl shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">save</span>
-            <span>Save Profile Settings</span>
-          </button>
-        </div>
-      </form>
-
-      {/* App Update Modal */}
+      {/* App Auto-Update Modal */}
       <AppUpdateModal
         isOpen={isUpdateModalOpen}
         releaseInfo={updateRelease}

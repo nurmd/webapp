@@ -33,6 +33,7 @@ import { BusinessReportsView } from './components/Reports/BusinessReportsView.ts
 import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
 import { StitchShowcaseView } from './components/StitchShowcase/StitchShowcaseView.tsx';
+import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHubView.tsx';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
 import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
@@ -286,7 +287,7 @@ export const App: React.FC = () => {
         activeUser={activeUser}
         onOpenDrawer={() => setIsDrawerOpen(true)}
         onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
-        onSearchClick={() => handleSelectTab('sales')}
+        onSearchClick={() => handleSelectTab('menu')}
         onBarcodeClick={() => handleSelectTab('pos')}
         onProfileClick={() => setIsRoleSwitchOpen(true)}
       />
@@ -409,6 +410,25 @@ export const App: React.FC = () => {
           <CompanySettingsView
             company={company}
             onSave={handleSaveCompany}
+          />
+        )}
+
+        {activeTab === 'menu' && (
+          <NavigationMenuHubView
+            company={company}
+            invoices={invoices}
+            purchases={purchases}
+            parties={parties}
+            items={items}
+            expenses={expenses}
+            vouchers={vouchers}
+            onNavigate={handleSelectTab}
+            onNewInvoice={() => {
+              setEditingInvoice(null);
+              setIsTableGridInvoiceOpen(true);
+            }}
+            onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
+            onCheckUpdate={() => setIsUpdateModalOpen(true)}
           />
         )}
       </main>

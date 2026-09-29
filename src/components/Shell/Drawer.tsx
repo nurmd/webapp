@@ -14,7 +14,8 @@ export type AppTab =
   | 'accounting'
   | 'pos'
   | 'stitch'
-  | 'settings';
+  | 'settings'
+  | 'menu';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 }) => {
   const navItems: Array<{ id: AppTab; label: string; icon: string }> = [
     { id: 'dashboard', label: 'Dashboard / Home', icon: 'dashboard' },
+    { id: 'menu', label: 'Navigation Menu Hub', icon: 'grid_view' },
     { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
     { id: 'purchases', label: 'Purchases & Orders', icon: 'shopping_bag' },
     { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
