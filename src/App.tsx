@@ -370,6 +370,7 @@ export const App: React.FC = () => {
             onSaveItem={handleSaveItem}
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
+            onScanBarcodeClick={() => handleSelectTab('pos')}
           />
         )}
 

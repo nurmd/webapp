@@ -419,10 +419,12 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               <span className="material-symbols-outlined text-secondary text-[22px]">system_update</span>
               <div>
                 <h3 className="font-label-md text-sm font-bold text-on-surface">
-                  Software Updates &amp; App Version
+                  Software Updates &amp; GitHub OTA Channel
                 </h3>
                 <p className="text-[11px] text-on-surface-variant">
                   Current Installed Version: <strong className="text-secondary font-mono">v{CURRENT_APP_VERSION} (PRO)</strong>
+                  <span className="mx-1">•</span>
+                  <span>Static Keystore Signed</span>
                 </p>
               </div>
             </div>
@@ -436,8 +438,30 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               <span className="material-symbols-outlined text-[16px]">
                 {isUpdateChecking ? 'sync' : 'refresh'}
               </span>
-              <span>{isUpdateChecking ? 'Checking...' : 'Check for Updates'}</span>
+              <span>{isUpdateChecking ? 'Checking...' : 'Check GitHub Releases'}</span>
             </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
+                <span className="text-on-surface font-semibold">Static Keystore</span>
+              </div>
+              <span className="text-[10px] font-mono bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded-full font-bold">
+                Valid to 2054
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/20 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-secondary">cloud_download</span>
+                <span className="text-on-surface font-semibold">OTA Source</span>
+              </div>
+              <span className="text-[10px] font-mono text-on-surface-variant font-bold">
+                nurmd/webapp
+              </span>
+            </div>
           </div>
 
           {updateStatusText && (

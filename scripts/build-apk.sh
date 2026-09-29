@@ -25,6 +25,22 @@ cp -r dist/* "$NATIVE_DIR/app/src/main/assets/"
 # 3. Clean & Prepare Build Directories
 echo "[3/6] Compiling Android resources with aapt2..."
 cd "$NATIVE_DIR"
+
+KEYSTORE_FILE="$NATIVE_DIR/keystore/app-key.keystore"
+if [ ! -f "$KEYSTORE_FILE" ]; then
+  echo "FATAL ERROR: Static release keystore not found at $KEYSTORE_FILE!"
+  echo "A static keystore is strictly required to ensure OTA updates can be installed without signature mismatches."
+  exit 1
+fi
+
+# Dynamically parse app version and integer version-code from package.json
+APP_VERSION=$(node -p "require('$APP_DIR/package.json').version || '1.0.0'")
+VERSION_CODE=$(echo "$APP_VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+if [ -z "$VERSION_CODE" ] || [ "$VERSION_CODE" -eq 0 ] 2>/dev/null; then
+  VERSION_CODE=1
+fi
+echo "Target Android Version: v$APP_VERSION (versionCode: $VERSION_CODE)"
+
 rm -rf build
 mkdir -p build/compiled-res build/gen build/app-classes build/dex dist-android
 
@@ -37,8 +53,8 @@ aapt2 link -I /system/framework/framework-res.apk \
   --manifest app/src/main/AndroidManifest.xml \
   --min-sdk-version 24 \
   --target-sdk-version 35 \
-  --version-code 1 \
-  --version-name "1.0.0" \
+  --version-code "$VERSION_CODE" \
+  --version-name "$APP_VERSION" \
   -o build/base.apk \
   build/compiled-res/*.flat \
   --java build/gen \
@@ -56,8 +72,8 @@ d8 --lib "$ANDROID_JAR" \
   "$KOTLIN_LIB" \
   --output build/dex/
 
-# 6. Package and Sign APK
-echo "[6/6] Packaging and signing Android APK..."
+# 6. Package and Sign APK with Static Keystore
+echo "[6/6] Packaging and signing Android APK with static keystore ($KEYSTORE_FILE)..."
 cp build/base.apk build/app-unaligned.apk
 (cd build/dex && zip -u ../app-unaligned.apk classes.dex)
 
@@ -65,11 +81,15 @@ mkdir -p "$APP_DIR/dist-android"
 FINAL_APK="$APP_DIR/dist-android/GSTBilling-Vyapar.apk"
 
 apksigner sign \
-  --ks keystore/app-key.keystore \
+  --ks "$KEYSTORE_FILE" \
   --ks-pass pass:android \
   --key-pass pass:android \
   --out "$FINAL_APK" \
   build/app-unaligned.apk
+
+# Verify signature
+echo "Verifying static keystore signature on output APK..."
+apksigner verify --verbose "$FINAL_APK" | grep -E "Verifies|Signer #1" || true
 
 # Copy to device Downloads if storage access exists
 DOWNLOADS_DIR="/data/data/com.termux/files/home/storage/downloads"

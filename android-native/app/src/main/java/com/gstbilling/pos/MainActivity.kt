@@ -159,4 +159,31 @@ class AndroidBridge(private val context: Context, private val vibrator: Vibrator
             }
         } catch (_: Exception) {}
     }
+
+    @JavascriptInterface
+    fun openUrl(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            (context as? Activity)?.runOnUiThread {
+                Toast.makeText(context, "Could not open URL: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun installApk(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            (context as? Activity)?.runOnUiThread {
+                Toast.makeText(context, "Cannot launch installer: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 }
+
