@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100%;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-surface": "#111c2d", "error": "#ba1a1a", "outline-variant": "#c5c6cd", "tertiary-fixed-dim": "#ffb95f", "surface-bright": "#f9f9ff", "error-container": "#ffdad6", "on-error-container": "#93000a", "on-background": "#111c2d", "on-secondary-fixed": "#002113", "on-primary-container": "#77849c", "tertiary-container": "#2a1700", "on-tertiary-container": "#b87500", "on-secondary-fixed-variant": "#005236", "on-tertiary": "#ffffff", "surface-dim": "#cfdaf2", "secondary-fixed-dim": "#4edea3", "background": "#f9f9ff", "primary-fixed-dim": "#bac7e1", "on-secondary-container": "#00714d", "secondary-container": "#6cf8bb", "on-secondary": "#ffffff", "surface-container": "#e7eeff", "primary": "#000000", "inverse-surface": "#263143", "surface-container-high": "#dee8ff", "on-primary-fixed-variant": "#3a475c", "tertiary-fixed": "#ffddb8", "on-error": "#ffffff", "surface-tint": "#525f75", "on-surface-variant": "#44474c", "surface-container-highest": "#d8e3fb", "inverse-on-surface": "#ecf1ff", "outline": "#75777d", "inverse-primary": "#bac7e1", "on-primary-fixed": "#0e1c2f", "surface-container-lowest": "#ffffff", "on-tertiary-fixed": "#2a1700", "primary-fixed": "#d6e3fe", "surface-container-low": "#f0f3ff", "secondary": "#006c49", "secondary-fixed": "#6ffbbe", "surface-variant": "#d8e3fb", "surface": "#f9f9ff", "on-tertiary-fixed-variant": "#653e00", "tertiary": "#000000", "on-primary": "#ffffff", "primary-container": "#0e1c2f" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter": "1rem", "margin": "1rem", "space-xl": "1.5rem", "margin-mobile": "0.75rem", "space-sm": "0.5rem", "space-lg": "1rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "space-md": "0.75rem" }, "fontFamily": { "headline-lg": ["Plus Jakarta Sans"], "tabular-data": ["Inter"], "label-sm": ["Inter"], "currency-display": ["Plus Jakarta Sans"], "label-md": ["Inter"], "currency-display-mobile": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "body-lg": ["Inter"], "body-sm": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Inter"] }, "fontSize": { "headline-lg": ["30px", { "lineHeight": "38px", "fontWeight": "700" }], "tabular-data": ["14px", { "lineHeight": "20px", "fontWeight": "500" }], "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }], "currency-display": ["28px", { "lineHeight": "34px", "fontWeight": "800" }], "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "600" }], "currency-display-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "800" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md text-body-md antialiased selection:bg-secondary-container selection:text-on-secondary-container"><header class="fixed top-0 w-full z-50 pt-safe bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><button aria-label="Go back" class="w-11 h-11 -ml-2 rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><img alt="Brand logo. - Primary color: #0b192c
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VmSATFQHBDGRLVqSnKtZ2BERifi84s9k3Ytxj6qwMq9O6mXvmi1Z6jqM8U1nWDMT33CU4T7sRcRlgozlW5TC_NB-6YpHwI403hFi9K-lbhHoQLPScjbJH7LGF5h_LBOMHp86TtmKGe1rSF3u0KKU4_jIBNIzvrufBZUUt5P0OFUIxfAUFHDObw_jaIQK1O6zJIYI09YYSKKhyXyvkH7jS3Qw7-zDz5gMHVs35CLjc0XvVXGSzlNvyqcq4"/><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight truncate">Settings</h1></div><div class="flex items-center gap-space-xs"><button aria-label="Help and Support" class="w-11 h-11 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">help</span></button><div class="w-11 h-11 flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1UIRusy4TWtgBCfnqwhv3TAoxaeQkL9yUWdysUgW_5YHEMNtqomT4Ef3_Y02mc332-hKGzkJ8PsGyBL78Ab6E-mzv00NSu_EPr11zFXobnITuKjemSy72COQMAGUcqV1Sd5cOwoKrTLFaR4HatEZ7JvgAasypAWzAVi6QO9AKpORdIrGjynsj1UnTZCB1kjy3T1tZUCOKIBwbg2w4DMPKPfDNExyH7itmxVeiWgBmnzWmAIuJZc8KGsQA"/></div></div></div></header><main class="flex flex-col relative w-full pt-16 bg-surface min-h-screen"><div class="flex flex-col w-full pb-32">
+<!-- Top Subtle Merchant Context Strip -->
+<div class="px-margin pt-space-md pb-space-xs">
+<div class="flex items-center justify-between p-space-md rounded-xl bg-surface-container-high/60 backdrop-blur-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-secondary/15 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">inventory_2</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider block">Vyapar Inventory Engine</span>
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Auto-sync across 2 Billing Counters</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+        GST Ready
+      </span>
+</div>
+</div>
+<div class="px-margin flex flex-col gap-space-lg pt-space-sm">
+<!-- Section 1: General Inventory Controls -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[22px]">tune</span>
+          General Stock Controls
+        </h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Core POS Rules</span>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-md">
+<!-- Toggle 1: Low Stock Alert -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<span class="font-label-md text-label-md text-on-surface">Low Stock Alert Notification</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Instant push notification &amp; badge when inventory dips below minimum safe margin</span>
+</div>
+<button aria-checked="true" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-secondary transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Toggle low stock alert</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-secondary shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<!-- Default Minimum Stock Input Sub-card -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex items-center justify-between gap-space-md">
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Default Minimum Stock Quantity</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Default re-order trigger for newly added SKUs</span>
+</div>
+<div class="flex items-center bg-surface-container-lowest rounded-lg shadow-sm px-space-sm py-1.5 shrink-0">
+<input class="w-12 text-center font-tabular-data text-tabular-data font-bold text-on-surface bg-transparent focus:outline-none" max="999" min="1" type="number" value="10"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-1">Units</span>
+</div>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Toggle 2: Negative Stock Billing -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Allow Negative Stock Billing</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-label-sm text-[10px]">Restricted</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Prevent invoices when item physical quantity touches 0</span>
+</div>
+<button aria-checked="false" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-surface-container-highest transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Allow negative stock billing</span>
+<span class="pointer-events-none translate-x-0.5 inline-block h-6 w-6 transform rounded-full bg-surface-container-lowest shadow-sm ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+</button>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Toggle 3: Purchase Price Visibility -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Show Purchase Price during Billing</span>
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">visibility_off</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Keep item margin and wholesale costs hidden from POS counter staff</span>
+</div>
+<button aria-checked="false" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-surface-container-highest transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Show purchase price</span>
+<span class="pointer-events-none translate-x-0.5 inline-block h-6 w-6 transform rounded-full bg-surface-container-lowest shadow-sm ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 2: Item Identifiers & Barcode Scanning -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[22px]">barcode_scanner</span>
+          Identifiers &amp; Barcodes
+        </h2>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Speed Billing</span>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-md">
+<!-- SKU Format Segmented Selector -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-md text-label-md text-on-surface">Item Code / SKU Generation</label>
+<div class="grid grid-cols-2 p-1 bg-surface-container-high rounded-xl gap-1">
+<button class="sku-mode-btn py-2 text-center rounded-lg font-label-md text-label-md bg-surface-container-lowest text-on-surface shadow-sm font-semibold transition-all" type="button">
+              Auto Generate SKU
+            </button>
+<button class="sku-mode-btn py-2 text-center rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all" type="button">
+              Manual Entry
+            </button>
+</div>
+<div class="mt-1 flex items-center justify-between px-space-md py-2.5 bg-surface-container-low rounded-xl">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Active Code Prefix</span>
+<span class="font-tabular-data text-tabular-data font-bold text-on-surface bg-surface-container-lowest px-2.5 py-1 rounded shadow-sm">SKU-24-XXXX</span>
+</div>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Toggle: Barcode Scanner -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<span class="font-label-md text-label-md text-on-surface">Barcode Scanner Integration</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Enable phone camera scanner &amp; support Wireless Bluetooth HID laser readers</span>
+</div>
+<button aria-checked="true" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-secondary transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Barcode integration</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-secondary shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Toggle: HSN/SAC Mandatory -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Require HSN / SAC Code</span>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">GST Mandate</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Enforce HSN search and tax code validation before saving any line item</span>
+</div>
+<button aria-checked="true" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-secondary transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Require HSN code</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-secondary shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Default Tax Rate Selector -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-on-surface">Default Tax Rate (GST slab for new items)</label>
+<span class="font-label-sm text-label-sm text-secondary font-bold">CGST + SGST</span>
+</div>
+<div class="grid grid-cols-5 gap-2 pt-1">
+<button class="tax-rate-chip py-2 px-1 text-center rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors" type="button">0%</button>
+<button class="tax-rate-chip py-2 px-1 text-center rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors" type="button">5%</button>
+<button class="tax-rate-chip py-2 px-1 text-center rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors" type="button">12%</button>
+<button class="tax-rate-chip py-2 px-1 text-center rounded-xl bg-secondary text-on-secondary font-headline-sm text-body-md font-bold shadow-md shadow-secondary/25 transition-transform active:scale-95" type="button">18%</button>
+<button class="tax-rate-chip py-2 px-1 text-center rounded-xl bg-surface-container font-label-md text-label-md text-on-surface hover:bg-surface-container-high transition-colors" type="button">28%</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Batches, Expiry & Serial Tracking -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[22px]">calendar_clock</span>
+          Batches &amp; Serialization
+        </h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Traceability</span>
+</div>
+<!-- Feature Card: Batch Tracking Master -->
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-md">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]">verified</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-md text-label-md font-bold text-on-surface">Batch Tracking &amp; Expiry Dates</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-snug">Track manufacturing dates, batch lots, and expiry shelf-life for FMCG &amp; Pharma goods</span>
+</div>
+</div>
+<button aria-checked="true" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-secondary transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Batch tracking master</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-secondary shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<!-- Nested Sub-Options for Batches -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Alert on Expired Stock</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Flag items nearing end of shelf-life</span>
+</div>
+<div class="px-3 py-1 bg-surface-container-lowest rounded-lg shadow-sm text-right shrink-0">
+<span class="font-tabular-data text-tabular-data font-bold text-secondary">30 Days Prior</span>
+</div>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Strict FIFO Outward</span>
+<span class="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Automatically suggest oldest active batch at checkout</span>
+</div>
+<input checked="" class="w-5 h-5 accent-secondary rounded cursor-pointer" type="checkbox"/>
+</div>
+</div>
+<div class="h-px bg-surface-container w-full"></div>
+<!-- Serial / IMEI Number Tracking -->
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<span class="font-label-md text-label-md text-on-surface">Serial / IMEI Number Tracking</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Log discrete warranty identification codes for mobile phones, batteries, &amp; appliances</span>
+</div>
+<button aria-checked="false" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-surface-container-highest transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">IMEI tracking</span>
+<span class="pointer-events-none translate-x-0.5 inline-block h-6 w-6 transform rounded-full bg-surface-container-lowest shadow-sm ring-0 transition duration-200 ease-in-out mt-0.5"></span>
+</button>
+</div>
+</div>
+</section>
+<!-- Section 4: Units & Measurement Master -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[22px]">straighten</span>
+          Units &amp; Conversions
+        </h2>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">UQC Mapping</span>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-md">
+<!-- Visual Unit Conversion Display -->
+<div class="flex items-center justify-between p-space-md rounded-xl bg-surface-container-low">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-center font-tabular-data text-tabular-data font-bold text-on-surface">
+              1 BOX
+            </div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">sync_alt</span>
+<div class="w-12 h-10 rounded-lg bg-secondary/10 flex items-center justify-center font-tabular-data text-tabular-data font-bold text-secondary">
+              24 PCS
+            </div>
+</div>
+<button class="text-secondary font-label-md text-label-md font-semibold hover:underline" type="button">Edit</button>
+</div>
+<!-- Add Custom Measurement Unit Button -->
+<button class="w-full py-3 px-space-md rounded-xl bg-surface-container-high hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-2 text-on-surface font-label-md text-label-md font-semibold" type="button">
+<span class="material-symbols-outlined text-secondary text-[20px]">add_circle</span>
+          Add Custom Measurement Unit (Kg, Litre, Mtr)
+        </button>
+</div>
+</section>
+<!-- Section 5: Multi-Warehouse / Godown Tracking -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[22px]">warehouse</span>
+          Multi-Godown Setup
+        </h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Warehouses</span>
+</div>
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex flex-col gap-0.5 min-w-0">
+<span class="font-label-md text-label-md text-on-surface">Multi-Godown Stock Transfer</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant leading-tight">Track item movement between branch store and distribution godowns</span>
+</div>
+<button aria-checked="true" class="stock-toggle relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full bg-secondary transition-colors duration-200 ease-in-out focus:outline-none" role="switch" type="button">
+<span class="sr-only">Multi godown transfer</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-secondary shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"></span>
+</button>
+</div>
+<!-- Configured Godowns Preview list -->
+<div class="flex flex-col gap-2 pt-1">
+<div class="flex items-center justify-between px-space-md py-2.5 rounded-xl bg-surface-container-low">
+<div class="flex items-center gap-2.5">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Katraj Central Depot</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Primary Hub</span>
+</div>
+<div class="flex items-center justify-between px-space-md py-2.5 rounded-xl bg-surface-container-low">
+<div class="flex items-center gap-2.5">
+<span class="w-2.5 h-2.5 rounded-full bg-surface-tint"></span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Market Yard Warehouse</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Wholesale Point</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Sticky Bottom Quick Action Dock (Safe-area aware) -->
+<div class="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_-4px_16px_rgba(11,25,44,0.08)] px-margin py-3 pb-safe">
+<div class="flex items-center gap-3 max-w-lg mx-auto">
+<button class="flex-1 h-12 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md font-bold transition-all active:scale-[0.98]" onclick="history.back()" type="button">
+        Discard
+      </button>
+<button class="flex-[2] h-12 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-label-md text-label-md font-bold shadow-lg shadow-secondary/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2" id="save-settings-btn" type="button">
+<span class="material-symbols-outlined text-[20px]">save</span>
+        Save Item Settings
+      </button>
+</div>
+</div>
+<!-- Toast Notification Overlay -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-300" id="save-toast">
+<div class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary-container text-on-primary shadow-xl">
+<span class="material-symbols-outlined text-secondary-fixed text-[20px]">check_circle</span>
+<span class="font-label-md text-label-md">Inventory parameters updated successfully</span>
+</div>
+</div>
+</div>
+<script>
+  // Interactive Toggle Switch Logic
+  document.querySelectorAll('.stock-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const isChecked = btn.getAttribute('aria-checked') === 'true';
+      btn.setAttribute('aria-checked', !isChecked);
+      const thumb = btn.querySelector('span:not(.sr-only)');
+      
+      if (!isChecked) {
+        btn.classList.remove('bg-surface-container-highest');
+        btn.classList.add('bg-secondary');
+        thumb.classList.remove('translate-x-0.5', 'bg-surface-container-lowest');
+        thumb.classList.add('translate-x-6', 'bg-on-secondary');
+      } else {
+        btn.classList.remove('bg-secondary');
+        btn.classList.add('bg-surface-container-highest');
+        thumb.classList.remove('translate-x-6', 'bg-on-secondary');
+        thumb.classList.add('translate-x-0.5', 'bg-surface-container-lowest');
+      }
+    });
+  });
+
+  // SKU Segmented selector
+  document.querySelectorAll('.sku-mode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.sku-mode-btn').forEach(b => {
+        b.classList.remove('bg-surface-container-lowest', 'text-on-surface', 'shadow-sm', 'font-semibold');
+        b.classList.add('text-on-surface-variant');
+      });
+      btn.classList.add('bg-surface-container-lowest', 'text-on-surface', 'shadow-sm', 'font-semibold');
+      btn.classList.remove('text-on-surface-variant');
+    });
+  });
+
+  // Tax Rate Selector Chips
+  document.querySelectorAll('.tax-rate-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.tax-rate-chip').forEach(c => {
+        c.classList.remove('bg-secondary', 'text-on-secondary', 'font-bold', 'shadow-md', 'shadow-secondary/25');
+        c.classList.add('bg-surface-container', 'text-on-surface');
+      });
+      chip.classList.remove('bg-surface-container', 'text-on-surface');
+      chip.classList.add('bg-secondary', 'text-on-secondary', 'font-bold', 'shadow-md', 'shadow-secondary/25');
+    });
+  });
+
+  // Save Settings Micro-delight Toast
+  const saveBtn = document.getElementById('save-settings-btn');
+  const toast = document.getElementById('save-toast');
+  saveBtn.addEventListener('click', () => {
+    saveBtn.classList.add('scale-95');
+    setTimeout(() => saveBtn.classList.remove('scale-95'), 150);
+    
+    toast.classList.remove('opacity-0', 'translate-y-2');
+    toast.classList.add('opacity-100', 'translate-y-0');
+    
+    setTimeout(() => {
+      toast.classList.remove('opacity-100', 'translate-y-0');
+      toast.classList.add('opacity-0', 'translate-y-2');
+    }, 2400);
+  });
+</script></main></body></html>

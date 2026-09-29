@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "background": "#f9f9ff", "error": "#ba1a1a", "surface-container-low": "#f0f3ff", "tertiary": "#000000", "on-primary-fixed": "#0e1c2f", "on-surface-variant": "#44474c", "on-tertiary-fixed-variant": "#653e00", "on-secondary-fixed-variant": "#005236", "outline": "#75777d", "secondary-fixed-dim": "#4edea3", "on-tertiary-container": "#b87500", "surface-dim": "#cfdaf2", "on-error-container": "#93000a", "on-secondary": "#ffffff", "primary-fixed-dim": "#bac7e1", "on-primary-container": "#77849c", "inverse-surface": "#263143", "surface-container-lowest": "#ffffff", "tertiary-fixed": "#ffddb8", "on-primary": "#ffffff", "surface-tint": "#525f75", "surface-variant": "#d8e3fb", "tertiary-fixed-dim": "#ffb95f", "primary-container": "#0e1c2f", "surface-container": "#e7eeff", "on-primary-fixed-variant": "#3a475c", "secondary-container": "#6cf8bb", "surface-container-high": "#dee8ff", "surface": "#f9f9ff", "inverse-primary": "#bac7e1", "surface-bright": "#f9f9ff", "surface-container-highest": "#d8e3fb", "on-error": "#ffffff", "on-secondary-container": "#00714d", "on-surface": "#111c2d", "on-tertiary": "#ffffff", "error-container": "#ffdad6", "primary": "#000000", "tertiary-container": "#2a1700", "outline-variant": "#c5c6cd", "on-secondary-fixed": "#002113", "inverse-on-surface": "#ecf1ff", "secondary": "#006c49", "on-background": "#111c2d", "primary-fixed": "#d6e3fe", "on-tertiary-fixed": "#2a1700", "secondary-fixed": "#6ffbbe" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "1.5rem", "space-lg": "1rem", "space-sm": "0.5rem", "margin-mobile": "0.75rem", "space-xs": "0.25rem", "gutter-mobile": "0.75rem", "gutter": "1rem", "margin": "1rem", "space-md": "0.75rem" }, fontFamily: { "body-md": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "headline-lg-mobile": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "label-sm": ["Inter"], "headline-sm": ["Plus Jakarta Sans"], "label-md": ["Inter"], "currency-display": ["Plus Jakarta Sans"], "body-lg": ["Inter"], "currency-display-mobile": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "tabular-data": ["Inter"] }, fontSize: { "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "600" }], "currency-display": ["28px", { "lineHeight": "34px", "fontWeight": "800" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "currency-display-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "800" }], "headline-lg": ["30px", { "lineHeight": "38px", "fontWeight": "700" }], "tabular-data": ["14px", { "lineHeight": "20px", "fontWeight": "500" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-space-sm flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs min-w-0 flex-1"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center text-on-surface hover:text-secondary transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><img alt="Brand logo. - Primary color: #0b192c
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+" class="h-7 w-auto object-contain hidden sm:block flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VmSATFQHBDGRLVqSnKtZ2BERifi84s9k3Ytxj6qwMq9O6mXvmi1Z6jqM8U1nWDMT33CU4T7sRcRlgozlW5TC_NB-6YpHwI403hFi9K-lbhHoQLPScjbJH7LGF5h_LBOMHp86TtmKGe1rSF3u0KKU4_jIBNIzvrufBZUUt5P0OFUIxfAUFHDObw_jaIQK1O6zJIYI09YYSKKhyXyvkH7jS3Qw7-zDz5gMHVs35CLjc0XvVXGSzlNvyqcq4"/><h1 class="font-headline-sm text-headline-sm text-on-surface truncate min-w-0">Invoice Preview &amp; Share</h1></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Barcode scanner" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">qr_code_scanner</span></button><button aria-label="Print invoice" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">print</span></button><button aria-label="Settings" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">tune</span></button><div class="pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shadow-[0_1px_3px_rgba(0,0,0,0.08)]" src="https://lh3.googleusercontent.com/aida/AEtjO1UIRusy4TWtgBCfnqwhv3TAoxaeQkL9yUWdysUgW_5YHEMNtqomT4Ef3_Y02mc332-hKGzkJ8PsGyBL78Ab6E-mzv00NSu_EPr11zFXobnITuKjemSy72COQMAGUcqV1Sd5cOwoKrTLFaR4HatEZ7JvgAasypAWzAVi6QO9AKpORdIrGjynsj1UnTZCB1kjy3T1tZUCOKIBwbg2w4DMPKPfDNExyH7itmxVeiWgBmnzWmAIuJZc8KGsQA"/></div></div></div></header><main class="flex-1 w-full bg-surface pt-16"><div class="flex flex-col w-full pb-8">
+<!-- Success Banner with Confetti Micro-burst -->
+<div class="px-space-md pt-space-md pb-space-sm">
+<div class="bg-secondary-container/30 rounded-xl p-space-md flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-secondary text-on-secondary flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(0,108,73,0.3)]">
+<span class="material-symbols-outlined text-[24px]">verified</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-space-xs flex-wrap">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">#INV-2024-0089</span>
+<span class="bg-secondary text-on-secondary rounded-full px-2 py-0.5 font-label-sm text-label-sm">Saved</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Today, 04:30 PM • GST Validated
+          </p>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-sm active:scale-95 transition-transform flex items-center gap-1" id="toggleReceiptView" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">zoom_in</span>
+<span>Zoom</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Document Canvas / Tactile Paper Card -->
+<div class="px-space-md py-space-xs">
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_20px_rgba(14,28,47,0.06)] relative overflow-hidden transition-all duration-300" id="invoiceDocumentCard">
+<!-- Faux Dog-Ear Paper Corner Motif -->
+<div class="absolute top-0 right-0 w-8 h-8 pointer-events-none">
+<div class="absolute top-0 right-0 w-0 h-0 border-t-[32px] border-t-surface-container-high border-l-[32px] border-l-transparent"></div>
+<div class="absolute top-0 right-0 w-0 h-0 border-b-[32px] border-b-surface-container-lowest border-r-[32px] border-r-transparent shadow-sm"></div>
+</div>
+<!-- Top Header & Badging -->
+<div class="p-space-md bg-surface-container-low/50">
+<div class="flex items-start justify-between">
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Tax Invoice</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">TAX INVOICE</h2>
+</div>
+<span class="font-label-sm text-label-sm bg-surface-container-highest text-on-surface-variant px-2 py-1 rounded">ORIGINAL FOR RECIPIENT</span>
+</div>
+<div class="mt-2 flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm">
+<span>Date: <strong class="text-on-surface font-tabular-data text-tabular-data">24 Oct 2024</strong></span>
+<span>POS State: <strong class="text-on-surface font-tabular-data text-tabular-data">27-MH</strong></span>
+</div>
+</div>
+<!-- Seller & Buyer Entity Split Grid -->
+<div class="p-space-md grid grid-cols-2 gap-space-md bg-surface-container-lowest">
+<!-- Billed By -->
+<div class="space-y-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Billed By (Seller)</span>
+<p class="font-label-md text-label-md text-on-surface font-semibold truncate">Shree Balaji Enterprises</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Shop 4, Market Yard, Pune - 411037</p>
+<div class="bg-surface-container-low px-2 py-1 rounded inline-block">
+<span class="font-tabular-data text-tabular-data text-on-surface-variant text-[11px]">GSTIN: <strong>27AABCU9603R1ZM</strong></span>
+</div>
+</div>
+<!-- Billed To -->
+<div class="space-y-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Billed To (Buyer)</span>
+<p class="font-label-md text-label-md text-on-surface font-semibold truncate">Radhe Shyam Store</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Prop: Rajesh Mehta (Katraj, Pune)</p>
+<div class="bg-surface-container-low px-2 py-1 rounded inline-block">
+<span class="font-tabular-data text-tabular-data text-on-surface-variant text-[11px]">GSTIN: <strong>27AAAPL1234F1Z5</strong></span>
+</div>
+</div>
+</div>
+<!-- Itemized Mini Table -->
+<div class="overflow-x-auto">
+<div class="min-w-full inline-block align-middle">
+<div class="bg-surface-container px-space-md py-2 flex items-center justify-between text-on-surface font-label-sm text-label-sm uppercase">
+<span class="w-5/12">Item / HSN</span>
+<span class="w-2/12 text-center">Qty</span>
+<span class="w-2/12 text-right">Rate</span>
+<span class="w-3/12 text-right">Amount (₹)</span>
+</div>
+<!-- Line Item 1 -->
+<div class="px-space-md py-2.5 flex items-center justify-between bg-surface-container-lowest">
+<div class="w-5/12 min-w-0 pr-1">
+<p class="font-label-md text-label-md text-on-surface truncate">Basmati Premium Rice 25kg</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">HSN: 1006 • GST 5%</p>
+</div>
+<div class="w-2/12 text-center font-tabular-data text-tabular-data text-on-surface">4 Bags</div>
+<div class="w-2/12 text-right font-tabular-data text-tabular-data text-on-surface-variant">2,100</div>
+<div class="w-3/12 text-right font-tabular-data text-tabular-data text-on-surface font-semibold">8,400.00</div>
+</div>
+<!-- Line Item 2 -->
+<div class="px-space-md py-2.5 flex items-center justify-between bg-surface-container-low/40">
+<div class="w-5/12 min-w-0 pr-1">
+<p class="font-label-md text-label-md text-on-surface truncate">Fortune Sunflower Oil 15L</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">HSN: 1512 • GST 5%</p>
+</div>
+<div class="w-2/12 text-center font-tabular-data text-tabular-data text-on-surface">2 Tins</div>
+<div class="w-2/12 text-right font-tabular-data text-tabular-data text-on-surface-variant">1,950</div>
+<div class="w-3/12 text-right font-tabular-data text-tabular-data text-on-surface font-semibold">3,900.00</div>
+</div>
+<!-- Line Item 3 -->
+<div class="px-space-md py-2.5 flex items-center justify-between bg-surface-container-lowest">
+<div class="w-5/12 min-w-0 pr-1">
+<p class="font-label-md text-label-md text-on-surface truncate">Tata Salt Iodized 1kg</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">HSN: 2501 • GST 0%</p>
+</div>
+<div class="w-2/12 text-center font-tabular-data text-tabular-data text-on-surface">20 Pkts</div>
+<div class="w-2/12 text-right font-tabular-data text-tabular-data text-on-surface-variant">27</div>
+<div class="w-3/12 text-right font-tabular-data text-tabular-data text-on-surface font-semibold">540.00</div>
+</div>
+</div>
+</div>
+<!-- Tax Breakup & Subtotals -->
+<div class="p-space-md bg-surface-container-low/70 flex flex-col gap-1.5 font-body-sm text-body-sm">
+<div class="flex justify-between text-on-surface-variant">
+<span>Taxable Value</span>
+<span class="font-tabular-data text-tabular-data text-on-surface">₹12,279.05</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span>CGST (2.5%)</span>
+<span class="font-tabular-data text-tabular-data text-on-surface">₹306.98</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span>SGST (2.5%)</span>
+<span class="font-tabular-data text-tabular-data text-on-surface">₹306.97</span>
+</div>
+<div class="flex justify-between pt-1 text-on-surface font-label-md text-label-md font-semibold">
+<span>Grand Total</span>
+<span class="font-tabular-data text-tabular-data text-on-surface font-bold">₹12,893.00</span>
+</div>
+</div>
+<!-- Financial Balance Settlement Card -->
+<div class="p-space-md bg-surface-container-lowest">
+<div class="grid grid-cols-3 gap-space-xs text-center p-space-sm bg-surface-container-low rounded-xl">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Total Bill</span>
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-surface font-bold">₹12,893</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-secondary">Paid (UPI)</span>
+<span class="font-currency-display-mobile text-currency-display-mobile text-secondary font-bold">₹10,000</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-error">Balance Due</span>
+<span class="font-currency-display-mobile text-currency-display-mobile text-error font-bold">₹2,893</span>
+</div>
+</div>
+</div>
+<!-- UPI Dynamic QR Code & Stamp Area -->
+<div class="p-space-md bg-surface-container-lowest flex items-center justify-between gap-space-md">
+<!-- Dynamic UPI Scan Section -->
+<div class="flex items-center gap-space-sm">
+<div class="w-20 h-20 bg-surface-container-lowest p-1 rounded-lg shadow-sm flex items-center justify-center relative flex-shrink-0">
+<!-- Simulated Crisp SVG QR Code for UPI Instant Scan -->
+<svg class="w-full h-full text-on-surface" fill="currentColor" viewbox="0 0 100 100">
+<path d="M0 0h30v30H0V0zm6 6h18v18H6V6zm4 4h10v10H10V10zM70 0h30v30H70V0zm6 6h18v18H76V6zm4 4h10v10H80V10zM0 70h30v30H0V70zm6 6h18v18H6V76zm4 4h10v10H10V80zm40-70h10v10H50V10zm10 10h10v10H60V20zm-20 20h10v10H40V40zm20 0h10v10H60V40zm10 10h10v10H70V50zm10 10h10v10H80V60zm-40 0h10v10H40V60zm0 20h10v10H40V80zm20 0h10v10H60V80zm20 0h10v10H80V80zm10 10h10v10H90V90z"></path>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<span class="material-symbols-outlined text-[14px] text-secondary bg-surface-container-lowest rounded-full p-0.5 shadow-xs">qr_code_2</span>
+</div>
+</div>
+<div>
+<div class="flex items-center gap-1">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Scan &amp; Pay ₹2,893</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">BHIM • GPay • PhonePe</p>
+<p class="font-label-sm text-label-sm text-secondary font-semibold">Instant auto-reconcile</p>
+</div>
+</div>
+<!-- Stamp & Sign Placeholder -->
+<div class="flex flex-col items-center justify-end text-center min-w-[100px]">
+<div class="w-16 h-12 bg-surface-container-low rounded-lg flex items-center justify-center text-on-surface-variant relative overflow-hidden">
+<span class="material-symbols-outlined text-[28px] text-on-surface-variant/40">verified_user</span>
+<span class="absolute text-[8px] font-bold uppercase tracking-wider text-secondary rotate-[-15deg] bg-secondary-container/80 px-1 rounded">BALAJI SIGNED</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1">Auth Signatory</span>
+</div>
+</div>
+<!-- Watermark / Footer Strip -->
+<div class="px-space-md py-2 bg-surface-container text-center flex items-center justify-center gap-1.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-secondary">security</span>
+<span class="font-label-sm text-label-sm">Digitally generated via GST Compliant ERP • E-Way exempt</span>
+</div>
+</div>
+</div>
+<!-- Omnichannel WhatsApp Share Action Card -->
+<div class="px-space-md pt-space-md">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<span class="font-label-md text-label-md text-on-surface">Instant WhatsApp Delivery</span>
+</div>
+<span class="bg-secondary-container text-on-secondary-container font-label-sm text-label-sm px-2 py-0.5 rounded-full font-bold">Preferred</span>
+</div>
+<!-- Formatted WhatsApp Message Preview Box -->
+<div class="bg-surface-container-low rounded-lg p-space-sm mb-3">
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary flex-shrink-0 mt-0.5">chat</span>
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+<span class="text-on-surface font-semibold">Preview message:</span><br/>
+            "Dear Radhe Shyam Store, bill #INV-2024-0089 of <strong>₹12,893</strong> has been generated by Shree Balaji Ent. Paid: ₹10,000. Balance due: <strong>₹2,893</strong>. Download PDF &amp; pay via UPI: <span class="text-secondary underline">vyp.in/p/89xZ</span>"
+          </div>
+</div>
+</div>
+<!-- Main WhatsApp Primary CTA Button -->
+<button class="w-full h-12 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(0,108,73,0.25)] active:scale-[0.99] transition-transform" id="shareWhatsAppBtn" type="button">
+<span class="material-symbols-outlined text-[20px]">send</span>
+<span>Share on WhatsApp with Payment Link</span>
+</button>
+</div>
+</div>
+<!-- Operational Grid (Print, Download, SMS) -->
+<div class="px-space-md pt-space-sm">
+<div class="grid grid-cols-3 gap-space-xs">
+<!-- Thermal & Normal Print -->
+<button class="bg-surface-container-lowest p-space-sm rounded-xl text-center shadow-sm flex flex-col items-center justify-center gap-1 active:scale-95 transition-all" id="openPrintModal" type="button">
+<div class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">print</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">Print</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Thermal / A4</span>
+</button>
+<!-- Download PDF -->
+<button class="bg-surface-container-lowest p-space-sm rounded-xl text-center shadow-sm flex flex-col items-center justify-center gap-1 active:scale-95 transition-all" id="downloadPdfBtn" type="button">
+<div class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">Save PDF</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Official GST</span>
+</button>
+<!-- SMS Reminder -->
+<button class="bg-surface-container-lowest p-space-sm rounded-xl text-center shadow-sm flex flex-col items-center justify-center gap-1 active:scale-95 transition-all" id="sendSmsBtn" type="button">
+<div class="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">sms</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface">SMS Alert</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">DND Safe</span>
+</button>
+</div>
+</div>
+<!-- Quick Options / Payment Ledger Shortcuts -->
+<div class="px-space-md pt-space-sm">
+<div class="bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-secondary">receipt_long</span>
+<span class="font-label-md text-label-md text-on-surface">Party Ledger Updated</span>
+</div>
+<a class="font-label-md text-label-md text-secondary font-semibold flex items-center" href="javascript:void(0)">
+        View Khata <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+</div>
+</div>
+<!-- Sticky Bottom Quick-Action Bar -->
+<div class="mt-space-lg px-space-md pb-space-sm">
+<button class="w-full h-12 bg-primary text-on-primary rounded-lg font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(11,25,44,0.18)] active:scale-[0.99] transition-transform" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" type="button">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+<span>+ Create Another Sale / New Bill</span>
+</button>
+</div>
+<!-- Interactive Print Drawer Modal (Hidden by default, toggled via JS) -->
+<div class="hidden fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-xs flex items-end justify-center" id="printDrawer">
+<div class="bg-surface-container-lowest w-full max-w-md rounded-t-2xl p-space-lg shadow-2xl space-y-space-md">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Choose Print Format</h3>
+<button class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface" id="closePrintDrawer" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<div class="space-y-2">
+<!-- 2 Inch Thermal Option -->
+<label class="flex items-center justify-between p-space-sm bg-surface-container-low rounded-xl cursor-pointer">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[24px] text-secondary">receipt</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Thermal POS (2-Inch / 58mm)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Direct Bluetooth wireless printer</p>
+</div>
+</div>
+<input checked="" class="w-4 h-4 accent-secondary" name="printer_type" type="radio"/>
+</label>
+<!-- 3 Inch Thermal Option -->
+<label class="flex items-center justify-between p-space-sm bg-surface-container-low rounded-xl cursor-pointer">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[24px] text-on-surface">receipt_long</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Thermal POS (3-Inch / 80mm)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Recommended for itemized bills</p>
+</div>
+</div>
+<input class="w-4 h-4 accent-secondary" name="printer_type" type="radio"/>
+</label>
+<!-- A4 / A5 Standard PDF -->
+<label class="flex items-center justify-between p-space-sm bg-surface-container-low rounded-xl cursor-pointer">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[24px] text-on-surface">description</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Standard A4 / A5 Laser Print</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Official GST format with logo &amp; stamps</p>
+</div>
+</div>
+<input class="w-4 h-4 accent-secondary" name="printer_type" type="radio"/>
+</label>
+</div>
+<div class="pt-2">
+<button class="w-full h-12 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md font-semibold flex items-center justify-center gap-2" id="executePrintAction" type="button">
+<span class="material-symbols-outlined text-[20px]">print</span>
+<span>Send to Connected Printer</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Notification Toast Container -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 pointer-events-none opacity-0 translate-y-[-10px] bg-inverse-surface text-inverse-on-surface px-4 py-2.5 rounded-full font-label-md text-label-md shadow-lg flex items-center gap-2" id="toastMessage">
+<span class="material-symbols-outlined text-[18px] text-secondary-fixed">check_circle</span>
+<span id="toastText">Action completed</span>
+</div>
+<!-- Client-side Interactive Actions -->
+<script>
+    (function() {
+      const toast = document.getElementById('toastMessage');
+      const toastText = document.getElementById('toastText');
+      const printDrawer = document.getElementById('printDrawer');
+      const openPrintBtn = document.getElementById('openPrintModal');
+      const closePrintBtn = document.getElementById('closePrintDrawer');
+      const executePrint = document.getElementById('executePrintAction');
+      const shareWhatsApp = document.getElementById('shareWhatsAppBtn');
+      const downloadPdf = document.getElementById('downloadPdfBtn');
+      const sendSms = document.getElementById('sendSmsBtn');
+      const toggleReceipt = document.getElementById('toggleReceiptView');
+      const card = document.getElementById('invoiceDocumentCard');
+
+      function showToast(msg) {
+        toastText.textContent = msg;
+        toast.classList.remove('opacity-0', 'translate-y-[-10px]');
+        toast.classList.add('opacity-100', 'translate-y-0');
+        setTimeout(() => {
+          toast.classList.remove('opacity-100', 'translate-y-0');
+          toast.classList.add('opacity-0', 'translate-y-[-10px]');
+        }, 2600);
+      }
+
+      openPrintBtn?.addEventListener('click', () => {
+        printDrawer.classList.remove('hidden');
+      });
+
+      closePrintBtn?.addEventListener('click', () => {
+        printDrawer.classList.add('hidden');
+      });
+
+      executePrint?.addEventListener('click', () => {
+        printDrawer.classList.add('hidden');
+        showToast('Connecting to thermal printer...');
+      });
+
+      shareWhatsApp?.addEventListener('click', () => {
+        showToast('Opening WhatsApp with payment link...');
+      });
+
+      downloadPdf?.addEventListener('click', () => {
+        showToast('GST Invoice PDF downloaded!');
+      });
+
+      sendSms?.addEventListener('click', () => {
+        showToast('SMS reminder sent to +91 98220 12345');
+      });
+
+      let isZoomed = false;
+      toggleReceipt?.addEventListener('click', () => {
+        isZoomed = !isZoomed;
+        if (isZoomed) {
+          card.classList.add('scale-[1.02]');
+          toggleReceipt.innerHTML = '<span class="material-symbols-outlined text-[16px] text-secondary">zoom_out</span><span>Reset</span>';
+        } else {
+          card.classList.remove('scale-[1.02]');
+          toggleReceipt.innerHTML = '<span class="material-symbols-outlined text-[16px] text-secondary">zoom_in</span><span>Zoom</span>';
+        }
+      });
+    })();
+  </script>
+</div></main></body></html>

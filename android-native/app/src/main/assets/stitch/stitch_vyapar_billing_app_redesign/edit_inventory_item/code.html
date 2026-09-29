@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-secondary-container": "#00714d", "on-tertiary": "#ffffff", "tertiary": "#000000", "tertiary-fixed-dim": "#ffb95f", "surface-tint": "#525f75", "on-tertiary-container": "#b87500", "surface-variant": "#d8e3fb", "secondary-fixed": "#6ffbbe", "primary": "#000000", "inverse-surface": "#263143", "on-error-container": "#93000a", "on-secondary-fixed": "#002113", "surface": "#f9f9ff", "error-container": "#ffdad6", "on-secondary": "#ffffff", "on-secondary-fixed-variant": "#005236", "surface-container-low": "#f0f3ff", "on-tertiary-fixed-variant": "#653e00", "surface-bright": "#f9f9ff", "primary-container": "#0e1c2f", "outline-variant": "#c5c6cd", "on-surface": "#111c2d", "error": "#ba1a1a", "background": "#f9f9ff", "surface-container-high": "#dee8ff", "on-primary-fixed": "#0e1c2f", "on-background": "#111c2d", "tertiary-container": "#2a1700", "surface-dim": "#cfdaf2", "primary-fixed": "#d6e3fe", "outline": "#75777d", "on-primary-container": "#77849c", "on-primary-fixed-variant": "#3a475c", "on-primary": "#ffffff", "secondary-container": "#6cf8bb", "surface-container-lowest": "#ffffff", "primary-fixed-dim": "#bac7e1", "on-tertiary-fixed": "#2a1700", "inverse-on-surface": "#ecf1ff", "tertiary-fixed": "#ffddb8", "secondary-fixed-dim": "#4edea3", "on-surface-variant": "#44474c", "secondary": "#006c49", "inverse-primary": "#bac7e1", "surface-container-highest": "#d8e3fb", "surface-container": "#e7eeff", "on-error": "#ffffff" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "gutter": "1rem", "margin": "1rem", "space-md": "0.75rem", "space-xl": "1.5rem", "space-lg": "1rem", "margin-mobile": "0.75rem", "space-sm": "0.5rem", "space-xs": "0.25rem", "gutter-mobile": "0.75rem" }, fontFamily: { "headline-md": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "currency-display-mobile": ["Plus Jakarta Sans"], "body-lg": ["Inter"], "headline-lg-mobile": ["Plus Jakarta Sans"], "label-sm": ["Inter"], "headline-lg": ["Plus Jakarta Sans"], "label-md": ["Inter"], "currency-display": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "tabular-data": ["Inter"], "body-md": ["Inter"] }, fontSize: { "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "currency-display-mobile": ["22px", { "lineHeight": "28px", "fontWeight": "800" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }], "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "600" }], "headline-lg": ["30px", { "lineHeight": "38px", "fontWeight": "700" }], "label-md": ["13px", { "lineHeight": "18px", "fontWeight": "600" }], "currency-display": ["28px", { "lineHeight": "34px", "fontWeight": "800" }], "headline-sm": ["18px", { "lineHeight": "24px", "fontWeight": "600" }], "tabular-data": ["14px", { "lineHeight": "20px", "fontWeight": "500" }], "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-gutter flex items-center justify-between gap-space-xs"><div class="flex items-center gap-space-xs min-w-0 flex-1"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-high transition-colors -ml-1.5 flex-shrink-0" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><img alt="Brand logo. - Primary color: #0b192c
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+" class="h-7 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VmSATFQHBDGRLVqSnKtZ2BERifi84s9k3Ytxj6qwMq9O6mXvmi1Z6jqM8U1nWDMT33CU4T7sRcRlgozlW5TC_NB-6YpHwI403hFi9K-lbhHoQLPScjbJH7LGF5h_LBOMHp86TtmKGe1rSF3u0KKU4_jIBNIzvrufBZUUt5P0OFUIxfAUFHDObw_jaIQK1O6zJIYI09YYSKKhyXyvkH7jS3Qw7-zDz5gMHVs35CLjc0XvVXGSzlNvyqcq4"/><h1 class="font-headline-sm text-headline-sm text-on-surface truncate">Edit Inventory Item</h1></div><div class="flex items-center gap-space-xs flex-shrink-0"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-surface-container-high" src="https://lh3.googleusercontent.com/aida/AEtjO1UIRusy4TWtgBCfnqwhv3TAoxaeQkL9yUWdysUgW_5YHEMNtqomT4Ef3_Y02mc332-hKGzkJ8PsGyBL78Ab6E-mzv00NSu_EPr11zFXobnITuKjemSy72COQMAGUcqV1Sd5cOwoKrTLFaR4HatEZ7JvgAasypAWzAVi6QO9AKpORdIrGjynsj1UnTZCB1kjy3T1tZUCOKIBwbg2w4DMPKPfDNExyH7itmxVeiWgBmnzWmAIuJZc8KGsQA"/></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-32">
+<!-- Top Item Status & Mode Header Card -->
+<div class="px-gutter pt-space-md">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm">
+<div class="flex items-center justify-between mb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-tabular-data text-label-sm font-semibold tracking-wider text-on-surface-variant uppercase bg-surface-container px-2 py-0.5 rounded-full">SKU-100630</span>
+<span class="inline-flex items-center gap-1 bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded-full font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            Active in Stock
+          </span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">12 Aug 2024</span>
+</div>
+<!-- Goods vs Service Toggle -->
+<div class="flex items-center bg-surface-container rounded-lg p-0.5 mt-space-sm">
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg bg-surface-container-lowest text-on-surface shadow-sm font-semibold transition-all" id="type-goods">
+<span class="material-symbols-outlined text-[16px] align-middle mr-1">inventory_2</span>Goods
+        </button>
+<button class="flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg text-on-surface-variant font-medium transition-all" id="type-service">
+<span class="material-symbols-outlined text-[16px] align-middle mr-1">design_services</span>Service
+        </button>
+</div>
+<!-- Quick Section Jump Anchors -->
+<div class="flex items-center gap-space-xs mt-space-md overflow-x-auto no-scrollbar py-0.5">
+<a class="px-3 py-1 bg-primary text-on-primary font-label-sm text-label-sm rounded-full whitespace-nowrap" href="#sec-details">Details</a>
+<a class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm rounded-full whitespace-nowrap" href="#sec-pricing">Pricing &amp; GST</a>
+<a class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm rounded-full whitespace-nowrap" href="#sec-stock">Stock &amp; Batch</a>
+<a class="px-3 py-1 bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm rounded-full whitespace-nowrap" href="#sec-history">History</a>
+</div>
+</div>
+</div>
+<!-- SECTION 1: Basic Item Details -->
+<div class="px-gutter mt-space-md" id="sec-details">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">edit_note</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Basic Details</h2>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Step 1 of 3</span>
+</div>
+<!-- Item Image & Visual Identity -->
+<div class="flex items-center gap-space-md bg-surface-container-low p-space-sm rounded-xl">
+<img class="w-16 h-16 rounded-lg object-cover shadow-sm bg-surface-container" data-alt="High quality commercial product packaging of Royal Premium Basmati Rice sack bag 5kg with golden seal of purity and transparent rice grain window on crisp clean studio surface with soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzT6oTaEBCc64bIvLzdS9jKmR5JjftkCnNOV9oE9B2bwLSTf2tIh5KjHGOgL7evORwMrIaYnRq7unBSy6MoCNLMGAe-IMf5xA26Ud9C8gtsDIfPDAFKhdpY2CGIpvaoWEeYsckHz0SjDXwYNtlv-8qSZ_ZIF6VyZQixtbrnfB01289SBUrp-Zv485AGrhOmYHzScyx-vL9PzjSkm6RR7IuKNF92YPm2gZNp3dxuMAQ_0JPgh05LEbx"/>
+<div class="flex-1 min-w-0">
+<p class="font-label-md text-label-md text-on-surface font-semibold truncate">Item Visual Media</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">1 image attached • JPEG (340 KB)</p>
+<button class="mt-1 font-label-sm text-label-sm text-secondary font-semibold hover:underline flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[14px]">photo_camera</span> Replace Photo
+          </button>
+</div>
+</div>
+<!-- Item Name Field -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1 font-semibold uppercase tracking-wider">Item Name *</label>
+<div class="flex items-center bg-surface-container-low rounded-lg px-3 py-2.5 shadow-sm">
+<input class="bg-transparent flex-1 font-body-md text-body-md text-on-surface focus:outline-none min-w-0" type="text" value="Basmati Rice Royal Premium 5kg"/>
+<button aria-label="Voice input" class="text-on-surface-variant hover:text-secondary transition-colors p-1">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+</div>
+<!-- Item Code & Barcode -->
+<div class="grid grid-cols-1 gap-space-xs">
+<label class="block font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Barcode / SKU Code</label>
+<div class="flex items-center gap-space-xs">
+<div class="flex-1 flex items-center bg-surface-container-low rounded-lg px-3 py-2.5 shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2">barcode_scanner</span>
+<input class="bg-transparent flex-1 font-tabular-data text-tabular-data text-on-surface focus:outline-none min-w-0 font-medium" type="text" value="890103094821"/>
+</div>
+<button class="flex items-center gap-1.5 bg-surface-container px-3.5 py-2.5 rounded-lg text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors shadow-sm whitespace-nowrap">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span>
+            Scan
+          </button>
+</div>
+</div>
+<!-- Category Selector -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1 font-semibold uppercase tracking-wider">Category</label>
+<div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2.5 shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-[20px]">category</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">Groceries &amp; Staples</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">expand_more</span>
+</div>
+</div>
+<!-- Unit of Measurement (UOM) -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="block font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Unit of Measurement (UOM)</label>
+<button class="font-label-sm text-label-sm text-secondary font-semibold">+ Custom Unit</button>
+</div>
+<div class="flex flex-wrap gap-2">
+<button class="px-3 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md font-semibold shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check</span>
+            Bags / Bori
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors">
+            Kgs (Kilogram)
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors">
+            Boxes / Pkts
+          </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md hover:bg-surface-container-high transition-colors">
+            Pcs (Pieces)
+          </button>
+</div>
+</div>
+<!-- HSN / SAC Code & Verification -->
+<div class="bg-surface-container-low rounded-xl p-space-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold">HSN / SAC Code</span>
+<button class="font-label-sm text-label-sm text-secondary font-semibold hover:underline">Change HSN</button>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-tabular-data text-headline-sm text-on-surface font-bold tracking-wide">1006.30</span>
+<span class="inline-flex items-center gap-1 bg-secondary-container/40 text-on-secondary-container px-2 py-0.5 rounded-full font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[12px]">verified</span>
+              GST 5% (Verified)
+            </span>
+</div>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Rice, semi-milled or wholly milled, whether or not polished or glazed.</p>
+</div>
+</div>
+</div>
+<!-- SECTION 2: Pricing & Tax Details -->
+<div class="px-gutter mt-space-md" id="sec-pricing">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">payments</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Pricing &amp; GST</h2>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold">Tax Compliant</span>
+</div>
+<!-- Profit Margin Calculation Card -->
+<div class="bg-secondary-container/25 rounded-xl p-space-md flex items-center justify-between">
+<div>
+<span class="block font-label-sm text-label-sm text-on-secondary-container font-semibold uppercase tracking-wider">Gross Profit Margin</span>
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-secondary-container font-extrabold">+16.1%</span>
+</div>
+<div class="text-right">
+<span class="block font-label-sm text-label-sm text-on-secondary-container font-medium">Profit / Bag</span>
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-secondary-container font-extrabold">₹ 75.00</span>
+</div>
+</div>
+<!-- Sale Price with Tax Toggle -->
+<div>
+<div class="flex items-center justify-between mb-1">
+<label class="block font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Sale Price (MRP / Retail) *</label>
+<div class="flex items-center gap-1.5">
+<span class="font-label-sm text-label-sm text-on-surface font-medium">Tax Included</span>
+<div class="w-8 h-4 bg-secondary rounded-full p-0.5 flex items-center justify-end cursor-pointer">
+<div class="w-3 h-3 bg-surface rounded-full shadow-sm"></div>
+</div>
+</div>
+</div>
+<div class="flex items-center bg-surface-container-low rounded-lg px-3 py-2 shadow-sm">
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-surface-variant mr-2">₹</span>
+<input class="bg-transparent flex-1 font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold focus:outline-none min-w-0" type="text" value="540.00"/>
+<span class="font-label-md text-label-md text-on-surface-variant">/ Bag</span>
+</div>
+</div>
+<!-- Wholesale Price -->
+<div class="bg-surface-container-low rounded-xl p-space-sm space-y-space-xs">
+<div class="flex items-center justify-between">
+<label class="block font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Wholesale / Bulk Price</label>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Tier 1</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex-1 flex items-center bg-surface-container-lowest rounded-lg px-3 py-2 shadow-sm">
+<span class="font-tabular-data text-body-lg text-on-surface-variant mr-1.5 font-bold">₹</span>
+<input class="bg-transparent flex-1 font-tabular-data text-body-lg text-on-surface font-bold focus:outline-none min-w-0" type="text" value="510.00"/>
+</div>
+<div class="flex items-center bg-surface-container-lowest rounded-lg px-3 py-2 shadow-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant mr-1 font-medium">Min:</span>
+<input class="bg-transparent w-8 font-tabular-data text-body-lg text-on-surface font-bold text-center focus:outline-none" type="text" value="10"/>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-1">Bags</span>
+</div>
+</div>
+</div>
+<!-- Purchase Price -->
+<div>
+<div class="flex items-center justify-between mb-1">
+<label class="block font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Purchase Price</label>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Incl. 5% GST</span>
+</div>
+<div class="flex items-center bg-surface-container-low rounded-lg px-3 py-2 shadow-sm">
+<span class="font-currency-display-mobile text-currency-display-mobile text-on-surface-variant mr-2">₹</span>
+<input class="bg-transparent flex-1 font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold focus:outline-none min-w-0" type="text" value="465.00"/>
+<span class="font-label-md text-label-md text-on-surface-variant">/ Bag</span>
+</div>
+</div>
+<!-- Applicable GST Rate Segmented Pills -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1.5 font-semibold uppercase tracking-wider">Applicable GST Rate</label>
+<div class="grid grid-cols-5 gap-1.5 bg-surface-container rounded-xl p-1">
+<button class="py-2 text-center rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all">0%</button>
+<button class="py-2 text-center rounded-lg font-label-md text-label-md font-bold bg-primary text-on-primary shadow-sm transition-all">5%</button>
+<button class="py-2 text-center rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all">12%</button>
+<button class="py-2 text-center rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all">18%</button>
+<button class="py-2 text-center rounded-lg font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-all">28%</button>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 3: Stock Management & Warehousing -->
+<div class="px-gutter mt-space-md" id="sec-stock">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<div class="flex items-center justify-between pb-1">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">warehouse</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Stock &amp; Godown</h2>
+</div>
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm text-secondary font-semibold">
+<span class="material-symbols-outlined text-[14px]">sync</span> Live Sync
+        </span>
+</div>
+<!-- Current Stock in Hand with Quick Adjust -->
+<div class="bg-surface-container-low rounded-xl p-space-md">
+<div class="flex items-center justify-between mb-space-sm">
+<div>
+<span class="block font-label-sm text-label-sm text-on-surface-variant uppercase font-semibold">Current Stock on Hand</span>
+<div class="flex items-baseline gap-1 mt-0.5">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-extrabold">85</span>
+<span class="font-body-md text-body-md text-on-surface-variant font-medium">Bags</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Asset Value: ₹ 39,525.00</span>
+</div>
+<button class="flex flex-col items-center justify-center bg-surface-container-highest px-3 py-2 rounded-xl text-on-surface hover:bg-surface-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[20px] text-secondary">tune</span>
+<span class="font-label-sm text-label-sm font-semibold mt-0.5">Adjust Stock</span>
+</button>
+</div>
+<div class="flex items-center gap-2 pt-space-xs">
+<button class="flex-1 py-2 px-2 bg-surface-container-lowest text-on-secondary-container font-label-md text-label-md font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1 hover:bg-secondary-container/20 transition-colors">
+<span class="material-symbols-outlined text-[16px] text-secondary">add_circle</span> + Stock In
+          </button>
+<button class="flex-1 py-2 px-2 bg-surface-container-lowest text-on-surface font-label-md text-label-md font-semibold rounded-lg shadow-sm flex items-center justify-center gap-1 hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-[16px] text-error">remove_circle</span> - Stock Out
+          </button>
+</div>
+</div>
+<!-- Low Stock Threshold Alert -->
+<div class="flex items-center justify-between p-space-sm bg-surface-container-low rounded-xl">
+<div class="flex-1 pr-2">
+<div class="flex items-center gap-1.5">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Low Stock Alert</span>
+<span class="inline-flex items-center px-1.5 py-0.2 bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm rounded-full font-medium">WhatsApp On</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Notify when quantity dips below threshold</p>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-14 bg-surface-container-lowest px-2 py-1 rounded-lg text-center shadow-sm">
+<input class="w-full text-center font-tabular-data text-body-lg text-on-surface font-bold focus:outline-none bg-transparent" type="text" value="15"/>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant font-medium">Bags</span>
+</div>
+</div>
+<!-- Godown & Storage Rack -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1 font-semibold uppercase tracking-wider">Godown / Rack Location</label>
+<div class="flex items-center bg-surface-container-low rounded-lg px-3 py-2.5 shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2">location_on</span>
+<input class="bg-transparent flex-1 font-body-md text-body-md text-on-surface focus:outline-none min-w-0 font-medium" type="text" value="Warehouse A - Bay 3, Shelf 2"/>
+</div>
+</div>
+<!-- Batch & Expiry Tracking -->
+<div class="bg-surface-container-low rounded-xl p-space-sm space-y-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-semibold uppercase tracking-wider">Batch &amp; Expiry Info</span>
+<span class="font-label-sm text-label-sm text-secondary font-semibold cursor-pointer">+ Add Batch</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest p-2.5 rounded-lg shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">calendar_month</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">BR-2024-B</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Exp: 12/2025 • Mfg: 06/2024</p>
+</div>
+</div>
+<span class="font-tabular-data text-body-md text-on-surface font-bold">85 Bags</span>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 4: Danger Zone & Item Audit -->
+<div class="px-gutter mt-space-md mb-space-md" id="sec-history">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-space-md">
+<!-- Movement History Button -->
+<a class="flex items-center justify-between p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors shadow-sm" href="#ledger">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Stock Movement History</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">View all billings, purchases, &amp; adjustments</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">chevron_right</span>
+</a>
+<!-- Active / Out of stock Toggle -->
+<div class="flex items-center justify-between pt-1">
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Available for Sale</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Show this item in POS billing list</p>
+</div>
+<div class="w-10 h-6 bg-secondary rounded-full p-1 flex items-center justify-end cursor-pointer">
+<div class="w-4 h-4 bg-surface rounded-full shadow-sm"></div>
+</div>
+</div>
+<!-- Delete Item Action -->
+<div class="pt-space-xs">
+<button class="w-full py-2.5 flex items-center justify-center gap-1.5 text-error hover:bg-error-container/30 rounded-lg transition-colors font-label-md text-label-md font-semibold">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+          Delete Item from Inventory
+        </button>
+</div>
+</div>
+</div>
+<!-- Sticky Bottom Quick Action Dock -->
+<div class="fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-xl px-gutter py-space-sm shadow-[0_-4px_16px_rgba(11,25,44,0.08)]">
+<div class="flex items-center gap-space-sm max-w-md mx-auto">
+<button class="w-2/5 h-12 rounded-lg bg-surface-container-highest text-on-surface font-label-md text-label-md font-semibold hover:bg-surface-container transition-colors shadow-sm" onclick="history.back()">
+        Cancel
+      </button>
+<button class="w-3/5 h-12 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.28)] hover:brightness-105 active:scale-[0.99] transition-all" id="save-btn">
+<span class="material-symbols-outlined text-[20px]">check</span>
+        Save Changes
+      </button>
+</div>
+</div>
+</div>
+<script>
+  // Simple micro-interactions for Goods / Service tabs & visual click state
+  const goodsBtn = document.getElementById('type-goods');
+  const serviceBtn = document.getElementById('type-service');
+  const saveBtn = document.getElementById('save-btn');
+
+  if (goodsBtn && serviceBtn) {
+    goodsBtn.addEventListener('click', () => {
+      goodsBtn.className = 'flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg bg-surface-container-lowest text-on-surface shadow-sm font-semibold transition-all';
+      serviceBtn.className = 'flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg text-on-surface-variant font-medium transition-all';
+    });
+
+    serviceBtn.addEventListener('click', () => {
+      serviceBtn.className = 'flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg bg-surface-container-lowest text-on-surface shadow-sm font-semibold transition-all';
+      goodsBtn.className = 'flex-1 py-1.5 text-center font-label-md text-label-md rounded-lg text-on-surface-variant font-medium transition-all';
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      saveBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">progress_activity</span> Updating...';
+      setTimeout(() => {
+        saveBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">task_alt</span> Updated!';
+        setTimeout(() => {
+          saveBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">check</span> Save Changes';
+        }, 1500);
+      }, 700);
+    });
+  }
+</script></main></body></html>

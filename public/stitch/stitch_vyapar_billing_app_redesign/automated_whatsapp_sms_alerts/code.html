@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Plus+Jakarta+Sans:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      "colors": {
+        "secondary-fixed": "#6ffbbe",
+        "on-surface": "#111c2d",
+        "on-secondary-container": "#00714d",
+        "error-container": "#ffdad6",
+        "on-tertiary-fixed-variant": "#653e00",
+        "on-background": "#111c2d",
+        "outline": "#75777d",
+        "tertiary-container": "#2a1700",
+        "surface-tint": "#525f75",
+        "surface-container-highest": "#d8e3fb",
+        "on-secondary-fixed": "#002113",
+        "tertiary-fixed-dim": "#ffb95f",
+        "tertiary": "#000000",
+        "on-primary": "#ffffff",
+        "outline-variant": "#c5c6cd",
+        "secondary-fixed-dim": "#4edea3",
+        "error": "#ba1a1a",
+        "on-primary-container": "#77849c",
+        "on-surface-variant": "#44474c",
+        "surface-container": "#e7eeff",
+        "on-tertiary": "#ffffff",
+        "background": "#f9f9ff",
+        "surface-container-low": "#f0f3ff",
+        "inverse-on-surface": "#ecf1ff",
+        "surface": "#f9f9ff",
+        "on-error-container": "#93000a",
+        "surface-container-high": "#dee8ff",
+        "primary-fixed-dim": "#bac7e1",
+        "on-tertiary-fixed": "#2a1700",
+        "tertiary-fixed": "#ffddb8",
+        "secondary": "#006c49",
+        "on-primary-fixed": "#0e1c2f",
+        "on-primary-fixed-variant": "#3a475c",
+        "on-error": "#ffffff",
+        "surface-dim": "#cfdaf2",
+        "inverse-surface": "#263143",
+        "on-secondary-fixed-variant": "#005236",
+        "surface-variant": "#d8e3fb",
+        "primary-fixed": "#d6e3fe",
+        "surface-bright": "#f9f9ff",
+        "secondary-container": "#6cf8bb",
+        "on-secondary": "#ffffff",
+        "primary-container": "#0e1c2f",
+        "on-tertiary-container": "#b87500",
+        "surface-container-lowest": "#ffffff",
+        "inverse-primary": "#bac7e1",
+        "primary": "#000000"
+      },
+      "borderRadius": {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "full": "9999px"
+      },
+      "spacing": {
+        "space-md": "0.75rem",
+        "gutter-mobile": "0.75rem",
+        "space-xs": "0.25rem",
+        "space-sm": "0.5rem",
+        "space-lg": "1rem",
+        "gutter": "1rem",
+        "margin-mobile": "0.75rem",
+        "space-xl": "1.5rem",
+        "margin": "1rem"
+      },
+      "fontFamily": {
+        "body-lg": ["Inter"],
+        "label-md": ["Inter"],
+        "body-sm": ["Inter"],
+        "headline-lg": ["Plus Jakarta Sans"],
+        "headline-sm": ["Plus Jakarta Sans"],
+        "headline-lg-mobile": ["Plus Jakarta Sans"],
+        "currency-display-mobile": ["Plus Jakarta Sans"],
+        "label-sm": ["Inter"],
+        "tabular-data": ["Inter"],
+        "currency-display": ["Plus Jakarta Sans"],
+        "headline-md": ["Plus Jakarta Sans"],
+        "body-md": ["Inter"]
+      },
+      "fontSize": {
+        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+        "label-md": ["13px", {"lineHeight": "18px", "fontWeight": "600"}],
+        "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+        "headline-lg": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
+        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+        "currency-display-mobile": ["22px", {"lineHeight": "28px", "fontWeight": "800"}],
+        "label-sm": ["11px", {"lineHeight": "14px", "fontWeight": "600"}],
+        "tabular-data": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+        "currency-display": ["28px", {"lineHeight": "34px", "fontWeight": "800"}],
+        "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+      }
+    }
+  }
+}</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-gutter-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-xs min-w-0 flex-1"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-high transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined text-[24px]">arrow_back</span></button><h1 class="font-headline-sm text-headline-sm text-on-surface truncate">Automated Whatsapp &amp; Sms Alerts</h1></div><div class="flex items-center gap-space-xs"><button aria-label="Share" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">help_outline</span></button><button aria-label="More options" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">more_vert</span></button></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-32">
+<!-- Status & Quick Navigation Row -->
+<div class="px-gutter-mobile pt-space-md pb-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface">Auto-Dispatch Engine Live</span>
+</div>
+<button class="flex items-center gap-1.5 px-space-md py-1.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors font-label-sm text-label-sm shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">history</span>
+<span>Delivery Logs</span>
+</button>
+</div>
+<!-- Provider & Channel Status Master Card -->
+<div class="px-gutter-mobile mb-space-lg">
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm overflow-hidden">
+<!-- WhatsApp Gateway Segment -->
+<div class="p-space-lg flex flex-col gap-space-sm">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[24px]">chat</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface">WhatsApp Business API</span>
+<span class="material-symbols-outlined text-[18px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Cloud API v19.0 • Meta Tier 2 Verified</p>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-secondary-container/40 text-on-secondary-container px-2.5 py-1 rounded-full">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm">Connected</span>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Verified Sender Profile</span>
+<span class="text-secondary font-medium">99.8% Open Rate</span>
+</div>
+<p class="font-label-md text-label-md text-on-surface">Shree Balaji Enterprises (+91 98201 44521)</p>
+</div>
+</div>
+<!-- SMS DLT Gateway Segment -->
+<div class="bg-surface-container-low p-space-lg flex flex-col gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[22px]">sms</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface">DLT SMS Gateway</span>
+<span class="bg-surface-container text-on-surface-variant px-1.5 py-0.5 rounded font-label-sm text-label-sm">Govt Approved</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Entity ID: 140155239000 (TRAI)</p>
+</div>
+</div>
+<button class="bg-surface-container-lowest text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded-lg shadow-sm font-label-md text-label-md transition-all active:scale-95" type="button">
+            + Recharge Pack
+          </button>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest rounded-xl p-space-md">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">token</span>
+<div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Transactional SMS Credits</p>
+<p class="font-headline-sm text-headline-sm text-on-surface tabular-nums">1,840 <span class="font-body-sm text-body-sm font-normal text-on-surface-variant">credits left</span></p>
+</div>
+</div>
+<div class="w-24 bg-surface-container-high h-2 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full w-[68%]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Section Title -->
+<div class="px-gutter-mobile mb-space-sm flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Automated Trigger Scenarios</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">5 Active</span>
+</div>
+<!-- Scenarios Stack -->
+<div class="px-gutter-mobile flex flex-col gap-space-md">
+<!-- Scenario 1: Invoice Dispatch -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">receipt_long</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Instant Invoice Dispatch</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Fired upon saving invoice</p>
+</div>
+</div>
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Send PDF invoice download link and dynamic UPI QR immediately after saving invoice.</p>
+<!-- Channel Selector -->
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Channels:</span>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary-container/40 text-on-secondary-container font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[16px]">check_box</span>
+<span>WhatsApp</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[16px]">check_box</span>
+<span>SMS DLT</span>
+</button>
+</div>
+<!-- Template preview chip -->
+<div class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Verified Template: INV_DISPATCH_V2</span>
+<button class="text-secondary font-label-sm text-label-sm flex items-center gap-0.5" type="button">
+<span class="material-symbols-outlined text-[14px]">edit</span> Edit
+          </button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface italic">
+          "Namaste {CustomerName}, your bill of ₹{Amount} from Shree Balaji Enterprises is ready. Download PDF: {Link} or pay via UPI: {QR_Link}"
+        </p>
+</div>
+</div>
+<!-- Scenario 2: Payment Receipt -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-secondary-fixed/50 flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Payment Receipt Confirmation</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Fired on 'Payment In' entry</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Notify customer immediately when Payment In is recorded against their ledger.</p>
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Channels:</span>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary-container/40 text-on-secondary-container font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[16px]">check_box</span>
+<span>WhatsApp</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-low text-outline font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[16px]">check_box_outline_blank</span>
+<span>SMS DLT</span>
+</button>
+</div>
+</div>
+<!-- Scenario 3: Automated Overdue Reminders -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Overdue Payment Reminders</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Scheduled multi-step cadence</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<!-- Schedule options -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Reminder Schedule Rule</label>
+<div class="grid grid-cols-1 gap-1.5">
+<button class="w-full text-left px-3 py-2 rounded-xl bg-surface-container flex items-center justify-between text-on-surface font-label-md text-label-md" type="button">
+<span>On due date &amp; Every 3 days after</span>
+<span class="material-symbols-outlined text-secondary text-[18px]">radio_button_checked</span>
+</button>
+<button class="w-full text-left px-3 py-2 rounded-xl bg-surface-container-low flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm" type="button">
+<span>3 days before due date (Gentle heads-up)</span>
+<span class="material-symbols-outlined text-outline text-[18px]">radio_button_unchecked</span>
+</button>
+</div>
+</div>
+<!-- Tone Switcher -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Copy Tone &amp; Urgency</label>
+<div class="grid grid-cols-2 gap-space-xs p-1 bg-surface-container-low rounded-xl">
+<button class="py-1.5 px-3 rounded-lg bg-surface-container-lowest text-on-surface shadow-sm font-label-md text-label-md text-center" type="button">
+            Polite Merchant
+          </button>
+<button class="py-1.5 px-3 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md text-center" type="button">
+            Firm Commercial
+          </button>
+</div>
+</div>
+<!-- Preview -->
+<div class="bg-surface-container-low rounded-xl p-space-md">
+<p class="font-body-sm text-body-sm text-on-surface italic">
+          "Dear {CustomerName}, friendly reminder that payment of ₹{Balance} for Inv #{InvoiceNo} is due. Click to pay instantly via UPI: {UPI_Payment_Link}"
+        </p>
+</div>
+</div>
+<!-- Scenario 4: Delivery Challan & Dispatch -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[20px]">local_shipping</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Challan &amp; Dispatch Alert</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Fired on goods outgate</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Send transporter name, vehicle number, and live tracking link upon goods dispatch.</p>
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Channels:</span>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary-container/40 text-on-secondary-container font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[16px]">check_box</span>
+<span>WhatsApp Only</span>
+</button>
+</div>
+</div>
+<!-- Scenario 5: Daily Owner Digest -->
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-[20px]">leaderboard</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Daily Owner Business Digest</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sent at 9:00 PM every evening</p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Send 9:00 PM summary to proprietor WhatsApp (Total Sales, Cash Collected, Pending Dues).</p>
+<div class="p-2.5 rounded-xl bg-surface-container-low flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-secondary">phone_android</span>
+<span class="font-label-md text-label-md text-on-surface">+91 98201 44521 (Proprietor)</span>
+</div>
+</div>
+</div>
+<!-- Notification Customization & Branding -->
+<div class="px-gutter-mobile mt-space-xl flex flex-col gap-space-md">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Notification Customization &amp; Branding</h2>
+<div class="bg-surface-container-lowest rounded-2xl p-space-lg shadow-sm flex flex-col gap-space-md">
+<!-- Option 1: Payment QR -->
+<div class="flex items-center justify-between py-1">
+<div class="pr-space-md">
+<p class="font-label-md text-label-md text-on-surface">Include Store Digital Payment QR</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Adds dynamic PhonePe/GooglePay QR inside WhatsApp reminder body</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="h-px bg-surface-container"></div>
+<!-- Option 2: PDF Attachment -->
+<div class="flex items-center justify-between py-1">
+<div class="pr-space-md">
+<p class="font-label-md text-label-md text-on-surface">Attach Branded PDF Invoice</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Direct file attachment instead of external cloud browser link</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<div class="h-px bg-surface-container"></div>
+<!-- Option 3: Custom Signature -->
+<div class="flex flex-col gap-1.5 pt-1">
+<label class="font-label-md text-label-md text-on-surface" for="custom-sig">Custom Greeting Signature</label>
+<div class="bg-surface-container-low rounded-xl px-3 py-2.5 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">draw</span>
+<input class="bg-transparent border-0 outline-none w-full font-body-md text-body-md text-on-surface p-0" id="custom-sig" type="text" value="With Best Regards, Shree Balaji Enterprises, Katraj"/>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant text-right">48 / 60 chars</span>
+</div>
+</div>
+</div>
+<!-- Sticky Bottom Quick-Action Bar -->
+<div class="fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-lg px-gutter-mobile py-space-md pb-safe shadow-[0_-4px_16px_rgba(11,25,44,0.06)] flex flex-col gap-2">
+<div class="flex items-center gap-space-sm max-w-md mx-auto w-full">
+<button class="flex-1 h-12 rounded-xl bg-surface-container-lowest text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition-all hover:bg-surface-container-low" id="btn-test-wa" type="button">
+<span class="material-symbols-outlined text-secondary text-[20px]">send</span>
+<span>Send Test Alert</span>
+</button>
+<button class="flex-1 h-12 rounded-xl bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all hover:opacity-95" id="btn-save-pref" type="button">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span>Save Preferences</span>
+</button>
+</div>
+</div>
+<!-- Toast Notification Container -->
+<div class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 translate-y-[-8px]" id="toast">
+<div class="bg-primary-container text-on-primary px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 font-label-md text-label-md">
+<span class="material-symbols-outlined text-secondary text-[18px]">verified</span>
+<span id="toast-msg">Preferences updated successfully</span>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const toast = document.getElementById('toast');
+    const toastMsg = document.getElementById('toast-msg');
+    const btnSave = document.getElementById('btn-save-pref');
+    const btnTest = document.getElementById('btn-test-wa');
+
+    function showToast(text) {
+      if (!toast || !toastMsg) return;
+      toastMsg.innerText = text;
+      toast.classList.remove('opacity-0', 'translate-y-[-8px]');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-[-8px]');
+      }, 2400);
+    }
+
+    if (btnSave) {
+      btnSave.addEventListener('click', () => {
+        showToast('All alert triggers & templates saved!');
+      });
+    }
+
+    if (btnTest) {
+      btnTest.addEventListener('click', () => {
+        showToast('Test WhatsApp message sent to +91 98201 44521');
+      });
+    }
+  })();
+</script></main></body></html>
