@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "/data/data/com.termux/files/usr/bin/node",
+      "args": [
+        "./scripts/stitch-mcp-server.mjs"
+      ],
+      "env": {
+        "STITCH_PROJECT_ID": "5973526274439406288"
+      }
+    },
+    "stitch-cloud": {
+      "command": "/data/data/com.termux/files/usr/bin/node",
+      "args": [
+        "/data/data/com.termux/files/usr/bin/stitch-mcp",
+        "proxy"
+      ],
+      "env": {
+        "STITCH_PROJECT_ID": "5973526274439406288"
+      }
+    }
+  }
+}
