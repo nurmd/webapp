@@ -681,8 +681,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </span>
                     </div>
 
-                    {/* Bottom Row: Pricing (Sale & Buy with click-to-reveal) */}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-on-surface-variant">
+                    {/* Bottom Row: Pricing (Sale left, Buy justified right) */}
+                    <div className="flex items-center justify-between gap-2 mt-1 text-xs text-on-surface-variant">
                       {/* Sale Price */}
                       <div className="inline-flex items-baseline gap-1">
                         <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Sale:</span>
@@ -691,13 +691,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         </span>
                       </div>
 
-                      <span className="text-outline-variant text-[10px]">•</span>
-
-                      {/* Buy Price (Hidden with *** by default, click to toggle) */}
+                      {/* Buy Price (Right-justified with click-to-reveal) */}
                       <button
                         type="button"
                         onClick={(e) => toggleBuyPrice(item.id, e)}
-                        className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 active:scale-95 transition-all text-left bg-transparent border-0 p-0"
+                        className="inline-flex items-center justify-end gap-1 cursor-pointer hover:opacity-80 active:scale-95 transition-all text-right ml-auto bg-transparent border-0 p-0"
                         title={revealedBuyPrices[item.id] ? 'Click to hide purchase price' : 'Click to view purchase price'}
                       >
                         <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
