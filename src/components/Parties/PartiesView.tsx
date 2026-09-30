@@ -59,6 +59,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
   const overdueCustomersCount = customers.filter((p) => p.currentBalance > 0).length;
   const overdueSuppliersCount = suppliers.filter((p) => p.currentBalance < 0).length;
+  const settledCustomersCount = customers.filter((p) => p.currentBalance === 0).length;
+  const settledSuppliersCount = suppliers.filter((p) => p.currentBalance === 0).length;
 
   const activePartiesList = activeSegment === 'CUSTOMERS' ? customers : suppliers;
 
@@ -168,37 +170,78 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     : null;
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-3 gap-space-sm">
-      {/* 1. Segment Switcher: Customers vs Suppliers (Stitch parties_ledger_simplified) */}
-      <section className="pt-space-xs">
-        <div className="bg-surface-container p-1 rounded-xl flex items-center shadow-sm">
+    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-2 sm:py-3 gap-2 sm:gap-3">
+      {/* 1. Unified 1-Glance Financial Balance Summary */}
+      <section className="pt-0.5">
+        <div className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 shadow-sm border border-outline-variant/20 grid grid-cols-2 divide-x divide-outline-variant/20">
+          {/* You'll Get (Receivables) */}
+          <div
+            onClick={() => {
+              setActiveSegment('CUSTOMERS');
+              setStatusFilter('ALL');
+            }}
+            className={`pr-2.5 sm:pr-4 flex flex-col cursor-pointer transition-all ${
+              activeSegment === 'CUSTOMERS' ? 'opacity-100 scale-[1.01]' : 'opacity-60 hover:opacity-85'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-secondary">
+              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">call_received</span>
+              <span className="font-label-sm text-[10px] sm:text-[11px] uppercase tracking-wider font-bold">
+                You'll Get
+              </span>
+            </div>
+            <span className="font-headline-sm text-base sm:text-lg font-extrabold text-secondary mt-0.5 tracking-tight truncate">
+              {formatINR(totalReceivables)}
+            </span>
+            <span className="text-[10px] text-on-surface-variant font-medium mt-0.5 truncate">
+              {overdueCustomersCount} customers have dues
+            </span>
+          </div>
+
+          {/* You'll Give (Payables) */}
+          <div
+            onClick={() => {
+              setActiveSegment('SUPPLIERS');
+              setStatusFilter('ALL');
+            }}
+            className={`pl-2.5 sm:pl-4 flex flex-col cursor-pointer transition-all ${
+              activeSegment === 'SUPPLIERS' ? 'opacity-100 scale-[1.01]' : 'opacity-60 hover:opacity-85'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-error">
+              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">call_made</span>
+              <span className="font-label-sm text-[10px] sm:text-[11px] uppercase tracking-wider font-bold">
+                You'll Give
+              </span>
+            </div>
+            <span className="font-headline-sm text-base sm:text-lg font-extrabold text-error mt-0.5 tracking-tight truncate">
+              {formatINR(totalPayables)}
+            </span>
+            <span className="text-[10px] text-on-surface-variant font-medium mt-0.5 truncate">
+              {overdueSuppliersCount} suppliers to pay
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Clean Segment Switcher: Customers vs Suppliers */}
+      <section>
+        <div className="bg-surface-container/70 p-1 rounded-xl flex items-center shadow-xs">
           <button
             type="button"
             onClick={() => {
               setActiveSegment('CUSTOMERS');
               setStatusFilter('ALL');
             }}
-            className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeSegment === 'CUSTOMERS'
-                ? 'bg-surface-container-lowest shadow-sm text-on-surface'
-                : 'text-on-surface-variant hover:text-on-surface'
+                ? 'bg-surface-container-lowest shadow-xs text-on-surface font-bold'
+                : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
           >
-            <span
-              className={`material-symbols-outlined text-[18px] ${
-                activeSegment === 'CUSTOMERS' ? 'text-secondary' : ''
-              }`}
-            >
-              groups
-            </span>
-            <span className="font-label-md text-label-md font-bold">Customers</span>
-            <span
-              className={`font-label-sm text-label-sm px-1.5 py-0.2 rounded-full ${
-                activeSegment === 'CUSTOMERS'
-                  ? 'bg-secondary-container text-on-secondary-container'
-                  : 'bg-surface-variant text-on-surface-variant'
-              }`}
-            >
+            <span className="material-symbols-outlined text-[16px] text-secondary">groups</span>
+            <span className="text-xs">Customers</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary/10 text-secondary font-bold">
               {customers.length}
             </span>
           </button>
@@ -209,106 +252,58 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               setActiveSegment('SUPPLIERS');
               setStatusFilter('ALL');
             }}
-            className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               activeSegment === 'SUPPLIERS'
-                ? 'bg-surface-container-lowest shadow-sm text-on-surface'
-                : 'text-on-surface-variant hover:text-on-surface'
+                ? 'bg-surface-container-lowest shadow-xs text-on-surface font-bold'
+                : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
           >
-            <span
-              className={`material-symbols-outlined text-[18px] ${
-                activeSegment === 'SUPPLIERS' ? 'text-primary' : ''
-              }`}
-            >
-              local_shipping
-            </span>
-            <span className="font-label-md text-label-md font-bold">Suppliers</span>
-            <span
-              className={`font-label-sm text-label-sm px-1.5 py-0.2 rounded-full ${
-                activeSegment === 'SUPPLIERS'
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-variant text-on-surface-variant'
-              }`}
-            >
+            <span className="material-symbols-outlined text-[16px] text-primary">local_shipping</span>
+            <span className="text-xs">Suppliers</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-bold">
               {suppliers.length}
             </span>
           </button>
         </div>
       </section>
 
-      {/* 2. Summary Header Card with tactile ambient background (Stitch parties_ledger_simplified) */}
-      <section className="pt-space-xs">
-        <div className="rounded-2xl bg-surface-container-lowest p-4 shadow-sm border border-outline-variant/20 flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
-              {activeSegment === 'CUSTOMERS' ? 'Total Receivables' : 'Total Payables'}
-            </span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold tracking-tight">
-                {formatINR(activeSegment === 'CUSTOMERS' ? totalReceivables : totalPayables)}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold flex items-center gap-1 ${
-                (activeSegment === 'CUSTOMERS' ? overdueCustomersCount : overdueSuppliersCount) > 0
-                  ? 'bg-error-container text-on-error-container'
-                  : 'bg-secondary-container text-on-secondary-container'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  (activeSegment === 'CUSTOMERS' ? overdueCustomersCount : overdueSuppliersCount) > 0
-                    ? 'bg-error'
-                    : 'bg-secondary'
-                }`}
-              />
-              {activeSegment === 'CUSTOMERS'
-                ? `${overdueCustomersCount} Overdue`
-                : `${overdueSuppliersCount} Overdue`}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Search & Filter Bar (Stitch simplified) */}
-      <section className="pt-space-xs flex flex-col gap-2">
+      {/* 3. Search & Quick Filter Pills */}
+      <section className="flex flex-col gap-1.5">
         <div className="relative flex items-center">
-          <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">
+          <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">
             search
           </span>
           <input
             type="text"
             placeholder={
               activeSegment === 'CUSTOMERS'
-                ? 'Search customer, phone, GSTIN...'
-                : 'Search supplier, GSTIN, phone...'
+                ? 'Search customer by name, phone, GSTIN...'
+                : 'Search supplier by name, phone, GSTIN...'
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-container-lowest pl-10 pr-10 py-2.5 rounded-xl font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-sm border border-outline-variant/20 transition-all"
+            className="w-full bg-surface-container-lowest pl-9 pr-8 py-2 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-xs border border-outline-variant/20 transition-all"
           />
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter(statusFilter === 'OVERDUE' ? 'ALL' : 'OVERDUE');
-            }}
-            className="absolute right-2.5 w-7 h-7 flex items-center justify-center rounded-lg bg-surface-container text-on-surface-variant active:scale-95 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">tune</span>
-          </button>
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          )}
         </div>
 
-        {/* Filter Chips */}
+        {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-sm text-label-sm shadow-sm transition-colors cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
               statusFilter === 'ALL'
-                ? 'bg-inverse-surface text-inverse-on-surface'
-                : 'bg-surface-container-lowest text-on-surface border border-outline-variant/20'
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
             }`}
           >
             All ({activePartiesList.length})
@@ -316,124 +311,127 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('OVERDUE')}
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-sm text-label-sm shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'OVERDUE'
-                ? 'bg-inverse-surface text-inverse-on-surface'
-                : 'bg-surface-container-lowest text-on-surface border border-outline-variant/20'
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-error" />
-            Overdue ({activeSegment === 'CUSTOMERS' ? overdueCustomersCount : overdueSuppliersCount})
+            <span>Pending Dues ({activeSegment === 'CUSTOMERS' ? overdueCustomersCount : overdueSuppliersCount})</span>
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter('SETTLED')}
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full font-label-sm text-label-sm shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'SETTLED'
-                ? 'bg-inverse-surface text-inverse-on-surface'
-                : 'bg-surface-container-lowest text-on-surface border border-outline-variant/20'
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-            Settled ({activePartiesList.filter((p) => p.currentBalance === 0).length})
+            <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
         </div>
       </section>
 
-      {/* 4. Parties Ledger Card Feed (Stitch parties_ledger_simplified) */}
-      <section className="flex flex-col gap-2.5">
+      {/* 4. Streamlined Passbook-Style Parties Feed */}
+      <section className="flex flex-col gap-2">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-sm">
-            No {activeSegment.toLowerCase()} found.
+          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
+            <span className="material-symbols-outlined text-[32px] text-outline mb-1">
+              person_off
+            </span>
+            <p className="font-semibold text-xs text-on-surface">No {activeSegment.toLowerCase()} found</p>
+            <p className="text-[11px] text-outline mt-0.5">
+              {search ? 'Try clearing your search query' : 'Tap the button below to add your first party'}
+            </p>
           </div>
         ) : (
           filtered.map((party) => {
             const isReceivable = party.currentBalance > 0;
             const isPayable = party.currentBalance < 0;
             const isSettled = party.currentBalance === 0;
-            const latestDoc = getLatestDocRef(party);
 
             return (
               <div
                 key={party.id}
                 onClick={() => setSelectedPartyForLedger(party)}
-                className="party-card bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/20 flex flex-col gap-3 active:bg-surface-container-low transition-all cursor-pointer hover:border-secondary/40"
+                className="w-full bg-surface-container-lowest rounded-xl p-3 shadow-xs border border-outline-variant/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer hover:shadow-md hover:border-secondary/30"
               >
-                <div className="flex items-center justify-between gap-2 sm:gap-3">
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                    <div
-                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-headline-sm text-sm sm:text-headline-sm flex-shrink-0 font-bold ${
-                        isReceivable || isPayable
-                          ? 'bg-error-container text-on-error-container'
-                          : 'bg-secondary-container text-on-secondary-container'
-                      }`}
-                    >
-                      {party.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <div className="flex items-center gap-1">
-                        <span className="font-headline-sm text-sm sm:text-base text-on-surface truncate font-semibold">
-                          {party.name}
-                        </span>
-                        {party.gstin && (
-                          <span
-                            className="material-symbols-outlined text-[15px] sm:text-[16px] text-secondary flex-shrink-0"
-                            style={{ fontVariationSettings: "'FILL' 1" }}
-                          >
-                            verified
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-on-surface-variant font-body-sm text-[11px] sm:text-xs truncate">
-                        {party.billingAddress || party.phone}
-                      </span>
-                    </div>
+                {/* Left: Avatar + Details */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div
+                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-extrabold flex-shrink-0 ${
+                      isReceivable
+                        ? 'bg-error/10 text-error'
+                        : isPayable
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : 'bg-secondary/10 text-secondary'
+                    }`}
+                  >
+                    {party.name.charAt(0).toUpperCase()}
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
-                    <span
-                      className={`font-currency-display-mobile text-xs sm:text-base tracking-tight font-extrabold whitespace-nowrap ${
-                        isReceivable
-                          ? 'text-error'
-                          : isPayable
-                          ? 'text-error'
-                          : 'text-secondary'
-                      }`}
-                    >
-                      {formatINR(Math.abs(party.currentBalance))}
-                    </span>
-                    <span
-                      className={`font-label-sm text-[10px] sm:text-label-sm px-2 py-0.5 rounded-md mt-0.5 font-bold whitespace-nowrap ${
-                        isReceivable
-                          ? 'text-error bg-error-container/60'
-                          : isPayable
-                          ? 'text-error bg-error-container/60'
-                          : 'text-on-secondary-container bg-secondary-container/60'
-                      }`}
-                    >
-                      {isReceivable
-                        ? 'To Collect'
-                        : isPayable
-                        ? 'To Pay'
-                        : 'Settled'}
-                    </span>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
+                        {party.name}
+                      </span>
+                      {party.gstin && (
+                        <span
+                          className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0"
+                          title={`GSTIN: ${party.gstin}`}
+                        >
+                          verified
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5 truncate">
+                      <span>{party.phone}</span>
+                      {party.billingAddress && party.billingAddress !== 'Local Counter' && (
+                        <>
+                          <span className="text-outline-variant">•</span>
+                          <span className="truncate">{party.billingAddress}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Sub-row with doc ref and quick collect/remind buttons */}
-                <div
-                  className="flex items-center justify-between pt-1 border-t border-surface-container"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-body-sm">
-                    <span className="material-symbols-outlined text-[16px]">receipt</span>
-                    <span className="truncate">{latestDoc}</span>
+                {/* Right: Balance + Quick WhatsApp Icon */}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                  <div className="flex flex-col items-end text-right">
+                    <span
+                      className={`font-currency-display-mobile text-xs sm:text-sm font-extrabold tracking-tight ${
+                        isReceivable
+                          ? 'text-error'
+                          : isPayable
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-secondary'
+                      }`}
+                    >
+                      {isSettled ? '₹0' : formatINR(Math.abs(party.currentBalance))}
+                    </span>
+                    <span
+                      className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md mt-0.5 ${
+                        isReceivable
+                          ? 'text-error bg-error/10'
+                          : isPayable
+                          ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10'
+                          : 'text-secondary bg-secondary/10'
+                      }`}
+                    >
+                      {isReceivable ? 'To Collect' : isPayable ? 'To Pay' : 'Settled'}
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  {/* WhatsApp Reminder Shortcut (if pending balance) */}
+                  {party.currentBalance !== 0 && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         const url = getPaymentReminderWhatsAppUrl(
                           party.name,
                           party.phone,
@@ -443,21 +441,16 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                         );
                         window.open(url, '_blank');
                       }}
-                      className="w-9 h-9 rounded-xl bg-surface-container text-secondary flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-                      title="WhatsApp Remind"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-surface-container-low text-secondary hover:bg-secondary/10 flex items-center justify-center active:scale-95 transition-all cursor-pointer ml-0.5"
+                      title="Send WhatsApp Reminder"
                     >
-                      <span className="material-symbols-outlined text-[18px]">chat</span>
+                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chat</span>
                     </button>
+                  )}
 
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPartyForLedger(party)}
-                      className="h-9 px-3.5 rounded-xl bg-secondary text-on-secondary font-label-md text-label-md flex items-center gap-1 active:scale-95 transition-transform cursor-pointer shadow-sm"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">payments</span>
-                      <span>{party.type === 'CUSTOMER' ? 'Collect' : 'Pay Now'}</span>
-                    </button>
-                  </div>
+                  <span className="material-symbols-outlined text-[16px] text-outline-variant">
+                    chevron_right
+                  </span>
                 </div>
               </div>
             );
@@ -465,17 +458,15 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         )}
       </section>
 
-      {/* 5. Bottom Floating Action Button (Stitch simplified FAB) */}
+      {/* 5. Minimal Bottom Floating Action Button */}
       <div className="fixed bottom-20 right-4 z-40">
         <button
           onClick={handleOpenAddModal}
-          className="h-12 px-4 rounded-full bg-primary text-on-primary font-headline-sm text-headline-sm shadow-xl flex items-center gap-2 active:scale-95 transition-transform cursor-pointer"
+          className="h-11 px-4 rounded-full bg-secondary text-on-secondary font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"
           type="button"
         >
-          <span className="material-symbols-outlined text-[22px]">person_add</span>
-          <span className="font-label-md text-label-md">
-            {activeSegment === 'CUSTOMERS' ? 'Add Customer' : 'Add Supplier'}
-          </span>
+          <span className="material-symbols-outlined text-[18px]">person_add</span>
+          <span>{activeSegment === 'CUSTOMERS' ? '+ Customer' : '+ Supplier'}</span>
         </button>
       </div>
 
