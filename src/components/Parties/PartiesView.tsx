@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
+import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
@@ -11,6 +12,7 @@ interface PartiesViewProps {
   parties: Party[];
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
+  vouchers?: Voucher[];
   onSaveParty: (party: Party) => void;
   onDeleteParty: (id: string) => void;
   onRecordPartyPayment?: (party: Party, amount: number, paymentMode: string, notes: string) => void;
@@ -21,12 +23,14 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   parties,
   invoices = [],
   purchases = [],
+  vouchers,
   onSaveParty,
   onDeleteParty,
   onRecordPartyPayment,
   onViewInvoice,
 }) => {
   const company = db.getCompany();
+  const allVouchers = vouchers || db.getVouchers();
   // Segmented switch: Customers vs Suppliers (Stitch parties_ledger_simplified)
   const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>('ALL');
@@ -617,10 +621,15 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           company={company}
           invoices={invoices}
           purchases={purchases}
+          vouchers={allVouchers}
           onClose={() => setSelectedPartyForLedger(null)}
           onEditParty={(p) => {
             setSelectedPartyForLedger(null);
             handleOpenEditModal(p);
+          }}
+          onDeleteParty={(id) => {
+            setSelectedPartyForLedger(null);
+            onDeleteParty(id);
           }}
           onRecordPayment={handleRecordPayment}
           onViewInvoice={onViewInvoice}

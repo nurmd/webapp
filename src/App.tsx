@@ -445,6 +445,7 @@ export const App: React.FC = () => {
             parties={parties}
             invoices={invoices}
             purchases={purchases}
+            vouchers={vouchers}
             onSaveParty={handleSaveParty}
             onDeleteParty={handleDeleteParty}
             onRecordPartyPayment={handleRecordPartyPayment}
