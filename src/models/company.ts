@@ -18,4 +18,5 @@ export interface CompanyProfile {
   termsAndConditions?: string;
   invoicePrefix?: string;
   logoUrl?: string;
+  isGstEnabled?: boolean;
 }

@@ -22,6 +22,9 @@ interface NavigationMenuHubViewProps {
   onNewInvoice: () => void;
   onOpenRoleSwitch?: () => void;
   onCheckUpdate?: () => void;
+  hasUpdate?: boolean;
+  latestVersion?: string;
+  isCheckingUpdate?: boolean;
 }
 
 type HubCategory =
@@ -61,6 +64,9 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   onNewInvoice,
   onOpenRoleSwitch,
   onCheckUpdate,
+  hasUpdate,
+  latestVersion,
+  isCheckingUpdate,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<HubCategory>('all');
@@ -372,7 +378,12 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Regular, Composition, reverse charge & HSN/SAC master',
       icon: 'tune',
       category: 'settings',
-      action: () => onNavigate('settings'),
+      action: () => {
+        onNavigate('settings');
+        setTimeout(() => {
+          document.getElementById('gst-tax-config')?.scrollIntoView({ behavior: 'smooth' });
+        }, 120);
+      },
       keywords: ['tax', 'gstin', 'composition', 'hsn', 'settings'],
     },
     {
@@ -536,9 +547,13 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                    GSTIN Active
+                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold flex items-center gap-1 ${
+                    company.isGstEnabled === false
+                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                      : 'bg-secondary-container text-on-secondary-container'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${company.isGstEnabled === false ? 'bg-amber-500' : 'bg-secondary'}`}></span>
+                    {company.isGstEnabled === false ? 'Non-GST Store' : 'GSTIN Active'}
                   </span>
                   <span className="font-body-sm text-xs text-on-surface-variant truncate">
                     {company.tradeName || 'Wholesale & Retail'}
@@ -561,10 +576,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
           <div className="mt-3.5 pt-2 border-t border-outline-variant/20 grid grid-cols-3 gap-2 relative z-10">
             <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
               <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">
-                GST Reg.
+                {company.isGstEnabled === false ? 'Tax Mode' : 'GST Reg.'}
               </span>
               <span className="font-tabular-data text-xs text-on-surface truncate font-semibold">
-                {company.gstin || '27AAAAA0000A1Z5'}
+                {company.isGstEnabled === false ? 'Non-GST' : (company.gstin || '27AAAAA0000A1Z5')}
               </span>
             </div>
             <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
@@ -907,10 +922,25 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
             <button
               type="button"
               onClick={onCheckUpdate}
-              className="text-secondary font-bold hover:underline cursor-pointer flex items-center gap-1"
+              disabled={isCheckingUpdate}
+              className={`font-bold hover:underline cursor-pointer flex items-center gap-1 ${
+                hasUpdate ? 'text-amber-600 dark:text-amber-400' : 'text-secondary'
+              }`}
             >
-              <span>Vyapar PRO v{CURRENT_APP_VERSION}</span>
-              <span className="material-symbols-outlined text-[14px]">system_update</span>
+              <span>
+                {isCheckingUpdate
+                  ? 'Checking for Updates...'
+                  : hasUpdate && latestVersion
+                  ? `Update to v${latestVersion} Available`
+                  : `Vyapar PRO v${CURRENT_APP_VERSION}`}
+              </span>
+              <span
+                className={`material-symbols-outlined text-[14px] ${
+                  hasUpdate ? 'animate-bounce text-amber-500' : isCheckingUpdate ? 'animate-spin' : ''
+                }`}
+              >
+                {isCheckingUpdate ? 'sync' : 'system_update'}
+              </span>
             </button>
           </div>
         </div>

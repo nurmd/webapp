@@ -26,6 +26,9 @@ interface DrawerProps {
   onSelectTab: (tab: AppTab) => void;
   onOpenRoleSwitch?: () => void;
   onCheckUpdate?: () => void;
+  hasUpdate?: boolean;
+  latestVersion?: string;
+  isCheckingUpdate?: boolean;
 }
 
 export const Drawer: React.FC<DrawerProps> = ({
@@ -37,6 +40,9 @@ export const Drawer: React.FC<DrawerProps> = ({
   onSelectTab,
   onOpenRoleSwitch,
   onCheckUpdate,
+  hasUpdate,
+  latestVersion,
+  isCheckingUpdate,
 }) => {
   const navItems: Array<{ id: AppTab; label: string; icon: string }> = [
     { id: 'dashboard', label: 'Dashboard / Home', icon: 'dashboard' },
@@ -185,13 +191,36 @@ export const Drawer: React.FC<DrawerProps> = ({
             <button
               type="button"
               onClick={() => {
-                onClose();
+                if (hasUpdate) {
+                  onClose();
+                }
                 onCheckUpdate();
               }}
-              className="w-full py-1.5 px-3 rounded-xl bg-secondary/10 border border-secondary/30 text-secondary text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-secondary/20 active:scale-95 transition-all cursor-pointer"
+              disabled={isCheckingUpdate}
+              className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                hasUpdate
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 active:scale-95 shadow-sm'
+                  : 'bg-surface-container-low/70 border-outline-variant/30 text-on-surface-variant hover:bg-surface-container active:scale-95'
+              }`}
             >
-              <span className="material-symbols-outlined text-[16px] animate-pulse">system_update</span>
-              <span>Update to v1.1.0 Available</span>
+              <span
+                className={`material-symbols-outlined text-[16px] ${
+                  hasUpdate
+                    ? 'animate-bounce text-amber-500'
+                    : isCheckingUpdate
+                    ? 'animate-spin text-secondary'
+                    : 'text-secondary'
+                }`}
+              >
+                {isCheckingUpdate ? 'sync' : hasUpdate ? 'system_update' : 'cloud_sync'}
+              </span>
+              <span>
+                {isCheckingUpdate
+                  ? 'Checking for Updates...'
+                  : hasUpdate && latestVersion
+                  ? `Update to v${latestVersion} Available`
+                  : 'Check for Updates'}
+              </span>
             </button>
           )}
 

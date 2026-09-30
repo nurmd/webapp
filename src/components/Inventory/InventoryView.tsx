@@ -1,9 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { InventoryItem, StockAdjustment, UnitOfMeasurement } from '../../models/item.ts';
+import { Invoice } from '../../models/invoice.ts';
+import { PurchaseBill } from '../../models/purchase.ts';
+import { db } from '../../services/db.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+
+export type ItemTransactionType = 'SALE' | 'PURCHASE' | 'STOCK_IN' | 'STOCK_OUT' | 'WASTAGE' | 'CORRECTION';
+
+export interface ItemTransactionRecord {
+  id: string;
+  type: ItemTransactionType;
+  date: string;
+  referenceNo: string;
+  partyName?: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number;
+  totalAmount?: number;
+  notes?: string;
+  isInward: boolean;
+}
 
 interface InventoryViewProps {
   items: InventoryItem[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
+  adjustments?: StockAdjustment[];
   onSaveItem: (item: InventoryItem) => void;
   onDeleteItem: (id: string) => void;
   onSaveAdjustment: (adj: StockAdjustment) => void;
@@ -12,13 +34,21 @@ interface InventoryViewProps {
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   items,
+  invoices,
+  purchases,
+  adjustments,
   onSaveItem,
   onDeleteItem,
   onSaveAdjustment,
   onScanBarcodeClick,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [filterLowStockOnly, setFilterLowStockOnly] = useState<boolean>(false);
+  // Filter & Sort State (Name, Available Stock, Category, Created Date)
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [filterStockStatus, setFilterStockStatus] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
+  const [filterCreatedTimeframe, setFilterCreatedTimeframe] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
+  const [sortOption, setSortOption] = useState<'DEFAULT' | 'NAME_ASC' | 'NAME_DESC' | 'STOCK_HIGH' | 'STOCK_LOW' | 'CREATED_DESC' | 'CREATED_ASC'>('DEFAULT');
+
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -27,6 +57,165 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
   const [adjQty, setAdjQty] = useState<number>(1);
   const [adjReason, setAdjReason] = useState('New inventory arrival');
+
+  // Privacy toggles: Buy price visibility per item
+  const [revealedBuyPrices, setRevealedBuyPrices] = useState<Record<string, boolean>>({});
+
+  const toggleBuyPrice = (itemId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setRevealedBuyPrices((prev) => ({
+      ...prev,
+      [itemId]: !prev[itemId],
+    }));
+  };
+
+  const activeFilterCount =
+    (filterCategory !== 'ALL' ? 1 : 0) +
+    (filterStockStatus !== 'ALL' ? 1 : 0) +
+    (filterCreatedTimeframe !== 'ALL' ? 1 : 0) +
+    (sortOption !== 'DEFAULT' ? 1 : 0);
+
+  const resetAllFilters = () => {
+    setFilterCategory('ALL');
+    setFilterStockStatus('ALL');
+    setFilterCreatedTimeframe('ALL');
+    setSortOption('DEFAULT');
+    setSearch('');
+  };
+
+  // Recent transactions filter inside Item Detail Modal
+  const [txnFilter, setTxnFilter] = useState<'ALL' | 'SALES' | 'PURCHASES' | 'ADJUSTMENTS'>('ALL');
+
+  // Transactions aggregation (Sales, Purchases, Stock Adjustments)
+  const allInvoices = invoices || db.getInvoices();
+  const allPurchases = purchases || db.getPurchases();
+  const allAdjustments = adjustments || db.getStockAdjustments();
+
+  // Aggregate all transactions for activeItemDetail
+  const itemTransactions = useMemo(() => {
+    if (!activeItemDetail) return [];
+    const list: ItemTransactionRecord[] = [];
+
+    // 1. Sales from Invoices
+    for (const inv of allInvoices) {
+      if (!inv.items) continue;
+      for (const it of inv.items) {
+        if (
+          it.itemId === activeItemDetail.id ||
+          (it.name && it.name.trim().toLowerCase() === activeItemDetail.name.trim().toLowerCase())
+        ) {
+          list.push({
+            id: `inv-${inv.id}-${it.itemId || it.name}`,
+            type: 'SALE',
+            date: inv.date,
+            referenceNo: inv.invoiceNumber || 'INV',
+            partyName: inv.partyName || 'Cash / Retail Customer',
+            quantity: it.quantity,
+            unit: it.unit || activeItemDetail.unit,
+            unitPrice: it.unitPrice,
+            totalAmount: it.totalAmount,
+            notes: inv.invoiceType === 'B2B' ? 'B2B Tax Invoice' : 'Retail Sale',
+            isInward: false,
+          });
+        }
+      }
+    }
+
+    // 2. Purchases from Purchase Bills
+    for (const bill of allPurchases) {
+      if (!bill.items) continue;
+      for (const it of bill.items) {
+        if (
+          it.itemId === activeItemDetail.id ||
+          (it.name && it.name.trim().toLowerCase() === activeItemDetail.name.trim().toLowerCase())
+        ) {
+          list.push({
+            id: `pur-${bill.id}-${it.itemId || it.name}`,
+            type: 'PURCHASE',
+            date: bill.date,
+            referenceNo: bill.billNumber || 'BILL',
+            partyName: bill.supplierName || 'Vendor / Supplier',
+            quantity: it.quantity,
+            unit: it.unit || activeItemDetail.unit,
+            unitPrice: it.unitPrice,
+            totalAmount: it.totalAmount,
+            notes: 'Inward Purchase Bill',
+            isInward: true,
+          });
+        }
+      }
+    }
+
+    // 3. Stock Adjustments
+    for (const adj of allAdjustments) {
+      if (
+        adj.itemId === activeItemDetail.id ||
+        (adj.itemName && adj.itemName.trim().toLowerCase() === activeItemDetail.name.trim().toLowerCase())
+      ) {
+        const isInward = adj.type === 'STOCK_IN';
+        list.push({
+          id: `adj-${adj.id}`,
+          type: adj.type,
+          date: adj.date,
+          referenceNo: `ADJ-${adj.id.substring(Math.max(0, adj.id.length - 4))}`,
+          partyName: adj.adjustedBy || 'Inventory Manager',
+          quantity: adj.quantity,
+          unit: activeItemDetail.unit,
+          unitPrice: activeItemDetail.purchasePrice,
+          totalAmount: adj.quantity * activeItemDetail.purchasePrice,
+          notes: adj.reason || (isInward ? 'Manual Stock In' : 'Manual Stock Out'),
+          isInward,
+        });
+      }
+    }
+
+    // Sort chronologically (newest first)
+    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return list;
+  }, [activeItemDetail, allInvoices, allPurchases, allAdjustments]);
+
+  // Filtered transactions according to selected tab
+  const filteredItemTransactions = useMemo(() => {
+    if (txnFilter === 'ALL') return itemTransactions;
+    if (txnFilter === 'SALES') return itemTransactions.filter((t) => t.type === 'SALE');
+    if (txnFilter === 'PURCHASES') return itemTransactions.filter((t) => t.type === 'PURCHASE');
+    if (txnFilter === 'ADJUSTMENTS') return itemTransactions.filter((t) => !['SALE', 'PURCHASE'].includes(t.type));
+    return itemTransactions;
+  }, [itemTransactions, txnFilter]);
+
+  // Summary totals for item transactions
+  const itemTxnSummary = useMemo(() => {
+    let totalSoldQty = 0;
+    let totalSoldAmount = 0;
+    let totalPurchasedQty = 0;
+    let totalPurchasedAmount = 0;
+    let totalAdjustedQty = 0;
+
+    for (const t of itemTransactions) {
+      if (t.type === 'SALE') {
+        totalSoldQty += t.quantity;
+        totalSoldAmount += t.totalAmount || 0;
+      } else if (t.type === 'PURCHASE') {
+        totalPurchasedQty += t.quantity;
+        totalPurchasedAmount += t.totalAmount || 0;
+      } else if (t.isInward) {
+        totalAdjustedQty += t.quantity;
+      } else {
+        totalAdjustedQty -= t.quantity;
+      }
+    }
+
+    return {
+      totalSoldQty,
+      totalSoldAmount,
+      totalPurchasedQty,
+      totalPurchasedAmount,
+      totalAdjustedQty,
+      totalTransactions: itemTransactions.length,
+    };
+  }, [itemTransactions]);
 
   // Form State (Product vs Service, Basic, Pricing, Stock)
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
@@ -54,21 +243,75 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       ? `₹${(totalStockValue / 100000).toFixed(2)} Lakh`
       : formatINR(totalStockValue);
 
-  const filtered = items.filter((item) => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      (item.sku && item.sku.toLowerCase().includes(search.toLowerCase())) ||
-      (item.barcode && item.barcode.includes(search)) ||
-      item.hsnSacCode.includes(search);
+  // Multi-criteria filtering & sorting (Name, Available Stock, Category, Created)
+  const filtered = useMemo(() => {
+    return items
+      .filter((item) => {
+        // 1. Search query (Matches Name, SKU, Barcode, HSN)
+        const s = search.toLowerCase().trim();
+        const matchesSearch =
+          !s ||
+          item.name.toLowerCase().includes(s) ||
+          (item.sku && item.sku.toLowerCase().includes(s)) ||
+          (item.barcode && item.barcode.includes(s)) ||
+          item.hsnSacCode.includes(s);
 
-    if (filterLowStockOnly) {
-      return matchesSearch && item.currentStock <= item.minStockAlert;
-    }
-    if (selectedCategory !== 'ALL') {
-      return matchesSearch && item.category === selectedCategory;
-    }
-    return matchesSearch;
-  });
+        if (!matchesSearch) return false;
+
+        // 2. Category filter
+        if (filterCategory !== 'ALL' && item.category !== filterCategory) {
+          return false;
+        }
+
+        // 3. Available Stock filter
+        if (filterStockStatus === 'IN_STOCK' && item.currentStock <= 0) {
+          return false;
+        }
+        if (filterStockStatus === 'LOW_STOCK' && (item.currentStock > item.minStockAlert || item.currentStock <= 0)) {
+          return false;
+        }
+        if (filterStockStatus === 'OUT_OF_STOCK' && item.currentStock > 0) {
+          return false;
+        }
+
+        // 4. Created Date timeframe filter
+        if (filterCreatedTimeframe !== 'ALL') {
+          const createdDate = new Date(item.createdAt || 0);
+          const now = new Date();
+          if (filterCreatedTimeframe === 'TODAY') {
+            if (createdDate.toDateString() !== now.toDateString()) return false;
+          } else if (filterCreatedTimeframe === 'WEEK') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(now.getDate() - 7);
+            if (createdDate < sevenDaysAgo) return false;
+          } else if (filterCreatedTimeframe === 'MONTH') {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(now.getDate() - 30);
+            if (createdDate < thirtyDaysAgo) return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortOption) {
+          case 'NAME_ASC':
+            return a.name.localeCompare(b.name);
+          case 'NAME_DESC':
+            return b.name.localeCompare(a.name);
+          case 'STOCK_HIGH':
+            return b.currentStock - a.currentStock;
+          case 'STOCK_LOW':
+            return a.currentStock - b.currentStock;
+          case 'CREATED_DESC':
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+          case 'CREATED_ASC':
+            return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+          default:
+            return 0;
+        }
+      });
+  }, [items, search, filterCategory, filterStockStatus, filterCreatedTimeframe, sortOption]);
 
   const handleOpenAdd = () => {
     setEditingItem(null);
@@ -175,11 +418,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setFilterLowStockOnly(!filterLowStockOnly);
-                  setSelectedCategory('ALL');
+                  setFilterStockStatus(filterStockStatus === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
-                  filterLowStockOnly
+                  filterStockStatus === 'LOW_STOCK'
                     ? 'bg-secondary text-on-secondary shadow-sm'
                     : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
                 }`}
@@ -191,8 +433,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </section>
 
-        {/* Sticky Search & Quick Scan Input Area */}
-        <section className="px-margin-mobile pt-space-sm pb-space-xs">
+        {/* Sticky Search & Filter Input Area */}
+        <section className="px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2">
           <div className="flex items-center gap-space-xs">
             <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm">
               <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
@@ -217,16 +459,107 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
             <button
-              aria-label="Filter Options"
-              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                filterLowStockOnly ? 'border border-secondary text-secondary' : ''
+              aria-label="Filter & Sort Options"
+              className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
+                activeFilterCount > 0 ? 'border-2 border-secondary text-secondary bg-secondary/5 font-bold' : ''
               }`}
               type="button"
-              onClick={() => setFilterLowStockOnly(!filterLowStockOnly)}
+              onClick={() => setIsFilterModalOpen(true)}
             >
               <span className="material-symbols-outlined text-[20px]">tune</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center shadow">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
           </div>
+
+          {/* Active Filter Chips Row (if any filter is active) */}
+          {activeFilterCount > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              <span className="text-[11px] text-outline font-semibold flex-shrink-0">Active:</span>
+
+              {filterCategory !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterCategory('ALL')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                >
+                  <span>Category: {filterCategory}</span>
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              )}
+
+              {filterStockStatus !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterStockStatus('ALL')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                >
+                  <span>
+                    Stock:{' '}
+                    {filterStockStatus === 'IN_STOCK'
+                      ? 'In Stock'
+                      : filterStockStatus === 'LOW_STOCK'
+                      ? 'Low Stock'
+                      : 'Out of Stock'}
+                  </span>
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              )}
+
+              {filterCreatedTimeframe !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterCreatedTimeframe('ALL')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                >
+                  <span>
+                    Created:{' '}
+                    {filterCreatedTimeframe === 'TODAY'
+                      ? 'Today'
+                      : filterCreatedTimeframe === 'WEEK'
+                      ? 'Last 7 Days'
+                      : 'Last 30 Days'}
+                  </span>
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              )}
+
+              {sortOption !== 'DEFAULT' && (
+                <button
+                  type="button"
+                  onClick={() => setSortOption('DEFAULT')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                >
+                  <span>
+                    Sort:{' '}
+                    {sortOption === 'NAME_ASC'
+                      ? 'Name (A→Z)'
+                      : sortOption === 'NAME_DESC'
+                      ? 'Name (Z→A)'
+                      : sortOption === 'STOCK_HIGH'
+                      ? 'Stock (High)'
+                      : sortOption === 'STOCK_LOW'
+                      ? 'Stock (Low)'
+                      : sortOption === 'CREATED_DESC'
+                      ? 'Newest'
+                      : 'Oldest'}
+                  </span>
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                className="text-[11px] text-error font-semibold hover:underline flex-shrink-0 cursor-pointer ml-1"
+              >
+                Clear All
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Horizontal Scrollable Category Pills */}
@@ -234,14 +567,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
             <button
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-                selectedCategory === 'ALL' && !filterLowStockOnly
+                filterCategory === 'ALL' && filterStockStatus === 'ALL'
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container-lowest text-on-surface-variant active:bg-surface-container-low'
               }`}
               type="button"
               onClick={() => {
-                setSelectedCategory('ALL');
-                setFilterLowStockOnly(false);
+                setFilterCategory('ALL');
+                setFilterStockStatus('ALL');
               }}
             >
               <span>All Items</span>
@@ -252,14 +585,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
             <button
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                filterLowStockOnly
+                filterStockStatus === 'LOW_STOCK'
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container-lowest text-on-surface-variant'
               }`}
               type="button"
               onClick={() => {
-                setFilterLowStockOnly(true);
-                setSelectedCategory('ALL');
+                setFilterStockStatus(filterStockStatus === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
               }}
             >
               Low Stock ({lowStockCount})
@@ -269,14 +601,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <button
                 key={cat}
                 className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                  selectedCategory === cat && !filterLowStockOnly
+                  filterCategory === cat
                     ? 'bg-primary text-on-primary'
                     : 'bg-surface-container-lowest text-on-surface-variant'
                 }`}
                 type="button"
                 onClick={() => {
-                  setSelectedCategory(cat);
-                  setFilterLowStockOnly(false);
+                  setFilterCategory(filterCategory === cat ? 'ALL' : cat);
                 }}
               >
                 {cat}
@@ -299,85 +630,85 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             filtered.map((item) => {
               const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
               const isOut = item.currentStock <= 0;
-              const itemStockValue = item.currentStock * item.purchasePrice;
 
               return (
                 <div
                   key={item.id}
                   onClick={() => setActiveItemDetail(item)}
-                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center justify-between gap-2 sm:gap-space-sm cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
                 >
-                  <div className="flex items-center gap-2.5 sm:gap-space-sm min-w-0 flex-1">
-                    {/* Thumbnail */}
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-surface-container-low flex-shrink-0 overflow-hidden flex items-center justify-center">
-                      <span className="material-symbols-outlined text-secondary text-[24px] sm:text-[28px]">
-                        inventory_2
-                      </span>
-                    </div>
+                  {/* Thumbnail / Item Avatar */}
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-surface-container-low flex-shrink-0 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-secondary text-[22px] sm:text-[24px]">
+                      inventory_2
+                    </span>
+                  </div>
 
-                    {/* Information Column */}
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <h3 className="font-headline-sm text-sm sm:text-[16px] text-on-surface truncate font-semibold">
+                  {/* Information Column */}
+                  <div className="flex flex-col min-w-0 flex-1 justify-center">
+                    {/* Top Row: Item Name (left) & Available Stock Badge (right) */}
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-headline-sm text-sm sm:text-base text-on-surface truncate font-semibold">
                         {item.name}
                       </h3>
 
-                      {/* Sale and Buy Pricing with Responsive Wrap */}
-                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mt-0.5 text-xs">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Sale:</span>
-                          <span className="font-headline-sm text-xs sm:text-body-md font-bold text-on-surface">
-                            {formatINR(item.salePrice)}
-                          </span>
-                          <span className="text-outline text-[10px]">/{item.unit.toLowerCase()}</span>
-                        </div>
-
-                        <span className="text-outline-variant text-[10px] hidden sm:inline">•</span>
-
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
-                          <span className="font-tabular-data text-xs font-semibold text-on-surface-variant">
-                            {formatINR(item.purchasePrice)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-1 flex items-center gap-1.5">
+                      {/* Available Stock Badge */}
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 whitespace-nowrap ${
+                          isOut
+                            ? 'bg-error/10 text-error'
+                            : isLow
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            : 'bg-secondary/10 text-secondary'
+                        }`}
+                      >
                         <span
-                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                          className={`w-1.5 h-1.5 rounded-full ${
                             isOut
                               ? 'bg-error'
                               : isLow
-                              ? 'bg-tertiary-fixed-dim animate-pulse'
+                              ? 'bg-amber-500 animate-pulse'
                               : 'bg-secondary'
                           }`}
                         />
-                        <span
-                          className={`font-label-sm text-[11px] font-semibold truncate ${
-                            isOut
-                              ? 'text-error'
-                              : isLow
-                              ? 'text-on-tertiary-fixed-variant'
-                              : 'text-secondary'
-                          }`}
-                        >
+                        <span>
                           {isOut
-                            ? '0 (Out of stock)'
+                            ? 'Out of stock'
                             : isLow
-                            ? `${item.currentStock} left (low)`
-                            : `${item.currentStock} in stock`}
+                            ? `${item.currentStock} ${item.unit} left`
+                            : `${item.currentStock} ${item.unit}`}
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Bottom Row: Pricing (Sale & Buy with click-to-reveal) */}
+                    <div className="flex items-center gap-3 mt-1 text-xs text-on-surface-variant">
+                      {/* Sale Price */}
+                      <div className="inline-flex items-baseline gap-1">
+                        <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Sale:</span>
+                        <span className="font-headline-sm text-xs sm:text-body-md font-bold text-on-surface">
+                          {formatINR(item.salePrice)}
                         </span>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Stock Value Column with Fixed Width and Whitespace Protection */}
-                  <div className="flex flex-col items-end justify-center flex-shrink-0 text-right pl-2 min-w-[72px] sm:min-w-[85px]">
-                    <span className="font-label-sm text-[10px] sm:text-[11px] text-outline uppercase font-semibold tracking-wider whitespace-nowrap">
-                      Stock Value
-                    </span>
-                    <span className="font-tabular-data text-xs sm:text-body-md font-bold text-on-surface mt-0.5 whitespace-nowrap">
-                      {formatINR(itemStockValue)}
-                    </span>
+                      <span className="text-outline-variant text-[10px]">•</span>
+
+                      {/* Buy Price (Hidden with *** by default, click to toggle) */}
+                      <button
+                        type="button"
+                        onClick={(e) => toggleBuyPrice(item.id, e)}
+                        className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80 active:scale-95 transition-all text-left bg-transparent border-0 p-0"
+                        title={revealedBuyPrices[item.id] ? 'Click to hide purchase price' : 'Click to view purchase price'}
+                      >
+                        <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
+                        <span className="font-tabular-data text-xs font-semibold text-on-surface-variant font-mono tracking-wider">
+                          {revealedBuyPrices[item.id] ? formatINR(item.purchasePrice) : '***'}
+                        </span>
+                        <span className="material-symbols-outlined text-[14px] text-outline ml-0.5">
+                          {revealedBuyPrices[item.id] ? 'visibility' : 'visibility_off'}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -387,80 +718,169 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
         {/* Sticky Bottom Floating Action Center */}
         <div className="fixed bottom-20 left-0 right-0 z-40 px-margin-mobile pointer-events-none">
-          <div className="max-w-md mx-auto flex items-center justify-end gap-space-xs pointer-events-auto">
+          <div className="max-w-md mx-auto flex items-center justify-end pointer-events-auto">
             <button
               onClick={handleOpenAdd}
-              className="h-12 px-5 rounded-full bg-secondary text-on-secondary shadow-lg flex items-center gap-2 font-label-md text-label-md active:scale-95 transition-transform cursor-pointer"
+              aria-label="Add New Item"
+              className="w-14 h-14 rounded-full bg-secondary text-on-secondary shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-pointer hover:opacity-95"
               type="button"
             >
-              <span className="material-symbols-outlined text-[20px]">add_box</span>
-              <span>Add New Item</span>
+              <span className="material-symbols-outlined text-[30px]">add</span>
             </button>
-            {onScanBarcodeClick && (
-              <button
-                onClick={onScanBarcodeClick}
-                aria-label="Scan New Barcode"
-                className="w-12 h-12 rounded-full bg-primary-container text-on-primary shadow-lg flex items-center justify-center active:scale-95 transition-transform cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[20px] text-secondary-fixed">
-                  qr_code_scanner
-                </span>
-              </button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Item Quick Action & Stock Adjustment Bottom Sheet */}
+      {/* Simplified Item Details & Recent Transactions Sheet */}
       {activeItemDetail && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom">
-            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
-                  <span className="material-symbols-outlined text-[22px]">inventory_2</span>
-                </div>
-                <div>
-                  <h3 className="font-headline-sm text-base font-bold text-on-surface">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-t-3xl sm:rounded-2xl p-4 sm:p-5 w-full max-w-lg max-h-[85vh] shadow-2xl border border-outline-variant/30 flex flex-col gap-3.5 overflow-hidden animate-in slide-in-from-bottom">
+            {/* Header: Title + Stock Status + Close */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-outline-variant/20 flex-shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-headline-sm text-base font-bold text-on-surface truncate">
                     {activeItemDetail.name}
                   </h3>
-                  <p className="text-xs text-on-surface-variant font-mono">
-                    {activeItemDetail.sku} • HSN: {activeItemDetail.hsnSacCode}
-                  </p>
+                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] font-bold flex-shrink-0 ${
+                    activeItemDetail.currentStock <= 0
+                      ? 'bg-error/15 text-error'
+                      : activeItemDetail.currentStock <= activeItemDetail.minStockAlert
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                      : 'bg-secondary-container text-on-secondary-container'
+                  }`}>
+                    {activeItemDetail.currentStock} {activeItemDetail.unit}
+                  </span>
                 </div>
+                <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
+                  {activeItemDetail.category} • HSN: {activeItemDetail.hsnSacCode}
+                  {activeItemDetail.sku ? ` • SKU: ${activeItemDetail.sku}` : ''}
+                </p>
               </div>
+
               <button
                 type="button"
                 onClick={() => setActiveItemDetail(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-surface-container-low">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-outline font-semibold uppercase">Sale Price</span>
-                <span className="text-sm font-bold text-on-surface">{formatINR(activeItemDetail.salePrice)}</span>
+            {/* Compact Pricing Bar */}
+            <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-surface-container-low text-xs flex-shrink-0">
+              <div>
+                <span className="text-[10px] text-outline font-semibold uppercase block">Sale Price</span>
+                <span className="font-bold text-on-surface text-sm">{formatINR(activeItemDetail.salePrice)}</span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-outline font-semibold uppercase">Current Stock</span>
-                <span className="text-sm font-bold text-secondary">
-                  {activeItemDetail.currentStock} {activeItemDetail.unit}
-                </span>
+              <div>
+                <span className="text-[10px] text-outline font-semibold uppercase block">Buy Price</span>
+                <button
+                  type="button"
+                  onClick={() => toggleBuyPrice(activeItemDetail.id)}
+                  className="font-bold text-on-surface text-sm flex items-center gap-1 cursor-pointer hover:text-secondary transition-colors"
+                >
+                  <span className="font-mono">
+                    {revealedBuyPrices[activeItemDetail.id]
+                      ? formatINR(activeItemDetail.purchasePrice)
+                      : '***'}
+                  </span>
+                  <span className="material-symbols-outlined text-[13px] text-outline">
+                    {revealedBuyPrices[activeItemDetail.id] ? 'visibility' : 'visibility_off'}
+                  </span>
+                </button>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] text-outline font-semibold uppercase">Stock Value</span>
-                <span className="text-sm font-bold text-on-surface">
+              <div>
+                <span className="text-[10px] text-outline font-semibold uppercase block">Stock Value</span>
+                <span className="font-bold text-on-surface text-sm">
                   {formatINR(activeItemDetail.currentStock * activeItemDetail.purchasePrice)}
                 </span>
               </div>
             </div>
 
-            {/* Actions Grid */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Filter Tabs */}
+            <div className="flex items-center justify-between gap-1 flex-shrink-0">
+              <span className="text-xs font-bold text-on-surface">Transactions</span>
+              <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
+                {(['ALL', 'SALES', 'PURCHASES', 'ADJUSTMENTS'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setTxnFilter(tab)}
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer capitalize ${
+                      txnFilter === tab
+                        ? 'bg-surface-container-lowest text-on-surface shadow-xs font-bold'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {tab === 'ALL' ? 'All' : tab.toLowerCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scrollable Transaction List */}
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5 text-xs min-h-[160px] max-h-[360px]">
+              {filteredItemTransactions.length === 0 ? (
+                <div className="py-8 text-center text-on-surface-variant flex flex-col items-center gap-1">
+                  <span className="material-symbols-outlined text-[24px] text-outline">receipt_long</span>
+                  <p className="text-xs">No transactions recorded</p>
+                </div>
+              ) : (
+                filteredItemTransactions.map((txn) => {
+                  const isSale = txn.type === 'SALE';
+                  const isPurchase = txn.type === 'PURCHASE';
+
+                  return (
+                    <div
+                      key={txn.id}
+                      className="p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-colors flex items-center justify-between gap-2.5"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          txn.isInward
+                            ? 'bg-secondary/15 text-secondary'
+                            : 'bg-error/15 text-error'
+                        }`}>
+                          <span className="material-symbols-outlined text-[18px]">
+                            {txn.isInward ? 'arrow_downward' : 'arrow_upward'}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-on-surface truncate text-xs">
+                              {isSale ? 'Sale' : isPurchase ? 'Purchase' : txn.type.replace('_', ' ')}
+                            </span>
+                            <span className="text-[10px] text-outline font-mono truncate">
+                              #{txn.referenceNo}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-on-surface-variant truncate">
+                            {txn.partyName || txn.notes} • <span className="text-[10px] text-outline">{txn.date}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <span className={`text-xs font-bold font-tabular-data block ${
+                          txn.isInward ? 'text-secondary' : 'text-error'
+                        }`}>
+                          {txn.isInward ? '+' : '-'}{txn.quantity} {txn.unit}
+                        </span>
+                        {txn.totalAmount !== undefined && (
+                          <span className="text-[11px] text-on-surface-variant font-medium font-tabular-data block">
+                            {formatINR(txn.totalAmount)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Bottom Actions: Stock In, Stock Out, Edit, Delete */}
+            <div className="pt-2 border-t border-outline-variant/20 flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -469,9 +889,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   setAdjQty(1);
                   setActiveItemDetail(null);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                className="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-xs"
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span className="material-symbols-outlined text-[16px]">add</span>
                 <span>Stock In</span>
               </button>
 
@@ -483,19 +903,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   setAdjQty(1);
                   setActiveItemDetail(null);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer hover:bg-surface-container-high"
               >
-                <span className="material-symbols-outlined text-[18px]">remove</span>
+                <span className="material-symbols-outlined text-[16px]">remove</span>
                 <span>Stock Out</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleOpenEdit(activeItemDetail)}
-                className="py-2.5 px-3 rounded-xl bg-surface-container-high text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-surface-container text-on-surface flex items-center justify-center active:scale-95 cursor-pointer hover:bg-surface-container-high transition-colors"
+                title="Edit Item"
               >
                 <span className="material-symbols-outlined text-[18px]">edit</span>
-                <span>Edit Details</span>
               </button>
 
               <button
@@ -504,10 +924,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   onDeleteItem(activeItemDetail.id);
                   setActiveItemDetail(null);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-error/10 text-error font-label-md text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-error/10 text-error flex items-center justify-center active:scale-95 cursor-pointer hover:bg-error/20 transition-colors"
+                title="Delete Item"
               >
                 <span className="material-symbols-outlined text-[18px]">delete</span>
-                <span>Delete</span>
               </button>
             </div>
           </div>
@@ -866,6 +1286,150 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Simplified Filter & Sort Modal */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-surface-container-lowest rounded-t-2xl sm:rounded-2xl p-4 w-full max-w-sm shadow-2xl flex flex-col gap-3 animate-in slide-in-from-bottom">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary text-[20px]">tune</span>
+                <h3 className="font-headline-sm text-sm font-bold text-on-surface">Filter &amp; Sort</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetAllFilters}
+                    className="text-xs font-semibold text-error hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsFilterModalOpen(false)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 1. Sort by Name */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                Sort by Name
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { id: 'DEFAULT', label: 'Default' },
+                  { id: 'NAME_ASC', label: 'A → Z' },
+                  { id: 'NAME_DESC', label: 'Z → A' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSortOption(s.id as any)}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold text-center transition-colors cursor-pointer ${
+                      sortOption === s.id
+                        ? 'bg-secondary text-on-secondary shadow-sm'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Available Stock */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                Available Stock
+              </label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { id: 'ALL', label: 'All' },
+                  { id: 'IN_STOCK', label: 'In Stock' },
+                  { id: 'LOW_STOCK', label: 'Low' },
+                  { id: 'OUT_OF_STOCK', label: 'Out' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setFilterStockStatus(s.id as any)}
+                    className={`py-1.5 px-1 rounded-lg text-xs font-semibold text-center transition-colors cursor-pointer ${
+                      filterStockStatus === s.id
+                        ? 'bg-secondary text-on-secondary shadow-sm'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3. Category */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                Category
+              </label>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg bg-surface-container border border-outline-variant/30 text-on-surface text-xs font-semibold focus:outline-none focus:border-secondary cursor-pointer"
+              >
+                <option value="ALL">All Categories ({items.length})</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c} ({items.filter((i) => i.category === c).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Created Date */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-wider">
+                Created Date
+              </label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { id: 'ALL', label: 'All Time' },
+                  { id: 'TODAY', label: 'Today' },
+                  { id: 'WEEK', label: '7 Days' },
+                  { id: 'MONTH', label: '30 Days' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setFilterCreatedTimeframe(t.id as any)}
+                    className={`py-1.5 px-1 rounded-lg text-xs font-semibold text-center transition-colors cursor-pointer ${
+                      filterCreatedTimeframe === t.id
+                        ? 'bg-secondary text-on-secondary shadow-sm'
+                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Apply Button */}
+            <button
+              type="button"
+              onClick={() => setIsFilterModalOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm active:scale-98 transition-transform cursor-pointer mt-1"
+            >
+              Apply Filter ({filtered.length} Items)
+            </button>
           </div>
         </div>
       )}

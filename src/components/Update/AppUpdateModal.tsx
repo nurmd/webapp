@@ -23,6 +23,20 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
   const cancelDownloadRef = useRef<(() => void) | null>(null);
 
+  const [activeRelease, setActiveRelease] = useState<AppReleaseInfo | null>(releaseInfo || null);
+
+  useEffect(() => {
+    if (releaseInfo) {
+      setActiveRelease(releaseInfo);
+    } else if (isOpen) {
+      updateService.checkForUpdates().then((res) => {
+        if (res.latestRelease) {
+          setActiveRelease(res.latestRelease);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, releaseInfo]);
+
   useEffect(() => {
     if (!isOpen) {
       // Reset state on close
@@ -41,11 +55,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
   if (!isOpen) return null;
 
-  const info: AppReleaseInfo = releaseInfo || {
-    version: '1.0.3',
-    versionCode: 10003,
-    releaseDate: '2026-09-29',
-    releaseTitle: 'Vyapar PRO v1.0.3 - Production Release',
+  const info: AppReleaseInfo = activeRelease || {
+    version: CURRENT_APP_VERSION,
+    versionCode: 10008,
+    releaseDate: new Date().toISOString().split('T')[0],
+    releaseTitle: `Vyapar PRO v${CURRENT_APP_VERSION} - Production Release`,
     releaseNotes: [
       'Direct ESC/POS 58mm & 80mm Bluetooth & USB thermal receipt printing',
       'Hardware barcode scanner gun wedge listener + live camera scanner with torch',

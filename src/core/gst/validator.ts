@@ -14,7 +14,17 @@ export interface GstinValidationResult {
 }
 
 /**
- * Validates a GSTIN using format and Mod 36 Luhn-like checksum.
+ * Validates an Indian Goods and Services Tax Identification Number (GSTIN).
+ * 
+ * GSTIN Structure (15 Characters):
+ * - Characters 1-2: State Code (01 to 38).
+ * - Characters 3-12: Permanent Account Number (PAN) of taxpayer.
+ * - Character 13: Entity registration number within state (1-9, A-Z).
+ * - Character 14: Default character 'Z'.
+ * - Character 15: Check digit calculated using Luhn Mod 36 algorithm.
+ * 
+ * @param gstin - The 15-character GSTIN string to validate.
+ * @returns Object with validity flag, extracted State Code, State Name, PAN, Entity Number, and error message if invalid.
  */
 export function validateGstin(gstin: string): GstinValidationResult {
   const cleanGstin = gstin.trim().toUpperCase();
@@ -62,7 +72,17 @@ export function validateGstin(gstin: string): GstinValidationResult {
 }
 
 /**
- * Computes GSTIN Check Digit using official Mod 36 calculation.
+ * Computes the 15th Check Digit of a GSTIN using the official Indian Tax Luhn Mod 36 algorithm.
+ * 
+ * Algorithm:
+ * 1. Base 36 character set: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ' (indices 0 to 35).
+ * 2. Alternating weight factor: 1 for even index, 2 for odd index.
+ * 3. Product = characterValue * weightFactor.
+ * 4. Add quotient (Math.floor(product / 36)) and remainder (product % 36) to running sum.
+ * 5. Checksum index = (36 - (sum % 36)) % 36.
+ * 
+ * @param input14 - The first 14 characters of the GSTIN.
+ * @returns Single check digit character (0-9 or A-Z).
  */
 export function calculateGstinChecksum(input14: string): string {
   let sum = 0;

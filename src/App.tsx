@@ -37,6 +37,7 @@ import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHub
 import { rbac, UserProfile } from './services/rbac.ts';
 import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
 import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
+import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -44,6 +45,12 @@ export const App: React.FC = () => {
   const [activeUser, setActiveUser] = useState<UserProfile>(rbac.getActiveUser());
   const [isRoleSwitchOpen, setIsRoleSwitchOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  // Dynamic OTA Update & Notification State
+  const [hasUpdate, setHasUpdate] = useState<boolean>(false);
+  const [latestRelease, setLatestRelease] = useState<AppReleaseInfo | null>(null);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [company, setCompany] = useState<CompanyProfile>(db.getCompany());
   const [parties, setParties] = useState<Party[]>(db.getParties());
@@ -77,6 +84,58 @@ export const App: React.FC = () => {
     });
     return unsub;
   }, []);
+
+  // Background silent OTA update check on mount
+  React.useEffect(() => {
+    updateService
+      .checkForUpdates()
+      .then((res) => {
+        if (res.hasUpdate && res.latestRelease) {
+          setHasUpdate(true);
+          setLatestRelease(res.latestRelease);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((cur) => (cur === msg ? null : cur));
+    }, 3500);
+  };
+
+  const handleCheckUpdate = async (explicit: boolean = true) => {
+    if (hasUpdate && latestRelease) {
+      setIsUpdateModalOpen(true);
+      return;
+    }
+
+    setIsCheckingUpdate(true);
+    try {
+      const res = await updateService.checkForUpdates();
+      if (res.hasUpdate && res.latestRelease) {
+        setHasUpdate(true);
+        setLatestRelease(res.latestRelease);
+        setIsUpdateModalOpen(true);
+      } else if (res.error) {
+        if (explicit) {
+          showToast(`Update check failed: ${res.error}`);
+        }
+      } else {
+        setHasUpdate(false);
+        if (explicit) {
+          showToast(`You are on the latest version (v${CURRENT_APP_VERSION}).`);
+        }
+      }
+    } catch (_err) {
+      if (explicit) {
+        showToast('Unable to check for updates. Please verify your network connection.');
+      }
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const handleSaveInvoice = (newInvoice: Invoice) => {
     db.saveInvoice(newInvoice);
@@ -290,6 +349,7 @@ export const App: React.FC = () => {
         onSearchClick={() => handleSelectTab('menu')}
         onBarcodeClick={() => handleSelectTab('pos')}
         onProfileClick={() => setIsRoleSwitchOpen(true)}
+        hasUpdate={hasUpdate}
       />
 
       {/* Slide-out Navigation Drawer */}
@@ -301,7 +361,10 @@ export const App: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSelectTab={handleSelectTab}
         onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
-        onCheckUpdate={() => setIsUpdateModalOpen(true)}
+        onCheckUpdate={() => handleCheckUpdate(true)}
+        hasUpdate={hasUpdate}
+        latestVersion={latestRelease?.version}
+        isCheckingUpdate={isCheckingUpdate}
       />
 
       {/* Main Scrollable View Area with safe-area padding */}
@@ -368,6 +431,8 @@ export const App: React.FC = () => {
         {activeTab === 'inventory' && (
           <InventoryView
             items={items}
+            invoices={invoices}
+            purchases={purchases}
             onSaveItem={handleSaveItem}
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
@@ -428,7 +493,10 @@ export const App: React.FC = () => {
               setIsTableGridInvoiceOpen(true);
             }}
             onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
-            onCheckUpdate={() => setIsUpdateModalOpen(true)}
+            onCheckUpdate={() => handleCheckUpdate(true)}
+            hasUpdate={hasUpdate}
+            latestVersion={latestRelease?.version}
+            isCheckingUpdate={isCheckingUpdate}
           />
         )}
       </main>
@@ -490,8 +558,17 @@ export const App: React.FC = () => {
       {/* App Auto-Update Modal */}
       <AppUpdateModal
         isOpen={isUpdateModalOpen}
+        releaseInfo={latestRelease}
         onClose={() => setIsUpdateModalOpen(false)}
       />
+
+      {/* Floating Status Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/95 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl border border-white/10 flex items-center gap-2 max-w-[90vw] animate-bounce-once">
+          <span className="material-symbols-outlined text-[18px] text-secondary">info</span>
+          <span className="truncate">{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 };

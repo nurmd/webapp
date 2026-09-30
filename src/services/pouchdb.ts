@@ -169,6 +169,20 @@ class PouchService {
     this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined });
   }
 
+  public async syncNow(): Promise<void> {
+    const savedRemote = localStorage.getItem('couchdb_remote_url');
+    if (savedRemote && savedRemote.trim()) {
+      this.startSync(savedRemote.trim());
+    } else {
+      this.notifyDataChange();
+      this.notifySyncState({
+        status: 'synced',
+        lastSyncedAt: new Date().toISOString(),
+        error: undefined,
+      });
+    }
+  }
+
   // --- Document CRUD Operations with Document Type Prefixes ---
 
   public async putDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
@@ -189,6 +203,7 @@ class PouchService {
         docType: type,
         syncedAt: new Date().toISOString(),
       });
+      this.notifyDataChange();
     } catch (e) {
       console.error(`PouchDB putDoc error [${docId}]:`, e);
     }

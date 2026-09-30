@@ -17,7 +17,22 @@ const STORAGE_KEYS = {
   EXPENSES: 'gst_expenses',
   ADJUSTMENTS: 'gst_stock_adjustments',
   VOUCHERS: 'gst_vouchers',
+  SETTINGS: 'gst_app_settings',
+  LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
 };
+
+export interface SyncedSettings {
+  id: string; // 'app_settings'
+  company: CompanyProfile;
+  isGstEnabled?: boolean;
+  appLanguage?: string;
+  isAppLockEnabled?: boolean;
+  defaultGstRate?: number;
+  enableEwayBill?: boolean;
+  ewayBillThreshold?: number;
+  autoWhatsAppAlerts?: boolean;
+  updatedAt: string;
+}
 
 // Initial Seed Data for immediate testing & demonstration
 const DEFAULT_COMPANY: CompanyProfile = {
@@ -39,6 +54,7 @@ const DEFAULT_COMPANY: CompanyProfile = {
   upiId: 'bharatinfotech@sbi',
   termsAndConditions: '1. Goods once sold will not be taken back.\n2. Interest @ 18% p.a. will be charged after due date.\n3. Subject to Pune jurisdiction.',
   invoicePrefix: 'INV-2627-',
+  isGstEnabled: true,
 };
 
 const DEFAULT_PARTIES: Party[] = [
@@ -149,8 +165,42 @@ const DEFAULT_ITEMS: InventoryItem[] = [
   },
 ];
 
+/**
+ * Offline-first Data Access and Multi-Device Synchronization Engine.
+ * 
+ * Architecture:
+ * - Tier 1: Synchronous LocalStorage cache for immediate 60fps UI responsiveness.
+ * - Tier 2: Asynchronous PouchDB (IndexedDB) for persistent offline transactions and document versioning.
+ * - Tier 3: Bidirectional continuous CouchDB sync for remote multi-counter / multi-branch synchronization.
+ * - Tier 4: Cross-tab / PWA BroadcastChannel (`vyapar_multi_device_sync`) for instant intra-device state sync.
+ * - Hardware Isolation: Printing hardware configurations (thermal paper width 58/80mm, Bluetooth/USB addresses)
+ *   are strictly retained locally and excluded from remote sync to prevent counter conflicts.
+ */
 class StorageService {
   constructor() {
+    // Cross-tab / cross-window multi-device real-time sync channel
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('vyapar_multi_device_sync');
+        bc.onmessage = (event) => {
+          if (event.data?.type === 'ALL_SETTINGS_SYNC' && event.data.settings) {
+            // Apply all settings, strictly excluding and preserving local device printing settings
+            const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = event.data.settings;
+            const current = this.getSettings();
+            this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+            if (syncable.company) {
+              this.set(STORAGE_KEYS.COMPANY, syncable.company);
+            }
+          } else if (event.data?.type === 'COMPANY_PROFILE_SYNC' && event.data.company) {
+            this.set(STORAGE_KEYS.COMPANY, event.data.company);
+            pouch.putDoc('company', event.data.company);
+          }
+        };
+      } catch (e) {
+        console.warn('BroadcastChannel not initialized:', e);
+      }
+    }
+
     // Perform initial PouchDB migration and setup live synchronization hooks
     setTimeout(() => {
       pouch.migrateFromLocalStorage({
@@ -167,6 +217,20 @@ class StorageService {
       pouch.subscribeDataChange(async () => {
         // Synchronize remote changes from other counter devices into local storage cache
         try {
+          // Synchronize all settings (taxes, invoices, banking, alerts, security) excluding printing
+          const remoteSettings = await pouch.getAllDocs<SyncedSettings>('settings');
+          if (remoteSettings.length > 0) {
+            const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = remoteSettings[0] as any;
+            const current = this.getSettings();
+            this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+            if (syncable.company) {
+              this.set(STORAGE_KEYS.COMPANY, syncable.company);
+            }
+          }
+
+          const remoteCompany = await pouch.getAllDocs<CompanyProfile>('company');
+          if (remoteCompany.length > 0) this.set(STORAGE_KEYS.COMPANY, remoteCompany[0]);
+
           const remoteInvoices = await pouch.getAllDocs<Invoice>('invoice');
           if (remoteInvoices.length > 0) this.set(STORAGE_KEYS.INVOICES, remoteInvoices);
 
@@ -207,6 +271,76 @@ class StorageService {
   saveCompany(company: CompanyProfile): void {
     this.set(STORAGE_KEYS.COMPANY, company);
     pouch.putDoc('company', company);
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('vyapar_multi_device_sync');
+        bc.postMessage({ type: 'COMPANY_PROFILE_SYNC', company, timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
+    }
+  }
+
+  async syncBusinessProfileAcrossDevices(company: CompanyProfile): Promise<{ success: boolean; lastSyncedAt: string }> {
+    this.saveCompany(company);
+    await pouch.syncNow();
+    return {
+      success: true,
+      lastSyncedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    };
+  }
+
+  // Synced Settings (All settings except device-local printing settings)
+  getSettings(): SyncedSettings {
+    const defaultSettings: SyncedSettings = {
+      id: 'app_settings',
+      company: this.getCompany(),
+      appLanguage: 'English (India)',
+      isAppLockEnabled: true,
+      defaultGstRate: 18,
+      enableEwayBill: true,
+      ewayBillThreshold: 50000,
+      autoWhatsAppAlerts: true,
+      updatedAt: new Date().toISOString(),
+    };
+    return this.get<SyncedSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
+  }
+
+  saveSettings(settings: Partial<SyncedSettings>): void {
+    const current = this.getSettings();
+    // Explicitly exclude and strip any printing settings so they remain device-local
+    const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = settings as any;
+    const merged: SyncedSettings = {
+      ...current,
+      ...syncable,
+      updatedAt: new Date().toISOString(),
+    };
+    this.set(STORAGE_KEYS.SETTINGS, merged);
+    if (merged.company) {
+      this.set(STORAGE_KEYS.COMPANY, merged.company);
+      pouch.putDoc('company', merged.company);
+    }
+    pouch.putDoc('settings', merged);
+
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        const bc = new BroadcastChannel('vyapar_multi_device_sync');
+        bc.postMessage({ type: 'ALL_SETTINGS_SYNC', settings: merged, timestamp: Date.now() });
+        bc.close();
+      } catch (e) {}
+    }
+  }
+
+  async syncAllSettingsAcrossDevices(settingsPayload?: Partial<SyncedSettings>): Promise<{ success: boolean; lastSyncedAt: string }> {
+    if (settingsPayload) {
+      this.saveSettings(settingsPayload);
+    } else {
+      this.saveSettings(this.getSettings());
+    }
+    await pouch.syncNow();
+    return {
+      success: true,
+      lastSyncedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    };
   }
 
   // Parties

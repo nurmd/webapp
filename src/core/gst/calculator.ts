@@ -45,6 +45,19 @@ export interface InvoiceCalculationSummary {
 
 /**
  * Calculates GST components for a single line item.
+ * 
+ * Rules:
+ * 1. Computes Gross Amount = quantity * unitPrice.
+ * 2. Applies flat discount amount or percentage discount.
+ * 3. Taxable Amount = Gross Amount - Discount Amount.
+ * 4. Tax bifurcation:
+ *    - Intra-State (Same State): CGST (50% of GST rate) + SGST (50% of GST rate).
+ *    - Inter-State (Different State): IGST (100% of GST rate).
+ * 5. Applies Compensation Cess (percentage of taxable value and/or fixed per-unit cess).
+ * 
+ * @param input - Item input details including quantity, unit price, discounts, and GST/Cess rates.
+ * @param isIntraState - True if Supplier State matches Recipient Place of Supply (POS).
+ * @returns Fully calculated item with breakdown of CGST, SGST, IGST, Cess, total tax, and total amount.
  */
 export function calculateItemGst(
   input: InvoiceItemCalculationInput,
@@ -103,7 +116,18 @@ export function calculateItemGst(
 }
 
 /**
- * Calculates entire Invoice totals, GST slabs summary, and round-off.
+ * Calculates entire Invoice totals, GST slabs summary, and mathematical round-off.
+ * 
+ * Rules:
+ * 1. Automatically determines Intra vs Inter-State supply based on 2-digit GST state codes.
+ * 2. Maps every item through `calculateItemGst`.
+ * 3. Aggregates gross, discounts, taxable value, CGST, SGST, IGST, and cess.
+ * 4. Applies mathematical rounding to the nearest Indian Rupee (₹), computing explicit roundOff delta.
+ * 
+ * @param supplierStateCode - Two-digit GST state code of supplier (e.g. '27' for Maharashtra).
+ * @param placeOfSupplyStateCode - Two-digit GST state code of recipient POS (e.g. '24' for Gujarat).
+ * @param items - Array of line item inputs.
+ * @returns Summary containing item-by-item calculations, total taxes, round-off, and grand total.
  */
 export function calculateInvoice(
   supplierStateCode: string,

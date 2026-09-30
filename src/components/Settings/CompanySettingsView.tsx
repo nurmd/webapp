@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
 import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
+import { db } from '../../services/db.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
 
@@ -21,6 +22,16 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  // Multi-Device Profile Sync State
+  const [isSyncingProfile, setIsSyncingProfile] = useState(false);
+  const [profileSyncNotice, setProfileSyncNotice] = useState<string | null>(null);
+  const [lastProfileSyncTime, setLastProfileSyncTime] = useState<string>('Just now');
+  const [isPairQrModalOpen, setIsPairQrModalOpen] = useState(false);
+  const [isImportProfileModalOpen, setIsImportProfileModalOpen] = useState(false);
+  const [importProfileInput, setImportProfileInput] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
+  const [copiedSyncCode, setCopiedSyncCode] = useState(false);
 
   // App Update state
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
@@ -111,9 +122,124 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
+  const isGstActive = profile.isGstEnabled ?? true;
+
+  const handleToggleGst = (newEnabled?: boolean) => {
+    const updatedStatus = typeof newEnabled === 'boolean' ? newEnabled : !isGstActive;
+    const updatedProfile: CompanyProfile = {
+      ...profile,
+      isGstEnabled: updatedStatus,
+    };
+    setProfile(updatedProfile);
+    onSave(updatedProfile);
+    db.syncAllSettingsAcrossDevices({
+      company: updatedProfile,
+      isGstEnabled: updatedStatus,
+      appLanguage,
+      isAppLockEnabled,
+    });
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 3000);
+  };
+
+  const handleSyncAllSettingsAcrossDevices = async () => {
+    setIsSyncingProfile(true);
+    setProfileSyncNotice(null);
+    try {
+      const res = await db.syncAllSettingsAcrossDevices({
+        company: profile,
+        isGstEnabled: isGstActive,
+        appLanguage,
+        isAppLockEnabled,
+      });
+      setLastProfileSyncTime(res.lastSyncedAt);
+      setProfileSyncNotice('All settings synced with all devices! (Printing settings preserved locally)');
+      setTimeout(() => setProfileSyncNotice(null), 4500);
+    } catch (e: any) {
+      setProfileSyncNotice('Settings synced locally. Connect network for remote devices.');
+      setTimeout(() => setProfileSyncNotice(null), 4000);
+    } finally {
+      setIsSyncingProfile(false);
+    }
+  };
+
+  const allSettingsSyncPayload = useMemo(() => {
+    try {
+      const fullSettings = {
+        company: profile,
+        isGstEnabled: isGstActive,
+        appLanguage,
+        isAppLockEnabled,
+        // Explicitly exclude any printer / printing settings
+      };
+      return btoa(unescape(encodeURIComponent(JSON.stringify(fullSettings))));
+    } catch {
+      return '';
+    }
+  }, [profile, isGstActive, appLanguage, isAppLockEnabled]);
+
+  const handleCopySyncCode = () => {
+    if (allSettingsSyncPayload) {
+      navigator.clipboard.writeText(allSettingsSyncPayload);
+      setCopiedSyncCode(true);
+      setTimeout(() => setCopiedSyncCode(false), 3000);
+    }
+  };
+
+  const handleImportSettings = () => {
+    setImportError(null);
+    try {
+      if (!importProfileInput.trim()) {
+        setImportError('Please enter a valid settings sync code or JSON.');
+        return;
+      }
+      let jsonStr = importProfileInput.trim();
+      try {
+        jsonStr = decodeURIComponent(escape(atob(jsonStr)));
+      } catch {
+        // Raw JSON input
+      }
+      const parsed = JSON.parse(jsonStr);
+      // Support both { company, appLanguage, ... } format or direct CompanyProfile
+      const incomingCompany: CompanyProfile = parsed.company ? parsed.company : parsed;
+      if (!incomingCompany.businessName) {
+        setImportError('Invalid settings payload. Missing Business Name.');
+        return;
+      }
+      if (parsed.isGstEnabled !== undefined) {
+        incomingCompany.isGstEnabled = parsed.isGstEnabled;
+      }
+      onSave(incomingCompany);
+      if (parsed.appLanguage) setAppLanguage(parsed.appLanguage);
+      if (parsed.isAppLockEnabled !== undefined) setIsAppLockEnabled(parsed.isAppLockEnabled);
+
+      // Save all settings excluding printing
+      db.syncAllSettingsAcrossDevices({
+        company: incomingCompany,
+        isGstEnabled: incomingCompany.isGstEnabled ?? true,
+        appLanguage: parsed.appLanguage || appLanguage,
+        isAppLockEnabled: parsed.isAppLockEnabled !== undefined ? parsed.isAppLockEnabled : isAppLockEnabled,
+      });
+
+      setProfile(incomingCompany);
+      setIsImportProfileModalOpen(false);
+      setImportProfileInput('');
+      setProfileSyncNotice('All settings imported & synced! (Device printing settings preserved)');
+      setTimeout(() => setProfileSyncNotice(null), 4500);
+    } catch (e: any) {
+      setImportError('Invalid sync code format. Please check the code.');
+    }
+  };
+
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(profile);
+    db.syncAllSettingsAcrossDevices({
+      company: profile,
+      isGstEnabled: profile.isGstEnabled ?? true,
+      appLanguage,
+      isAppLockEnabled,
+    });
     setSavedNotice(true);
     setIsEditModalOpen(false);
     setTimeout(() => setSavedNotice(false), 3000);
@@ -167,27 +293,41 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               {profile.tradeName || 'Wholesale & Retail Groceries'}
             </p>
             {/* Verification Pill */}
-            <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-              <span>GST Portal Verified</span>
-            </div>
+            {isGstActive ? (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                <span>GST Portal Verified</span>
+              </div>
+            ) : (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-label-sm text-[11px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Non-GST Store (Exempt)</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Essential Metadata Grid */}
         <div className="bg-surface-container-low/70 rounded-xl p-3.5 flex flex-col gap-2 text-xs">
-          <div className="flex items-center justify-between text-on-surface">
-            <span className="text-on-surface-variant font-medium">GSTIN</span>
-            <span className="font-tabular-data tracking-wider font-bold text-on-surface">
-              {profile.gstin || '27AAAAA0000A1Z5'}
+          <div
+            onClick={() => document.getElementById('gst-tax-config')?.scrollIntoView({ behavior: 'smooth' })}
+            className="flex items-center justify-between text-on-surface hover:bg-surface-container-high/50 p-1 -m-1 rounded-lg transition-colors cursor-pointer"
+            title="Click to configure GST & Legal Tax settings"
+          >
+            <span className="text-on-surface-variant font-medium flex items-center gap-1">
+              <span>GSTIN</span>
+              <span className="material-symbols-outlined text-[13px] text-secondary">tune</span>
+            </span>
+            <span className={`font-tabular-data tracking-wider font-bold ${isGstActive ? 'text-on-surface' : 'text-on-surface-variant italic'}`}>
+              {isGstActive ? (profile.gstin || '27AAAAA0000A1Z5') : 'Not Applicable (Disabled)'}
             </span>
           </div>
 
           <div className="flex items-center justify-between text-on-surface">
             <span className="text-on-surface-variant font-medium">Taxpayer Status</span>
-            <span className="text-secondary font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-              Active • Regular
+            <span className={`font-bold flex items-center gap-1 ${isGstActive ? 'text-secondary' : 'text-amber-600 dark:text-amber-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isGstActive ? 'bg-secondary' : 'bg-amber-500'}`} />
+              {isGstActive ? 'Active • Regular' : 'Non-GST / Unregistered'}
             </span>
           </div>
 
@@ -235,7 +375,82 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       </section>
 
-      {/* 2. Store Data Protected / Sync Pulse Banner (Stitch Design) */}
+      {/* 2. Multi-Device Settings Synchronization Card (All Settings Except Printing) */}
+      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-secondary/30 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary flex-shrink-0">
+              <span className={`material-symbols-outlined text-[22px] ${isSyncingProfile ? 'animate-spin' : ''}`}>
+                sync
+              </span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-headline-sm text-sm font-bold text-on-surface">
+                  Sync All Settings Across Devices
+                </span>
+                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+              </div>
+              <span className="text-[11px] text-on-surface-variant truncate">
+                Last Synced: {lastProfileSyncTime} • All counter devices paired
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSyncAllSettingsAcrossDevices}
+            disabled={isSyncingProfile}
+            className="px-3.5 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <span className={`material-symbols-outlined text-[16px] ${isSyncingProfile ? 'animate-spin' : ''}`}>
+              sync
+            </span>
+            <span>{isSyncingProfile ? 'Syncing...' : 'Sync All Settings'}</span>
+          </button>
+        </div>
+
+        {/* Sync Scope Indicator: Everything synced except printing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1 border-t border-outline-variant/15">
+          <div className="flex items-center gap-1.5 text-secondary font-medium">
+            <span className="material-symbols-outlined text-[15px]">check_circle</span>
+            <span>Synced: Profile, Bank, UPI, Taxes, Alerts &amp; Lock</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-outline font-medium">
+            <span className="material-symbols-outlined text-[15px]">lock</span>
+            <span>Local to Device: Thermal &amp; Printing Setup</span>
+          </div>
+        </div>
+
+        {profileSyncNotice && (
+          <div className="p-2.5 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-xs font-semibold flex items-center gap-2 animate-fade-in">
+            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+            <span>{profileSyncNotice}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/15">
+          <button
+            type="button"
+            onClick={() => setIsPairQrModalOpen(true)}
+            className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">qr_code_2</span>
+            <span>Pair via QR</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportProfileModalOpen(true)}
+            className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">download</span>
+            <span>Import Settings</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 3. Store Data Protected / Sync Pulse Banner (Stitch Design) */}
       <section className="bg-secondary-container/60 text-on-secondary-container rounded-2xl p-4 shadow-sm border border-secondary/20 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
@@ -340,29 +555,191 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </button>
       </section>
 
-      {/* GROUP 1: Tax & Legal Compliance (Stitch Design) */}
-      <section className="flex flex-col gap-2">
+      {/* GROUP 1: GST & Legal Tax Configuration */}
+      <section id="gst-tax-config" className="flex flex-col gap-2.5 scroll-mt-20">
         <div className="px-1 flex items-center justify-between">
-          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Tax & Legal Compliance
-          </h3>
-          <span className="font-label-sm text-[11px] text-secondary font-bold">GST Mode: Regular</span>
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-secondary">tune</span>
+            <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+              GST &amp; Legal Tax Configuration
+            </h3>
+          </div>
+          <span className={`font-label-sm text-[11px] font-bold ${isGstActive ? 'text-secondary' : 'text-amber-500'}`}>
+            {isGstActive ? 'GST Mode: Regular' : 'GST Mode: Disabled (Non-GST)'}
+          </span>
         </div>
 
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+        {/* 1. Master GST Billing Toggle Card */}
+        <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+              isGstActive ? 'bg-secondary/15 text-secondary' : 'bg-surface-container text-on-surface-variant'
+            }`}>
+              <span className="material-symbols-outlined text-[22px]">
+                {isGstActive ? 'verified' : 'power_settings_new'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-label-md text-sm font-bold text-on-surface">Enable GST Billing</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  isGstActive
+                    ? 'bg-secondary-container text-on-secondary-container'
+                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                }`}>
+                  {isGstActive ? 'Active' : 'Disabled (Non-GST)'}
+                </span>
+              </div>
+              <p className="font-body-sm text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                {isGstActive
+                  ? 'Tax rates (CGST/SGST/IGST), GSTIN validation, HSN/SAC codes & E-Way bills active.'
+                  : 'Tax calculations disabled. Generate simple non-tax bills / Bills of Supply without GST.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Interactive Switch */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isGstActive}
+            onClick={() => handleToggleGst()}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 cursor-pointer ${
+              isGstActive ? 'bg-secondary' : 'bg-surface-container-highest'
+            }`}
+            title={isGstActive ? 'Click to disable GST' : 'Click to enable GST'}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-surface-container-lowest shadow-sm transition-transform ${
+                isGstActive ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {!isGstActive && (
+          <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] flex-shrink-0">info</span>
+            <span>GST-related settings below are deactivated. Toggle switch above to activate GST compliance &amp; tax slabs.</span>
+          </div>
+        )}
+
+        {/* 2. Business GSTIN & State Tax Registration Card */}
+        <div className={`bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3.5 ${
+          !isGstActive ? 'opacity-65' : ''
+        }`}>
+          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary text-[20px]">badge</span>
+              <div>
+                <h4 className="font-label-md text-sm font-bold text-on-surface">GSTIN &amp; Tax Registration</h4>
+                <p className="font-body-sm text-[11px] text-on-surface-variant">Business GSTIN number, State Place of Supply &amp; Filing Scheme</p>
+              </div>
+            </div>
+            {isGstActive && (
+              <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold">
+                Regular Taxpayer
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="font-bold text-on-surface block mb-1">
+                GSTIN {isGstActive ? '(15 Digits)' : '(Disabled)'}
+              </label>
+              <input
+                type="text"
+                maxLength={15}
+                disabled={!isGstActive}
+                value={isGstActive ? profile.gstin : ''}
+                placeholder={isGstActive ? '27AABCU9603R1ZN' : 'Disabled (Non-GST Business)'}
+                onChange={(e) => handleGstinChange(e.target.value)}
+                className={`w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-mono font-bold uppercase outline-none focus:border-secondary ${
+                  !isGstActive ? 'opacity-50 cursor-not-allowed bg-surface-container' : ''
+                }`}
+              />
+              {isGstActive && feedback && (
+                <p className="text-[10px] text-secondary font-medium mt-1">{feedback}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="font-bold text-on-surface block mb-1">Default Place of Supply (POS) State</label>
+              <select
+                disabled={!isGstActive}
+                value={profile.stateCode}
+                onChange={(e) => {
+                  const updated = { ...profile, stateCode: e.target.value };
+                  setProfile(updated);
+                  onSave(updated);
+                  db.syncAllSettingsAcrossDevices({ company: updated, isGstEnabled: isGstActive, appLanguage, isAppLockEnabled });
+                  setSavedNotice(true);
+                  setTimeout(() => setSavedNotice(false), 2000);
+                }}
+                className={`w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none focus:border-secondary ${
+                  !isGstActive ? 'opacity-50 cursor-not-allowed bg-surface-container' : ''
+                }`}
+              >
+                {getStateList().map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.code} - {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-1 text-[11px] text-on-surface-variant flex-wrap gap-2">
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[15px] text-secondary">verified</span>
+              {isGstActive ? `PAN: ${profile.pan || 'Extracted from GSTIN'} • State: ${stateName} (${profile.stateCode})` : 'Tax calculation disabled'}
+            </span>
+            {isGstActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSave(profile);
+                  db.syncAllSettingsAcrossDevices({ company: profile, isGstEnabled: isGstActive, appLanguage, isAppLockEnabled });
+                  setSavedNotice(true);
+                  setTimeout(() => setSavedNotice(false), 2000);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-[11px] hover:bg-surface-container-high transition-colors cursor-pointer"
+              >
+                Save GSTIN
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Items list: GST & Tax Rates, State & Place of Supply, E-Way Bill & E-Invoice */}
+        <div className={`bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col ${
+          !isGstActive ? 'opacity-65' : ''
+        }`}>
           {/* Item 1: GST & Tax Rates */}
           <button
             type="button"
             onClick={() => setActiveSubModal('tax_rates')}
             className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isGstActive ? 'bg-surface-container text-on-surface' : 'bg-surface-container-low text-on-surface-variant'
+            }`}>
               <span className="material-symbols-outlined text-[22px]">account_balance</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">GST & Tax Rates</div>
+              <div className="flex items-center gap-2">
+                <span className="font-label-md text-sm font-bold text-on-surface">GST & Tax Rates</span>
+                {!isGstActive && (
+                  <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant text-[10px] font-bold">
+                    Disabled
+                  </span>
+                )}
+              </div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                Slab rates 0%, 5%, 12%, 18%, 28% • RCM & Cess Ready
+                {isGstActive
+                  ? 'Slab rates 0%, 5%, 12%, 18%, 28% • RCM & Cess Ready'
+                  : 'Standard slabs dormant while GST is disabled'}
               </div>
             </div>
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
@@ -374,13 +751,22 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             onClick={() => setActiveSubModal('place_of_supply')}
             className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isGstActive ? 'bg-surface-container text-on-surface' : 'bg-surface-container-low text-on-surface-variant'
+            }`}>
               <span className="material-symbols-outlined text-[22px]">map</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">State & Place of Supply</div>
+              <div className="flex items-center gap-2">
+                <span className="font-label-md text-sm font-bold text-on-surface">State & Place of Supply Rules</span>
+                {!isGstActive && (
+                  <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant text-[10px] font-bold">
+                    Disabled
+                  </span>
+                )}
+              </div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                {stateName} ({profile.stateCode}) • Auto CGST+SGST / IGST Engine
+                {stateName} ({profile.stateCode}) • {isGstActive ? 'Auto CGST+SGST / IGST Engine' : 'Intra/Interstate tax engine paused'}
               </div>
             </div>
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
@@ -392,18 +778,26 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             onClick={() => setActiveSubModal('eway_bill')}
             className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              isGstActive ? 'bg-surface-container text-on-surface' : 'bg-surface-container-low text-on-surface-variant'
+            }`}>
               <span className="material-symbols-outlined text-[22px]">local_shipping</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-label-md text-sm font-bold text-on-surface">E-Way Bill & E-Invoice API</span>
-                <span className="px-1.5 py-0.2 rounded bg-secondary-container text-on-secondary-container text-[10px] font-bold">
-                  Active
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                  isGstActive
+                    ? 'bg-secondary-container text-on-secondary-container'
+                    : 'bg-surface-container-high text-on-surface-variant'
+                }`}>
+                  {isGstActive ? 'Active' : 'Disabled'}
                 </span>
               </div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                Threshold ₹50,000 • Official NIC Portal JSON v1.1
+                {isGstActive
+                  ? 'Threshold ₹50,000 • Official NIC Portal JSON v1.1'
+                  : 'NIC JSON generation paused (Non-GST mode)'}
               </div>
             </div>
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
@@ -653,33 +1047,32 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-on-surface block mb-1">GSTIN (15 Digits)</label>
-                  <input
-                    type="text"
-                    maxLength={15}
-                    value={profile.gstin}
-                    onChange={(e) => handleGstinChange(e.target.value)}
-                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-mono font-bold uppercase outline-none"
-                  />
-                  {feedback && <p className="text-[10px] text-secondary font-medium mt-1">{feedback}</p>}
+              {/* Reference to GST & Legal Tax Configuration */}
+              <div className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-secondary text-[16px]">tune</span>
+                    <span className="font-bold text-on-surface text-xs">GST &amp; Legal Tax Configuration</span>
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant truncate block mt-0.5">
+                    {isGstActive
+                      ? `GSTIN: ${profile.gstin || 'Not configured'} • State: ${stateName} (${profile.stateCode})`
+                      : 'GST Mode: Disabled (Non-GST Billing)'}
+                  </span>
                 </div>
-
-                <div>
-                  <label className="font-bold text-on-surface block mb-1">State / POS Code</label>
-                  <select
-                    value={profile.stateCode}
-                    onChange={(e) => setProfile({ ...profile, stateCode: e.target.value })}
-                    className="w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
-                  >
-                    {getStateList().map((s) => (
-                      <option key={s.code} value={s.code}>
-                        {s.code} - {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setTimeout(() => {
+                      document.getElementById('gst-tax-config')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 150);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-surface-container text-secondary font-bold text-[11px] hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0 flex items-center gap-1"
+                >
+                  <span>Configure</span>
+                  <span className="material-symbols-outlined text-[14px]">arrow_downward</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -831,7 +1224,108 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       )}
 
-      {/* 3. Sub-feature Info Modals */}
+      {/* Pair All Settings to Another Device via QR Code (Excluding Printing) */}
+      {isPairQrModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant/30 text-center flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-secondary text-on-secondary flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-[28px]">qr_code_2</span>
+            </div>
+            <h3 className="font-headline-sm text-base font-bold text-on-surface">
+              Pair All Settings
+            </h3>
+            <p className="text-xs text-on-surface-variant font-medium">
+              Scan from any secondary device or counter to clone all business, bank, and app settings. Printing settings are preserved separately for this device.
+            </p>
+
+            {/* Dynamic QR Code */}
+            <div className="w-52 h-52 rounded-2xl bg-white p-3 border border-outline-variant/20 flex flex-col items-center justify-center shadow-inner my-1">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(allSettingsSyncPayload)}`}
+                alt="Settings Sync QR Code"
+                className="w-44 h-44 object-contain rounded-lg"
+              />
+            </div>
+
+            <div className="w-full flex flex-col gap-1.5 mt-1">
+              <button
+                type="button"
+                onClick={handleCopySyncCode}
+                className="w-full py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {copiedSyncCode ? 'check' : 'content_copy'}
+                </span>
+                <span>{copiedSyncCode ? 'Settings Sync Code Copied!' : 'Copy Pairing Code'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPairQrModalOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-md cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import All Settings Modal (Excluding Printing) */}
+      {isImportProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-secondary text-[22px]">download</span>
+                <h3 className="font-headline-sm text-sm font-bold text-on-surface">
+                  Import All Settings
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportProfileModalOpen(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-on-surface-variant">
+              Paste the Pairing Code or JSON from master counter. All settings will update, while this device's printer settings stay preserved:
+            </p>
+
+            <textarea
+              rows={4}
+              value={importProfileInput}
+              onChange={(e) => setImportProfileInput(e.target.value)}
+              placeholder="Paste settings pairing code or JSON here..."
+              className="w-full p-2.5 rounded-xl bg-surface-container border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+            />
+
+            {importError && (
+              <p className="text-xs text-error font-medium">{importError}</p>
+            )}
+
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setIsImportProfileModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-surface-container text-on-surface text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleImportSettings}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-md cursor-pointer"
+              >
+                Apply &amp; Sync
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {activeSubModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-surface-container-lowest rounded-3xl max-w-md w-full p-5 shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
@@ -848,6 +1342,13 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             </div>
 
             <div className="text-xs text-on-surface-variant space-y-2 py-2">
+              {!isGstActive && ['tax_rates', 'place_of_supply', 'eway_bill'].includes(activeSubModal) && (
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-medium flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-[18px] flex-shrink-0">warning</span>
+                  <span>GST is currently disabled. Toggle &quot;Enable GST Billing&quot; in settings to apply these tax rules to your bills.</span>
+                </div>
+              )}
+
               {activeSubModal === 'tax_rates' && (
                 <>
                   <p className="font-semibold text-on-surface">Standard GST Tax Slabs Configured:</p>

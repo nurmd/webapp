@@ -10,6 +10,7 @@ interface HeaderProps {
   onSearchClick?: () => void;
   onBarcodeClick?: () => void;
   onProfileClick?: () => void;
+  hasUpdate?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchClick,
   onBarcodeClick,
   onProfileClick,
+  hasUpdate,
 }) => {
   return (
     <header className="fixed top-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.06)] border-b border-outline-variant/30 pt-safe">
@@ -29,10 +31,16 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenDrawer}
             aria-label="Open Navigation Drawer"
-            className="w-11 h-11 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full transition-colors flex-shrink-0 cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center text-on-surface-variant active:text-on-surface active:bg-surface-container-low rounded-full transition-colors flex-shrink-0 cursor-pointer relative"
             type="button"
           >
             <span className="material-symbols-outlined text-[24px]">menu</span>
+            {hasUpdate && (
+              <span
+                className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-amber-500 rounded-full ring-2 ring-surface animate-pulse"
+                title="App Update Available"
+              />
+            )}
           </button>
 
           <div className="flex items-center gap-space-xs text-left min-w-0 py-space-xs px-space-xs rounded-lg">
@@ -45,8 +53,10 @@ export const Header: React.FC<HeaderProps> = ({
                   verified
                 </span>
               </div>
-              <span className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-0.5">
-                GSTIN: {company.gstin}
+              <span className={`font-label-sm text-label-sm font-semibold flex items-center gap-0.5 ${
+                company.isGstEnabled === false ? 'text-amber-500' : 'text-secondary'
+              }`}>
+                {company.isGstEnabled === false ? 'Non-GST Billing' : `GSTIN: ${company.gstin}`}
               </span>
             </div>
           </div>

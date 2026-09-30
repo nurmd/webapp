@@ -32,8 +32,8 @@ export interface OtaDownloadOptions {
   onError?: (errorMessage: string, canRetry: boolean) => void;
 }
 
-export const CURRENT_APP_VERSION = '1.0.7';
-export const CURRENT_VERSION_CODE = 10007;
+export const CURRENT_APP_VERSION = '1.0.8';
+export const CURRENT_VERSION_CODE = 10008;
 export const DEFAULT_GITHUB_REPO = 'nurmd/webapp';
 
 class UpdateService {
@@ -166,38 +166,27 @@ class UpdateService {
           currentVersion: CURRENT_APP_VERSION,
           latestRelease: releaseInfo,
         };
-      } else if (res.status === 404) {
-        console.warn(`No GitHub releases found for ${repo}`);
+      } else {
+        const errorMsg = res.status === 404
+          ? `No GitHub releases found for ${repo}`
+          : `GitHub API returned ${res.status}`;
+        console.warn(errorMsg);
+        return {
+          hasUpdate: false,
+          currentVersion: CURRENT_APP_VERSION,
+          latestRelease: this.cachedRelease || undefined,
+          error: errorMsg,
+        };
       }
     } catch (err: any) {
       console.warn('GitHub OTA release check failed or offline:', err);
+      return {
+        hasUpdate: false,
+        currentVersion: CURRENT_APP_VERSION,
+        latestRelease: this.cachedRelease || undefined,
+        error: err?.message || 'Network error checking for updates',
+      };
     }
-
-    // Fallback if GitHub API is offline or rate-limited: check custom endpoint or cached
-    const fallbackRelease: AppReleaseInfo = this.cachedRelease || {
-      version: '1.0.0',
-      versionCode: 1,
-      releaseDate: new Date().toISOString().split('T')[0],
-      releaseTitle: `Vyapar PRO v1.0.0 (Production Release)`,
-      releaseNotes: [
-        '100% Offline-First PouchDB & CouchDB multi-device sync',
-        'Direct ESC/POS 58mm & 80mm thermal receipt printing',
-        'Hardware barcode scanner gun wedge listener + camera scanner',
-        '4-Digit PIN Multi-Role Security (Owner, Cashier, Chartered Accountant)',
-        'Party Ledger Passbook with automated payment receipt & payment out vouchers',
-      ],
-      apkUrl: `https://github.com/${repo}/releases/download/v1.0.0/GSTBilling-Vyapar.apk`,
-      apkSize: '20.2 MB',
-      htmlUrl: `https://github.com/${repo}/releases/tag/v1.0.0`,
-      isMandatory: false,
-    };
-
-    const hasUpdate = this.isNewer(fallbackRelease.version, CURRENT_APP_VERSION);
-    return {
-      hasUpdate,
-      currentVersion: CURRENT_APP_VERSION,
-      latestRelease: fallbackRelease,
-    };
   }
 
   public isNewer(latest: string, current: string): boolean {
