@@ -165,6 +165,91 @@ const DEFAULT_ITEMS: InventoryItem[] = [
   },
 ];
 
+export const DEFAULT_INVOICES: Invoice[] = [
+  {
+    id: 'INV-SAMPLE-001',
+    invoiceNumber: 'INV-2024-001',
+    invoiceType: 'B2B',
+    date: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+    partyId: 'PTY-101',
+    partyName: 'National Hardware & Electronics Ltd',
+    partyGstin: '27AAACS1429B1ZV',
+    partyAddress: 'Plot 42, MIDC Phase II, Hinjewadi, Pune, Maharashtra - 411057',
+    partyStateCode: '27',
+    placeOfSupplyStateCode: '27',
+    isIntraState: true,
+    items: [
+      {
+        itemId: 'ITM-001',
+        name: 'Thermal Receipt Printer 80mm USB+BT',
+        hsnSacCode: '844332',
+        unit: 'PCS',
+        quantity: 2,
+        unitPrice: 3800,
+        discountPercent: 5,
+        taxableAmount: 7220,
+        gstRate: 18,
+        cgstAmount: 649.8,
+        sgstAmount: 649.8,
+        igstAmount: 0,
+        cessAmount: 0,
+        totalAmount: 8519.6,
+      },
+      {
+        itemId: 'ITM-002',
+        name: 'Wireless 2D Barcode Scanner',
+        hsnSacCode: '847130',
+        unit: 'PCS',
+        quantity: 1,
+        unitPrice: 1950,
+        discountPercent: 0,
+        taxableAmount: 1950,
+        gstRate: 18,
+        cgstAmount: 175.5,
+        sgstAmount: 175.5,
+        igstAmount: 0,
+        cessAmount: 0,
+        totalAmount: 2301,
+      },
+      {
+        itemId: 'ITM-003',
+        name: 'Billing Thermal Paper Roll (79mm x 50m)',
+        hsnSacCode: '4802',
+        unit: 'BOX',
+        quantity: 4,
+        unitPrice: 850,
+        discountPercent: 0,
+        taxableAmount: 3400,
+        gstRate: 12,
+        cgstAmount: 204,
+        sgstAmount: 204,
+        igstAmount: 0,
+        cessAmount: 0,
+        totalAmount: 3808,
+      },
+    ],
+    totalGrossAmount: 12950,
+    totalDiscount: 380,
+    totalTaxableAmount: 12570,
+    totalCgst: 1029.3,
+    totalSgst: 1029.3,
+    totalIgst: 0,
+    totalCess: 0,
+    totalTax: 2058.6,
+    roundOff: 0.4,
+    grandTotal: 14629,
+    amountInWords: 'Rupees Fourteen Thousand Six Hundred Twenty Nine Only',
+    paymentMode: 'UPI',
+    paymentStatus: 'PAID',
+    paidAmount: 14629,
+    balanceAmount: 0,
+    notes: 'Goods once sold cannot be returned without original receipt.',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
 /**
  * Offline-first Data Access and Multi-Device Synchronization Engine.
  * 
@@ -391,7 +476,8 @@ class StorageService {
 
   // Invoices
   getInvoices(): Invoice[] {
-    return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, []);
+    const list = this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
+    return list && list.length > 0 ? list : DEFAULT_INVOICES;
   }
 
   saveInvoice(invoice: Invoice): void {
