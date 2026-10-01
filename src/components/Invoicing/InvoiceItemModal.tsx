@@ -71,6 +71,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [totalInput, setTotalInput] = useState<string>('');
   const [isEditingTotal, setIsEditingTotal] = useState(false);
 
+  // Editable Discount Amount State
+  const [discountAmountInput, setDiscountAmountInput] = useState<string>('');
+  const [isEditingDiscountAmount, setIsEditingDiscountAmount] = useState(false);
+
   // Sync state whenever modal opens or initialItem changes
   useEffect(() => {
     if (isOpen) {
@@ -86,6 +90,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setDiscountPercent(initialItem.discountPercent || 0);
         setGstRate(initialItem.gstRate ?? 18);
         setIsEditingTotal(false);
+        setIsEditingDiscountAmount(false);
         setIsDropdownOpen(false);
       } else {
         resetForm();
@@ -110,6 +115,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setGstRate(18);
     setTotalInput('');
     setIsEditingTotal(false);
+    setDiscountAmountInput('');
+    setIsEditingDiscountAmount(false);
     setIsDropdownOpen(false);
   };
 
@@ -183,6 +190,42 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       }
     }
   }, [calculation.totalAmount, isEditingTotal]);
+
+  // Keep discountAmountInput synchronized with calculated discount unless user is actively editing it
+  useEffect(() => {
+    if (!isEditingDiscountAmount) {
+      if (calculation.discountAmount > 0) {
+        setDiscountAmountInput(calculation.discountAmount.toFixed(2));
+      } else {
+        setDiscountAmountInput('');
+      }
+    }
+  }, [calculation.discountAmount, isEditingDiscountAmount]);
+
+  const handleDiscountPercentChange = (valStr: string) => {
+    if (!valStr.trim()) {
+      setDiscountPercent(0);
+      return;
+    }
+    const val = Math.min(100, Math.max(0, Number(valStr)));
+    setDiscountPercent(val);
+  };
+
+  const handleDiscountAmountChange = (valStr: string) => {
+    setDiscountAmountInput(valStr);
+    if (!valStr.trim()) {
+      setDiscountPercent(0);
+      return;
+    }
+    const val = parseFloat(valStr);
+    if (isNaN(val) || val < 0) return;
+
+    const gross = (Number(quantity) || 1) * (Number(unitPrice) || 0);
+    if (gross > 0) {
+      const calculatedPct = Math.min(100, Math.round(((val / gross) * 100) * 100) / 100);
+      setDiscountPercent(calculatedPct);
+    }
+  };
 
   // Back-calculate unitPrice when user edits Total directly
   const handleTotalChange = (valStr: string) => {
@@ -483,106 +526,93 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 5. Discount (%) */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-              <span>Discount (%)</span>
-              {calculation.discountAmount > 0 && (
-                <span className="text-[10px] text-secondary font-bold">
-                  Discount: - {formatINR(calculation.discountAmount)}
+          {/* 5. Discount: Both Percentage (%) and Amount (₹) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                <span>Discount (%)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={discountPercent || ''}
+                  onChange={(e) => handleDiscountPercentChange(e.target.value)}
+                  placeholder="0"
+                  className="w-full pl-3 pr-7 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
+                  %
                 </span>
-              )}
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={discountPercent || ''}
-                onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                placeholder="0"
-                className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
-                %
-              </span>
-            </div>
-          </div>
-
-          {/* 6. EDITABLE TOTAL & BREAKDOWN */}
-          <div className="rounded-2xl p-3.5 bg-gradient-to-br from-secondary/10 via-surface-container to-secondary/5 border border-secondary/30 flex flex-col gap-2.5 mt-0.5 shadow-xs">
-            <div className="flex items-center justify-between gap-3 pb-2 border-b border-secondary/20">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-7 h-7 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary shrink-0">
-                  <span className="material-symbols-outlined text-[18px]">calculate</span>
-                </div>
-                <div>
-                  <label htmlFor="modal-item-total" className="text-xs font-bold uppercase tracking-wider text-secondary block">
-                    Item Total
-                  </label>
-                  <span className="text-[10px] text-on-surface-variant font-medium">
-                    Editable · Auto-adjusts unit price
-                  </span>
-                </div>
               </div>
+            </div>
 
-              <div className="relative flex items-center w-36 sm:w-44">
-                <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                <span>Discount (₹)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
                   ₹
                 </span>
                 <input
-                  id="modal-item-total"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={totalInput}
-                  onFocus={() => setIsEditingTotal(true)}
+                  value={discountAmountInput}
+                  onFocus={() => setIsEditingDiscountAmount(true)}
                   onBlur={() => {
-                    setIsEditingTotal(false);
-                    if (calculation.totalAmount > 0) {
-                      setTotalInput(calculation.totalAmount.toFixed(2));
+                    setIsEditingDiscountAmount(false);
+                    if (calculation.discountAmount > 0) {
+                      setDiscountAmountInput(calculation.discountAmount.toFixed(2));
+                    } else {
+                      setDiscountAmountInput('');
                     }
                   }}
-                  onChange={(e) => handleTotalChange(e.target.value)}
+                  onChange={(e) => handleDiscountAmountChange(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-secondary/40 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
+                  className="w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
                 />
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-on-surface-variant pt-0.5">
-              <div className="flex items-center justify-between">
-                <span>Gross ({quantity} × ₹{unitPrice}):</span>
-                <span className="font-tabular-data font-semibold text-on-surface">
-                  {formatINR(calculation.gross)}
+          {/* 6. Simplified Item Total Card */}
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30">
+            <div>
+              <label htmlFor="modal-item-total" className="text-xs font-bold text-on-surface block">
+                Item Total
+              </label>
+              {calculation.discountAmount > 0 && (
+                <span className="text-[11px] text-secondary font-semibold">
+                  Saved {formatINR(calculation.discountAmount)}
                 </span>
-              </div>
-
-              {calculation.discountAmount > 0 ? (
-                <div className="flex items-center justify-between text-secondary">
-                  <span>Disc ({discountPercent}%):</span>
-                  <span className="font-tabular-data font-semibold">
-                    - {formatINR(calculation.discountAmount)}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <span>Taxable:</span>
-                  <span className="font-tabular-data font-semibold text-on-surface">
-                    {formatINR(calculation.taxableAmount)}
-                  </span>
-                </div>
               )}
+            </div>
 
-              {calculation.gstAmount > 0 && (
-                <div className="col-span-2 flex items-center justify-between text-[10px] text-outline">
-                  <span>GST Included ({gstRate}%):</span>
-                  <span className="font-tabular-data font-medium">
-                    {formatINR(calculation.gstAmount)}
-                  </span>
-                </div>
-              )}
+            <div className="relative flex items-center w-36 sm:w-44">
+              <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
+                ₹
+              </span>
+              <input
+                id="modal-item-total"
+                type="number"
+                min="0"
+                step="0.01"
+                value={totalInput}
+                onFocus={() => setIsEditingTotal(true)}
+                onBlur={() => {
+                  setIsEditingTotal(false);
+                  if (calculation.totalAmount > 0) {
+                    setTotalInput(calculation.totalAmount.toFixed(2));
+                  }
+                }}
+                onChange={(e) => handleTotalChange(e.target.value)}
+                placeholder="0.00"
+                className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
+              />
             </div>
           </div>
 

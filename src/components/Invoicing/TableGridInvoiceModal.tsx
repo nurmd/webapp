@@ -1291,18 +1291,53 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               ))}
             </div>
 
-            <div>
-              <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
-                Custom Discount Percentage (%):
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={overallDiscountPercent}
-                onChange={(e) => setOverallDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40 text-right"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                  Discount (%):
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={overallDiscountPercent || ''}
+                    onChange={(e) => setOverallDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                    className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl pl-3 pr-7 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40 text-right"
+                    placeholder="0"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
+                    %
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                  Discount (₹):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={overallDiscountAmount || ''}
+                    onChange={(e) => {
+                      const amt = Number(e.target.value) || 0;
+                      if (calcSummary.totalTaxableAmount > 0) {
+                        const pct = Math.min(100, Math.round(((amt / calcSummary.totalTaxableAmount) * 100) * 100) / 100);
+                        setOverallDiscountPercent(pct);
+                      }
+                    }}
+                    className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl pl-7 pr-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40 text-right"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-secondary-container/40 text-on-secondary-container text-xs font-semibold flex items-center justify-between">
