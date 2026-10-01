@@ -801,106 +801,123 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           {/* Lower Workstation Section: Left Payment & Terms, Right Financial Ledger */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
             {/* Left Column: Payment Settlement Details */}
-            <div className="lg:col-span-7 flex flex-col gap-3">
-              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
+            <div className="lg:col-span-6 flex flex-col gap-2">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
+                {/* Header with Quick Payment Mode Selector */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[18px] text-secondary">payments</span>
-                    <span className="font-bold text-xs sm:text-sm text-on-surface">
-                      Payment &amp; Settlement
-                    </span>
+                    <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                    <span className="font-bold text-xs text-on-surface">Payment Settlement</span>
                   </div>
-                  <span className="text-[11px] text-on-surface-variant">
-                    {paymentModeTab === 'paid' ? 'Immediate Settlement' : 'Party Ledger Credit'}
-                  </span>
+
+                  {/* 1-Tap Quick Payment Mode Buttons */}
+                  <div className="inline-flex rounded-lg bg-surface-container p-0.5 border border-outline-variant/20 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentModeTab('paid');
+                        setCashAmount(finalGrandTotal);
+                        setBankAmount(0);
+                      }}
+                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                        paymentModeTab === 'paid' && bankAmount === 0
+                          ? 'bg-surface-container-lowest text-secondary shadow-2xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">payments</span>
+                      <span>Cash</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentModeTab('paid');
+                        setBankAmount(finalGrandTotal);
+                        setCashAmount(0);
+                      }}
+                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                        paymentModeTab === 'paid' && bankAmount > 0 && cashAmount === 0
+                          ? 'bg-surface-container-lowest text-secondary shadow-2xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">account_balance</span>
+                      <span>Bank / UPI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModeTab('credit')}
+                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                        paymentModeTab === 'credit'
+                          ? 'bg-surface-container-lowest text-error shadow-2xs'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[13px]">schedule</span>
+                      <span>Credit</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* Paid vs Credit Segmented Control */}
-                <div className="flex rounded-lg bg-surface-container-low p-1 gap-1 border border-outline-variant/20">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModeTab('paid')}
-                    className={`flex-1 py-1.5 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      paymentModeTab === 'paid'
-                        ? 'bg-surface-container-lowest text-secondary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    <span>Paid / Cash Counter</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentModeTab('credit')}
-                    className={`flex-1 py-1.5 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      paymentModeTab === 'credit'
-                        ? 'bg-surface-container-lowest text-error shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-error">schedule</span>
-                    <span>Credit / Ledger Due</span>
-                  </button>
-                </div>
-
-                {/* Payment Split Inputs */}
+                {/* Compact Payment Split & Settlement Status */}
                 {paymentModeTab === 'paid' ? (
-                  <div className="rounded-lg bg-surface-container-low/40 p-2.5 flex flex-col gap-2 border border-outline-variant/20">
-                    <div className="space-y-1.5">
-                      {/* Cash Received */}
-                      <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface-container-lowest shadow-2xs border border-outline-variant/20">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[16px] text-on-surface-variant">payments</span>
-                          <span className="font-bold text-xs text-on-surface">Cash Received</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-tabular-data text-on-surface-variant text-xs">₹</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={cashAmount}
-                            onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value)))}
-                            className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Bank / Online UPI */}
-                      <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface-container-lowest shadow-2xs border border-outline-variant/20">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="material-symbols-outlined text-[16px] text-secondary">account_balance</span>
-                          <div className="min-w-0">
-                            <span className="font-bold text-xs text-on-surface block truncate">Bank / UPI Transfer</span>
-                            <span className="text-[10px] text-on-surface-variant block truncate">
-                              {company.bankName ? `${company.bankName} (${company.accountNumber || ''})` : 'Digital Bank Account'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-tabular-data text-on-surface-variant text-xs">₹</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={bankAmount}
-                            onChange={(e) => setBankAmount(Math.max(0, Number(e.target.value)))}
-                            className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
-                          />
-                        </div>
+                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/15 text-xs">
+                    {/* Cash Split Field */}
+                    <div className="flex-1 min-w-[120px] flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                      <span className="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1">
+                        <span>Cash:</span>
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[11px] text-outline">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={cashAmount || ''}
+                          onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value) || 0))}
+                          placeholder="0"
+                          className="w-20 text-right font-tabular-data font-bold text-xs text-on-surface bg-transparent outline-none focus:text-secondary"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 text-xs text-on-surface-variant border-t border-outline-variant/15">
-                      <span>Total Paid: <strong className="text-on-surface font-bold">{formatINR(totalPaid)}</strong></span>
-                      <span>Balance Due: <strong className={balanceDue > 0 ? 'text-error font-bold' : 'text-secondary font-bold'}>{formatINR(balanceDue)}</strong></span>
+                    {/* Bank / UPI Split Field */}
+                    <div className="flex-1 min-w-[120px] flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                      <span className="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1">
+                        <span>Bank:</span>
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[11px] text-outline">₹</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={bankAmount || ''}
+                          onChange={(e) => setBankAmount(Math.max(0, Number(e.target.value) || 0))}
+                          placeholder="0"
+                          className="w-20 text-right font-tabular-data font-bold text-xs text-on-surface bg-transparent outline-none focus:text-secondary"
+                        />
+                      </div>
                     </div>
+
+                    {/* Status Pill */}
+                    {balanceDue > 0 ? (
+                      <div className="px-2 py-1 rounded-lg bg-error-container/40 text-on-error-container text-[11px] font-bold flex items-center gap-1 shrink-0">
+                        <span>Due:</span>
+                        <span className="font-tabular-data">{formatINR(balanceDue)}</span>
+                      </div>
+                    ) : (
+                      <div className="px-2 py-1 rounded-lg bg-secondary-container/40 text-secondary text-[11px] font-bold flex items-center gap-0.5 shrink-0">
+                        <span className="material-symbols-outlined text-[14px]">check</span>
+                        <span>Settled</span>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-amber-600">info</span>
-                    <span>
-                      Full invoice amount of <strong>{formatINR(finalGrandTotal)}</strong> will be credited directly to <strong>{selectedParty?.name || 'Customer'}</strong>'s ledger.
-                    </span>
+                  <div className="px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="material-symbols-outlined text-[15px] text-amber-600 shrink-0">info</span>
+                      <span className="truncate">Unpaid credit added to customer ledger</span>
+                    </div>
+                    <span className="font-tabular-data font-bold shrink-0">{formatINR(finalGrandTotal)}</span>
                   </div>
                 )}
               </div>
