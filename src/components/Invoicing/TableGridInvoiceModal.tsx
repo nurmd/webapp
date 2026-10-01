@@ -643,12 +643,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                 </div>
               </div>
 
-              {/* Table Header */}
-              <div className="grid grid-cols-12 px-3 py-2 bg-surface-container text-on-surface-variant font-label-sm text-[11px] font-bold border-b border-outline-variant/20">
-                <div className="col-span-5 sm:col-span-6 truncate">Item / Description</div>
+              {/* Table Header - Only visible on sm and up */}
+              <div className="hidden sm:grid sm:grid-cols-12 px-3 py-2 bg-surface-container text-on-surface-variant font-label-sm text-[11px] font-bold border-b border-outline-variant/20">
+                <div className="col-span-6 truncate">Item / Description</div>
                 <div className="col-span-2 text-center">Qty</div>
                 <div className="col-span-2 text-right">Price</div>
-                <div className="col-span-3 sm:col-span-2 text-right">Total</div>
+                <div className="col-span-2 text-right">Total</div>
               </div>
 
               {/* Items Rows */}
@@ -656,78 +656,157 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                 {rows.map((row, idx) => {
                   const itemCalc = calcSummary.items[idx];
                   return (
-                    <div
-                      key={idx}
-                      onClick={() => handleOpenEditItem(idx)}
-                      className="grid grid-cols-12 px-3 py-2.5 items-center hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
-                    >
-                      {/* Name & Subtitle */}
-                      <div className="col-span-5 sm:col-span-6 min-w-0 pr-2">
-                        <span className="font-bold text-xs sm:text-sm text-on-surface block truncate group-hover:text-secondary transition-colors">
-                          {row.name}
-                        </span>
-                        {row.description && (
-                          <span className="text-[10px] text-on-surface-variant block truncate">
-                            {row.description}
+                    <React.Fragment key={idx}>
+                      {/* Mobile View (< sm): Complete Data Card (Zero Truncation) */}
+                      <div
+                        onClick={() => handleOpenEditItem(idx)}
+                        className="sm:hidden p-3.5 hover:bg-surface-container-low/60 active:bg-surface-container-low cursor-pointer transition-colors group"
+                      >
+                        {/* Row 1: Item Name (Full Width), Total Amount & Delete */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-sm text-on-surface block leading-snug break-words group-hover:text-secondary transition-colors">
+                              {row.name}
+                            </span>
+                            {row.description && (
+                              <p className="text-xs text-on-surface-variant mt-0.5 break-words leading-tight">
+                                {row.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <div className="text-right">
+                              <span className="font-tabular-data text-sm font-black text-on-surface block whitespace-nowrap">
+                                {formatINR(itemCalc?.totalAmount || 0)}
+                              </span>
+                              <span className="text-[10px] text-outline block whitespace-nowrap">
+                                incl. {row.gstRate}% tax
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRow(idx);
+                              }}
+                              title="Remove item"
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 active:scale-95 transition-all cursor-pointer shrink-0 ml-0.5"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Row 2: Complete Financial Details (Qty × Rate, Discount, HSN & GST) */}
+                        <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 mt-2 pt-2 border-t border-outline-variant/15 text-xs text-on-surface-variant">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="bg-surface-container-high px-2 py-0.5 rounded-lg font-tabular-data font-bold text-on-surface text-xs">
+                              {row.quantity} {row.unit}
+                            </span>
+                            <span className="text-outline font-semibold">×</span>
+                            <span className="font-tabular-data font-semibold text-on-surface">
+                              {formatINR(row.unitPrice)}
+                            </span>
+
+                            {row.discountPercent > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-secondary/15 text-secondary text-[11px] font-bold">
+                                {row.discountPercent}% off
+                                {itemCalc?.discountAmount ? ` (-${formatINR(itemCalc.discountAmount)})` : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant flex-wrap font-medium">
+                            <span className="font-mono bg-surface-container-lowest px-1.5 py-0.5 rounded border border-outline-variant/20">
+                              HSN {row.hsnSacCode}
+                            </span>
+                            <span className="text-secondary font-bold">
+                              {row.gstRate}% GST (+{formatINR(itemCalc?.totalTax || 0)})
+                            </span>
+                            {row.mrp && row.mrp > row.unitPrice && (
+                              <span className="line-through text-outline">
+                                MRP {formatINR(row.mrp)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Desktop / Tablet View (>= sm): Grid Row */}
+                      <div
+                        onClick={() => handleOpenEditItem(idx)}
+                        className="hidden sm:grid sm:grid-cols-12 px-3 py-2.5 items-center hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
+                      >
+                        {/* Name & Subtitle */}
+                        <div className="col-span-6 min-w-0 pr-2">
+                          <span className="font-bold text-xs sm:text-sm text-on-surface block truncate group-hover:text-secondary transition-colors">
+                            {row.name}
                           </span>
-                        )}
-                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-on-surface-variant truncate mt-0.5">
-                          <span className="font-mono">HSN {row.hsnSacCode}</span>
-                          <span>·</span>
-                          <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
-                          {row.mrp && row.mrp > row.unitPrice && (
-                            <>
-                              <span>·</span>
-                              <span className="line-through text-outline">MRP {formatINR(row.mrp)}</span>
-                            </>
+                          {row.description && (
+                            <span className="text-[10px] text-on-surface-variant block truncate">
+                              {row.description}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-on-surface-variant truncate mt-0.5">
+                            <span className="font-mono">HSN {row.hsnSacCode}</span>
+                            <span>·</span>
+                            <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
+                            {row.mrp && row.mrp > row.unitPrice && (
+                              <>
+                                <span>·</span>
+                                <span className="line-through text-outline">MRP {formatINR(row.mrp)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Qty & Unit */}
+                        <div className="col-span-2 text-center min-w-0">
+                          <span className="font-tabular-data text-xs font-bold text-on-surface block">
+                            {row.quantity}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
+                            {row.unit}
+                          </span>
+                        </div>
+
+                        {/* Price */}
+                        <div className="col-span-2 text-right min-w-0">
+                          <span className="font-tabular-data text-xs sm:text-sm font-semibold text-on-surface block">
+                            {formatINR(row.unitPrice)}
+                          </span>
+                          {row.discountPercent > 0 && (
+                            <span className="text-[10px] text-secondary font-semibold block">
+                              {row.discountPercent}% off
+                            </span>
                           )}
                         </div>
-                      </div>
 
-                      {/* Qty & Unit */}
-                      <div className="col-span-2 text-center min-w-0">
-                        <span className="font-tabular-data text-xs font-bold text-on-surface block">
-                          {row.quantity}
-                        </span>
-                        <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
-                          {row.unit}
-                        </span>
-                      </div>
+                        {/* Total & Action */}
+                        <div className="col-span-2 text-right flex items-center justify-end gap-1">
+                          <div className="min-w-0 text-right">
+                            <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block whitespace-nowrap">
+                              {formatINR(itemCalc?.totalAmount || 0)}
+                            </span>
+                            <span className="text-[10px] text-outline block whitespace-nowrap">tax incl.</span>
+                          </div>
 
-                      {/* Price */}
-                      <div className="col-span-2 text-right min-w-0">
-                        <span className="font-tabular-data text-xs sm:text-sm font-semibold text-on-surface block">
-                          {formatINR(row.unitPrice)}
-                        </span>
-                        {row.discountPercent > 0 && (
-                          <span className="text-[10px] text-secondary font-semibold block">
-                            {row.discountPercent}% off
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Total & Action */}
-                      <div className="col-span-3 sm:col-span-2 text-right flex items-center justify-end gap-1">
-                        <div className="min-w-0 text-right">
-                          <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block truncate">
-                            {formatINR(itemCalc?.totalAmount || 0)}
-                          </span>
-                          <span className="text-[10px] text-outline block">tax incl.</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRow(idx);
+                            }}
+                            title="Remove item"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors ml-1 cursor-pointer flex-shrink-0"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeRow(idx);
-                          }}
-                          title="Remove item"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors ml-1 cursor-pointer flex-shrink-0"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">delete</span>
-                        </button>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })}
               </div>
