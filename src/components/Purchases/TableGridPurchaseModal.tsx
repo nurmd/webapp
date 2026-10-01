@@ -639,22 +639,24 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="h-7 px-2.5 bg-surface-container-lowest rounded-lg text-xs font-semibold text-on-surface flex items-center gap-1 hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/30 shadow-2xs"
+                  className="w-8 h-8 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface flex items-center justify-center transition-colors cursor-pointer border border-outline-variant/30 shadow-2xs active:scale-95"
+                  title="Scan Product Barcode"
+                  aria-label="Scan Product Barcode"
                 >
-                  <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">barcode_scanner</span>
-                  <span>Scan</span>
+                  <span className="material-symbols-outlined text-[18px] text-orange-600 dark:text-orange-400">barcode_scanner</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenAddItem}
-                  className="h-7 px-2.5 bg-orange-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-orange-700 transition-colors cursor-pointer shadow-2xs shadow-orange-600/20"
+                  className="w-8 h-8 rounded-lg bg-orange-600 text-white flex items-center justify-center hover:bg-orange-700 transition-all cursor-pointer shadow-2xs shadow-orange-600/20 active:scale-95"
+                  title="Add Item"
+                  aria-label="Add Item"
                 >
-                  <span className="material-symbols-outlined text-[15px]">add</span>
-                  <span>Add Item</span>
+                  <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
               </div>
             </div>
