@@ -77,23 +77,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* 2. Unified Financial Snapshot Card (Glanceable 3-Metric Summary) */}
-      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3">
-        <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary font-bold text-xs">
-              ₹
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-sm text-on-surface leading-tight">
-                {company.tradeName || company.businessName}
-              </span>
-              <span className="text-[11px] text-on-surface-variant">
-                {company.isGstEnabled !== false && company.gstin
-                  ? `GSTIN: ${company.gstin}`
-                  : 'Business Overview'}
-              </span>
-            </div>
-          </div>
+      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30">
+        <div className="flex items-center justify-between pb-2 mb-2 border-b border-outline-variant/20">
+          <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-secondary"></span>
+            Overview
+          </span>
 
           <button
             type="button"
@@ -101,7 +90,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             className="text-secondary text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
           >
             <span>Reports</span>
-            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            <span className="material-symbols-outlined text-[15px]">chevron_right</span>
           </button>
         </div>
 
