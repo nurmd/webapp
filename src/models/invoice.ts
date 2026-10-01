@@ -14,10 +14,12 @@ export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID';
 export interface InvoiceItemEntry {
   itemId: string;
   name: string;
+  description?: string;
   hsnSacCode: string;
   unit: UnitOfMeasurement;
   quantity: number;
   unitPrice: number;
+  mrp?: number;
   discountPercent?: number;
   discountAmount?: number;
   taxableAmount: number;

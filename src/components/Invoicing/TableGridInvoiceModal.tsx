@@ -12,6 +12,7 @@ import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.
 import { InvoicePreviewModal } from './InvoicePreviewModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
+import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
 
 interface TableGridInvoiceModalProps {
   company: CompanyProfile;
@@ -23,16 +24,7 @@ interface TableGridInvoiceModalProps {
   onAddNewParty: () => void;
 }
 
-interface GridRow {
-  itemId: string;
-  name: string;
-  hsnSacCode: string;
-  quantity: number;
-  unit: string;
-  unitPrice: number;
-  discountPercent: number;
-  gstRate: number;
-}
+export type GridRow = InvoiceItemData;
 
 export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   company,
@@ -43,7 +35,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onSave,
   onAddNewParty,
 }) => {
-  // Party selection
+  // Party selection - clean start without dummy selection
   const [selectedParty, setSelectedParty] = useState<Party | null>(() => {
     if (initialInvoice) {
       const found = parties.find(
@@ -64,7 +56,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
     }
-    return parties.find((p) => p.type === 'CUSTOMER') || parties[0] || null;
+    return null;
   });
 
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
@@ -109,49 +101,55 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Detailed Tax info modal
   const [isTaxDetailsOpen, setIsTaxDetailsOpen] = useState(false);
 
-  // Active editing row index for mobile detailed drawer
-  const [activeRowDrawerIdx, setActiveRowDrawerIdx] = useState<number | null>(null);
+  // Dedicated Add/Edit Item Modal State
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
 
-  // Grid rows
+  const handleOpenAddItem = () => {
+    setEditingRowIndex(null);
+    setIsItemModalOpen(true);
+  };
+
+  const handleOpenEditItem = (index: number) => {
+    setEditingRowIndex(index);
+    setIsItemModalOpen(true);
+  };
+
+  const handleSaveItemModal = (itemData: GridRow) => {
+    if (editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length) {
+      const updated = [...rows];
+      updated[editingRowIndex] = itemData;
+      setRows(updated);
+    } else {
+      setRows([...rows, itemData]);
+    }
+    setEditingRowIndex(null);
+  };
+
+  const handleDeleteItemModal = () => {
+    if (editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length) {
+      setRows(rows.filter((_, idx) => idx !== editingRowIndex));
+    }
+    setEditingRowIndex(null);
+  };
+
+  // Grid rows - Clean start with no dummy placeholder rows!
   const [rows, setRows] = useState<GridRow[]>(() => {
     if (initialInvoice && initialInvoice.items.length > 0) {
       return initialInvoice.items.map((it) => ({
         itemId: it.itemId,
         name: it.name,
+        description: it.description || '',
         hsnSacCode: it.hsnSacCode,
         quantity: it.quantity,
         unit: it.unit,
         unitPrice: it.unitPrice,
+        mrp: it.mrp,
         discountPercent: it.discountPercent || 0,
         gstRate: it.gstRate,
       }));
     }
-    if (itemsCatalog.length > 0) {
-      return [
-        {
-          itemId: itemsCatalog[0].id,
-          name: itemsCatalog[0].name,
-          hsnSacCode: itemsCatalog[0].hsnSacCode || '0902',
-          quantity: 1,
-          unit: itemsCatalog[0].unit || 'PCS',
-          unitPrice: itemsCatalog[0].salePrice || 100,
-          discountPercent: 0,
-          gstRate: itemsCatalog[0].gstRate || 18,
-        },
-      ];
-    }
-    return [
-      {
-        itemId: '',
-        name: '',
-        hsnSacCode: '0902',
-        quantity: 1,
-        unit: 'PCS',
-        unitPrice: 100,
-        discountPercent: 0,
-        gstRate: 18,
-      },
-    ];
+    return [];
   });
 
   // Calculate taxes and items
@@ -255,33 +253,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   };
 
   const removeRow = (index: number) => {
-    if (rows.length === 1) return;
     setRows(rows.filter((_, idx) => idx !== index));
-    if (activeRowDrawerIdx === index) setActiveRowDrawerIdx(null);
   };
 
   const updateRow = (index: number, field: keyof GridRow, value: any) => {
     const updated = [...rows];
     (updated[index] as any)[field] = value;
     setRows(updated);
-  };
-
-  const handleSelectItemFromCatalog = (index: number, itemId: string) => {
-    const itm = itemsCatalog.find((i) => i.id === itemId);
-    if (itm) {
-      const updated = [...rows];
-      updated[index] = {
-        itemId: itm.id,
-        name: itm.name,
-        hsnSacCode: itm.hsnSacCode || '0902',
-        quantity: 1,
-        unit: itm.unit || 'PCS',
-        unitPrice: itm.salePrice || 0,
-        discountPercent: 0,
-        gstRate: itm.gstRate ?? 18,
-      };
-      setRows(updated);
-    }
   };
 
   // Barcode scan handler
@@ -301,7 +279,21 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       if (existingIdx !== -1) {
         updateRow(existingIdx, 'quantity', rows[existingIdx].quantity + 1);
       } else {
-        addRow(found);
+        setRows([
+          ...rows,
+          {
+            itemId: found.id,
+            name: found.name,
+            description: '',
+            hsnSacCode: found.hsnSacCode || '998313',
+            quantity: 1,
+            unit: found.unit || 'PCS',
+            unitPrice: found.salePrice || 0,
+            mrp: found.mrp || found.salePrice,
+            discountPercent: 0,
+            gstRate: found.gstRate ?? 18,
+          },
+        ]);
       }
       setIsScannerOpen(false);
     } else {
@@ -316,18 +308,20 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       return {
         itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
         name: r.name || 'Billed Product / Service',
-        hsnSacCode: r.hsnSacCode || '0902',
+        description: r.description,
+        hsnSacCode: r.hsnSacCode || '998313',
         unit: (r.unit as any) || 'PCS',
         quantity: r.quantity,
         unitPrice: r.unitPrice,
+        mrp: r.mrp,
         discountPercent: r.discountPercent,
-        taxableAmount: calcItem.taxableAmount,
+        taxableAmount: calcItem?.taxableAmount || 0,
         gstRate: r.gstRate,
-        cgstAmount: calcItem.cgstAmount,
-        sgstAmount: calcItem.sgstAmount,
-        igstAmount: calcItem.igstAmount,
-        cessAmount: calcItem.cessAmount,
-        totalAmount: calcItem.totalAmount,
+        cgstAmount: calcItem?.cgstAmount || 0,
+        sgstAmount: calcItem?.sgstAmount || 0,
+        igstAmount: calcItem?.igstAmount || 0,
+        cessAmount: calcItem?.cessAmount || 0,
+        totalAmount: calcItem?.totalAmount || 0,
       };
     });
 
@@ -541,267 +535,238 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h2 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface truncate">
-                  {selectedParty?.name || 'Cash Counter Customer'}
+                  {selectedParty ? selectedParty.name : 'Cash Sale / Walk-in Customer'}
                 </h2>
                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                   <span className="font-label-sm text-[10px] sm:text-[11px] bg-surface-container-low px-1.5 py-0.5 rounded text-on-surface-variant font-mono">
-                    {selectedParty?.gstin ? selectedParty.gstin : 'Unregistered / B2C'}
+                    {selectedParty?.gstin ? selectedParty.gstin : 'Retail / Unregistered'}
                   </span>
                   <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                    · State: {posStateCode}
+                    · Place of Supply: {posStateCode}
                   </span>
                 </div>
               </div>
 
               <div className="text-right flex-shrink-0 pl-1">
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold ${
-                    (selectedParty?.currentBalance || 0) > 0
-                      ? 'bg-amber-100 text-amber-900'
-                      : (selectedParty?.currentBalance || 0) < 0
-                      ? 'bg-error-container text-on-error-container'
-                      : 'bg-secondary-container text-on-secondary-container'
-                  }`}
-                >
-                  {(selectedParty?.currentBalance || 0) > 0
-                    ? `Due ${formatINR(selectedParty?.currentBalance || 0)}`
-                    : 'Settled'}
-                </span>
-                <span className="font-body-sm text-[10px] text-on-surface-variant block mt-0.5">
-                  Party Ledger
-                </span>
+                {selectedParty ? (
+                  <>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold ${
+                        (selectedParty?.currentBalance || 0) > 0
+                          ? 'bg-amber-100 text-amber-900'
+                          : (selectedParty?.currentBalance || 0) < 0
+                          ? 'bg-error-container text-on-error-container'
+                          : 'bg-secondary-container text-on-secondary-container'
+                      }`}
+                    >
+                      {(selectedParty?.currentBalance || 0) > 0
+                        ? `Due ${formatINR(selectedParty?.currentBalance || 0)}`
+                        : 'Settled'}
+                    </span>
+                    <span className="font-body-sm text-[10px] text-on-surface-variant block mt-0.5">
+                      Party Ledger
+                    </span>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsPartyModalOpen(true)}
+                    className="px-2.5 py-1 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    + Select Party
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Core Items: Dense Commercial Table (Stitch create_invoice_table_view) */}
-          <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden">
-            {/* Section Title & Fast Actions */}
-            <div className="p-3 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/20">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[20px] text-secondary">
-                  inventory_2
-                </span>
-                <span className="font-headline-sm text-sm font-bold text-on-surface">
-                  Items ({rows.length})
-                </span>
+          {/* Core Items Section */}
+          {rows.length === 0 ? (
+            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden p-6 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
+                <span className="material-symbols-outlined text-[30px]">add_shopping_cart</span>
               </div>
-
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-1 max-w-sm">
+                <h3 className="font-bold text-sm sm:text-base text-on-surface">No items on this bill yet</h3>
+                <p className="text-xs text-on-surface-variant">
+                  Add items from your inventory catalog or create custom products with live tax & total estimation.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenAddItem}
+                  className="px-4 py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                  <span>+ Add Item</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="h-7 px-2.5 bg-surface-container-lowest rounded-lg font-label-sm text-xs text-on-surface flex items-center gap-1 shadow-sm hover:bg-surface-container transition-colors cursor-pointer"
+                  className="px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-bold text-xs border border-outline-variant/30 hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <span className="material-symbols-outlined text-[16px] text-secondary">
-                    barcode_scanner
-                  </span>
-                  <span>Scan</span>
+                  <span className="material-symbols-outlined text-[18px] text-secondary">barcode_scanner</span>
+                  <span>Scan Barcode</span>
                 </button>
               </div>
             </div>
+          ) : (
+            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden">
+              {/* Section Header */}
+              <div className="p-3 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/20">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[20px] text-secondary">inventory_2</span>
+                  <span className="font-headline-sm text-sm font-bold text-on-surface">
+                    Items ({rows.length})
+                  </span>
+                </div>
 
-            {/* Table Header (12 Grid Columns) */}
-            <div className="grid grid-cols-12 px-3 py-2 bg-surface-container text-on-surface-variant font-label-sm text-[11px] font-bold border-b border-outline-variant/20">
-              <div className="col-span-5 truncate">Item / Tax</div>
-              <div className="col-span-2 text-center">Qty</div>
-              <div className="col-span-2 text-right">Rate</div>
-              <div className="col-span-3 text-right">Total</div>
-            </div>
-
-            {/* Items Rows */}
-            <div className="divide-y divide-outline-variant/20">
-              {rows.map((row, idx) => {
-                const itemCalc = calcSummary.items[idx];
-                return (
-                  <div
-                    key={idx}
-                    className="grid grid-cols-12 px-3 py-2.5 items-center hover:bg-surface-container-low/40 transition-colors"
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="h-7 px-2.5 bg-surface-container-lowest rounded-lg font-label-sm text-xs text-on-surface flex items-center gap-1 shadow-xs hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/20"
                   >
-                    {/* Item Description & Tax */}
-                    <div className="col-span-5 min-w-0 pr-1">
-                      <input
-                        type="text"
-                        value={row.name}
-                        placeholder="Enter item name..."
-                        onChange={(e) => updateRow(idx, 'name', e.target.value)}
-                        className="w-full bg-transparent font-label-md text-xs sm:text-sm font-bold text-on-surface outline-none placeholder:text-outline truncate"
-                      />
-                      <div className="flex items-center gap-1 text-[11px] text-on-surface-variant truncate mt-0.5">
-                        <span className="font-mono">HSN {row.hsnSacCode || '0902'}</span>
-                        <span>·</span>
-                        <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
-                      </div>
-                    </div>
+                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
+                    <span>Scan</span>
+                  </button>
 
-                    {/* Qty & Unit */}
-                    <div className="col-span-2 text-center">
-                      <input
-                        type="number"
-                        min="1"
-                        value={row.quantity}
-                        onChange={(e) => updateRow(idx, 'quantity', Math.max(1, Number(e.target.value)))}
-                        className="w-12 text-center font-tabular-data text-xs font-bold text-on-surface bg-surface-container-low px-1 py-0.5 rounded outline-none focus:ring-1 focus:ring-secondary mx-auto block"
-                      />
-                      <span className="font-body-sm text-on-surface-variant block text-[10px] mt-0.5 truncate">
-                        {row.unit || 'pcs'}
-                      </span>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenAddItem}
+                    className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg font-label-sm text-xs font-bold flex items-center gap-1 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add</span>
+                    <span>Add Item</span>
+                  </button>
+                </div>
+              </div>
 
-                    {/* Rate */}
-                    <div className="col-span-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={row.unitPrice}
-                        onChange={(e) => updateRow(idx, 'unitPrice', Math.max(0, Number(e.target.value)))}
-                        className="w-full text-right font-tabular-data text-xs sm:text-sm text-on-surface bg-transparent outline-none font-semibold"
-                      />
-                    </div>
+              {/* Table Header */}
+              <div className="grid grid-cols-12 px-3 py-2 bg-surface-container text-on-surface-variant font-label-sm text-[11px] font-bold border-b border-outline-variant/20">
+                <div className="col-span-5 sm:col-span-6 truncate">Item / Description</div>
+                <div className="col-span-2 text-center">Qty</div>
+                <div className="col-span-2 text-right">Price</div>
+                <div className="col-span-3 sm:col-span-2 text-right">Total</div>
+              </div>
 
-                    {/* Row Total & Action Menu */}
-                    <div className="col-span-3 text-right flex items-center justify-end gap-1">
-                      <div className="min-w-0 text-right">
-                        <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-bold block truncate">
-                          {formatINR(itemCalc?.totalAmount || 0)}
+              {/* Items Rows */}
+              <div className="divide-y divide-outline-variant/20">
+                {rows.map((row, idx) => {
+                  const itemCalc = calcSummary.items[idx];
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleOpenEditItem(idx)}
+                      className="grid grid-cols-12 px-3 py-2.5 items-center hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
+                    >
+                      {/* Name & Subtitle */}
+                      <div className="col-span-5 sm:col-span-6 min-w-0 pr-2">
+                        <span className="font-bold text-xs sm:text-sm text-on-surface block truncate group-hover:text-secondary transition-colors">
+                          {row.name}
                         </span>
-                        {row.discountPercent > 0 ? (
-                          <span className="font-body-sm text-secondary block text-[10px] font-semibold truncate">
-                            {row.discountPercent}% off
+                        {row.description && (
+                          <span className="text-[10px] text-on-surface-variant block truncate">
+                            {row.description}
                           </span>
-                        ) : (
-                          <span className="font-body-sm text-outline block text-[10px] truncate">
-                            tax incl.
+                        )}
+                        <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-on-surface-variant truncate mt-0.5">
+                          <span className="font-mono">HSN {row.hsnSacCode}</span>
+                          <span>·</span>
+                          <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
+                          {row.mrp && row.mrp > row.unitPrice && (
+                            <>
+                              <span>·</span>
+                              <span className="line-through text-outline">MRP {formatINR(row.mrp)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Qty & Unit */}
+                      <div className="col-span-2 text-center min-w-0">
+                        <span className="font-tabular-data text-xs font-bold text-on-surface block">
+                          {row.quantity}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
+                          {row.unit}
+                        </span>
+                      </div>
+
+                      {/* Price */}
+                      <div className="col-span-2 text-right min-w-0">
+                        <span className="font-tabular-data text-xs sm:text-sm font-semibold text-on-surface block">
+                          {formatINR(row.unitPrice)}
+                        </span>
+                        {row.discountPercent > 0 && (
+                          <span className="text-[10px] text-secondary font-semibold block">
+                            {row.discountPercent}% off
                           </span>
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setActiveRowDrawerIdx(activeRowDrawerIdx === idx ? null : idx)}
-                        aria-label="Edit item options"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-surface-container-low ml-0.5 cursor-pointer flex-shrink-0"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          {activeRowDrawerIdx === idx ? 'expand_less' : 'more_vert'}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Collapsible Row Detailed Settings */}
-                    {activeRowDrawerIdx === idx && (
-                      <div className="col-span-12 mt-2 p-2.5 rounded-xl bg-surface-container-low/70 border border-outline-variant/30 flex flex-wrap items-center gap-3 animate-fade-in">
-                        <div className="flex-1 min-w-[130px]">
-                          <label className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
-                            HSN/SAC
-                          </label>
-                          <input
-                            type="text"
-                            value={row.hsnSacCode}
-                            onChange={(e) => updateRow(idx, 'hsnSacCode', e.target.value)}
-                            className="w-full bg-surface-container-lowest px-2 py-1 rounded text-xs outline-none border border-outline-variant/30"
-                          />
+                      {/* Total & Action */}
+                      <div className="col-span-3 sm:col-span-2 text-right flex items-center justify-end gap-1">
+                        <div className="min-w-0 text-right">
+                          <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block truncate">
+                            {formatINR(itemCalc?.totalAmount || 0)}
+                          </span>
+                          <span className="text-[10px] text-outline block">tax incl.</span>
                         </div>
 
-                        <div className="w-20">
-                          <label className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
-                            Unit
-                          </label>
-                          <select
-                            value={row.unit}
-                            onChange={(e) => updateRow(idx, 'unit', e.target.value)}
-                            className="w-full bg-surface-container-lowest px-1.5 py-1 rounded text-xs outline-none border border-outline-variant/30"
-                          >
-                            <option value="PCS">PCS</option>
-                            <option value="KGS">KGS</option>
-                            <option value="BOX">BOX</option>
-                            <option value="MTR">MTR</option>
-                            <option value="LTR">LTR</option>
-                            <option value="PACK">PACK</option>
-                          </select>
-                        </div>
-
-                        <div className="w-24">
-                          <label className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
-                            GST Slab
-                          </label>
-                          <select
-                            value={row.gstRate}
-                            onChange={(e) => updateRow(idx, 'gstRate', Number(e.target.value))}
-                            className="w-full bg-surface-container-lowest px-1.5 py-1 rounded text-xs outline-none border border-outline-variant/30 font-semibold"
-                          >
-                            <option value={0}>0%</option>
-                            <option value={5}>5%</option>
-                            <option value={12}>12%</option>
-                            <option value={18}>18%</option>
-                            <option value={28}>28%</option>
-                          </select>
-                        </div>
-
-                        <div className="w-20">
-                          <label className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
-                            Disc %
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={row.discountPercent}
-                            onChange={(e) => updateRow(idx, 'discountPercent', Number(e.target.value))}
-                            className="w-full bg-surface-container-lowest px-2 py-1 rounded text-xs outline-none border border-outline-variant/30 text-right font-semibold"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-auto pt-4">
-                          <button
-                            type="button"
-                            onClick={() => removeRow(idx)}
-                            disabled={rows.length === 1}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer ${
-                              rows.length === 1
-                                ? 'text-outline-variant cursor-not-allowed'
-                                : 'text-error bg-error-container hover:bg-error/20'
-                            }`}
-                          >
-                            <span className="material-symbols-outlined text-[14px]">delete</span>
-                            Remove
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeRow(idx);
+                          }}
+                          title="Remove item"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors ml-1 cursor-pointer flex-shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-            {/* Quick Action Row inside Table Box */}
-            <div className="p-2.5 bg-surface-container-low flex items-center gap-2 border-t border-outline-variant/20">
-              <button
-                type="button"
-                onClick={() => addRow()}
-                className="flex-1 py-2 px-3 rounded-xl bg-surface-container-lowest font-label-md text-xs sm:text-sm text-on-surface font-semibold shadow-sm hover:bg-surface-container flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-outline-variant/20"
-              >
-                <span className="material-symbols-outlined text-[18px] text-secondary">
-                  add_circle
-                </span>
-                <span>+ Add Another Product</span>
-              </button>
+              {/* Action Bar below Table */}
+              <div className="p-2.5 bg-surface-container-low flex items-center gap-2 border-t border-outline-variant/20">
+                <button
+                  type="button"
+                  onClick={handleOpenAddItem}
+                  className="flex-1 py-2 px-3 rounded-xl bg-surface-container-lowest font-label-md text-xs sm:text-sm text-on-surface font-semibold shadow-xs hover:bg-surface-container flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-outline-variant/20"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">add_circle</span>
+                  <span>+ Add Item</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setIsExtraDiscountModalOpen(true)}
-                className={`py-2 px-3 rounded-xl font-label-md text-xs sm:text-sm shadow-sm flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 ${
-                  overallDiscountPercent > 0
-                    ? 'bg-secondary-container text-on-secondary-container font-bold'
-                    : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">percent</span>
-                <span>{overallDiscountPercent > 0 ? `${overallDiscountPercent}% Disc` : 'Extra Disc'}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="py-2 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:text-on-surface font-label-md text-xs sm:text-sm shadow-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">barcode_scanner</span>
+                  <span>Barcode</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsExtraDiscountModalOpen(true)}
+                  className={`py-2 px-3 rounded-xl font-label-md text-xs sm:text-sm shadow-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 ${
+                    overallDiscountPercent > 0
+                      ? 'bg-secondary-container text-on-secondary-container font-bold'
+                      : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px]">percent</span>
+                  <span>{overallDiscountPercent > 0 ? `${overallDiscountPercent}% Disc` : 'Discount'}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Condensed Bill Calculation & GST Summary */}
           <div className="bg-surface-container-lowest rounded-2xl p-3.5 shadow-sm border border-outline-variant/30 flex flex-col gap-2">
@@ -1355,6 +1320,24 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Add / Edit Bill Item Modal with Catalog Search & Real-Time Total Estimation */}
+      <InvoiceItemModal
+        isOpen={isItemModalOpen}
+        onClose={() => {
+          setIsItemModalOpen(false);
+          setEditingRowIndex(null);
+        }}
+        initialItem={
+          editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length
+            ? rows[editingRowIndex]
+            : null
+        }
+        onSaveItem={handleSaveItemModal}
+        onDeleteItem={editingRowIndex !== null ? handleDeleteItemModal : undefined}
+        itemsCatalog={itemsCatalog}
+        isIntraState={calcSummary.isIntraState}
+      />
     </div>
   );
 };

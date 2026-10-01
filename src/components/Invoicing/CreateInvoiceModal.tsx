@@ -33,7 +33,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
 
-  // Line items state
+  // Line items state - clean start without dummy placeholders
   const [lines, setLines] = useState<Array<{
     itemId: string;
     name: string;
@@ -42,17 +42,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     unitPrice: number;
     discountPercent: number;
     gstRate: number;
-  }>>([
-    {
-      itemId: itemsCatalog[0]?.id || 'CUSTOM',
-      name: itemsCatalog[0]?.name || 'Standard Item',
-      hsnSacCode: itemsCatalog[0]?.hsnSacCode || '844332',
-      quantity: 1,
-      unitPrice: itemsCatalog[0]?.salePrice || 1000,
-      discountPercent: 0,
-      gstRate: itemsCatalog[0]?.gstRate || 18,
-    },
-  ]);
+  }>>([]);
 
   // Handle party change
   const handlePartySelect = (partyId: string) => {
@@ -292,8 +282,20 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              {lines.map((l, idx) => {
+            {lines.length === 0 ? (
+              <div className="p-6 text-center rounded-xl bg-surface-container-low/40 border border-outline-variant/30 flex flex-col items-center gap-2">
+                <span className="text-xs text-on-surface-variant font-medium">No line items added to this bill yet.</span>
+                <button
+                  type="button"
+                  onClick={addLine}
+                  className="px-3.5 py-1.5 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-xs cursor-pointer active:scale-95"
+                >
+                  + Add Line Item
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {lines.map((l, idx) => {
                 const itemCalc = calcSummary.items[idx];
                 return (
                   <div
@@ -385,6 +387,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 );
               })}
             </div>
+          )}
           </div>
 
           {/* Tax Breakdown Summary Card */}
