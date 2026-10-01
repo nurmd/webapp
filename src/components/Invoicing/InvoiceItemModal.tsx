@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 
@@ -39,8 +39,6 @@ const COMMON_UNITS: UnitOfMeasurement[] = [
   'BAG',
 ];
 
-const GST_SLABS = [0, 5, 12, 18, 28];
-
 export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   isOpen,
   onClose,
@@ -51,10 +49,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   isIntraState,
 }) => {
   const isEditing = Boolean(initialItem);
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isCatalogSearchOpen, setIsCatalogSearchOpen] = useState(!isEditing);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Form Fields
   const [itemId, setItemId] = useState(initialItem?.itemId || '');
@@ -67,6 +62,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [mrp, setMrp] = useState<number | undefined>(initialItem?.mrp);
   const [discountPercent, setDiscountPercent] = useState<number>(initialItem?.discountPercent || 0);
   const [gstRate, setGstRate] = useState<number>(initialItem?.gstRate ?? 18);
+
+  // Integrated Search Dropdown State
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [justAddedCount, setJustAddedCount] = useState(0);
 
   // Sync state whenever modal opens or initialItem changes
   useEffect(() => {
@@ -82,44 +81,49 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setMrp(initialItem.mrp);
         setDiscountPercent(initialItem.discountPercent || 0);
         setGstRate(initialItem.gstRate ?? 18);
-        setIsCatalogSearchOpen(false);
+        setIsDropdownOpen(false);
       } else {
-        // Reset to clean blank item
-        setItemId('');
-        setName('');
-        setDescription('');
-        setHsnSacCode('998313');
-        setQuantity(1);
-        setUnit('PCS');
-        setUnitPrice(0);
-        setMrp(undefined);
-        setDiscountPercent(0);
-        setGstRate(18);
-        setSearchQuery('');
-        setIsCatalogSearchOpen(true);
+        resetForm();
+        setJustAddedCount(0);
+        setTimeout(() => {
+          nameInputRef.current?.focus();
+        }, 150);
       }
     }
   }, [isOpen, initialItem]);
 
-  // Catalog item search matches
-  const filteredCatalog = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return itemsCatalog.slice(0, 8);
+  const resetForm = () => {
+    setItemId('');
+    setName('');
+    setDescription('');
+    setHsnSacCode('998313');
+    setQuantity(1);
+    setUnit('PCS');
+    setUnitPrice(0);
+    setMrp(undefined);
+    setDiscountPercent(0);
+    setGstRate(18);
+    setIsDropdownOpen(false);
+  };
+
+  // Typeahead catalog suggestions based on Item Name
+  const suggestions = useMemo(() => {
+    if (!name.trim()) {
+      return itemsCatalog.slice(0, 6);
     }
-    const q = searchQuery.toLowerCase().trim();
+    const q = name.toLowerCase().trim();
     return itemsCatalog
       .filter(
         (it) =>
           it.name.toLowerCase().includes(q) ||
           (it.barcode && it.barcode.toLowerCase().includes(q)) ||
           (it.sku && it.sku.toLowerCase().includes(q)) ||
-          (it.hsnSacCode && it.hsnSacCode.includes(q)) ||
           (it.category && it.category.toLowerCase().includes(q))
       )
-      .slice(0, 10);
-  }, [itemsCatalog, searchQuery]);
+      .slice(0, 8);
+  }, [itemsCatalog, name]);
 
-  // Select an item from catalog
+  // Handle catalog item selection
   const handleSelectCatalogItem = (item: InventoryItem) => {
     setItemId(item.id);
     setName(item.name);
@@ -128,7 +132,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setUnitPrice(item.salePrice || 0);
     setMrp(item.mrp || item.salePrice || 0);
     setGstRate(item.gstRate ?? 18);
-    setIsCatalogSearchOpen(false);
+    setIsDropdownOpen(false);
   };
 
   // Live item total calculation ("etitae total")
@@ -164,22 +168,38 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildItemData = (): InvoiceItemData => ({
+    itemId: itemId || `CUSTOM-${Date.now()}`,
+    name: name.trim(),
+    description: description.trim() || undefined,
+    hsnSacCode: hsnSacCode.trim() || '998313',
+    quantity: Number(quantity) || 1,
+    unit,
+    unitPrice: Number(unitPrice) || 0,
+    mrp: mrp ? Number(mrp) : undefined,
+    discountPercent: Number(discountPercent) || 0,
+    gstRate: Number(gstRate) || 0,
+  });
+
+  // Save and keep modal open for next product
+  const handleSaveAndAddMore = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!name.trim() || quantity <= 0) return;
 
-    onSaveItem({
-      itemId: itemId || `CUSTOM-${Date.now()}`,
-      name: name.trim(),
-      description: description.trim() || undefined,
-      hsnSacCode: hsnSacCode.trim() || '998313',
-      quantity: Number(quantity) || 1,
-      unit,
-      unitPrice: Number(unitPrice) || 0,
-      mrp: mrp ? Number(mrp) : undefined,
-      discountPercent: Number(discountPercent) || 0,
-      gstRate: Number(gstRate) || 0,
-    });
+    onSaveItem(buildItemData());
+    setJustAddedCount((prev) => prev + 1);
+    resetForm();
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 50);
+  };
+
+  // Save and close modal
+  const handleSaveAndClose = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!name.trim() || quantity <= 0) return;
+
+    onSaveItem(buildItemData());
     onClose();
   };
 
@@ -196,10 +216,16 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
             <div>
               <h2 className="font-bold text-sm sm:text-base text-on-surface">
-                {isEditing ? 'Edit Bill Item' : 'Add Item to Bill'}
+                {isEditing ? 'Edit Item' : 'Add Item to Bill'}
               </h2>
               <span className="text-[11px] text-on-surface-variant">
-                Select from inventory or enter details manually
+                {justAddedCount > 0 ? (
+                  <span className="text-secondary font-bold">
+                    ✓ {justAddedCount} item{justAddedCount > 1 ? 's' : ''} added! Ready for next
+                  </span>
+                ) : (
+                  'Search inventory or enter product details'
+                )}
               </span>
             </div>
           </div>
@@ -214,124 +240,107 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           </button>
         </div>
 
-        {/* Scrollable Content Body */}
-        <form onSubmit={handleSubmit} className="p-4 overflow-y-auto flex flex-col gap-3.5 flex-1">
-          {/* 1. Item Catalog Search Dropdown */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                <span>Select from Catalog</span>
-                <span className="text-[10px] text-secondary lowercase font-normal">(optional)</span>
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setIsCatalogSearchOpen(!isCatalogSearchOpen)}
-                className="text-xs text-secondary font-bold hover:underline cursor-pointer flex items-center gap-0.5"
-              >
-                <span>{isCatalogSearchOpen ? 'Hide Catalog' : 'Browse Inventory'}</span>
-                <span className="material-symbols-outlined text-[16px]">
-                  {isCatalogSearchOpen ? 'expand_less' : 'expand_more'}
+        {/* Form Body */}
+        <form onSubmit={handleSaveAndClose} className="p-4 overflow-y-auto flex flex-col gap-3.5 flex-1">
+          {/* 1. Item Name with Integrated Search Dropdown */}
+          <div className="relative flex flex-col gap-1">
+            <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+              <span>Item Name / Search Inventory <span className="text-error">*</span></span>
+              {itemId && (
+                <span className="text-[10px] text-secondary font-bold flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                  Catalog Linked
                 </span>
-              </button>
+              )}
+            </label>
+
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
+                search
+              </span>
+              <input
+                ref={nameInputRef}
+                type="text"
+                required
+                value={name}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setIsDropdownOpen(true);
+                  if (itemId) setItemId(''); // user edited name away from linked catalog item
+                }}
+                placeholder="Type item name or search inventory..."
+                className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all"
+              />
+              {name && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setName('');
+                    setItemId('');
+                    setIsDropdownOpen(true);
+                    nameInputRef.current?.focus();
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">cancel</span>
+                </button>
+              )}
             </div>
 
-            {isCatalogSearchOpen && (
-              <div className="border border-outline-variant/30 rounded-2xl p-2.5 bg-surface-container-low/50 flex flex-col gap-2">
-                <div className="relative">
-                  <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
-                    search
-                  </span>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by name, barcode, SKU or HSN..."
-                    className="w-full pl-9 pr-7 py-2 rounded-xl bg-surface-container-lowest text-xs text-on-surface placeholder:text-outline border border-outline-variant/30 outline-none focus:border-secondary transition-all"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">cancel</span>
-                    </button>
-                  )}
+            {/* Integrated Autocomplete / Suggestions Popover */}
+            {isDropdownOpen && suggestions.length > 0 && (
+              <div className="absolute top-[68px] left-0 right-0 z-30 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-outline-variant/20 animate-fade-in">
+                <div className="px-3 py-1.5 bg-surface-container-low text-[10px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
+                  <span>Inventory Catalog Matches</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="text-secondary hover:underline cursor-pointer"
+                  >
+                    Close
+                  </button>
                 </div>
-
-                {/* Filtered Results List */}
-                <div className="max-h-40 overflow-y-auto divide-y divide-outline-variant/20 rounded-xl bg-surface-container-lowest border border-outline-variant/20">
-                  {filteredCatalog.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-on-surface-variant">
-                      No matching items found. Enter custom item details below.
+                {suggestions.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectCatalogItem(item)}
+                    className="p-2.5 flex items-center justify-between gap-2 hover:bg-surface-container-low cursor-pointer transition-colors"
+                  >
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-on-surface truncate">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
+                        <span>Stock: {item.currentStock} {item.unit}</span>
+                        {item.mrp && <span>• MRP ₹{item.mrp}</span>}
+                      </div>
                     </div>
-                  ) : (
-                    filteredCatalog.map((item) => {
-                      const isSelected = itemId === item.id;
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={() => handleSelectCatalogItem(item)}
-                          className={`p-2 sm:p-2.5 flex items-center justify-between gap-2 cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-secondary/10 text-secondary'
-                              : 'hover:bg-surface-container-low active:bg-surface-container'
-                          }`}
-                        >
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-on-surface truncate">
-                              {item.name}
-                            </span>
-                            <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
-                              {item.hsnSacCode && <span>HSN: {item.hsnSacCode}</span>}
-                              <span>•</span>
-                              <span>Stock: {item.currentStock} {item.unit}</span>
-                            </div>
-                          </div>
-
-                          <div className="text-right flex-shrink-0">
-                            <span className="font-tabular-data text-xs font-black text-on-surface block">
-                              {formatINR(item.salePrice)}
-                            </span>
-                            <span className="text-[10px] font-semibold text-secondary block">
-                              {item.gstRate}% GST
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                    <div className="text-right flex-shrink-0">
+                      <span className="font-tabular-data text-xs font-black text-secondary block">
+                        {formatINR(item.salePrice)}
+                      </span>
+                      <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
+                        per {item.unit}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* 2. Item Name & Description Fields */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-on-surface-variant">
-              Item Name <span className="text-error">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Basmati Rice 5kg, Sony Headphones..."
-              className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
-            />
-          </div>
-
+          {/* 2. Optional Description / Batch / IMEI */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-              <span>Description / Serial / Batch</span>
+              <span>Description / Notes</span>
               <span className="text-[10px] text-outline lowercase font-normal">(optional)</span>
             </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Batch #409, IMEI, or product notes..."
+              placeholder="e.g. Batch #102, IMEI, Size/Color, or custom notes..."
               className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
             />
           </div>
@@ -346,7 +355,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setQuantity(Math.max(1, Number((quantity - 1).toFixed(2))))}
-                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold"
+                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold text-base"
                 >
                   -
                 </button>
@@ -362,7 +371,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setQuantity(Number((quantity + 1).toFixed(2)))}
-                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold"
+                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold text-base"
                 >
                   +
                 </button>
@@ -385,7 +394,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Unit Price & MRP */}
+          {/* 4. Sale Price & MRP */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-on-surface-variant">
@@ -430,76 +439,39 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 5. Discount (%) and HSN/SAC */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-                <span>Discount (%)</span>
-                {calculation.discountAmount > 0 && (
-                  <span className="text-[10px] text-secondary font-bold">
-                    - {formatINR(calculation.discountAmount)}
-                  </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={discountPercent || ''}
-                  onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
-                  %
+          {/* 5. Discount (%) */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+              <span>Discount (%)</span>
+              {calculation.discountAmount > 0 && (
+                <span className="text-[10px] text-secondary font-bold">
+                  Discount: - {formatINR(calculation.discountAmount)}
                 </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-on-surface-variant">HSN / SAC</label>
+              )}
+            </label>
+            <div className="relative">
               <input
-                type="text"
-                value={hsnSacCode}
-                onChange={(e) => setHsnSacCode(e.target.value)}
-                placeholder="e.g. 998313"
-                className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-mono font-medium text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={discountPercent || ''}
+                onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                placeholder="0"
+                className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
               />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                %
+              </span>
             </div>
           </div>
 
-          {/* 6. GST Tax Rate Slab */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-on-surface-variant">GST Slab</label>
-            <div className="grid grid-cols-5 gap-1.5">
-              {GST_SLABS.map((slab) => {
-                const isSelected = gstRate === slab;
-                return (
-                  <button
-                    key={slab}
-                    type="button"
-                    onClick={() => setGstRate(slab)}
-                    className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                      isSelected
-                        ? 'bg-secondary text-on-secondary border-secondary shadow-xs scale-102'
-                        : 'bg-surface-container-low text-on-surface border-outline-variant/30 hover:bg-surface-container'
-                    }`}
-                  >
-                    {slab}%
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 7. LIVE ESTIMATED TOTAL BREAKDOWN ("etitae total") */}
-          <div className="rounded-2xl p-3.5 bg-gradient-to-br from-emerald-500/5 to-secondary/10 border border-secondary/25 flex flex-col gap-2 mt-1">
+          {/* 6. LIVE ESTIMATED TOTAL BREAKDOWN ("etitae total") */}
+          <div className="rounded-2xl p-3.5 bg-gradient-to-br from-emerald-500/5 to-secondary/10 border border-secondary/25 flex flex-col gap-2 mt-0.5">
             <div className="flex items-center justify-between pb-1.5 border-b border-secondary/20">
               <span className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">calculate</span>
-                Estimated Item Total
+                Estimated Total
               </span>
               <span className="font-tabular-data text-base sm:text-lg font-black text-secondary">
                 {formatINR(calculation.totalAmount)}
@@ -514,32 +486,30 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 </span>
               </div>
 
-              {calculation.discountAmount > 0 && (
+              {calculation.discountAmount > 0 ? (
                 <div className="flex items-center justify-between text-secondary">
                   <span>Disc ({discountPercent}%):</span>
                   <span className="font-tabular-data font-semibold">
                     - {formatINR(calculation.discountAmount)}
                   </span>
                 </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span>Taxable:</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">
+                    {formatINR(calculation.taxableAmount)}
+                  </span>
+                </div>
               )}
 
-              <div className="flex items-center justify-between">
-                <span>Taxable Value:</span>
-                <span className="font-tabular-data font-semibold text-on-surface">
-                  {formatINR(calculation.taxableAmount)}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span>
-                  {isIntraState
-                    ? `GST ${gstRate}% (CGST+SGST):`
-                    : `IGST ${gstRate}%:`}
-                </span>
-                <span className="font-tabular-data font-semibold text-on-surface">
-                  + {formatINR(calculation.gstAmount)}
-                </span>
-              </div>
+              {calculation.gstAmount > 0 && (
+                <div className="col-span-2 flex items-center justify-between text-[10px] text-outline">
+                  <span>GST Included ({gstRate}%):</span>
+                  <span className="font-tabular-data font-medium">
+                    {formatINR(calculation.gstAmount)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -563,10 +533,26 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+                className="py-2.5 px-3.5 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
               >
-                Cancel
+                {justAddedCount > 0 ? 'Done' : 'Cancel'}
               </button>
+
+              {!isEditing && (
+                <button
+                  type="button"
+                  onClick={handleSaveAndAddMore}
+                  disabled={!name.trim() || quantity <= 0}
+                  className={`py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                    !name.trim() || quantity <= 0
+                      ? 'bg-outline-variant/40 text-outline cursor-not-allowed'
+                      : 'bg-surface-container-high hover:bg-surface-container-highest text-secondary border border-secondary/30'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">playlist_add</span>
+                  <span>Save & Add More</span>
+                </button>
+              )}
 
               <button
                 type="submit"
@@ -580,7 +566,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <span className="material-symbols-outlined text-[16px]">
                   {isEditing ? 'check' : 'add'}
                 </span>
-                <span>{isEditing ? 'Save Changes' : 'Add to Bill'}</span>
+                <span>{isEditing ? 'Save Changes' : 'Add & Close'}</span>
               </button>
             </div>
           </div>
