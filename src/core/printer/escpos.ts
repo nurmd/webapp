@@ -48,7 +48,7 @@ export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 4
   if (data.companyAddress) lines.push(padCenter(data.companyAddress, width));
   if (data.gstin) lines.push(padCenter(`GSTIN: ${data.gstin}`, width));
   if (data.phone) lines.push(padCenter(`Ph: ${data.phone}`, width));
-  lines.push(padCenter('TAX INVOICE', width));
+  lines.push(padCenter(data.gstin ? 'TAX INVOICE' : 'RETAIL INVOICE', width));
   lines.push(doubleLine);
 
   // Meta
@@ -76,7 +76,7 @@ export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 4
   lines.push(line);
 
   // Totals
-  lines.push(padRow('Subtotal (Taxable):', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  lines.push(padRow(data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
   if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
   if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
   if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));

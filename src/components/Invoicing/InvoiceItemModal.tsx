@@ -23,6 +23,7 @@ interface InvoiceItemModalProps {
   initialItem?: InvoiceItemData | null;
   itemsCatalog: InventoryItem[];
   isIntraState: boolean;
+  isGstActive?: boolean;
 }
 
 const COMMON_UNITS: UnitOfMeasurement[] = [
@@ -47,6 +48,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   initialItem,
   itemsCatalog,
   isIntraState,
+  isGstActive = true,
 }) => {
   const isEditing = Boolean(initialItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -159,7 +161,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const discountAmount = (gross * discPct) / 100;
     const taxableAmount = Math.max(0, gross - discountAmount);
 
-    const taxPct = Math.max(0, Number(gstRate) || 0);
+    const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
     const gstAmount = (taxableAmount * taxPct) / 100;
 
     const cgstAmount = isIntraState ? gstAmount / 2 : 0;
@@ -178,7 +180,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       igstAmount,
       totalAmount,
     };
-  }, [quantity, unitPrice, discountPercent, gstRate, isIntraState]);
+  }, [quantity, unitPrice, discountPercent, gstRate, isIntraState, isGstActive]);
 
   // Keep totalInput synchronized with calculated total unless user is actively editing it
   useEffect(() => {
@@ -243,7 +245,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const qty = Math.max(0.0001, Number(quantity) || 1);
     const discPct = Math.min(100, Math.max(0, Number(discountPercent) || 0));
     const discMultiplier = 1 - discPct / 100;
-    const taxPct = Math.max(0, Number(gstRate) || 0);
+    const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
     const taxMultiplier = 1 + taxPct / 100;
 
     const divisor = qty * (discMultiplier > 0 ? discMultiplier : 1) * taxMultiplier;
@@ -259,13 +261,13 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     itemId: itemId || `CUSTOM-${Date.now()}`,
     name: name.trim(),
     description: description.trim() || undefined,
-    hsnSacCode: hsnSacCode.trim() || '998313',
+    hsnSacCode: isGstActive ? (hsnSacCode.trim() || '998313') : '',
     quantity: Number(quantity) || 1,
     unit,
     unitPrice: Number(unitPrice) || 0,
     mrp: mrp ? Number(mrp) : undefined,
     discountPercent: Number(discountPercent) || 0,
-    gstRate: Number(gstRate) || 0,
+    gstRate: isGstActive ? (Number(gstRate) || 0) : 0,
   });
 
   // Save and keep modal open for next product
@@ -617,25 +619,27 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               </div>
             </div>
 
-            {/* Tax Details */}
-            <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
-              <div>
-                <span>Taxable Value: </span>
-                <span className="font-tabular-data font-bold text-on-surface">
-                  {formatINR(calculation.taxableAmount)}
-                </span>
+            {/* Tax Details - only shown when GST is enabled */}
+            {isGstActive && (
+              <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
+                <div>
+                  <span>Taxable Value: </span>
+                  <span className="font-tabular-data font-bold text-on-surface">
+                    {formatINR(calculation.taxableAmount)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span>
+                    {isIntraState
+                      ? `GST ${gstRate}% (CGST+SGST): `
+                      : `IGST ${gstRate}%: `}
+                  </span>
+                  <span className="font-tabular-data font-bold text-secondary">
+                    +{formatINR(calculation.gstAmount)}
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span>
-                  {isIntraState
-                    ? `GST ${gstRate}% (CGST+SGST): `
-                    : `IGST ${gstRate}%: `}
-                </span>
-                <span className="font-tabular-data font-bold text-secondary">
-                  +{formatINR(calculation.gstAmount)}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Modal Footer Controls */}
@@ -647,10 +651,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   onDeleteItem();
                   onClose();
                 }}
-                className="py-2.5 px-3 rounded-xl text-error font-bold text-xs hover:bg-error-container/40 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                className="py-2.5 px-3.5 rounded-xl text-error font-bold text-xs bg-error-container/20 hover:bg-error-container/40 border border-error/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
-                <span>Delete</span>
+                <span>Delete Item</span>
               </button>
             )}
 

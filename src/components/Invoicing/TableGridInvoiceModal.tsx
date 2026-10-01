@@ -83,12 +83,14 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
 
   // Place of supply
+  const isGstActive = company.isGstEnabled !== false;
   const [posStateCode, setPosStateCode] = useState<string>(
     initialInvoice?.placeOfSupplyStateCode || selectedParty?.stateCode || company.stateCode
   );
 
-  // Overall Discount
+  // Overall Discount & Shipping
   const [overallDiscountPercent, setOverallDiscountPercent] = useState<number>(0);
+  const [shippingAmount, setShippingAmount] = useState<number>(initialInvoice?.shippingAmount || 0);
   const [isExtraDiscountModalOpen, setIsExtraDiscountModalOpen] = useState(false);
 
   // Scanner modal
@@ -152,15 +154,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return [];
   });
 
-  // Calculate taxes and items
+  // Calculate taxes and items (zero GST if company.isGstEnabled is false)
   const calcInputs = useMemo(() => {
     return rows.map((r) => ({
       quantity: Number(r.quantity) || 1,
       unitPrice: Number(r.unitPrice) || 0,
       discountPercent: Number(r.discountPercent) || 0,
-      gstRate: Number(r.gstRate) || 0,
+      gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
     }));
-  }, [rows]);
+  }, [rows, isGstActive]);
 
   const calcSummary = useMemo(() => {
     return calculateInvoice(company.stateCode, posStateCode, calcInputs);
@@ -173,8 +175,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   }, [calcSummary.totalTaxableAmount, overallDiscountPercent]);
 
   const finalGrandTotal = useMemo(() => {
-    return Math.max(0, Math.round(calcSummary.grandTotal - overallDiscountAmount));
-  }, [calcSummary.grandTotal, overallDiscountAmount]);
+    return Math.max(0, Math.round(calcSummary.grandTotal - overallDiscountAmount + (Number(shippingAmount) || 0)));
+  }, [calcSummary.grandTotal, overallDiscountAmount, shippingAmount]);
 
   // Payment status & split
   const [cashAmount, setCashAmount] = useState<number>(() => {
@@ -309,18 +311,18 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
         name: r.name || 'Billed Product / Service',
         description: r.description,
-        hsnSacCode: r.hsnSacCode || '998313',
+        hsnSacCode: isGstActive ? (r.hsnSacCode || '998313') : '',
         unit: (r.unit as any) || 'PCS',
         quantity: r.quantity,
         unitPrice: r.unitPrice,
         mrp: r.mrp,
         discountPercent: r.discountPercent,
         taxableAmount: calcItem?.taxableAmount || 0,
-        gstRate: r.gstRate,
-        cgstAmount: calcItem?.cgstAmount || 0,
-        sgstAmount: calcItem?.sgstAmount || 0,
-        igstAmount: calcItem?.igstAmount || 0,
-        cessAmount: calcItem?.cessAmount || 0,
+        gstRate: isGstActive ? (r.gstRate || 0) : 0,
+        cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
+        sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
+        igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
+        cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
         totalAmount: calcItem?.totalAmount || 0,
       };
     });
@@ -347,12 +349,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
       invoiceNumber: invoiceNumber.trim(),
-      invoiceType: isB2B ? 'B2B' : 'B2CS',
+      invoiceType: isB2B && isGstActive ? 'B2B' : 'B2CS',
+      isGstInvoice: isGstActive,
       date: invoiceDate,
       dueDate: dueDate || undefined,
       partyId: selectedParty?.id,
       partyName: selectedParty?.name || 'Cash Counter Customer',
-      partyGstin: selectedParty?.gstin,
+      partyGstin: isGstActive ? selectedParty?.gstin : undefined,
       partyAddress: selectedParty?.billingAddress || 'Local Counter',
       partyStateCode: posStateCode,
       placeOfSupplyStateCode: posStateCode,
@@ -361,12 +364,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       totalGrossAmount: calcSummary.totalGrossAmount,
       totalDiscount: calcSummary.totalDiscount + overallDiscountAmount,
       totalTaxableAmount: Math.max(0, calcSummary.totalTaxableAmount - overallDiscountAmount),
-      totalCgst: calcSummary.totalCgst,
-      totalSgst: calcSummary.totalSgst,
-      totalIgst: calcSummary.totalIgst,
-      totalCess: calcSummary.totalCess,
-      totalTax: calcSummary.totalTax,
+      totalCgst: isGstActive ? calcSummary.totalCgst : 0,
+      totalSgst: isGstActive ? calcSummary.totalSgst : 0,
+      totalIgst: isGstActive ? calcSummary.totalIgst : 0,
+      totalCess: isGstActive ? calcSummary.totalCess : 0,
+      totalTax: isGstActive ? calcSummary.totalTax : 0,
       roundOff: calcSummary.roundOff,
+      shippingAmount: Number(shippingAmount) || 0,
       grandTotal: finalGrandTotal,
       amountInWords: amountInWords(finalGrandTotal),
       paymentMode: resolvedPaymentMode,
@@ -436,7 +440,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                 {initialInvoice ? `Edit Invoice` : 'Create Invoice'}
               </h1>
               <span className="text-[11px] text-secondary font-medium truncate">
-                {calcSummary.isIntraState ? 'Intra-State GST (CGST+SGST)' : 'Inter-State GST (IGST)'}
+                {isGstActive
+                  ? (calcSummary.isIntraState ? 'Intra-State GST (CGST+SGST)' : 'Inter-State GST (IGST)')
+                  : 'Retail Mode (Non-GST)'}
               </span>
             </div>
           </div>
@@ -675,27 +681,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <div className="text-right">
-                              <span className="font-tabular-data text-sm font-black text-on-surface block whitespace-nowrap">
-                                {formatINR(itemCalc?.totalAmount || 0)}
-                              </span>
+                          <div className="text-right shrink-0">
+                            <span className="font-tabular-data text-sm font-black text-on-surface block whitespace-nowrap">
+                              {formatINR(itemCalc?.totalAmount || 0)}
+                            </span>
+                            {isGstActive && (
                               <span className="text-[10px] text-outline block whitespace-nowrap">
                                 incl. {row.gstRate}% tax
                               </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeRow(idx);
-                              }}
-                              title="Remove item"
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 active:scale-95 transition-all cursor-pointer shrink-0 ml-0.5"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                            </button>
+                            )}
                           </div>
                         </div>
 
@@ -719,12 +713,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                           </div>
 
                           <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant flex-wrap font-medium">
-                            <span className="font-mono bg-surface-container-lowest px-1.5 py-0.5 rounded border border-outline-variant/20">
-                              HSN {row.hsnSacCode}
-                            </span>
-                            <span className="text-secondary font-bold">
-                              {row.gstRate}% GST (+{formatINR(itemCalc?.totalTax || 0)})
-                            </span>
+                            {isGstActive && (
+                              <>
+                                <span className="font-mono bg-surface-container-lowest px-1.5 py-0.5 rounded border border-outline-variant/20">
+                                  HSN {row.hsnSacCode}
+                                </span>
+                                <span className="text-secondary font-bold">
+                                  {row.gstRate}% GST (+{formatINR(itemCalc?.totalTax || 0)})
+                                </span>
+                              </>
+                            )}
                             {row.mrp && row.mrp > row.unitPrice && (
                               <span className="line-through text-outline">
                                 MRP {formatINR(row.mrp)}
@@ -750,12 +748,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                             </span>
                           )}
                           <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-on-surface-variant truncate mt-0.5">
-                            <span className="font-mono">HSN {row.hsnSacCode}</span>
-                            <span>·</span>
-                            <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
+                            {isGstActive && (
+                              <>
+                                <span className="font-mono">HSN {row.hsnSacCode}</span>
+                                <span>·</span>
+                                <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
+                              </>
+                            )}
                             {row.mrp && row.mrp > row.unitPrice && (
                               <>
-                                <span>·</span>
+                                {isGstActive && <span>·</span>}
                                 <span className="line-through text-outline">MRP {formatINR(row.mrp)}</span>
                               </>
                             )}
@@ -784,65 +786,19 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                           )}
                         </div>
 
-                        {/* Total & Action */}
-                        <div className="col-span-2 text-right flex items-center justify-end gap-1">
-                          <div className="min-w-0 text-right">
-                            <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block whitespace-nowrap">
-                              {formatINR(itemCalc?.totalAmount || 0)}
-                            </span>
+                        {/* Total */}
+                        <div className="col-span-2 text-right">
+                          <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block whitespace-nowrap">
+                            {formatINR(itemCalc?.totalAmount || 0)}
+                          </span>
+                          {isGstActive && (
                             <span className="text-[10px] text-outline block whitespace-nowrap">tax incl.</span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRow(idx);
-                            }}
-                            title="Remove item"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 transition-colors ml-1 cursor-pointer flex-shrink-0"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">delete</span>
-                          </button>
+                          )}
                         </div>
                       </div>
                     </React.Fragment>
                   );
                 })}
-              </div>
-
-              {/* Action Bar below Table */}
-              <div className="p-2.5 bg-surface-container-low flex items-center gap-2 border-t border-outline-variant/20">
-                <button
-                  type="button"
-                  onClick={handleOpenAddItem}
-                  className="flex-1 py-2 px-3 rounded-xl bg-surface-container-lowest font-label-md text-xs sm:text-sm text-on-surface font-semibold shadow-xs hover:bg-surface-container flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-outline-variant/20"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-secondary">add_circle</span>
-                  <span>+ Add Item</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsScannerOpen(true)}
-                  className="py-2 px-3 rounded-xl bg-surface-container-lowest text-on-surface-variant hover:text-on-surface font-label-md text-xs sm:text-sm shadow-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-secondary">barcode_scanner</span>
-                  <span>Barcode</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsExtraDiscountModalOpen(true)}
-                  className={`py-2 px-3 rounded-xl font-label-md text-xs sm:text-sm shadow-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 ${
-                    overallDiscountPercent > 0
-                      ? 'bg-secondary-container text-on-secondary-container font-bold'
-                      : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px]">percent</span>
-                  <span>{overallDiscountPercent > 0 ? `${overallDiscountPercent}% Disc` : 'Discount'}</span>
-                </button>
               </div>
             </div>
           )}
@@ -851,76 +807,60 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           <div className="bg-surface-container-lowest rounded-2xl p-3.5 shadow-sm border border-outline-variant/30 flex flex-col gap-2">
             {/* Subtotal */}
             <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
-              <span>Subtotal (Items gross)</span>
+              <span>{isGstActive ? 'Subtotal (Items gross)' : 'Subtotal'}</span>
               <span className="font-tabular-data text-on-surface font-medium">
                 {formatINR(calcSummary.totalGrossAmount)}
               </span>
             </div>
 
-            {/* Overall Discount */}
-            {overallDiscountPercent > 0 && (
-              <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs py-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-on-surface font-medium">Overall Discount</span>
+            {/* Taxes - only shown if GST is active */}
+            {isGstActive && (
+              <>
+                <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
                   <button
                     type="button"
-                    onClick={() => setIsExtraDiscountModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-secondary-container font-label-sm text-[11px] hover:bg-surface-container-high transition-colors cursor-pointer"
+                    onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
+                    className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
                   >
-                    <span className="font-semibold">{overallDiscountPercent}% off</span>
-                    <span className="material-symbols-outlined text-[12px]">edit</span>
+                    <span>
+                      {calcSummary.isIntraState
+                        ? 'Taxes (CGST + SGST)'
+                        : 'Taxes (Inter-State IGST)'}
+                    </span>
+                    <span className="material-symbols-outlined text-[14px] text-outline">info</span>
                   </button>
+                  <span className="font-tabular-data text-on-surface font-medium">
+                    + {formatINR(calcSummary.totalTax)}
+                  </span>
                 </div>
-                <span className="font-tabular-data text-secondary font-semibold">
-                  - {formatINR(overallDiscountAmount)}
-                </span>
-              </div>
-            )}
 
-            {/* Taxes */}
-            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
-              <button
-                type="button"
-                onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-                className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
-              >
-                <span>
-                  {calcSummary.isIntraState
-                    ? 'Taxes (CGST + SGST)'
-                    : 'Taxes (Inter-State IGST)'}
-                </span>
-                <span className="material-symbols-outlined text-[14px] text-outline">info</span>
-              </button>
-              <span className="font-tabular-data text-on-surface font-medium">
-                + {formatINR(calcSummary.totalTax)}
-              </span>
-            </div>
-
-            {/* Collapsible Tax Breakdown */}
-            {isTaxDetailsOpen && (
-              <div className="p-2.5 rounded-xl bg-surface-container-low text-xs flex flex-col gap-1 animate-fade-in border border-outline-variant/20">
-                {calcSummary.isIntraState ? (
-                  <>
-                    <div className="flex items-center justify-between text-on-surface-variant">
-                      <span>Central GST (CGST)</span>
-                      <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalCgst)}</span>
+                {/* Collapsible Tax Breakdown */}
+                {isTaxDetailsOpen && (
+                  <div className="p-2.5 rounded-xl bg-surface-container-low text-xs flex flex-col gap-1 animate-fade-in border border-outline-variant/20">
+                    {calcSummary.isIntraState ? (
+                      <>
+                        <div className="flex items-center justify-between text-on-surface-variant">
+                          <span>Central GST (CGST)</span>
+                          <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalCgst)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-on-surface-variant">
+                          <span>State GST (SGST)</span>
+                          <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalSgst)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-between text-on-surface-variant">
+                        <span>Integrated GST (IGST)</span>
+                        <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalIgst)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
+                      <span>Total Taxable Base</span>
+                      <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalTaxableAmount)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-on-surface-variant">
-                      <span>State GST (SGST)</span>
-                      <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalSgst)}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between text-on-surface-variant">
-                    <span>Integrated GST (IGST)</span>
-                    <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalIgst)}</span>
                   </div>
                 )}
-                <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
-                  <span>Total Taxable Base</span>
-                  <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalTaxableAmount)}</span>
-                </div>
-              </div>
+              </>
             )}
 
             {/* Round Off */}
@@ -929,6 +869,68 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               <span className="font-tabular-data text-on-surface font-medium">
                 {calcSummary.roundOff >= 0 ? `+ ₹${calcSummary.roundOff}` : `- ₹${Math.abs(calcSummary.roundOff)}`}
               </span>
+            </div>
+
+            {/* Shipping Amount Field */}
+            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs py-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-outline">local_shipping</span>
+                <span>Shipping Charges</span>
+              </div>
+              <div className="relative w-28 sm:w-32 flex items-center">
+                <span className="absolute left-2.5 text-xs font-semibold text-outline pointer-events-none">₹</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={shippingAmount || ''}
+                  onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
+                  placeholder="0.00"
+                  className="w-full pl-6 pr-2.5 py-1 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Overall Discount (Moved below Roundoff) */}
+            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs py-0.5">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-outline">percent</span>
+                <span>Bill Discount</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setIsExtraDiscountModalOpen(true)}
+                  className={`px-2.5 py-1 rounded-lg font-label-sm text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border ${
+                    overallDiscountAmount > 0
+                      ? 'bg-secondary/15 text-secondary border-secondary/30'
+                      : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-outline-variant/30'
+                  }`}
+                >
+                  {overallDiscountAmount > 0 ? (
+                    <>
+                      <span>-{formatINR(overallDiscountAmount)}</span>
+                      <span className="text-[10px] opacity-80">({overallDiscountPercent}%)</span>
+                      <span className="material-symbols-outlined text-[13px]">edit</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[14px]">add</span>
+                      <span>Add Discount</span>
+                    </>
+                  )}
+                </button>
+                {overallDiscountAmount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOverallDiscountPercent(0)}
+                    title="Remove discount"
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="h-px bg-outline-variant/20 my-0.5"></div>
@@ -1451,6 +1453,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onDeleteItem={editingRowIndex !== null ? handleDeleteItemModal : undefined}
         itemsCatalog={itemsCatalog}
         isIntraState={calcSummary.isIntraState}
+        isGstActive={isGstActive}
       />
     </div>
   );

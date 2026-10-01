@@ -34,7 +34,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [showMoreActions, setShowMoreActions] = useState(false);
   const [copyType, setCopyType] = useState<InvoiceCopyType>('ORIGINAL FOR RECIPIENT');
 
-  const isGst = company.isGstEnabled !== false;
+  const isGst = company.isGstEnabled !== false && (propInvoice as any)?.isGstInvoice !== false;
 
   const handlePrint = () => {
     window.print();
@@ -483,11 +483,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               {/* TOP HEADER: Title, Subtitle, Copy Badge & Reverse Charge Notice */}
               <div className="border-b-2 border-slate-900 text-center py-2 px-3 bg-slate-50 relative flex items-center justify-between">
                 <div className="text-[10px] font-bold text-slate-700 uppercase tracking-tight text-left">
-                  <span>Reverse Charge: <strong>NO</strong></span>
-                  {invoice.isIntraState ? (
-                    <span className="block text-[9px] text-slate-500">Tax Payable: CGST + SGST</span>
+                  {isGst ? (
+                    <>
+                      <span>Reverse Charge: <strong>NO</strong></span>
+                      {invoice.isIntraState ? (
+                        <span className="block text-[9px] text-slate-500">Tax Payable: CGST + SGST</span>
+                      ) : (
+                        <span className="block text-[9px] text-slate-500">Tax Payable: IGST</span>
+                      )}
+                    </>
                   ) : (
-                    <span className="block text-[9px] text-slate-500">Tax Payable: IGST</span>
+                    <span>Commercial / Retail Bill</span>
                   )}
                 </div>
 
@@ -711,15 +717,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <th className="py-2 px-2 text-center w-14 border-r border-slate-400">Unit</th>
                       <th className="py-2 px-2.5 text-right w-20 border-r border-slate-400">Rate (₹)</th>
                       <th className="py-2 px-2 text-right w-14 border-r border-slate-400">Disc %</th>
-                      <th className="py-2 px-2.5 text-right w-24 border-r border-slate-400">
-                        Taxable Value (₹)
-                      </th>
+                      {isGst && (
+                        <th className="py-2 px-2.5 text-right w-24 border-r border-slate-400">
+                          Taxable Value (₹)
+                        </th>
+                      )}
                       {isGst && (
                         <th className="py-2 px-2 text-center w-14 border-r border-slate-400">
                           GST %
                         </th>
                       )}
-                      <th className="py-2 px-3 text-right w-24">Total (₹)</th>
+                      <th className="py-2 px-3 text-right w-24">
+                        {isGst ? 'Total (₹)' : 'Amount (₹)'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -753,16 +763,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <td className="py-2 px-2 text-right text-slate-600 border-r border-slate-300 font-tabular-data text-xs">
                           {line.discountPercent > 0 ? `${line.discountPercent}%` : '-'}
                         </td>
-                        <td className="py-2 px-2.5 text-right font-semibold text-slate-900 border-r border-slate-300 font-tabular-data text-xs">
-                          {line.taxableAmount.toFixed(2)}
-                        </td>
+                        {isGst && (
+                          <td className="py-2 px-2.5 text-right font-semibold text-slate-900 border-r border-slate-300 font-tabular-data text-xs">
+                            {line.taxableAmount.toFixed(2)}
+                          </td>
+                        )}
                         {isGst && (
                           <td className="py-2 px-2 text-center text-slate-800 border-r border-slate-300 font-tabular-data text-xs">
                             {line.gstRate}%
                           </td>
                         )}
                         <td className="py-2 px-3 text-right font-bold text-slate-950 font-tabular-data text-xs">
-                          {(isGst ? line.taxableAmount : line.totalAmount).toFixed(2)}
+                          {line.totalAmount.toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -829,6 +841,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       </tr>
                     )}
 
+                    {Boolean(invoice.shippingAmount && invoice.shippingAmount > 0) && (
+                      <tr className="bg-slate-50/40">
+                        <td className="border-r border-slate-300"></td>
+                        <td
+                          colSpan={isGst ? 8 : 6}
+                          className="py-1 px-3 text-slate-700 italic border-r border-slate-300 text-right text-[11px]"
+                        >
+                          Shipping / Delivery Charges
+                        </td>
+                        <td className="py-1 px-3 text-right font-medium text-slate-800 text-[11px] font-tabular-data">
+                          +{Number(invoice.shippingAmount).toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+
                     {/* Total Grand Row */}
                     <tr className="bg-slate-100 font-black border-t-2 border-slate-900">
                       <td className="border-r border-slate-400"></td>
@@ -842,9 +869,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <td className="border-r border-slate-400"></td>
                       <td className="border-r border-slate-400"></td>
                       <td className="border-r border-slate-400"></td>
-                      <td className="py-2.5 px-2.5 text-right border-r border-slate-400 text-slate-950 font-tabular-data font-black">
-                        {totalTaxable.toFixed(2)}
-                      </td>
+                      {isGst && (
+                        <td className="py-2.5 px-2.5 text-right border-r border-slate-400 text-slate-950 font-tabular-data font-black">
+                          {totalTaxable.toFixed(2)}
+                        </td>
+                      )}
                       {isGst && <td className="border-r border-slate-400"></td>}
                       <td className="py-2.5 px-3 text-right text-sm text-slate-950 font-tabular-data font-black">
                         {formatINR(resolvedGrandTotal)}

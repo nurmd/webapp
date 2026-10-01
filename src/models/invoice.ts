@@ -44,6 +44,7 @@ export interface Invoice {
   partyStateCode: string;
   placeOfSupplyStateCode: string;
   isIntraState: boolean;
+  isGstInvoice?: boolean;
 
   items: InvoiceItemEntry[];
 
@@ -56,6 +57,7 @@ export interface Invoice {
   totalCess: number;
   totalTax: number;
   roundOff: number;
+  shippingAmount?: number;
   grandTotal: number;
   amountInWords: string;
 
