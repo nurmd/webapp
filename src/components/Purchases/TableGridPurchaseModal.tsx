@@ -10,6 +10,7 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
+import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
 
 interface TableGridPurchaseModalProps {
   company: CompanyProfile;
@@ -24,10 +25,12 @@ interface TableGridPurchaseModalProps {
 interface PurchaseGridRow {
   itemId: string;
   name: string;
+  description?: string;
   hsnSacCode: string;
   quantity: number;
   unit: string;
   unitPrice: number;
+  mrp?: number;
   discountPercent: number;
   gstRate: number;
 }
@@ -108,12 +111,57 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const [overallDiscountPercent, setOverallDiscountPercent] = useState<number>(0);
   const [shippingAmount, setShippingAmount] = useState<number>(initialBill?.shippingAmount || 0);
 
+  // Dedicated Add/Edit Item Modal State
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+
+  const handleOpenAddItem = () => {
+    setEditingRowIndex(null);
+    setIsItemModalOpen(true);
+  };
+
+  const handleOpenEditItem = (index: number) => {
+    setEditingRowIndex(index);
+    setIsItemModalOpen(true);
+  };
+
+  const handleSaveItemModal = (itemData: InvoiceItemData) => {
+    const gridItem: PurchaseGridRow = {
+      itemId: itemData.itemId,
+      name: itemData.name,
+      description: itemData.description,
+      hsnSacCode: itemData.hsnSacCode,
+      quantity: itemData.quantity,
+      unit: itemData.unit,
+      unitPrice: itemData.unitPrice,
+      mrp: itemData.mrp,
+      discountPercent: itemData.discountPercent,
+      gstRate: itemData.gstRate,
+    };
+    if (editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length) {
+      const updated = [...rows];
+      updated[editingRowIndex] = gridItem;
+      setRows(updated);
+    } else {
+      setRows([...rows, gridItem]);
+    }
+    setEditingRowIndex(null);
+  };
+
+  const handleDeleteItemModal = () => {
+    if (editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length) {
+      setRows(rows.filter((_, idx) => idx !== editingRowIndex));
+    }
+    setEditingRowIndex(null);
+  };
+
   // Line items
   const [rows, setRows] = useState<PurchaseGridRow[]>(() => {
     if (initialBill && initialBill.items.length > 0) {
       return initialBill.items.map((it) => ({
         itemId: it.itemId || '',
         name: it.name,
+        description: '',
         hsnSacCode: it.hsnSacCode || '844332',
         quantity: it.quantity,
         unit: it.unit || 'PCS',
@@ -122,32 +170,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         gstRate: it.gstRate,
       }));
     }
-    if (itemsCatalog.length > 0) {
-      return [
-        {
-          itemId: itemsCatalog[0].id,
-          name: itemsCatalog[0].name,
-          hsnSacCode: itemsCatalog[0].hsnSacCode || '844332',
-          quantity: 1,
-          unit: itemsCatalog[0].unit || 'PCS',
-          unitPrice: itemsCatalog[0].purchasePrice || itemsCatalog[0].salePrice || 100,
-          discountPercent: 0,
-          gstRate: itemsCatalog[0].gstRate ?? 18,
-        },
-      ];
-    }
-    return [
-      {
-        itemId: '',
-        name: 'Purchased Stock',
-        hsnSacCode: '844332',
-        quantity: 1,
-        unit: 'PCS',
-        unitPrice: 100,
-        discountPercent: 0,
-        gstRate: 18,
-      },
-    ];
+    return [];
   });
 
   // Calculate invoice
@@ -319,7 +342,6 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   };
 
   const removeRow = (index: number) => {
-    if (rows.length <= 1) return;
     setRows(rows.filter((_, idx) => idx !== index));
   };
 
@@ -344,9 +366,28 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       audioService.playScanSuccess();
       const existingIdx = rows.findIndex((r) => r.itemId === found.id);
       if (existingIdx !== -1) {
-        updateRow(existingIdx, 'quantity', rows[existingIdx].quantity + 1);
+        const updated = [...rows];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: updated[existingIdx].quantity + 1,
+        };
+        setRows(updated);
       } else {
-        addRow(found);
+        setRows([
+          ...rows,
+          {
+            itemId: found.id,
+            name: found.name,
+            description: '',
+            hsnSacCode: found.hsnSacCode || '844332',
+            quantity: 1,
+            unit: found.unit || 'PCS',
+            unitPrice: found.purchasePrice || found.salePrice || 0,
+            mrp: found.mrp || found.salePrice,
+            discountPercent: 0,
+            gstRate: found.gstRate ?? 18,
+          },
+        ]);
       }
       setIsScannerOpen(false);
     } else {
@@ -478,7 +519,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
             <button
               type="button"
-              onClick={() => addRow()}
+              onClick={handleOpenAddItem}
               className="h-8 px-3 bg-secondary text-on-secondary rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[17px]">add</span>
@@ -627,7 +668,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => addRow()}
+                  onClick={handleOpenAddItem}
                   className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer shadow-2xs"
                 >
                   <span className="material-symbols-outlined text-[15px]">add</span>
@@ -636,189 +677,170 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
               </div>
             </div>
 
-            {/* Accounting Grid Table */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-outline-variant/20 bg-surface-container-low/30 text-on-surface-variant font-bold uppercase tracking-wider text-[10px]">
-                    <th className="py-2 px-3 w-10 text-center">#</th>
-                    <th className="py-2 px-3 min-w-[200px]">Item Name / Description</th>
-                    {isGstActive && <th className="py-2 px-3 w-24">HSN/SAC</th>}
-                    <th className="py-2 px-3 w-20 text-center">Qty</th>
-                    <th className="py-2 px-3 w-16 text-center">Unit</th>
-                    <th className="py-2 px-3 w-28 text-right">Purchase Rate (₹)</th>
-                    <th className="py-2 px-3 w-20 text-right">Disc %</th>
-                    {isGstActive && <th className="py-2 px-3 w-20 text-center">GST %</th>}
-                    <th className="py-2 px-3 w-28 text-right">Amount (₹)</th>
-                    <th className="py-2 px-3 w-10 text-center"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/15 font-medium">
-                  {rows.map((row, idx) => {
-                    const rowAmount =
-                      row.quantity * row.unitPrice * (1 - (row.discountPercent || 0) / 100);
-                    const calcItem = calcSummary.items[idx];
-                    const finalRowTotal = calcItem ? calcItem.totalAmount : rowAmount;
-
-                    return (
-                      <tr key={idx} className="hover:bg-surface-container-low/50 transition-colors">
-                        <td className="py-2 px-3 text-center text-outline text-[11px]">{idx + 1}</td>
-                        <td className="py-2 px-3">
-                          <input
-                            type="text"
-                            value={row.name}
-                            onChange={(e) => updateRow(idx, 'name', e.target.value)}
-                            placeholder="Enter product name..."
-                            className="w-full px-2 py-1 rounded bg-surface-container-low text-xs font-semibold text-on-surface border border-outline-variant/20 outline-none focus:border-secondary"
-                          />
-                        </td>
-                        {isGstActive && (
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={row.hsnSacCode}
-                              onChange={(e) => updateRow(idx, 'hsnSacCode', e.target.value)}
-                              placeholder="HSN"
-                              className="w-full px-1.5 py-1 rounded bg-surface-container-low font-mono text-[11px] text-center border border-outline-variant/20 outline-none"
-                            />
-                          </td>
-                        )}
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="number"
-                            min="1"
-                            step="any"
-                            value={row.quantity}
-                            onChange={(e) => updateRow(idx, 'quantity', Math.max(1, parseFloat(e.target.value) || 1))}
-                            className="w-16 px-1.5 py-1 rounded bg-surface-container-low text-center font-bold font-tabular-data text-xs border border-outline-variant/20 outline-none"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="text"
-                            value={row.unit}
-                            onChange={(e) => updateRow(idx, 'unit', e.target.value.toUpperCase())}
-                            className="w-14 px-1 py-1 rounded bg-surface-container-low text-center text-[11px] font-bold border border-outline-variant/20 outline-none uppercase"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={row.unitPrice}
-                            onChange={(e) => updateRow(idx, 'unitPrice', Math.max(0, parseFloat(e.target.value) || 0))}
-                            className="w-24 px-1.5 py-1 rounded bg-surface-container-low text-right font-bold font-tabular-data text-xs border border-outline-variant/20 outline-none"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={row.discountPercent || ''}
-                            onChange={(e) => updateRow(idx, 'discountPercent', Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                            placeholder="0"
-                            className="w-14 px-1 py-1 rounded bg-surface-container-low text-right text-xs border border-outline-variant/20 outline-none"
-                          />
-                        </td>
-                        {isGstActive && (
-                          <td className="py-2 px-3 text-center">
-                            <select
-                              value={row.gstRate}
-                              onChange={(e) => updateRow(idx, 'gstRate', Number(e.target.value))}
-                              className="px-1 py-1 rounded bg-surface-container-low text-center font-bold text-xs border border-outline-variant/20 outline-none cursor-pointer"
-                            >
-                              {[0, 5, 12, 18, 28].map((r) => (
-                                <option key={r} value={r}>
-                                  {r}%
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                        )}
-                        <td className="py-2 px-3 text-right font-tabular-data font-bold text-xs text-on-surface">
-                          {formatINR(finalRowTotal)}
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          {rows.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeRow(idx)}
-                              title="Delete row"
-                              className="w-6 h-6 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">delete</span>
-                            </button>
-                          )}
-                        </td>
+            {/* If No Items */}
+            {rows.length === 0 ? (
+              <div className="py-12 px-4 text-center flex flex-col items-center justify-center gap-2.5">
+                <div className="w-12 h-12 rounded-xl bg-surface-container-low text-secondary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[26px]">inventory_2</span>
+                </div>
+                <h3 className="font-bold text-sm text-on-surface">No purchased items added yet</h3>
+                <p className="text-xs text-on-surface-variant max-w-sm">
+                  Add products to inward stock from your catalog or enter custom supplier items.
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenAddItem}
+                    className="px-4 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs hover:bg-secondary/90 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                    <span>+ Add First Item</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
+                    <span>Scan Barcode</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Desktop / Tablet Ledger Table (sm & up) */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-low text-on-surface-variant text-[11px] font-bold uppercase tracking-wider border-b border-outline-variant/20">
+                        <th className="py-2.5 px-3 w-10 text-center">#</th>
+                        <th className="py-2.5 px-3">Item &amp; Description</th>
+                        {isGstActive && <th className="py-2.5 px-3 w-28">HSN/SAC</th>}
+                        <th className="py-2.5 px-3 w-28 text-center">Qty / Unit</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Purchase Rate (₹)</th>
+                        <th className="py-2.5 px-3 w-24 text-right">Discount</th>
+                        {isGstActive && <th className="py-2.5 px-3 w-24 text-right">GST Rate</th>}
+                        <th className="py-2.5 px-4 w-32 text-right">Amount (₹)</th>
+                        <th className="py-2.5 px-2 w-10 text-center"></th>
                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/15 text-xs">
+                      {rows.map((row, idx) => {
+                        const itemCalc = calcSummary.items[idx];
+                        const rowTotal = itemCalc?.totalAmount || (row.quantity * row.unitPrice * (1 - (row.discountPercent || 0) / 100));
+                        return (
+                          <tr
+                            key={idx}
+                            onClick={() => handleOpenEditItem(idx)}
+                            className="hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-colors group"
+                          >
+                            <td className="py-2.5 px-3 text-center text-on-surface-variant font-mono font-medium">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3 min-w-48">
+                              <span className="font-bold text-on-surface block group-hover:text-secondary transition-colors">
+                                {row.name}
+                              </span>
+                              {row.description && (
+                                <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate max-w-md">
+                                  {row.description}
+                                </span>
+                              )}
+                            </td>
+                            {isGstActive && (
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-on-surface-variant">
+                                {row.hsnSacCode || '-'}
+                              </td>
+                            )}
+                            <td className="py-2.5 px-3 text-center font-tabular-data font-bold text-on-surface">
+                              {row.quantity} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
+                              {formatINR(row.unitPrice)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-tabular-data">
+                              {row.discountPercent > 0 ? (
+                                <span className="text-secondary font-bold">
+                                  {row.discountPercent}%
+                                </span>
+                              ) : (
+                                <span className="text-outline">-</span>
+                              )}
+                            </td>
+                            {isGstActive && (
+                              <td className="py-2.5 px-3 text-right font-tabular-data text-on-surface-variant font-medium">
+                                {row.gstRate}%
+                              </td>
+                            )}
+                            <td className="py-2.5 px-4 text-right font-tabular-data font-bold text-on-surface text-sm">
+                              {formatINR(rowTotal)}
+                            </td>
+                            <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => removeRow(idx)}
+                                title="Remove item"
+                                className="w-7 h-7 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile High-Density Sheet List (sm:hidden) */}
+                <div className="sm:hidden divide-y divide-outline-variant/15">
+                  {rows.map((row, idx) => {
+                    const itemCalc = calcSummary.items[idx];
+                    const rowTotal = itemCalc?.totalAmount || (row.quantity * row.unitPrice * (1 - (row.discountPercent || 0) / 100));
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleOpenEditItem(idx)}
+                        className="p-3 hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-xs sm:text-sm text-on-surface block leading-snug group-hover:text-secondary transition-colors">
+                              {idx + 1}. {row.name}
+                            </span>
+                            {row.description && (
+                              <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">
+                                {row.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-tabular-data font-black text-sm text-secondary shrink-0">
+                            {formatINR(rowTotal)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-on-surface-variant mt-2 pt-1.5 border-t border-outline-variant/10">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-on-surface">
+                              {row.quantity} {row.unit}
+                            </span>
+                            <span>×</span>
+                            <span>{formatINR(row.unitPrice)}</span>
+                            {row.discountPercent > 0 && (
+                              <span className="text-secondary font-semibold">(-{row.discountPercent}%)</span>
+                            )}
+                          </div>
+                          {isGstActive && (
+                            <span className="font-medium">
+                              GST {row.gstRate}% {row.hsnSacCode ? `· HSN ${row.hsnSacCode}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards for small screens */}
-            <div className="sm:hidden divide-y divide-outline-variant/15">
-              {rows.map((row, idx) => {
-                const calcItem = calcSummary.items[idx];
-                const finalRowTotal = calcItem ? calcItem.totalAmount : row.quantity * row.unitPrice;
-                return (
-                  <div key={idx} className="p-3 flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="text-xs font-bold text-outline">#{idx + 1}</span>
-                        <input
-                          type="text"
-                          value={row.name}
-                          onChange={(e) => updateRow(idx, 'name', e.target.value)}
-                          placeholder="Item name..."
-                          className="flex-1 px-2 py-1 rounded bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/20 outline-none"
-                        />
-                      </div>
-                      {rows.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRow(idx)}
-                          className="text-outline hover:text-error p-1 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">delete</span>
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <span className="text-[10px] text-on-surface-variant block font-semibold">Qty</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={row.quantity}
-                          onChange={(e) => updateRow(idx, 'quantity', Math.max(1, parseFloat(e.target.value) || 1))}
-                          className="w-full px-1.5 py-1 rounded bg-surface-container-low text-center font-bold"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-on-surface-variant block font-semibold">Rate (₹)</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={row.unitPrice}
-                          onChange={(e) => updateRow(idx, 'unitPrice', Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full px-1.5 py-1 rounded bg-surface-container-low text-right font-bold"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-on-surface-variant block font-semibold">Total</span>
-                        <span className="font-bold text-xs text-secondary block pt-1.5 text-right font-tabular-data">
-                          {formatINR(finalRowTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Financial Ledger Summary (Subtotal, Taxes, Roundoff, Shipping, Discount, Grand Total) */}
@@ -1263,6 +1285,25 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
           </div>
         </div>
       )}
+      {/* Add / Edit Purchase Item Modal with Catalog Search & Real-Time Estimation */}
+      <InvoiceItemModal
+        isOpen={isItemModalOpen}
+        onClose={() => {
+          setIsItemModalOpen(false);
+          setEditingRowIndex(null);
+        }}
+        initialItem={
+          editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length
+            ? rows[editingRowIndex]
+            : null
+        }
+        onSaveItem={handleSaveItemModal}
+        onDeleteItem={editingRowIndex !== null ? handleDeleteItemModal : undefined}
+        itemsCatalog={itemsCatalog}
+        isIntraState={calcSummary.isIntraState}
+        isGstActive={isGstActive}
+        mode="purchase"
+      />
     </div>
   );
 };

@@ -24,6 +24,7 @@ interface InvoiceItemModalProps {
   itemsCatalog: InventoryItem[];
   isIntraState: boolean;
   isGstActive?: boolean;
+  mode?: 'sale' | 'purchase';
 }
 
 const COMMON_UNITS: UnitOfMeasurement[] = [
@@ -49,7 +50,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   itemsCatalog,
   isIntraState,
   isGstActive = true,
+  mode = 'sale',
 }) => {
+  const defaultHsn = mode === 'purchase' ? '844332' : '998313';
   const isEditing = Boolean(initialItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +60,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [itemId, setItemId] = useState(initialItem?.itemId || '');
   const [name, setName] = useState(initialItem?.name || '');
   const [description, setDescription] = useState(initialItem?.description || '');
-  const [hsnSacCode, setHsnSacCode] = useState(initialItem?.hsnSacCode || '998313');
+  const [hsnSacCode, setHsnSacCode] = useState(initialItem?.hsnSacCode || defaultHsn);
   const [quantity, setQuantity] = useState<number>(initialItem?.quantity || 1);
   const [unit, setUnit] = useState<string>(initialItem?.unit || 'PCS');
   const [unitPrice, setUnitPrice] = useState<number>(initialItem?.unitPrice || 0);
@@ -84,7 +87,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setItemId(initialItem.itemId || '');
         setName(initialItem.name || '');
         setDescription(initialItem.description || '');
-        setHsnSacCode(initialItem.hsnSacCode || '998313');
+        setHsnSacCode(initialItem.hsnSacCode || defaultHsn);
         setQuantity(initialItem.quantity || 1);
         setUnit(initialItem.unit || 'PCS');
         setUnitPrice(initialItem.unitPrice || 0);
@@ -108,7 +111,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setItemId('');
     setName('');
     setDescription('');
-    setHsnSacCode('998313');
+    setHsnSacCode(defaultHsn);
     setQuantity(1);
     setUnit('PCS');
     setUnitPrice(0);
@@ -143,9 +146,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const handleSelectCatalogItem = (item: InventoryItem) => {
     setItemId(item.id);
     setName(item.name);
-    setHsnSacCode(item.hsnSacCode || '998313');
+    setHsnSacCode(item.hsnSacCode || defaultHsn);
     setUnit(item.unit || 'PCS');
-    setUnitPrice(item.salePrice || 0);
+    setUnitPrice(mode === 'purchase' ? (item.purchasePrice || item.salePrice || 0) : (item.salePrice || 0));
     setMrp(item.mrp || item.salePrice || 0);
     setGstRate(item.gstRate ?? 18);
     setIsDropdownOpen(false);
@@ -261,7 +264,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     itemId: itemId || `CUSTOM-${Date.now()}`,
     name: name.trim(),
     description: description.trim() || undefined,
-    hsnSacCode: isGstActive ? (hsnSacCode.trim() || '998313') : '',
+    hsnSacCode: isGstActive ? (hsnSacCode.trim() || defaultHsn) : '',
     quantity: Number(quantity) || 1,
     unit,
     unitPrice: Number(unitPrice) || 0,
@@ -300,12 +303,14 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
               <span className="material-symbols-outlined text-[20px]">
-                {isEditing ? 'edit_note' : 'add_shopping_cart'}
+                {isEditing ? 'edit_note' : (mode === 'purchase' ? 'inventory_2' : 'add_shopping_cart')}
               </span>
             </div>
             <div>
               <h2 className="font-bold text-sm sm:text-base text-on-surface">
-                {isEditing ? 'Edit Item' : 'Add Item to Bill'}
+                {isEditing
+                  ? (mode === 'purchase' ? 'Edit Purchased Item' : 'Edit Item')
+                  : (mode === 'purchase' ? 'Add Item to Purchase Bill' : 'Add Item to Bill')}
               </h2>
               <span className="text-[11px] text-on-surface-variant">
                 {justAddedCount > 0 ? (
@@ -313,7 +318,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     ✓ {justAddedCount} item{justAddedCount > 1 ? 's' : ''} added! Ready for next
                   </span>
                 ) : (
-                  'Search inventory or enter product details'
+                  mode === 'purchase'
+                    ? 'Search inventory or enter vendor product details'
+                    : 'Search inventory or enter product details'
                 )}
               </span>
             </div>
@@ -407,10 +414,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="font-tabular-data text-xs font-black text-secondary block">
-                        {formatINR(item.salePrice)}
+                        {formatINR(mode === 'purchase' ? (item.purchasePrice || item.salePrice || 0) : item.salePrice)}
                       </span>
                       <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
-                        per {item.unit}
+                        {mode === 'purchase' ? `Cost / ${item.unit}` : `per ${item.unit}`}
                       </span>
                     </div>
                   </div>
@@ -483,11 +490,11 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 4. Sale Price & MRP */}
+          {/* 4. Price & MRP */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-on-surface-variant">
-                Sale Price (₹) <span className="text-error">*</span>
+                {mode === 'purchase' ? 'Purchase Rate (₹)' : 'Sale Price (₹)'} <span className="text-error">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
