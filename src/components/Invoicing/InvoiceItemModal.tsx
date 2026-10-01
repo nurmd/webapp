@@ -579,40 +579,62 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 6. Simplified Item Total Card */}
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30">
-            <div>
-              <label htmlFor="modal-item-total" className="text-xs font-bold text-on-surface block">
-                Item Total
-              </label>
-              {calculation.discountAmount > 0 && (
-                <span className="text-[11px] text-secondary font-semibold">
-                  Saved {formatINR(calculation.discountAmount)}
+          {/* 6. Item Total Card with Tax Details */}
+          <div className="flex flex-col gap-2.5 p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <label htmlFor="modal-item-total" className="text-xs font-bold text-on-surface block">
+                  Item Total
+                </label>
+                {calculation.discountAmount > 0 && (
+                  <span className="text-[11px] text-secondary font-semibold">
+                    Saved {formatINR(calculation.discountAmount)}
+                  </span>
+                )}
+              </div>
+
+              <div className="relative flex items-center w-36 sm:w-44">
+                <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
+                  ₹
                 </span>
-              )}
+                <input
+                  id="modal-item-total"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={totalInput}
+                  onFocus={() => setIsEditingTotal(true)}
+                  onBlur={() => {
+                    setIsEditingTotal(false);
+                    if (calculation.totalAmount > 0) {
+                      setTotalInput(calculation.totalAmount.toFixed(2));
+                    }
+                  }}
+                  onChange={(e) => handleTotalChange(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
+                />
+              </div>
             </div>
 
-            <div className="relative flex items-center w-36 sm:w-44">
-              <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
-                ₹
-              </span>
-              <input
-                id="modal-item-total"
-                type="number"
-                min="0"
-                step="0.01"
-                value={totalInput}
-                onFocus={() => setIsEditingTotal(true)}
-                onBlur={() => {
-                  setIsEditingTotal(false);
-                  if (calculation.totalAmount > 0) {
-                    setTotalInput(calculation.totalAmount.toFixed(2));
-                  }
-                }}
-                onChange={(e) => handleTotalChange(e.target.value)}
-                placeholder="0.00"
-                className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
-              />
+            {/* Tax Details */}
+            <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
+              <div>
+                <span>Taxable Value: </span>
+                <span className="font-tabular-data font-bold text-on-surface">
+                  {formatINR(calculation.taxableAmount)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span>
+                  {isIntraState
+                    ? `GST ${gstRate}% (CGST+SGST): `
+                    : `IGST ${gstRate}%: `}
+                </span>
+                <span className="font-tabular-data font-bold text-secondary">
+                  +{formatINR(calculation.gstAmount)}
+                </span>
+              </div>
             </div>
           </div>
 
