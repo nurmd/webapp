@@ -156,7 +156,9 @@ export const Drawer: React.FC<DrawerProps> = ({
                   !hasAccess
                     ? 'opacity-50 text-on-surface-variant hover:bg-surface-container-low'
                     : isActive
-                    ? 'bg-secondary text-on-secondary font-bold shadow-sm'
+                    ? item.id === 'purchases'
+                      ? 'bg-orange-600 text-white font-bold shadow-sm shadow-orange-600/25'
+                      : 'bg-secondary text-on-secondary font-bold shadow-sm'
                     : 'text-on-surface hover:bg-surface-container-low active:bg-surface-container'
                 }`}
                 type="button"

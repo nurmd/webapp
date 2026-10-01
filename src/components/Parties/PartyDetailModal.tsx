@@ -503,7 +503,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                           : entry.type === 'SALE'
                           ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
                           : entry.type === 'PURCHASE'
-                          ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                          ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
                           : 'bg-surface-container text-on-surface-variant'
                       }`}
                     >
@@ -515,7 +515,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                           : entry.type === 'SALE'
                           ? 'point_of_sale'
                           : entry.type === 'PURCHASE'
-                          ? 'shopping_cart'
+                          ? 'shopping_bag'
                           : 'account_balance'}
                       </span>
                     </div>

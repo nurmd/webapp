@@ -75,14 +75,14 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         <div className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30">
           <div className="flex items-center justify-between pb-space-xs border-b border-outline-variant/20 mb-space-sm">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px] text-secondary">
-                receipt_long
+              <span className="material-symbols-outlined text-[18px] text-orange-600 dark:text-orange-400">
+                shopping_bag
               </span>
               <span className="font-label-md text-label-md text-on-surface font-semibold">
                 {currentMonthName} Purchases
               </span>
             </div>
-            <span className="font-label-sm text-label-sm text-secondary flex items-center gap-0.5 bg-secondary-container/50 px-2 py-0.5 rounded-full font-medium">
+            <span className="font-label-sm text-label-sm text-orange-600 dark:text-orange-400 flex items-center gap-0.5 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full font-medium">
               <span className="material-symbols-outlined text-[13px]">trending_up</span> +8.2%
             </span>
           </div>
@@ -113,13 +113,13 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             </div>
 
             <div className="flex flex-col border-l border-outline-variant/30 pl-2">
-              <span className="font-label-sm text-label-sm text-secondary flex items-center gap-1 font-medium">
+              <span className="font-label-sm text-label-sm text-orange-600 dark:text-orange-400 flex items-center gap-1 font-medium">
                 <span className="material-symbols-outlined text-[13px]">account_balance</span> ITC
               </span>
-              <span className="font-headline-sm text-headline-sm text-secondary font-bold mt-0.5">
+              <span className="font-headline-sm text-headline-sm text-orange-600 dark:text-orange-400 font-bold mt-0.5">
                 {formatINR(totalItcClaimable)}
               </span>
-              <span className="font-body-sm text-body-sm text-secondary font-medium">Eligible</span>
+              <span className="font-body-sm text-body-sm text-orange-600/80 dark:text-orange-400/80 font-medium">Eligible</span>
             </div>
           </div>
         </div>
@@ -133,7 +133,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               setEditingBill(null);
               setIsModalOpen(true);
             }}
-            className="bg-secondary text-on-secondary shadow-sm px-space-md py-2.5 rounded-xl flex items-center justify-center gap-1.5 flex-1 active:scale-95 transition-transform cursor-pointer font-bold"
+            className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm shadow-orange-600/25 px-space-md py-2.5 rounded-xl flex items-center justify-center gap-1.5 flex-1 active:scale-95 transition-all cursor-pointer font-bold"
             type="button"
           >
             <span className="material-symbols-outlined text-[18px]">post_add</span>
@@ -179,7 +179,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             onClick={() => setFilterStatus('ALL')}
             className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
               filterStatus === 'ALL'
-                ? 'bg-primary text-on-primary'
+                ? 'bg-orange-600 text-white'
                 : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface'
             }`}
           >
@@ -210,11 +210,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             onClick={() => setFilterStatus('DUE')}
             className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm border shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
               filterStatus === 'DUE'
-                ? 'bg-primary text-on-primary border-primary'
-                : 'bg-surface-container-lowest border-outline-variant/30 text-on-tertiary-container'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-surface-container-lowest border-outline-variant/30 text-amber-700 dark:text-amber-400'
             }`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             <span>Due Soon</span>
           </button>
 
@@ -223,13 +223,13 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             onClick={() => setFilterStatus('PAID')}
             className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm border shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
               filterStatus === 'PAID'
-                ? 'bg-secondary text-on-secondary border-secondary'
-                : 'bg-surface-container-lowest border-outline-variant/30 text-secondary'
+                ? 'bg-orange-600 text-white border-orange-600'
+                : 'bg-surface-container-lowest border-outline-variant/30 text-orange-600 dark:text-orange-400'
             }`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
             <span>Paid</span>
-            <span className="bg-secondary-container text-on-secondary-container px-1.5 py-0.2 rounded-full text-label-sm font-bold">
+            <span className="bg-orange-500/15 text-orange-700 dark:text-orange-300 px-1.5 py-0.2 rounded-full text-label-sm font-bold">
               {purchases.filter((p) => p.paymentStatus === 'PAID').length}
             </span>
           </button>
@@ -251,11 +251,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             return (
               <div
                 key={bill.id}
-                className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-secondary/40"
+                className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-orange-500/40"
               >
                 <div className="flex items-start justify-between gap-2 sm:gap-space-sm">
                   <div className="flex items-center gap-2 sm:gap-space-sm min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center flex-shrink-0 font-bold text-secondary text-base">
+                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0 font-bold text-orange-600 dark:text-orange-400 text-base">
                       {bill.supplierName.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
@@ -283,8 +283,8 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                         isUnpaid
                           ? 'text-error bg-error-container/60'
                           : isPartial
-                          ? 'text-on-tertiary-container bg-surface-container'
-                          : 'text-secondary bg-secondary-container/50'
+                          ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15'
+                          : 'text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-500/20'
                       }`}
                     >
                       {isUnpaid ? (
@@ -317,7 +317,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                   <span className="text-on-surface-variant truncate font-body-sm text-xs">
                     {itemDesc || `${bill.items.length} purchased items`}
                   </span>
-                  <span className="font-tabular-data text-tabular-data text-secondary flex-shrink-0 font-bold text-xs ml-2">
+                  <span className="font-tabular-data text-tabular-data text-orange-600 dark:text-orange-400 flex-shrink-0 font-bold text-xs ml-2">
                     +{formatINR(bill.totalTax)} ITC
                   </span>
                 </div>
@@ -347,7 +347,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                       </button>
                     ) : (
                       <div className="flex items-center gap-1 text-on-surface-variant font-body-sm text-xs">
-                        <span className="material-symbols-outlined text-[15px] text-secondary">
+                        <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">
                           sync
                         </span>
                         <span>Settled</span>
@@ -432,7 +432,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               </div>
               <div className="flex justify-between py-1 border-b border-outline-variant/10">
                 <span className="text-on-surface-variant">Input Tax Credit (ITC):</span>
-                <span className="font-bold text-secondary">
+                <span className="font-bold text-orange-600 dark:text-orange-400">
                   {formatINR(selectedBillForPreview.totalTax)}
                 </span>
               </div>
@@ -444,7 +444,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-on-surface-variant">Payment Status:</span>
-                <span className="font-bold text-secondary">{selectedBillForPreview.paymentStatus}</span>
+                <span className="font-bold text-orange-600 dark:text-orange-400">{selectedBillForPreview.paymentStatus}</span>
               </div>
             </div>
 

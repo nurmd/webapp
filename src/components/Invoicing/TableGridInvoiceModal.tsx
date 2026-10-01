@@ -527,30 +527,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              onClick={() => setIsScannerOpen(true)}
-              className="h-8 px-2.5 bg-surface-container rounded-lg font-bold text-xs text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
-              title="Camera Barcode Scanner"
-            >
-              <span className="material-symbols-outlined text-[17px] text-secondary">barcode_scanner</span>
-              <span className="hidden sm:inline">Scan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenAddItem}
-              className="h-8 px-3 bg-secondary text-on-secondary rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[17px]">add</span>
-              <span>Add Item</span>
-            </button>
-
-            <div className="w-px h-6 bg-outline-variant/30 mx-0.5"></div>
-
-            <button
-              type="button"
               onClick={onClose}
               aria-label="Close"
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -870,6 +849,27 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Bottom Add Item Bar (Visible when items are present) */}
+                <div className="p-2 sm:p-2.5 bg-surface-container-low/40 border-t border-outline-variant/20 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenAddItem}
+                    className="flex-1 py-2 px-3 rounded-lg border border-dashed border-secondary/40 hover:border-secondary hover:bg-secondary/10 text-secondary font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-99"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">add_circle</span>
+                    <span>+ Add Item</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="py-2 px-3 rounded-lg border border-dashed border-outline-variant/40 hover:border-outline hover:bg-surface-container-low text-on-surface-variant font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Camera Barcode Scanner"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
+                    <span className="hidden sm:inline">Scan</span>
+                  </button>
                 </div>
               </>
             )}

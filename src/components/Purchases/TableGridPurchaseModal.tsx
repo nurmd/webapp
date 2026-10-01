@@ -496,43 +496,25 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             >
               <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             </button>
+            <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
+              <span className="material-symbols-outlined text-[19px]">shopping_bag</span>
+            </div>
             <div className="min-w-0 flex items-center gap-2">
               <span className="font-bold text-sm sm:text-base text-on-surface truncate">
                 {initialBill ? 'Edit Purchase Bill' : 'Record Purchase Bill'}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 shrink-0">
-                Inward Stock
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 shrink-0">
+                Purchase (Inward)
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsScannerOpen(true)}
-              className="h-8 px-2.5 bg-surface-container rounded-lg font-semibold text-xs text-on-surface flex items-center gap-1 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
-              title="Scan Product Barcode"
-            >
-              <span className="material-symbols-outlined text-[17px] text-secondary">barcode_scanner</span>
-              <span className="hidden sm:inline">Scan</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenAddItem}
-              className="h-8 px-3 bg-secondary text-on-secondary rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[17px]">add</span>
-              <span>Add Item</span>
-            </button>
-
-            <div className="w-px h-6 bg-outline-variant/30 mx-0.5"></div>
-
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -553,21 +535,21 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 className="flex items-center gap-2 hover:bg-surface-container-low px-2 py-1 rounded-lg transition-colors cursor-pointer group min-w-0 text-left"
                 title="Select or Change Supplier"
               >
-                <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                <div className="w-7 h-7 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
                   <span className="material-symbols-outlined text-[17px]">store</span>
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-primary">
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-orange-600">
                       {selectedSupplier ? selectedSupplier.name : 'Select Supplier / Vendor'}
                     </span>
-                    <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-primary shrink-0">
+                    <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-orange-600 shrink-0">
                       swap_horiz
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate">
                     {selectedSupplier?.gstin && isGstActive ? (
-                      <span className="font-mono font-semibold text-primary">
+                      <span className="font-mono font-semibold text-orange-600 dark:text-orange-400">
                         GSTIN: {selectedSupplier.gstin}
                       </span>
                     ) : (
@@ -627,7 +609,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
               </button>
 
               {/* ITC Eligibility Selector */}
-              <div className="h-7 px-2 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1 border border-secondary/20">
+              <div className="h-7 px-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 border border-orange-500/20">
                 <span className="material-symbols-outlined text-[14px]">verified</span>
                 <span>
                   {itcEligibility === 'ELIGIBLE_INPUTS'
@@ -646,7 +628,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xs overflow-hidden">
             <div className="px-3 sm:px-4 py-2.5 bg-surface-container-low/60 border-b border-outline-variant/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-secondary">inventory_2</span>
+                <span className="material-symbols-outlined text-[18px] text-orange-600 dark:text-orange-400">inventory_2</span>
                 <span className="font-bold text-xs sm:text-sm text-on-surface">
                   Purchased Items ({rows.length})
                 </span>
@@ -663,13 +645,13 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   onClick={() => setIsScannerOpen(true)}
                   className="h-7 px-2.5 bg-surface-container-lowest rounded-lg text-xs font-semibold text-on-surface flex items-center gap-1 hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/30 shadow-2xs"
                 >
-                  <span className="material-symbols-outlined text-[15px] text-secondary">barcode_scanner</span>
+                  <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">barcode_scanner</span>
                   <span>Scan</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleOpenAddItem}
-                  className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer shadow-2xs"
+                  className="h-7 px-2.5 bg-orange-600 text-white rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-orange-700 transition-colors cursor-pointer shadow-2xs shadow-orange-600/20"
                 >
                   <span className="material-symbols-outlined text-[15px]">add</span>
                   <span>Add Item</span>
@@ -680,7 +662,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             {/* If No Items */}
             {rows.length === 0 ? (
               <div className="py-12 px-4 text-center flex flex-col items-center justify-center gap-2.5">
-                <div className="w-12 h-12 rounded-xl bg-surface-container-low text-secondary flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center">
                   <span className="material-symbols-outlined text-[26px]">inventory_2</span>
                 </div>
                 <h3 className="font-bold text-sm text-on-surface">No purchased items added yet</h3>
@@ -691,7 +673,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   <button
                     type="button"
                     onClick={handleOpenAddItem}
-                    className="px-4 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs hover:bg-secondary/90 transition-all cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl bg-orange-600 text-white font-bold text-xs shadow-xs hover:bg-orange-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-orange-600/20"
                   >
                     <span className="material-symbols-outlined text-[16px]">add_circle</span>
                     <span>+ Add First Item</span>
@@ -701,7 +683,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                     onClick={() => setIsScannerOpen(true)}
                     className="px-3.5 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-all cursor-pointer flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
+                    <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">barcode_scanner</span>
                     <span>Scan Barcode</span>
                   </button>
                 </div>
@@ -738,7 +720,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                               {idx + 1}
                             </td>
                             <td className="py-2.5 px-3 min-w-48">
-                              <span className="font-bold text-on-surface block group-hover:text-secondary transition-colors">
+                              <span className="font-bold text-on-surface block group-hover:text-orange-600 transition-colors">
                                 {row.name}
                               </span>
                               {row.description && (
@@ -760,7 +742,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                             </td>
                             <td className="py-2.5 px-3 text-right font-tabular-data">
                               {row.discountPercent > 0 ? (
-                                <span className="text-secondary font-bold">
+                                <span className="text-orange-600 dark:text-orange-400 font-bold">
                                   {row.discountPercent}%
                                 </span>
                               ) : (
@@ -805,7 +787,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <span className="font-bold text-xs sm:text-sm text-on-surface block leading-snug group-hover:text-secondary transition-colors">
+                            <span className="font-bold text-xs sm:text-sm text-on-surface block leading-snug group-hover:text-orange-600 transition-colors">
                               {idx + 1}. {row.name}
                             </span>
                             {row.description && (
@@ -814,7 +796,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                               </p>
                             )}
                           </div>
-                          <span className="font-tabular-data font-black text-sm text-secondary shrink-0">
+                          <span className="font-tabular-data font-black text-sm text-orange-600 dark:text-orange-400 shrink-0">
                             {formatINR(rowTotal)}
                           </span>
                         </div>
@@ -826,7 +808,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                             <span>×</span>
                             <span>{formatINR(row.unitPrice)}</span>
                             {row.discountPercent > 0 && (
-                              <span className="text-secondary font-semibold">(-{row.discountPercent}%)</span>
+                              <span className="text-orange-600 dark:text-orange-400 font-semibold">(-{row.discountPercent}%)</span>
                             )}
                           </div>
                           {isGstActive && (
@@ -839,6 +821,27 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                     );
                   })}
                 </div>
+
+                {/* Bottom Add Item Bar (Visible when items are present) */}
+                <div className="p-2 sm:p-2.5 bg-surface-container-low/40 border-t border-outline-variant/20 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={handleOpenAddItem}
+                    className="flex-1 py-2 px-3 rounded-lg border border-dashed border-orange-500/40 hover:border-orange-500 hover:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-99"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">add_circle</span>
+                    <span>+ Add Item</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="py-2 px-3 rounded-lg border border-dashed border-outline-variant/40 hover:border-outline hover:bg-surface-container-low text-on-surface-variant font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    title="Scan Product Barcode"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">barcode_scanner</span>
+                    <span className="hidden sm:inline">Scan</span>
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -850,7 +853,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
                   Purchase Bill Summary
                 </span>
-                <span className="text-[11px] font-bold text-secondary">
+                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
                   {isGstActive ? 'GST Compliant' : 'Non-GST'}
                 </span>
               </div>
@@ -931,7 +934,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                     value={shippingAmount || ''}
                     onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
                     placeholder="0.00"
-                    className="w-full pl-5 pr-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                    className="w-full pl-5 pr-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-orange-500 transition-all"
                   />
                 </div>
               </div>
@@ -951,7 +954,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                       value={overallDiscountPercent || ''}
                       onChange={(e) => setOverallDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
                       placeholder="0"
-                      className="w-full pr-5 pl-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                      className="w-full pr-5 pl-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-orange-500 transition-all"
                     />
                     <span className="absolute right-2 text-xs font-semibold text-outline pointer-events-none">%</span>
                   </div>
@@ -971,7 +974,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="font-tabular-data text-xl sm:text-2xl font-black text-secondary tracking-tight block">
+                  <span className="font-tabular-data text-xl sm:text-2xl font-black text-orange-600 dark:text-orange-400 tracking-tight block">
                     {formatINR(finalGrandTotal)}
                   </span>
                 </div>
@@ -984,14 +987,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             {/* Header with Title and Auto-Identified Status */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">payments</span>
                 <span className="font-bold text-xs text-on-surface">Payment Settlement</span>
               </div>
 
               {/* Auto-identified Payment Status Badge */}
               <div>
                 {autoPaymentStatus === 'PAID' && (
-                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[13px]">check_circle</span>
                     <span>Paid</span>
                   </span>
@@ -1020,7 +1023,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                     <select
                       value={split.mode}
                       onChange={(e) => handleUpdateSplitMode(split.id, e.target.value as PaymentMode)}
-                      className="w-full h-8 pl-2 pr-6 rounded-lg bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-colors cursor-pointer appearance-none"
+                      className="w-full h-8 pl-2 pr-6 rounded-lg bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-orange-500 transition-colors cursor-pointer appearance-none"
                     >
                       {PAYMENT_MODES.map((pm) => (
                         <option key={pm.value} value={pm.value}>
@@ -1044,7 +1047,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                         value={split.amount || ''}
                         onChange={(e) => handleUpdateSplitAmount(split.id, Number(e.target.value) || 0)}
                         placeholder="0.00"
-                        className="w-full h-8 pl-5 pr-2 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                        className="w-full h-8 pl-5 pr-2 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-orange-500 transition-all"
                       />
                     </div>
                   ) : (
@@ -1062,7 +1065,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                       title="Add split payment mode"
                       className="h-8 px-2 sm:px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs flex items-center gap-1 border border-outline-variant/30 transition-all cursor-pointer shrink-0"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-secondary">add</span>
+                      <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">add</span>
                       <span className="hidden sm:inline">Split</span>
                     </button>
                   )}
@@ -1097,7 +1100,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">
               Total Inward Bill
             </span>
-            <span className="font-tabular-data font-black text-sm text-secondary">
+            <span className="font-tabular-data font-black text-sm text-orange-600 dark:text-orange-400">
               {formatINR(finalGrandTotal)}
             </span>
           </div>
@@ -1113,7 +1116,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             <button
               type="button"
               onClick={handleSaveBill}
-              className="h-10 px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer"
+              className="h-10 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm shadow-orange-600/30 active:scale-95 transition-all cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">save</span>
               <span>Save Purchase Bill</span>
@@ -1160,7 +1163,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 value={customBillNo}
                 onChange={(e) => setCustomBillNo(e.target.value)}
                 placeholder="e.g. PB-2024-001"
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40"
+                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500"
               />
             </div>
             <div>
@@ -1169,7 +1172,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 type="date"
                 value={billDate}
                 onChange={(e) => setBillDate(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40"
+                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500"
               />
             </div>
             <div>
@@ -1177,7 +1180,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
               <select
                 value={supplierStateCode}
                 onChange={(e) => setSupplierStateCode(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40"
+                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500"
               >
                 {getStateList().map((s) => (
                   <option key={s.code} value={s.code}>
@@ -1200,7 +1203,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   setBillNumber(customBillNo.trim() || billNumber);
                   setIsBillNoModalOpen(false);
                 }}
-                className="flex-1 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm cursor-pointer"
+                className="flex-1 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-label-md text-xs font-bold shadow-sm cursor-pointer"
               >
                 Apply
               </button>
@@ -1272,13 +1275,13 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40"
+                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500"
               />
             </div>
             <button
               type="button"
               onClick={() => setIsDueDateModalOpen(false)}
-              className="py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold cursor-pointer mt-1"
+              className="py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-label-md text-xs font-bold cursor-pointer mt-1"
             >
               Done
             </button>

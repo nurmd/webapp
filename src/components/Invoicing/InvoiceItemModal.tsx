@@ -52,9 +52,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   isGstActive = true,
   mode = 'sale',
 }) => {
-  const defaultHsn = mode === 'purchase' ? '844332' : '998313';
+  const isPurchase = mode === 'purchase';
+  const defaultHsn = isPurchase ? '844332' : '998313';
   const isEditing = Boolean(initialItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const accentColorClass = isPurchase ? 'text-orange-600 dark:text-orange-400' : 'text-secondary';
+  const accentBgLightClass = isPurchase ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'bg-secondary/10 text-secondary';
+  const focusInputClass = isPurchase ? 'outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20' : 'outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20';
+  const simpleFocusClass = isPurchase ? 'outline-none focus:border-orange-500' : 'outline-none focus:border-secondary';
 
   // Form Fields
   const [itemId, setItemId] = useState(initialItem?.itemId || '');
@@ -301,24 +307,24 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         {/* Header */}
         <div className="px-4 py-3.5 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/40">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+            <div className={`w-8 h-8 rounded-xl ${accentBgLightClass} flex items-center justify-center`}>
               <span className="material-symbols-outlined text-[20px]">
-                {isEditing ? 'edit_note' : (mode === 'purchase' ? 'inventory_2' : 'add_shopping_cart')}
+                {isEditing ? 'edit_note' : (isPurchase ? 'inventory_2' : 'add_shopping_cart')}
               </span>
             </div>
             <div>
               <h2 className="font-bold text-sm sm:text-base text-on-surface">
                 {isEditing
-                  ? (mode === 'purchase' ? 'Edit Purchased Item' : 'Edit Item')
-                  : (mode === 'purchase' ? 'Add Item to Purchase Bill' : 'Add Item to Bill')}
+                  ? (isPurchase ? 'Edit Purchased Item' : 'Edit Item')
+                  : (isPurchase ? 'Add Item to Purchase Bill' : 'Add Item to Bill')}
               </h2>
               <span className="text-[11px] text-on-surface-variant">
                 {justAddedCount > 0 ? (
-                  <span className="text-secondary font-bold">
+                  <span className={`${accentColorClass} font-bold`}>
                     ✓ {justAddedCount} item{justAddedCount > 1 ? 's' : ''} added! Ready for next
                   </span>
                 ) : (
-                  mode === 'purchase'
+                  isPurchase
                     ? 'Search inventory or enter vendor product details'
                     : 'Search inventory or enter product details'
                 )}
@@ -343,7 +349,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
               <span>Item Name / Search Inventory <span className="text-error">*</span></span>
               {itemId && (
-                <span className="text-[10px] text-secondary font-bold flex items-center gap-0.5">
+                <span className={`text-[10px] ${accentColorClass} font-bold flex items-center gap-0.5`}>
                   <span className="material-symbols-outlined text-[13px]">check_circle</span>
                   Catalog Linked
                 </span>
@@ -366,7 +372,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   if (itemId) setItemId(''); // user edited name away from linked catalog item
                 }}
                 placeholder="Type item name or search inventory..."
-                className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all"
+                className={`w-full pl-9 pr-8 py-2.5 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 ${focusInputClass} transition-all`}
               />
               {name && (
                 <button
@@ -392,7 +398,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsDropdownOpen(false)}
-                    className="text-secondary hover:underline cursor-pointer"
+                    className={`${accentColorClass} hover:underline cursor-pointer`}
                   >
                     Close
                   </button>
@@ -413,11 +419,11 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className="font-tabular-data text-xs font-black text-secondary block">
-                        {formatINR(mode === 'purchase' ? (item.purchasePrice || item.salePrice || 0) : item.salePrice)}
+                      <span className={`font-tabular-data text-xs font-black ${accentColorClass} block`}>
+                        {formatINR(isPurchase ? (item.purchasePrice || item.salePrice || 0) : item.salePrice)}
                       </span>
                       <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
-                        {mode === 'purchase' ? `Cost / ${item.unit}` : `per ${item.unit}`}
+                        {isPurchase ? `Cost / ${item.unit}` : `per ${item.unit}`}
                       </span>
                     </div>
                   </div>
@@ -437,7 +443,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Batch #102, IMEI, Size/Color, or custom notes..."
-              className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+              className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
             />
           </div>
 
@@ -479,7 +485,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               <select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all h-[38px]"
+                className={`w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
               >
                 {COMMON_UNITS.map((u) => (
                   <option key={u} value={u}>
@@ -508,7 +514,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   value={unitPrice || ''}
                   onChange={(e) => setUnitPrice(Math.max(0, Number(e.target.value)))}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
                 />
               </div>
             </div>
@@ -529,7 +535,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   value={mrp !== undefined ? mrp : ''}
                   onChange={(e) => setMrp(e.target.value === '' ? undefined : Number(e.target.value))}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
                 />
               </div>
             </div>
@@ -550,7 +556,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   value={discountPercent || ''}
                   onChange={(e) => handleDiscountPercentChange(e.target.value)}
                   placeholder="0"
-                  className="w-full pl-3 pr-7 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                  className={`w-full pl-3 pr-7 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
                   %
@@ -582,7 +588,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   }}
                   onChange={(e) => handleDiscountAmountChange(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
                 />
               </div>
             </div>
@@ -596,14 +602,14 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   Item Total
                 </label>
                 {calculation.discountAmount > 0 && (
-                  <span className="text-[11px] text-secondary font-semibold">
+                  <span className={`text-[11px] ${accentColorClass} font-semibold`}>
                     Saved {formatINR(calculation.discountAmount)}
                   </span>
                 )}
               </div>
 
               <div className="relative flex items-center w-36 sm:w-44">
-                <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
+                <span className={`absolute left-3 text-sm font-black ${accentColorClass} select-none pointer-events-none`}>
                   ₹
                 </span>
                 <input
@@ -621,7 +627,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   }}
                   onChange={(e) => handleTotalChange(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-outline-variant/30 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
+                  className={`w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg ${accentColorClass} border border-outline-variant/30 ${isPurchase ? 'outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/25' : 'outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25'} transition-all shadow-inner`}
                 />
               </div>
             </div>
@@ -641,7 +647,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                       ? `GST ${gstRate}% (CGST+SGST): `
                       : `IGST ${gstRate}%: `}
                   </span>
-                  <span className="font-tabular-data font-bold text-secondary">
+                  <span className={`font-tabular-data font-bold ${accentColorClass}`}>
                     +{formatINR(calculation.gstAmount)}
                   </span>
                 </div>
@@ -674,13 +680,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     !name.trim() || quantity <= 0
                       ? 'bg-outline-variant/40 text-outline cursor-not-allowed'
-                      : 'bg-surface-container-high hover:bg-surface-container-highest text-secondary border border-secondary/30'
+                      : (isPurchase
+                          ? 'bg-surface-container-high hover:bg-surface-container-highest text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                          : 'bg-surface-container-high hover:bg-surface-container-highest text-secondary border border-secondary/30')
                   }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">playlist_add</span>
                   <span>Save & Add More</span>
                   {justAddedCount > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-secondary text-on-secondary text-[10px] font-black">
+                    <span className={`ml-1 px-1.5 py-0.5 rounded-full ${isPurchase ? 'bg-orange-600 text-white' : 'bg-secondary text-on-secondary'} text-[10px] font-black`}>
                       {justAddedCount}
                     </span>
                   )}
@@ -693,7 +701,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 className={`flex-1 sm:flex-initial py-2.5 px-5 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   !name.trim() || quantity <= 0
                     ? 'bg-outline-variant text-outline cursor-not-allowed'
-                    : 'bg-secondary text-on-secondary hover:bg-secondary/90 shadow-secondary/20'
+                    : (isPurchase
+                        ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-600/20'
+                        : 'bg-secondary text-on-secondary hover:bg-secondary/90 shadow-secondary/20')
                 }`}
               >
                 <span className="material-symbols-outlined text-[16px]">

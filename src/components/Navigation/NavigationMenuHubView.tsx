@@ -469,7 +469,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       key: 'purchases',
       title: 'Purchases & Expenses',
-      dotColor: 'bg-outline',
+      dotColor: 'bg-orange-500',
       items: filteredItems.filter((i) => i.category === 'purchases'),
     },
     {
@@ -662,11 +662,11 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
             onClick={() => setSelectedCategory('purchases')}
             className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-xs font-semibold shadow-sm transition-all cursor-pointer ${
               selectedCategory === 'purchases'
-                ? 'bg-secondary text-on-secondary'
+                ? 'bg-orange-600 text-white'
                 : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">shopping_cart</span>
+            <span className={`material-symbols-outlined text-[16px] ${selectedCategory === 'purchases' ? 'text-white' : 'text-orange-600 dark:text-orange-400'}`}>shopping_bag</span>
             Purchases
           </button>
 
@@ -772,7 +772,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
                     {section.title}
                   </span>
                 </div>
-                <span className="font-label-sm text-xs text-secondary font-semibold">
+                <span className={`font-label-sm text-xs font-semibold ${section.key === 'purchases' ? 'text-orange-600 dark:text-orange-400' : 'text-secondary'}`}>
                   {section.items.length} {section.items.length === 1 ? 'module' : 'modules'}
                 </span>
               </div>
@@ -787,7 +787,11 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
                     className="w-full flex items-center justify-between p-3.5 sm:p-4 text-left hover:bg-surface-container-low/60 active:bg-surface-container-low transition-colors cursor-pointer group"
                   >
                     <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                      <div className="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant flex-shrink-0 group-hover:text-secondary group-hover:bg-secondary-container/40 transition-colors">
+                      <div className={`w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant flex-shrink-0 ${
+                        section.key === 'purchases'
+                          ? 'group-hover:text-orange-600 group-hover:bg-orange-500/15'
+                          : 'group-hover:text-secondary group-hover:bg-secondary-container/40'
+                      } transition-colors`}>
                         <span className="material-symbols-outlined text-[22px]">
                           {item.icon}
                         </span>
