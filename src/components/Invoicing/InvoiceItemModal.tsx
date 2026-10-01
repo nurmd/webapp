@@ -67,6 +67,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [justAddedCount, setJustAddedCount] = useState(0);
 
+  // Editable Total State
+  const [totalInput, setTotalInput] = useState<string>('');
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+
   // Sync state whenever modal opens or initialItem changes
   useEffect(() => {
     if (isOpen) {
@@ -81,6 +85,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setMrp(initialItem.mrp);
         setDiscountPercent(initialItem.discountPercent || 0);
         setGstRate(initialItem.gstRate ?? 18);
+        setIsEditingTotal(false);
         setIsDropdownOpen(false);
       } else {
         resetForm();
@@ -103,6 +108,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setMrp(undefined);
     setDiscountPercent(0);
     setGstRate(18);
+    setTotalInput('');
+    setIsEditingTotal(false);
     setIsDropdownOpen(false);
   };
 
@@ -165,6 +172,43 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       totalAmount,
     };
   }, [quantity, unitPrice, discountPercent, gstRate, isIntraState]);
+
+  // Keep totalInput synchronized with calculated total unless user is actively editing it
+  useEffect(() => {
+    if (!isEditingTotal) {
+      if (calculation.totalAmount > 0) {
+        setTotalInput(calculation.totalAmount.toFixed(2));
+      } else {
+        setTotalInput('');
+      }
+    }
+  }, [calculation.totalAmount, isEditingTotal]);
+
+  // Back-calculate unitPrice when user edits Total directly
+  const handleTotalChange = (valStr: string) => {
+    setTotalInput(valStr);
+    if (!valStr.trim()) {
+      setUnitPrice(0);
+      return;
+    }
+
+    const newTotal = parseFloat(valStr);
+    if (isNaN(newTotal) || newTotal < 0) {
+      return;
+    }
+
+    const qty = Math.max(0.0001, Number(quantity) || 1);
+    const discPct = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+    const discMultiplier = 1 - discPct / 100;
+    const taxPct = Math.max(0, Number(gstRate) || 0);
+    const taxMultiplier = 1 + taxPct / 100;
+
+    const divisor = qty * (discMultiplier > 0 ? discMultiplier : 1) * taxMultiplier;
+    if (divisor > 0) {
+      const calculatedPrice = Math.round((newTotal / divisor) * 100) / 100;
+      setUnitPrice(calculatedPrice);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -466,16 +510,45 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 6. LIVE ESTIMATED TOTAL BREAKDOWN ("etitae total") */}
-          <div className="rounded-2xl p-3.5 bg-gradient-to-br from-emerald-500/5 to-secondary/10 border border-secondary/25 flex flex-col gap-2 mt-0.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-secondary/20">
-              <span className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">calculate</span>
-                Estimated Total
-              </span>
-              <span className="font-tabular-data text-base sm:text-lg font-black text-secondary">
-                {formatINR(calculation.totalAmount)}
-              </span>
+          {/* 6. EDITABLE TOTAL & BREAKDOWN */}
+          <div className="rounded-2xl p-3.5 bg-gradient-to-br from-secondary/10 via-surface-container to-secondary/5 border border-secondary/30 flex flex-col gap-2.5 mt-0.5 shadow-xs">
+            <div className="flex items-center justify-between gap-3 pb-2 border-b border-secondary/20">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-7 h-7 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">calculate</span>
+                </div>
+                <div>
+                  <label htmlFor="modal-item-total" className="text-xs font-bold uppercase tracking-wider text-secondary block">
+                    Item Total
+                  </label>
+                  <span className="text-[10px] text-on-surface-variant font-medium">
+                    Editable · Auto-adjusts unit price
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative flex items-center w-36 sm:w-44">
+                <span className="absolute left-3 text-sm font-black text-secondary select-none pointer-events-none">
+                  ₹
+                </span>
+                <input
+                  id="modal-item-total"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={totalInput}
+                  onFocus={() => setIsEditingTotal(true)}
+                  onBlur={() => {
+                    setIsEditingTotal(false);
+                    if (calculation.totalAmount > 0) {
+                      setTotalInput(calculation.totalAmount.toFixed(2));
+                    }
+                  }}
+                  onChange={(e) => handleTotalChange(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full pl-7 pr-3 py-1.5 rounded-xl bg-surface-container-lowest text-right font-tabular-data font-black text-base sm:text-lg text-secondary border border-secondary/40 outline-none focus:border-secondary focus:ring-2 focus:ring-secondary/25 transition-all shadow-inner"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-on-surface-variant pt-0.5">
@@ -529,21 +602,13 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               </button>
             )}
 
-            <div className="flex items-center gap-2 ml-auto w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="py-2.5 px-3.5 rounded-xl text-xs font-bold text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
-              >
-                {justAddedCount > 0 ? 'Done' : 'Cancel'}
-              </button>
-
+            <div className="flex items-center gap-2 ml-auto w-full sm:w-auto justify-end">
               {!isEditing && (
                 <button
                   type="button"
                   onClick={handleSaveAndAddMore}
                   disabled={!name.trim() || quantity <= 0}
-                  className={`py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     !name.trim() || quantity <= 0
                       ? 'bg-outline-variant/40 text-outline cursor-not-allowed'
                       : 'bg-surface-container-high hover:bg-surface-container-highest text-secondary border border-secondary/30'
@@ -551,6 +616,11 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 >
                   <span className="material-symbols-outlined text-[16px]">playlist_add</span>
                   <span>Save & Add More</span>
+                  {justAddedCount > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-secondary text-on-secondary text-[10px] font-black">
+                      {justAddedCount}
+                    </span>
+                  )}
                 </button>
               )}
 
