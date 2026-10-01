@@ -418,51 +418,62 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-surface flex flex-col min-h-screen overflow-x-hidden antialiased">
-      {/* Fixed Top Shell Header (Stitch mobile_stack standard) */}
-      <header className="fixed top-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.06)] border-b border-outline-variant/30 pt-safe">
-        <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 max-w-4xl mx-auto w-full">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      {/* Fixed Top Shell Header - Full Width */}
+      <header className="fixed top-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-xs border-b border-outline-variant/30 pt-safe">
+        <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               onClick={onClose}
               aria-label="Go Back"
               type="button"
-              className="w-10 h-10 flex items-center justify-center text-on-surface active:bg-surface-container-low rounded-full transition-colors cursor-pointer flex-shrink-0"
+              className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 rounded-xl transition-all cursor-pointer flex-shrink-0"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
             </button>
 
-            <div className="w-8 h-8 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
               ₹
             </div>
 
-            <div className="flex flex-col min-w-0 ml-1">
-              <h1 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
-                {initialInvoice ? `Edit Invoice` : 'Create Invoice'}
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="font-bold text-sm sm:text-base text-on-surface truncate">
+                {initialInvoice ? `Edit Invoice #${invoiceNumber}` : `New Invoice`}
               </h1>
-              <span className="text-[11px] text-secondary font-medium truncate">
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
                 {isGstActive
-                  ? (calcSummary.isIntraState ? 'Intra-State GST (CGST+SGST)' : 'Inter-State GST (IGST)')
+                  ? (calcSummary.isIntraState ? 'Intra-State GST' : 'Inter-State IGST')
                   : 'Retail Mode (Non-GST)'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
               onClick={() => setIsScannerOpen(true)}
-              className="h-8 px-2.5 bg-surface-container rounded-xl font-label-sm text-xs font-semibold text-secondary flex items-center gap-1 hover:bg-surface-container-high transition-colors cursor-pointer"
+              className="h-8 px-2.5 bg-surface-container rounded-lg font-bold text-xs text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
               title="Camera Barcode Scanner"
             >
-              <span className="material-symbols-outlined text-[17px]">barcode_scanner</span>
+              <span className="material-symbols-outlined text-[17px] text-secondary">barcode_scanner</span>
               <span className="hidden sm:inline">Scan</span>
             </button>
 
             <button
               type="button"
+              onClick={handleOpenAddItem}
+              className="h-8 px-3 bg-secondary text-on-secondary rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[17px]">add</span>
+              <span>Add Item</span>
+            </button>
+
+            <div className="w-px h-6 bg-outline-variant/30 mx-0.5"></div>
+
+            <button
+              type="button"
               onClick={onClose}
               aria-label="Close"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -470,674 +481,657 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         </div>
       </header>
 
-      {/* Main Scrollable Canvas */}
-      <main className="flex-1 flex flex-col relative w-full pt-14 pb-28 bg-surface overflow-y-auto">
-        <div className="px-3 sm:px-4 pt-3 flex flex-col gap-3 max-w-4xl mx-auto w-full">
-          {/* Compact Meta Strip: Invoice No, Date & Terms */}
-          <div className="bg-surface-container-lowest rounded-2xl p-3 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-2">
-            {/* Invoice Number & Date Button */}
-            <button
-              type="button"
-              onClick={() => setIsInvoiceNumberModalOpen(true)}
-              className="flex items-center gap-2 text-left min-w-0 flex-1 hover:opacity-85 transition-opacity cursor-pointer group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-surface-container-low flex items-center justify-center text-secondary flex-shrink-0 group-hover:bg-secondary-container transition-colors">
-                <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="font-label-md text-xs sm:text-sm font-bold text-on-surface truncate">
-                    #{invoiceNumber}
-                  </span>
-                  <span className="material-symbols-outlined text-[14px] text-outline">edit</span>
-                </div>
-                <p className="font-body-sm text-[11px] text-on-surface-variant truncate">
-                  {formatDateDisplay(invoiceDate)}
-                </p>
-              </div>
-            </button>
-
-            <div className="w-px h-8 bg-outline-variant/30 flex-shrink-0"></div>
-
-            {/* Due Date & Terms Button */}
-            <button
-              type="button"
-              onClick={() => setIsDueDateModalOpen(true)}
-              className="flex items-center gap-2 flex-shrink-0 text-right hover:opacity-85 transition-opacity cursor-pointer"
-            >
-              <div className="text-right min-w-0">
-                <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider block">
-                  Due Date
-                </span>
-                <span className="font-label-md text-xs sm:text-sm font-bold text-on-surface truncate block">
-                  {formatDateDisplay(dueDate)}
-                </span>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface flex-shrink-0">
-                <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Party Selector (Compact Ledger Style) */}
-          <div className="bg-surface-container-lowest rounded-2xl p-3 shadow-sm border border-outline-variant/30">
-            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-outline-variant/20 mb-2">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-secondary flex-shrink-0"></span>
-                <span className="font-label-sm text-[10px] sm:text-xs text-on-surface-variant uppercase tracking-wider font-bold">
-                  Billed To (Party)
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPartyModalOpen(true)}
-                className="flex items-center gap-0.5 text-secondary font-label-sm text-xs font-bold hover:underline cursor-pointer"
-              >
-                <span>Change</span>
-                <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h2 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface truncate">
-                  {selectedParty ? selectedParty.name : 'Cash Sale / Walk-in Customer'}
-                </h2>
-                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                  <span className="font-label-sm text-[10px] sm:text-[11px] bg-surface-container-low px-1.5 py-0.5 rounded text-on-surface-variant font-mono">
-                    {selectedParty?.gstin ? selectedParty.gstin : 'Retail / Unregistered'}
-                  </span>
-                  <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                    · Place of Supply: {posStateCode}
+      {/* Main Full-Width Scrollable Workstation */}
+      <main className="flex-1 flex flex-col relative w-full pt-14 pb-24 bg-surface overflow-y-auto">
+        <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
+          {/* Document Header Band: Billed To Customer & Invoice Metadata */}
+          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xs overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-outline-variant/20">
+            {/* Customer / Billed To Section */}
+            <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    Billed To (Customer)
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPartyModalOpen(true)}
+                  className="inline-flex items-center gap-1 text-secondary font-bold text-xs hover:underline cursor-pointer"
+                >
+                  <span>{selectedParty ? 'Change Customer' : '+ Select Customer'}</span>
+                  <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                </button>
               </div>
 
-              <div className="text-right flex-shrink-0 pl-1">
-                {selectedParty ? (
-                  <>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-bold text-sm sm:text-base text-on-surface truncate">
+                    {selectedParty ? selectedParty.name : 'Cash Sale / Walk-in Customer'}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-on-surface-variant">
+                    {selectedParty?.gstin && isGstActive ? (
+                      <span className="font-mono text-[11px] font-semibold bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/20">
+                        GSTIN: {selectedParty.gstin}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] bg-surface-container px-1.5 py-0.5 rounded font-medium">
+                        Unregistered / Retail
+                      </span>
+                    )}
+                    <span>· Place of Supply: <strong className="text-on-surface">{posStateCode}</strong></span>
+                    {selectedParty?.billingAddress && (
+                      <span className="truncate max-w-xs">· {selectedParty.billingAddress}</span>
+                    )}
+                  </div>
+                </div>
+
+                {selectedParty && (
+                  <div className="text-right shrink-0">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold ${
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
                         (selectedParty?.currentBalance || 0) > 0
-                          ? 'bg-amber-100 text-amber-900'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
                           : (selectedParty?.currentBalance || 0) < 0
                           ? 'bg-error-container text-on-error-container'
                           : 'bg-secondary-container text-on-secondary-container'
                       }`}
                     >
                       {(selectedParty?.currentBalance || 0) > 0
-                        ? `Due ${formatINR(selectedParty?.currentBalance || 0)}`
-                        : 'Settled'}
+                        ? `Balance Due: ${formatINR(selectedParty?.currentBalance || 0)}`
+                        : 'Balance: Settled'}
                     </span>
-                    <span className="font-body-sm text-[10px] text-on-surface-variant block mt-0.5">
-                      Party Ledger
-                    </span>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsPartyModalOpen(true)}
-                    className="px-2.5 py-1 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    + Select Party
-                  </button>
+                  </div>
                 )}
+              </div>
+            </div>
+
+            {/* Invoice Meta Grid Section (Invoice No, Dates, Mode) */}
+            <div className="p-3 sm:p-4 md:w-80 lg:w-96 bg-surface-container-low/30 flex flex-col justify-between gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                {/* Invoice Number */}
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceNumberModalOpen(true)}
+                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
+                    Invoice No.
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="font-bold text-xs sm:text-sm text-on-surface group-hover:text-secondary truncate">
+                      #{invoiceNumber}
+                    </span>
+                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">edit</span>
+                  </div>
+                </button>
+
+                {/* Invoice Date */}
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceNumberModalOpen(true)}
+                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
+                    Invoice Date
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="font-semibold text-xs sm:text-sm text-on-surface group-hover:text-secondary truncate">
+                      {formatDateDisplay(invoiceDate)}
+                    </span>
+                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">calendar_today</span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-outline-variant/20">
+                {/* Due Date */}
+                <button
+                  type="button"
+                  onClick={() => setIsDueDateModalOpen(true)}
+                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
+                    Due Date
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="font-semibold text-xs text-on-surface group-hover:text-secondary truncate">
+                      {formatDateDisplay(dueDate)}
+                    </span>
+                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">event</span>
+                  </div>
+                </button>
+
+                {/* Tax / Retail Mode Status */}
+                <div className="p-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
+                    Billing Mode
+                  </span>
+                  <span className="font-bold text-xs text-secondary truncate block mt-0.5">
+                    {isGstActive ? 'GST Invoice' : 'Non-GST Bill'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Core Items Section */}
-          {rows.length === 0 ? (
-            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden p-6 text-center flex flex-col items-center justify-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-secondary/10 text-secondary flex items-center justify-center">
-                <span className="material-symbols-outlined text-[30px]">add_shopping_cart</span>
+          {/* Full-Width Line Items Table Sheet */}
+          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xs overflow-hidden">
+            {/* Sheet Title Bar */}
+            <div className="px-3 sm:px-4 py-2.5 bg-surface-container-low/60 border-b border-outline-variant/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] text-secondary">receipt</span>
+                <span className="font-bold text-xs sm:text-sm text-on-surface">
+                  Line Items ({rows.length})
+                </span>
+                {rows.length > 0 && (
+                  <span className="text-xs text-on-surface-variant font-medium">
+                    · {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} units total
+                  </span>
+                )}
               </div>
-              <div className="flex flex-col gap-1 max-w-sm">
-                <h3 className="font-bold text-sm sm:text-base text-on-surface">No items on this bill yet</h3>
-                <p className="text-xs text-on-surface-variant">
-                  Add items from your inventory catalog or create custom products with live tax & total estimation.
-                </p>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <button
-                  type="button"
-                  onClick={handleOpenAddItem}
-                  className="px-4 py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                  <span>+ Add Item</span>
-                </button>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="px-3.5 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-bold text-xs border border-outline-variant/30 hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="h-7 px-2.5 bg-surface-container-lowest rounded-lg text-xs font-semibold text-on-surface flex items-center gap-1 hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/30 shadow-2xs"
                 >
-                  <span className="material-symbols-outlined text-[18px] text-secondary">barcode_scanner</span>
-                  <span>Scan Barcode</span>
+                  <span className="material-symbols-outlined text-[15px] text-secondary">barcode_scanner</span>
+                  <span>Scan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenAddItem}
+                  className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <span className="material-symbols-outlined text-[15px]">add</span>
+                  <span>Add Item</span>
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden">
-              {/* Section Header */}
-              <div className="p-3 bg-surface-container-low flex items-center justify-between border-b border-outline-variant/20">
-                <div className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[20px] text-secondary">inventory_2</span>
-                  <span className="font-headline-sm text-sm font-bold text-on-surface">
-                    Items ({rows.length})
-                  </span>
+
+            {/* If No Items */}
+            {rows.length === 0 ? (
+              <div className="py-12 px-4 text-center flex flex-col items-center justify-center gap-2.5">
+                <div className="w-12 h-12 rounded-xl bg-surface-container-low text-secondary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[26px]">add_shopping_cart</span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsScannerOpen(true)}
-                    className="h-7 px-2.5 bg-surface-container-lowest rounded-lg font-label-sm text-xs text-on-surface flex items-center gap-1 shadow-xs hover:bg-surface-container transition-colors cursor-pointer border border-outline-variant/20"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
-                    <span>Scan</span>
-                  </button>
-
+                <h3 className="font-bold text-sm text-on-surface">No line items on this invoice</h3>
+                <p className="text-xs text-on-surface-variant max-w-sm">
+                  Add products or services from your catalog or create custom billed items.
+                </p>
+                <div className="flex items-center gap-2 mt-2">
                   <button
                     type="button"
                     onClick={handleOpenAddItem}
-                    className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg font-label-sm text-xs font-bold flex items-center gap-1 shadow-xs hover:bg-secondary/90 transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs hover:bg-secondary/90 transition-all cursor-pointer flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
-                    <span>Add Item</span>
+                    <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                    <span>+ Add First Item</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsScannerOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs hover:bg-surface-container-high transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-secondary">barcode_scanner</span>
+                    <span>Scan Barcode</span>
                   </button>
                 </div>
               </div>
+            ) : (
+              <>
+                {/* Desktop / Tablet Ledger Table (sm & up) */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-container-low text-on-surface-variant text-[11px] font-bold uppercase tracking-wider border-b border-outline-variant/20">
+                        <th className="py-2.5 px-3 w-10 text-center">#</th>
+                        <th className="py-2.5 px-3">Item &amp; Description</th>
+                        {isGstActive && <th className="py-2.5 px-3 w-28">HSN/SAC</th>}
+                        <th className="py-2.5 px-3 w-28 text-center">Qty / Unit</th>
+                        <th className="py-2.5 px-3 w-28 text-right">Rate (₹)</th>
+                        <th className="py-2.5 px-3 w-24 text-right">Discount</th>
+                        {isGstActive && <th className="py-2.5 px-3 w-24 text-right">GST Rate</th>}
+                        <th className="py-2.5 px-4 w-32 text-right">Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/15 text-xs">
+                      {rows.map((row, idx) => {
+                        const itemCalc = calcSummary.items[idx];
+                        return (
+                          <tr
+                            key={idx}
+                            onClick={() => handleOpenEditItem(idx)}
+                            className="hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-colors group"
+                          >
+                            <td className="py-2.5 px-3 text-center text-on-surface-variant font-mono font-medium">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3 min-w-48">
+                              <span className="font-bold text-on-surface block group-hover:text-secondary transition-colors">
+                                {row.name}
+                              </span>
+                              {row.description && (
+                                <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate max-w-md">
+                                  {row.description}
+                                </span>
+                              )}
+                            </td>
+                            {isGstActive && (
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-on-surface-variant">
+                                {row.hsnSacCode || '-'}
+                              </td>
+                            )}
+                            <td className="py-2.5 px-3 text-center font-tabular-data font-bold text-on-surface">
+                              {row.quantity} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
+                              {formatINR(row.unitPrice)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-tabular-data">
+                              {row.discountPercent > 0 ? (
+                                <span className="text-secondary font-bold">
+                                  {row.discountPercent}%
+                                </span>
+                              ) : (
+                                <span className="text-outline">-</span>
+                              )}
+                            </td>
+                            {isGstActive && (
+                              <td className="py-2.5 px-3 text-right font-tabular-data text-on-surface-variant font-medium">
+                                {row.gstRate}%
+                              </td>
+                            )}
+                            <td className="py-2.5 px-4 text-right font-tabular-data font-bold text-on-surface text-sm">
+                              {formatINR(itemCalc?.totalAmount || 0)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-              {/* Table Header - Only visible on sm and up */}
-              <div className="hidden sm:grid sm:grid-cols-12 px-3 py-2 bg-surface-container text-on-surface-variant font-label-sm text-[11px] font-bold border-b border-outline-variant/20">
-                <div className="col-span-6 truncate">Item / Description</div>
-                <div className="col-span-2 text-center">Qty</div>
-                <div className="col-span-2 text-right">Price</div>
-                <div className="col-span-2 text-right">Total</div>
-              </div>
-
-              {/* Items Rows */}
-              <div className="divide-y divide-outline-variant/20">
-                {rows.map((row, idx) => {
-                  const itemCalc = calcSummary.items[idx];
-                  return (
-                    <React.Fragment key={idx}>
-                      {/* Mobile View (< sm): Complete Data Card (Zero Truncation) */}
+                {/* Mobile High-Density Sheet List (sm:hidden) */}
+                <div className="sm:hidden divide-y divide-outline-variant/15">
+                  {rows.map((row, idx) => {
+                    const itemCalc = calcSummary.items[idx];
+                    return (
                       <div
+                        key={idx}
                         onClick={() => handleOpenEditItem(idx)}
-                        className="sm:hidden p-3.5 hover:bg-surface-container-low/60 active:bg-surface-container-low cursor-pointer transition-colors group"
+                        className="p-3 hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
                       >
-                        {/* Row 1: Item Name (Full Width), Total Amount & Delete */}
+                        {/* Top Line: Name & Total Amount */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <span className="font-bold text-sm text-on-surface block leading-snug break-words group-hover:text-secondary transition-colors">
-                              {row.name}
+                            <span className="font-bold text-xs sm:text-sm text-on-surface block leading-snug group-hover:text-secondary transition-colors">
+                              {idx + 1}. {row.name}
                             </span>
                             {row.description && (
-                              <p className="text-xs text-on-surface-variant mt-0.5 break-words leading-tight">
+                              <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">
                                 {row.description}
                               </p>
                             )}
                           </div>
-
                           <div className="text-right shrink-0">
-                            <span className="font-tabular-data text-sm font-black text-on-surface block whitespace-nowrap">
+                            <span className="font-tabular-data text-sm font-black text-on-surface block">
                               {formatINR(itemCalc?.totalAmount || 0)}
                             </span>
                             {isGstActive && (
-                              <span className="text-[10px] text-outline block whitespace-nowrap">
+                              <span className="text-[10px] text-outline block">
                                 incl. {row.gstRate}% tax
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Row 2: Complete Financial Details (Qty × Rate, Discount, HSN & GST) */}
-                        <div className="flex flex-wrap items-center justify-between gap-y-1.5 gap-x-2 mt-2 pt-2 border-t border-outline-variant/15 text-xs text-on-surface-variant">
+                        {/* Bottom Line: Qty, Rate, Discount, HSN */}
+                        <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-outline-variant/10 text-xs text-on-surface-variant">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="bg-surface-container-high px-2 py-0.5 rounded-lg font-tabular-data font-bold text-on-surface text-xs">
+                            <span className="font-tabular-data font-bold text-on-surface">
                               {row.quantity} {row.unit}
                             </span>
-                            <span className="text-outline font-semibold">×</span>
+                            <span className="text-outline">×</span>
                             <span className="font-tabular-data font-semibold text-on-surface">
                               {formatINR(row.unitPrice)}
                             </span>
-
                             {row.discountPercent > 0 && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-secondary/15 text-secondary text-[11px] font-bold">
+                              <span className="px-1 py-0.2 rounded bg-secondary/15 text-secondary text-[10px] font-bold">
                                 {row.discountPercent}% off
-                                {itemCalc?.discountAmount ? ` (-${formatINR(itemCalc.discountAmount)})` : ''}
                               </span>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant flex-wrap font-medium">
-                            {isGstActive && (
-                              <>
-                                <span className="font-mono bg-surface-container-lowest px-1.5 py-0.5 rounded border border-outline-variant/20">
-                                  HSN {row.hsnSacCode}
-                                </span>
-                                <span className="text-secondary font-bold">
-                                  {row.gstRate}% GST (+{formatINR(itemCalc?.totalTax || 0)})
-                                </span>
-                              </>
-                            )}
-                            {row.mrp && row.mrp > row.unitPrice && (
-                              <span className="line-through text-outline">
-                                MRP {formatINR(row.mrp)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Desktop / Tablet View (>= sm): Grid Row */}
-                      <div
-                        onClick={() => handleOpenEditItem(idx)}
-                        className="hidden sm:grid sm:grid-cols-12 px-3 py-2.5 items-center hover:bg-surface-container-low/50 active:bg-surface-container-low cursor-pointer transition-colors group"
-                      >
-                        {/* Name & Subtitle */}
-                        <div className="col-span-6 min-w-0 pr-2">
-                          <span className="font-bold text-xs sm:text-sm text-on-surface block truncate group-hover:text-secondary transition-colors">
-                            {row.name}
-                          </span>
-                          {row.description && (
-                            <span className="text-[10px] text-on-surface-variant block truncate">
-                              {row.description}
-                            </span>
-                          )}
-                          <div className="flex items-center gap-1 text-[10px] sm:text-[11px] text-on-surface-variant truncate mt-0.5">
-                            {isGstActive && (
-                              <>
-                                <span className="font-mono">HSN {row.hsnSacCode}</span>
-                                <span>·</span>
-                                <span className="text-secondary font-semibold">{row.gstRate}% GST</span>
-                              </>
-                            )}
-                            {row.mrp && row.mrp > row.unitPrice && (
-                              <>
-                                {isGstActive && <span>·</span>}
-                                <span className="line-through text-outline">MRP {formatINR(row.mrp)}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Qty & Unit */}
-                        <div className="col-span-2 text-center min-w-0">
-                          <span className="font-tabular-data text-xs font-bold text-on-surface block">
-                            {row.quantity}
-                          </span>
-                          <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
-                            {row.unit}
-                          </span>
-                        </div>
-
-                        {/* Price */}
-                        <div className="col-span-2 text-right min-w-0">
-                          <span className="font-tabular-data text-xs sm:text-sm font-semibold text-on-surface block">
-                            {formatINR(row.unitPrice)}
-                          </span>
-                          {row.discountPercent > 0 && (
-                            <span className="text-[10px] text-secondary font-semibold block">
-                              {row.discountPercent}% off
+                          {isGstActive && row.hsnSacCode && (
+                            <span className="font-mono text-[10px] text-on-surface-variant">
+                              HSN {row.hsnSacCode}
                             </span>
                           )}
                         </div>
-
-                        {/* Total */}
-                        <div className="col-span-2 text-right">
-                          <span className="font-tabular-data text-xs sm:text-sm text-on-surface font-black block whitespace-nowrap">
-                            {formatINR(itemCalc?.totalAmount || 0)}
-                          </span>
-                          {isGstActive && (
-                            <span className="text-[10px] text-outline block whitespace-nowrap">tax incl.</span>
-                          )}
-                        </div>
                       </div>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Condensed Bill Calculation & GST Summary */}
-          <div className="bg-surface-container-lowest rounded-2xl p-3.5 shadow-sm border border-outline-variant/30 flex flex-col gap-2">
-            {/* Subtotal */}
-            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
-              <span>{isGstActive ? 'Subtotal (Items gross)' : 'Subtotal'}</span>
-              <span className="font-tabular-data text-on-surface font-medium">
-                {formatINR(calcSummary.totalGrossAmount)}
-              </span>
-            </div>
-
-            {/* Taxes - only shown if GST is active */}
-            {isGstActive && (
-              <>
-                <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-                    className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
-                  >
-                    <span>
-                      {calcSummary.isIntraState
-                        ? 'Taxes (CGST + SGST)'
-                        : 'Taxes (Inter-State IGST)'}
-                    </span>
-                    <span className="material-symbols-outlined text-[14px] text-outline">info</span>
-                  </button>
-                  <span className="font-tabular-data text-on-surface font-medium">
-                    + {formatINR(calcSummary.totalTax)}
-                  </span>
+                    );
+                  })}
                 </div>
-
-                {/* Collapsible Tax Breakdown */}
-                {isTaxDetailsOpen && (
-                  <div className="p-2.5 rounded-xl bg-surface-container-low text-xs flex flex-col gap-1 animate-fade-in border border-outline-variant/20">
-                    {calcSummary.isIntraState ? (
-                      <>
-                        <div className="flex items-center justify-between text-on-surface-variant">
-                          <span>Central GST (CGST)</span>
-                          <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalCgst)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-on-surface-variant">
-                          <span>State GST (SGST)</span>
-                          <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalSgst)}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-between text-on-surface-variant">
-                        <span>Integrated GST (IGST)</span>
-                        <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalIgst)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
-                      <span>Total Taxable Base</span>
-                      <span className="font-tabular-data font-semibold">{formatINR(calcSummary.totalTaxableAmount)}</span>
-                    </div>
-                  </div>
-                )}
               </>
             )}
+          </div>
 
-            {/* Round Off */}
-            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs">
-              <span>Round Off</span>
-              <span className="font-tabular-data text-on-surface font-medium">
-                {calcSummary.roundOff >= 0 ? `+ ₹${calcSummary.roundOff}` : `- ₹${Math.abs(calcSummary.roundOff)}`}
-              </span>
-            </div>
+          {/* Lower Workstation Section: Left Payment & Terms, Right Financial Ledger */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            {/* Left Column: Payment Settlement Details */}
+            <div className="lg:col-span-7 flex flex-col gap-3">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-secondary">payments</span>
+                    <span className="font-bold text-xs sm:text-sm text-on-surface">
+                      Payment &amp; Settlement
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant">
+                    {paymentModeTab === 'paid' ? 'Immediate Settlement' : 'Party Ledger Credit'}
+                  </span>
+                </div>
 
-            {/* Shipping Amount Field */}
-            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs py-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-outline">local_shipping</span>
-                <span>Shipping Charges</span>
-              </div>
-              <div className="relative w-28 sm:w-32 flex items-center">
-                <span className="absolute left-2.5 text-xs font-semibold text-outline pointer-events-none">₹</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={shippingAmount || ''}
-                  onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
-                  placeholder="0.00"
-                  className="w-full pl-6 pr-2.5 py-1 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary focus:ring-1 focus:ring-secondary/20 transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Overall Discount (Moved below Roundoff) */}
-            <div className="flex items-center justify-between text-on-surface-variant font-body-sm text-xs py-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-outline">percent</span>
-                <span>Bill Discount</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsExtraDiscountModalOpen(true)}
-                  className={`px-2.5 py-1 rounded-lg font-label-sm text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                    overallDiscountAmount > 0
-                      ? 'bg-secondary/15 text-secondary border-secondary/30'
-                      : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-outline-variant/30'
-                  }`}
-                >
-                  {overallDiscountAmount > 0 ? (
-                    <>
-                      <span>-{formatINR(overallDiscountAmount)}</span>
-                      <span className="text-[10px] opacity-80">({overallDiscountPercent}%)</span>
-                      <span className="material-symbols-outlined text-[13px]">edit</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[14px]">add</span>
-                      <span>Add Discount</span>
-                    </>
-                  )}
-                </button>
-                {overallDiscountAmount > 0 && (
+                {/* Paid vs Credit Segmented Control */}
+                <div className="flex rounded-lg bg-surface-container-low p-1 gap-1 border border-outline-variant/20">
                   <button
                     type="button"
-                    onClick={() => setOverallDiscountPercent(0)}
-                    title="Remove discount"
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                    onClick={() => setPaymentModeTab('paid')}
+                    className={`flex-1 py-1.5 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      paymentModeTab === 'paid'
+                        ? 'bg-surface-container-lowest text-secondary shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">close</span>
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Paid / Cash Counter</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentModeTab('credit')}
+                    className={`flex-1 py-1.5 rounded-md font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      paymentModeTab === 'credit'
+                        ? 'bg-surface-container-lowest text-error shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-error">schedule</span>
+                    <span>Credit / Ledger Due</span>
+                  </button>
+                </div>
+
+                {/* Payment Split Inputs */}
+                {paymentModeTab === 'paid' ? (
+                  <div className="rounded-lg bg-surface-container-low/40 p-2.5 flex flex-col gap-2 border border-outline-variant/20">
+                    <div className="space-y-1.5">
+                      {/* Cash Received */}
+                      <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface-container-lowest shadow-2xs border border-outline-variant/20">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[16px] text-on-surface-variant">payments</span>
+                          <span className="font-bold text-xs text-on-surface">Cash Received</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-tabular-data text-on-surface-variant text-xs">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={cashAmount}
+                            onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value)))}
+                            className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Bank / Online UPI */}
+                      <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface-container-lowest shadow-2xs border border-outline-variant/20">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="material-symbols-outlined text-[16px] text-secondary">account_balance</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-xs text-on-surface block truncate">Bank / UPI Transfer</span>
+                            <span className="text-[10px] text-on-surface-variant block truncate">
+                              {company.bankName ? `${company.bankName} (${company.accountNumber || ''})` : 'Digital Bank Account'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-tabular-data text-on-surface-variant text-xs">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={bankAmount}
+                            onChange={(e) => setBankAmount(Math.max(0, Number(e.target.value)))}
+                            className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 text-xs text-on-surface-variant border-t border-outline-variant/15">
+                      <span>Total Paid: <strong className="text-on-surface font-bold">{formatINR(totalPaid)}</strong></span>
+                      <span>Balance Due: <strong className={balanceDue > 0 ? 'text-error font-bold' : 'text-secondary font-bold'}>{formatINR(balanceDue)}</strong></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-amber-600">info</span>
+                    <span>
+                      Full invoice amount of <strong>{formatINR(finalGrandTotal)}</strong> will be credited directly to <strong>{selectedParty?.name || 'Customer'}</strong>'s ledger.
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="h-px bg-outline-variant/20 my-0.5"></div>
-
-            {/* Grand Total */}
-            <div className="flex items-baseline justify-between pt-0.5">
-              <div>
-                <span className="font-label-sm text-[11px] uppercase tracking-wide text-on-surface-variant block font-bold">
-                  Grand Invoice Total
-                </span>
-                <span className="font-body-sm text-xs text-on-surface-variant">
-                  {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} Total units
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="font-currency-display-mobile text-xl sm:text-2xl font-extrabold text-secondary tracking-tight">
-                  {formatINR(finalGrandTotal)}
-                </span>
-              </div>
-            </div>
-
-            {/* Payment Status & Split Segment */}
-            <div className="mt-1 flex flex-col gap-2">
-              {/* Payment Mode Pills */}
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-container-low">
-                <button
-                  type="button"
-                  onClick={() => setPaymentModeTab('paid')}
-                  className={`flex-1 py-1.5 rounded-lg font-label-md text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                    paymentModeTab === 'paid'
-                      ? 'bg-surface-container-lowest text-on-surface shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px] text-secondary">
-                    check_circle
+            {/* Right Column: Condensed Accounting Ledger Summary */}
+            <div className="lg:col-span-5">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/20">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    Invoice Summary
                   </span>
-                  <span>Paid / Cash</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentModeTab('credit')}
-                  className={`flex-1 py-1.5 rounded-lg font-label-md text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                    paymentModeTab === 'credit'
-                      ? 'bg-surface-container-lowest text-error shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px] text-error">
-                    schedule
+                  <span className="text-[11px] font-bold text-secondary">
+                    {isGstActive ? 'GST Compliant' : 'Non-GST'}
                   </span>
-                  <span>Credit / Ledger Due</span>
-                </button>
-              </div>
+                </div>
 
-              {/* Payment Split Inputs */}
-              {paymentModeTab === 'paid' && (
-                <div className="rounded-xl bg-surface-container-low p-2.5 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-on-surface-variant font-label-sm text-xs">
-                    <span className="font-bold uppercase tracking-wide text-on-surface flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[15px] text-secondary">
-                        account_balance_wallet
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                  <span>{isGstActive ? 'Subtotal (Items gross)' : 'Subtotal'}</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">
+                    {formatINR(calcSummary.totalGrossAmount)}
+                  </span>
+                </div>
+
+                {/* Taxes - only if GST is active */}
+                {isGstActive && (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                      <button
+                        type="button"
+                        onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
+                        className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
+                      >
+                        <span>{calcSummary.isIntraState ? 'Taxes (CGST + SGST)' : 'Taxes (IGST)'}</span>
+                        <span className="material-symbols-outlined text-[13px] text-outline">info</span>
+                      </button>
+                      <span className="font-tabular-data font-semibold text-on-surface">
+                        +{formatINR(calcSummary.totalTax)}
                       </span>
-                      Payment Split &amp; Methods
-                    </span>
-                    <span className="text-[11px] text-secondary font-medium">
-                      Auto-balanced
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {/* Cash Received */}
-                    <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface flex-shrink-0">
-                          <span className="material-symbols-outlined text-[16px]">payments</span>
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-label-md text-xs text-on-surface block font-bold">
-                            Cash Received
-                          </span>
-                          <span className="font-body-sm text-on-surface-variant text-[10px] block truncate">
-                            Direct drawer balance
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="font-tabular-data text-on-surface-variant font-medium text-xs">
-                          ₹
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={cashAmount}
-                          onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value)))}
-                          className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
-                        />
-                      </div>
                     </div>
 
-                    {/* Bank / Online UPI */}
-                    <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/20">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center flex-shrink-0">
-                          <span className="material-symbols-outlined text-[16px]">account_balance</span>
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-label-md text-xs text-on-surface font-bold truncate block">
-                            Bank / UPI QR
-                          </span>
-                          <span className="font-body-sm text-on-surface-variant text-[10px] block truncate">
-                            {company.bankName ? `${company.bankName} · ${company.accountNumber || ''}` : 'Online Transfer'}
-                          </span>
+                    {isTaxDetailsOpen && (
+                      <div className="p-2 rounded-lg bg-surface-container-low text-[11px] flex flex-col gap-1 border border-outline-variant/20 animate-fade-in">
+                        {calcSummary.isIntraState ? (
+                          <>
+                            <div className="flex items-center justify-between text-on-surface-variant">
+                              <span>Central GST (CGST)</span>
+                              <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalCgst)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-on-surface-variant">
+                              <span>State GST (SGST)</span>
+                              <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalSgst)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-between text-on-surface-variant">
+                            <span>Integrated GST (IGST)</span>
+                            <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalIgst)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
+                          <span>Taxable Base</span>
+                          <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalTaxableAmount)}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className="font-tabular-data text-on-surface-variant font-medium text-xs">
-                          ₹
-                        </span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={bankAmount}
-                          onChange={(e) => setBankAmount(Math.max(0, Number(e.target.value)))}
-                          className="w-24 text-right font-tabular-data font-bold text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded text-xs sm:text-sm outline-none focus:ring-1 focus:ring-secondary"
-                        />
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  </>
+                )}
 
-                  <div className="flex items-center justify-between pt-0.5 text-xs text-on-surface-variant">
-                    <span>
-                      Paid: <strong className="text-on-surface font-bold">{formatINR(totalPaid)}</strong>
+                {/* Round Off */}
+                <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                  <span>Round Off</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">
+                    {calcSummary.roundOff >= 0 ? `+₹${calcSummary.roundOff}` : `-₹${Math.abs(calcSummary.roundOff)}`}
+                  </span>
+                </div>
+
+                {/* Shipping Charges */}
+                <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px] text-outline">local_shipping</span>
+                    <span>Shipping Charges</span>
+                  </div>
+                  <div className="relative w-28 flex items-center">
+                    <span className="absolute left-2 text-xs font-semibold text-outline pointer-events-none">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={shippingAmount || ''}
+                      onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
+                      placeholder="0.00"
+                      className="w-full pl-5 pr-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Overall Discount (Below Roundoff) */}
+                <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px] text-outline">percent</span>
+                    <span>Bill Discount</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsExtraDiscountModalOpen(true)}
+                      className={`px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border ${
+                        overallDiscountAmount > 0
+                          ? 'bg-secondary/15 text-secondary border-secondary/30'
+                          : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-outline-variant/30'
+                      }`}
+                    >
+                      {overallDiscountAmount > 0 ? (
+                        <>
+                          <span>-{formatINR(overallDiscountAmount)}</span>
+                          <span className="text-[10px] opacity-80">({overallDiscountPercent}%)</span>
+                          <span className="material-symbols-outlined text-[12px]">edit</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[13px]">add</span>
+                          <span>Add Discount</span>
+                        </>
+                      )}
+                    </button>
+                    {overallDiscountAmount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setOverallDiscountPercent(0)}
+                        title="Remove discount"
+                        className="w-5 h-5 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">close</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-px bg-outline-variant/20 my-1"></div>
+
+                {/* Grand Total Ledger Highlight Box */}
+                <div className="p-3 rounded-lg bg-surface-container text-on-surface flex items-center justify-between border border-outline-variant/30">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant block">
+                      Grand Total Amount
                     </span>
-                    <span>
-                      Due:{' '}
-                      <strong className={balanceDue > 0 ? 'text-error font-bold' : 'text-secondary font-bold'}>
-                        {formatINR(balanceDue)}
-                      </strong>
+                    <span className="text-[11px] text-on-surface-variant">
+                      {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} Total Units
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-tabular-data text-xl sm:text-2xl font-black text-secondary tracking-tight block">
+                      {formatINR(finalGrandTotal)}
                     </span>
                   </div>
                 </div>
-              )}
-
-              {paymentModeTab === 'credit' && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[18px] text-amber-700">
-                    info
-                  </span>
-                  <span>
-                    Full invoice amount of <strong>{formatINR(finalGrandTotal)}</strong> will be credited directly to{' '}
-                    <strong>{selectedParty?.name || 'Customer'}</strong>'s ledger account.
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Visual Feedback Micro-Banner (Stitch standard) */}
-          <div className="bg-surface-container-low rounded-2xl p-3 flex items-center justify-between border border-outline-variant/20">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[18px]">verified</span>
-              </div>
-              <div className="min-w-0">
-                <span className="font-label-md text-xs font-bold text-on-surface block">
-                  E-Way &amp; GST Validated
-                </span>
-                <span className="font-body-sm text-[11px] text-on-surface-variant">
-                  Ready for instant ITC claiming &amp; CA export
-                </span>
               </div>
             </div>
-            <span className="material-symbols-outlined text-[18px] text-outline">chevron_right</span>
           </div>
         </div>
       </main>
 
-      {/* Sticky Bottom Quick-Action Bar (Stitch create_invoice_table_view) */}
+      {/* Sticky Bottom Full-Width Action Dock */}
       <aside
         aria-label="Invoice Actions"
-        className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] pb-safe"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-lg pb-safe"
       >
-        <div className="px-3 sm:px-4 py-2.5 flex items-center gap-2 max-w-4xl mx-auto w-full">
-          {/* Preview Button */}
-          <button
-            type="button"
-            onClick={() => {
-              const inv = constructInvoiceObject();
-              setPreviewInvoiceData(inv);
-            }}
-            className="h-12 px-4 rounded-2xl bg-surface-container font-label-md text-xs sm:text-sm font-bold text-on-surface flex items-center justify-center gap-1.5 active:bg-surface-container-high transition-colors flex-shrink-0 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[20px]">visibility</span>
-            <span>Preview</span>
-          </button>
+        <div className="px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 w-full">
+          {/* Left Total Info */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const inv = constructInvoiceObject();
+                setPreviewInvoiceData(inv);
+              }}
+              className="h-10 px-3.5 rounded-xl bg-surface-container font-bold text-xs text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
+            >
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              <span>Preview</span>
+            </button>
+            <div className="hidden sm:flex flex-col pl-2 border-l border-outline-variant/30">
+              <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">Net Payable</span>
+              <span className="font-tabular-data font-black text-sm text-secondary">{formatINR(finalGrandTotal)}</span>
+            </div>
+          </div>
 
-          {/* Primary Save & Share WhatsApp Button */}
-          <button
-            type="button"
-            onClick={() => handleSaveInvoice(true)}
-            className="h-12 flex-1 rounded-2xl bg-secondary text-on-secondary font-label-md text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(0,108,73,0.3)] active:scale-98 transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[20px]">send</span>
-            <span>Save &amp; Share WhatsApp</span>
-          </button>
+          {/* Right Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSaveInvoice(false)}
+              className="h-10 px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40"
+            >
+              <span className="material-symbols-outlined text-[18px]">save</span>
+              <span>Save Invoice</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSaveInvoice(true)}
+              className="h-10 px-4 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">send</span>
+              <span>Save &amp; WhatsApp</span>
+            </button>
+          </div>
         </div>
       </aside>
 
