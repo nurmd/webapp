@@ -51,6 +51,7 @@ export interface PurchaseBill {
   totalCess: number;
   totalTax: number;
   roundOff: number;
+  shippingAmount?: number;
   grandTotal: number;
 
   paymentMode: PaymentMode;

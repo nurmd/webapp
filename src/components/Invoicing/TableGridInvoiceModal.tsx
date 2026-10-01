@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
-import { Invoice, InvoiceItemEntry, PaymentMode } from '../../models/invoice.ts';
+import { Invoice, InvoiceItemEntry, PaymentMode, PaymentStatus } from '../../models/invoice.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -178,48 +178,133 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return Math.max(0, Math.round(calcSummary.grandTotal - overallDiscountAmount + (Number(shippingAmount) || 0)));
   }, [calcSummary.grandTotal, overallDiscountAmount, shippingAmount]);
 
-  // Payment status & split
-  const [cashAmount, setCashAmount] = useState<number>(() => {
+  // Available Payment Modes
+  const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
+    { value: 'CASH', label: 'Cash' },
+    { value: 'UPI', label: 'UPI / QR' },
+    { value: 'NET_BANKING', label: 'Bank Transfer' },
+    { value: 'CARD', label: 'Card' },
+    { value: 'CHEQUE', label: 'Cheque' },
+    { value: 'CREDIT', label: 'Credit (Unpaid)' },
+  ];
+
+  interface PaymentSplit {
+    id: string;
+    mode: PaymentMode;
+    amount: number;
+  }
+
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
     if (initialInvoice) {
-      return initialInvoice.paymentMode === 'CASH' ? initialInvoice.paidAmount : 0;
-    }
-    return finalGrandTotal;
-  });
-
-  const [bankAmount, setBankAmount] = useState<number>(() => {
-    if (initialInvoice && initialInvoice.paymentMode !== 'CASH' && initialInvoice.paymentMode !== 'CREDIT') {
-      return initialInvoice.paidAmount;
-    }
-    return 0;
-  });
-
-  const [paymentModeTab, setPaymentModeTab] = useState<'paid' | 'credit'>(() => {
-    if (initialInvoice && initialInvoice.paymentStatus === 'UNPAID') return 'credit';
-    return 'paid';
-  });
-
-  // Auto-sync cash amount when total changes and user hasn't chosen credit
-  React.useEffect(() => {
-    if (paymentModeTab === 'paid') {
-      if (bankAmount > 0) {
-        setCashAmount(Math.max(0, finalGrandTotal - bankAmount));
-      } else {
-        setCashAmount(finalGrandTotal);
+      if (initialInvoice.paymentStatus === 'UNPAID' || initialInvoice.paymentMode === 'CREDIT') {
+        return [{ id: '1', mode: 'CREDIT', amount: 0 }];
       }
-    } else {
-      setCashAmount(0);
-      setBankAmount(0);
+      return [{ id: '1', mode: initialInvoice.paymentMode || 'CASH', amount: initialInvoice.paidAmount }];
     }
-  }, [finalGrandTotal, paymentModeTab]);
+    return [{ id: '1', mode: 'CASH', amount: finalGrandTotal }];
+  });
+
+  const [isManualAmount, setIsManualAmount] = useState<boolean>(() => {
+    return Boolean(initialInvoice && initialInvoice.paymentStatus === 'PARTIAL');
+  });
+
+  // Auto-sync single non-credit payment with finalGrandTotal if user hasn't explicitly entered a partial amount
+  React.useEffect(() => {
+    if (!isManualAmount && paymentSplits.length === 1) {
+      if (paymentSplits[0].mode === 'CREDIT') {
+        if (paymentSplits[0].amount !== 0) {
+          setPaymentSplits([{ id: paymentSplits[0].id, mode: 'CREDIT', amount: 0 }]);
+        }
+      } else {
+        if (paymentSplits[0].amount !== finalGrandTotal) {
+          setPaymentSplits([{ id: paymentSplits[0].id, mode: paymentSplits[0].mode, amount: finalGrandTotal }]);
+        }
+      }
+    }
+  }, [finalGrandTotal, isManualAmount, paymentSplits]);
 
   const totalPaid = useMemo(() => {
-    if (paymentModeTab === 'credit') return 0;
-    return Number(cashAmount) + Number(bankAmount);
-  }, [paymentModeTab, cashAmount, bankAmount]);
+    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
+      return 0;
+    }
+    return paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  }, [paymentSplits]);
 
   const balanceDue = useMemo(() => {
     return Math.max(0, finalGrandTotal - totalPaid);
   }, [finalGrandTotal, totalPaid]);
+
+  // Auto-identify payment status: 'PAID' | 'PARTIAL' | 'UNPAID'
+  const autoPaymentStatus: PaymentStatus = useMemo(() => {
+    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
+      return 'UNPAID';
+    }
+    if (finalGrandTotal <= 0) {
+      return 'PAID';
+    }
+    if (totalPaid >= finalGrandTotal) {
+      return 'PAID';
+    }
+    if (totalPaid > 0 && totalPaid < finalGrandTotal) {
+      return 'PARTIAL';
+    }
+    return 'UNPAID';
+  }, [paymentSplits, totalPaid, finalGrandTotal]);
+
+  const handleUpdateSplitMode = (id: string, newMode: PaymentMode) => {
+    setPaymentSplits((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        if (newMode === 'CREDIT') {
+          return { ...s, mode: newMode, amount: 0 };
+        }
+        return {
+          ...s,
+          mode: newMode,
+          amount: prev.length === 1 && !isManualAmount ? finalGrandTotal : s.amount,
+        };
+      })
+    );
+  };
+
+  const handleUpdateSplitAmount = (id: string, newAmount: number) => {
+    setIsManualAmount(true);
+    setPaymentSplits((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, amount: Math.max(0, newAmount) } : s))
+    );
+  };
+
+  const handleAddSplitMode = () => {
+    setIsManualAmount(true);
+    const existingModes = new Set(paymentSplits.map((s) => s.mode));
+    const nextMode: PaymentMode = !existingModes.has('UPI')
+      ? 'UPI'
+      : !existingModes.has('NET_BANKING')
+      ? 'NET_BANKING'
+      : !existingModes.has('CARD')
+      ? 'CARD'
+      : 'CASH';
+
+    const currentTotal = paymentSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
+    const remaining = Math.max(0, finalGrandTotal - currentTotal);
+
+    setPaymentSplits([
+      ...paymentSplits,
+      {
+        id: String(Date.now()),
+        mode: nextMode,
+        amount: remaining,
+      },
+    ]);
+  };
+
+  const handleRemoveSplit = (id: string) => {
+    const updated = paymentSplits.filter((s) => s.id !== id);
+    if (updated.length === 1 && updated[0].amount >= finalGrandTotal) {
+      setIsManualAmount(false);
+    }
+    setPaymentSplits(updated);
+  };
 
   // Add row
   const addRow = (presetItem?: InventoryItem) => {
@@ -328,23 +413,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     });
 
     const isB2B = Boolean(selectedParty?.gstin && selectedParty.gstin.length === 15);
-    let resolvedPaymentMode: PaymentMode = 'CASH';
-    if (paymentModeTab === 'credit') {
+    let resolvedPaymentMode: PaymentMode = paymentSplits[0]?.mode || 'CASH';
+    if (autoPaymentStatus === 'UNPAID' && paymentSplits[0]?.mode === 'CREDIT') {
       resolvedPaymentMode = 'CREDIT';
-    } else if (bankAmount > 0 && cashAmount > 0) {
-      resolvedPaymentMode = 'UPI'; // Split / hybrid
-    } else if (bankAmount > 0) {
-      resolvedPaymentMode = 'UPI';
-    } else {
-      resolvedPaymentMode = 'CASH';
+    } else if (paymentSplits.length > 1) {
+      const nonCash = paymentSplits.find((s) => s.mode !== 'CASH');
+      resolvedPaymentMode = nonCash ? nonCash.mode : paymentSplits[0].mode;
     }
 
-    const paymentStatus =
-      paymentModeTab === 'credit' || balanceDue > 0
-        ? totalPaid > 0
-          ? 'PARTIAL'
-          : 'UNPAID'
-        : 'PAID';
+    const paymentStatus: PaymentStatus = autoPaymentStatus;
 
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
@@ -482,7 +559,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       </header>
 
       {/* Main Full-Width Scrollable Workstation */}
-      <main className="flex-1 flex flex-col relative w-full pt-14 pb-24 bg-surface overflow-y-auto">
+      <main className="flex-1 flex flex-col relative w-full pt-14 pb-36 sm:pb-32 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
           {/* Ultra-Compact Document Header Bar */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-2 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
@@ -798,287 +875,267 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             )}
           </div>
 
-          {/* Lower Workstation Section: Left Payment & Terms, Right Financial Ledger */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-            {/* Left Column: Payment Settlement Details */}
-            <div className="lg:col-span-6 flex flex-col gap-2">
-              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
-                {/* Header with Quick Payment Mode Selector */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
-                    <span className="font-bold text-xs text-on-surface">Payment Settlement</span>
-                  </div>
-
-                  {/* 1-Tap Quick Payment Mode Buttons */}
-                  <div className="inline-flex rounded-lg bg-surface-container p-0.5 border border-outline-variant/20 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentModeTab('paid');
-                        setCashAmount(finalGrandTotal);
-                        setBankAmount(0);
-                      }}
-                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
-                        paymentModeTab === 'paid' && bankAmount === 0
-                          ? 'bg-surface-container-lowest text-secondary shadow-2xs'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[13px]">payments</span>
-                      <span>Cash</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentModeTab('paid');
-                        setBankAmount(finalGrandTotal);
-                        setCashAmount(0);
-                      }}
-                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
-                        paymentModeTab === 'paid' && bankAmount > 0 && cashAmount === 0
-                          ? 'bg-surface-container-lowest text-secondary shadow-2xs'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[13px]">account_balance</span>
-                      <span>Bank / UPI</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentModeTab('credit')}
-                      className={`px-2 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
-                        paymentModeTab === 'credit'
-                          ? 'bg-surface-container-lowest text-error shadow-2xs'
-                          : 'text-on-surface-variant hover:text-on-surface'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[13px]">schedule</span>
-                      <span>Credit</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Compact Payment Split & Settlement Status */}
-                {paymentModeTab === 'paid' ? (
-                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/15 text-xs">
-                    {/* Cash Split Field */}
-                    <div className="flex-1 min-w-[120px] flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                      <span className="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1">
-                        <span>Cash:</span>
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[11px] text-outline">₹</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={cashAmount || ''}
-                          onChange={(e) => setCashAmount(Math.max(0, Number(e.target.value) || 0))}
-                          placeholder="0"
-                          className="w-20 text-right font-tabular-data font-bold text-xs text-on-surface bg-transparent outline-none focus:text-secondary"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Bank / UPI Split Field */}
-                    <div className="flex-1 min-w-[120px] flex items-center justify-between gap-1.5 px-2 py-1 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                      <span className="text-[11px] font-semibold text-on-surface-variant flex items-center gap-1">
-                        <span>Bank:</span>
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        <span className="text-[11px] text-outline">₹</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={bankAmount || ''}
-                          onChange={(e) => setBankAmount(Math.max(0, Number(e.target.value) || 0))}
-                          placeholder="0"
-                          className="w-20 text-right font-tabular-data font-bold text-xs text-on-surface bg-transparent outline-none focus:text-secondary"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Status Pill */}
-                    {balanceDue > 0 ? (
-                      <div className="px-2 py-1 rounded-lg bg-error-container/40 text-on-error-container text-[11px] font-bold flex items-center gap-1 shrink-0">
-                        <span>Due:</span>
-                        <span className="font-tabular-data">{formatINR(balanceDue)}</span>
-                      </div>
-                    ) : (
-                      <div className="px-2 py-1 rounded-lg bg-secondary-container/40 text-secondary text-[11px] font-bold flex items-center gap-0.5 shrink-0">
-                        <span className="material-symbols-outlined text-[14px]">check</span>
-                        <span>Settled</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="material-symbols-outlined text-[15px] text-amber-600 shrink-0">info</span>
-                      <span className="truncate">Unpaid credit added to customer ledger</span>
-                    </div>
-                    <span className="font-tabular-data font-bold shrink-0">{formatINR(finalGrandTotal)}</span>
-                  </div>
-                )}
+          {/* Financial Ledger Summary (Subtotal, Taxes, Roundoff, Shipping, Discount, Grand Total) */}
+          <div className="flex justify-end w-full">
+            <div className="w-full lg:max-w-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
+              <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/20">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                  Invoice Summary
+                </span>
+                <span className="text-[11px] font-bold text-secondary">
+                  {isGstActive ? 'GST Compliant' : 'Non-GST'}
+                </span>
               </div>
-            </div>
 
-            {/* Right Column: Condensed Accounting Ledger Summary */}
-            <div className="lg:col-span-5">
-              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 sm:p-4 shadow-xs flex flex-col gap-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/20">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                    Invoice Summary
-                  </span>
-                  <span className="text-[11px] font-bold text-secondary">
-                    {isGstActive ? 'GST Compliant' : 'Non-GST'}
-                  </span>
-                </div>
+              {/* Subtotal */}
+              <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                <span>{isGstActive ? 'Subtotal (Items gross)' : 'Subtotal'}</span>
+                <span className="font-tabular-data font-semibold text-on-surface">
+                  {formatINR(calcSummary.totalGrossAmount)}
+                </span>
+              </div>
 
-                {/* Subtotal */}
-                <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                  <span>{isGstActive ? 'Subtotal (Items gross)' : 'Subtotal'}</span>
-                  <span className="font-tabular-data font-semibold text-on-surface">
-                    {formatINR(calcSummary.totalGrossAmount)}
-                  </span>
-                </div>
-
-                {/* Taxes - only if GST is active */}
-                {isGstActive && (
-                  <>
-                    <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                      <button
-                        type="button"
-                        onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-                        className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
-                      >
-                        <span>{calcSummary.isIntraState ? 'Taxes (CGST + SGST)' : 'Taxes (IGST)'}</span>
-                        <span className="material-symbols-outlined text-[13px] text-outline">info</span>
-                      </button>
-                      <span className="font-tabular-data font-semibold text-on-surface">
-                        +{formatINR(calcSummary.totalTax)}
-                      </span>
-                    </div>
-
-                    {isTaxDetailsOpen && (
-                      <div className="p-2 rounded-lg bg-surface-container-low text-[11px] flex flex-col gap-1 border border-outline-variant/20 animate-fade-in">
-                        {calcSummary.isIntraState ? (
-                          <>
-                            <div className="flex items-center justify-between text-on-surface-variant">
-                              <span>Central GST (CGST)</span>
-                              <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalCgst)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-on-surface-variant">
-                              <span>State GST (SGST)</span>
-                              <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalSgst)}</span>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-between text-on-surface-variant">
-                            <span>Integrated GST (IGST)</span>
-                            <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalIgst)}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
-                          <span>Taxable Base</span>
-                          <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalTaxableAmount)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Round Off */}
-                <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                  <span>Round Off</span>
-                  <span className="font-tabular-data font-semibold text-on-surface">
-                    {calcSummary.roundOff >= 0 ? `+₹${calcSummary.roundOff}` : `-₹${Math.abs(calcSummary.roundOff)}`}
-                  </span>
-                </div>
-
-                {/* Shipping Charges */}
-                <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[15px] text-outline">local_shipping</span>
-                    <span>Shipping Charges</span>
-                  </div>
-                  <div className="relative w-28 flex items-center">
-                    <span className="absolute left-2 text-xs font-semibold text-outline pointer-events-none">₹</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={shippingAmount || ''}
-                      onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
-                      placeholder="0.00"
-                      className="w-full pl-5 pr-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Overall Discount (Below Roundoff) */}
-                <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[15px] text-outline">percent</span>
-                    <span>Bill Discount</span>
-                  </div>
-                  <div className="flex items-center gap-1">
+              {/* Taxes - only if GST is active */}
+              {isGstActive && (
+                <>
+                  <div className="flex items-center justify-between text-xs text-on-surface-variant">
                     <button
                       type="button"
-                      onClick={() => setIsExtraDiscountModalOpen(true)}
-                      className={`px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border ${
-                        overallDiscountAmount > 0
-                          ? 'bg-secondary/15 text-secondary border-secondary/30'
-                          : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-outline-variant/30'
-                      }`}
+                      onClick={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
+                      className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
                     >
-                      {overallDiscountAmount > 0 ? (
+                      <span>{calcSummary.isIntraState ? 'Taxes (CGST + SGST)' : 'Taxes (IGST)'}</span>
+                      <span className="material-symbols-outlined text-[13px] text-outline">info</span>
+                    </button>
+                    <span className="font-tabular-data font-semibold text-on-surface">
+                      +{formatINR(calcSummary.totalTax)}
+                    </span>
+                  </div>
+
+                  {isTaxDetailsOpen && (
+                    <div className="p-2 rounded-lg bg-surface-container-low text-[11px] flex flex-col gap-1 border border-outline-variant/20 animate-fade-in">
+                      {calcSummary.isIntraState ? (
                         <>
-                          <span>-{formatINR(overallDiscountAmount)}</span>
-                          <span className="text-[10px] opacity-80">({overallDiscountPercent}%)</span>
-                          <span className="material-symbols-outlined text-[12px]">edit</span>
+                          <div className="flex items-center justify-between text-on-surface-variant">
+                            <span>Central GST (CGST)</span>
+                            <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalCgst)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-on-surface-variant">
+                            <span>State GST (SGST)</span>
+                            <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalSgst)}</span>
+                          </div>
                         </>
                       ) : (
-                        <>
-                          <span className="material-symbols-outlined text-[13px]">add</span>
-                          <span>Add Discount</span>
-                        </>
+                        <div className="flex items-center justify-between text-on-surface-variant">
+                          <span>Integrated GST (IGST)</span>
+                          <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalIgst)}</span>
+                        </div>
                       )}
-                    </button>
-                    {overallDiscountAmount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setOverallDiscountPercent(0)}
-                        title="Remove discount"
-                        className="w-5 h-5 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[13px]">close</span>
-                      </button>
-                    )}
-                  </div>
+                      <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">
+                        <span>Taxable Base</span>
+                        <span className="font-tabular-data font-bold">{formatINR(calcSummary.totalTaxableAmount)}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Round Off */}
+              <div className="flex items-center justify-between text-xs text-on-surface-variant">
+                <span>Round Off</span>
+                <span className="font-tabular-data font-semibold text-on-surface">
+                  {calcSummary.roundOff >= 0 ? `+₹${calcSummary.roundOff}` : `-₹${Math.abs(calcSummary.roundOff)}`}
+                </span>
+              </div>
+
+              {/* Shipping Charges */}
+              <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px] text-outline">local_shipping</span>
+                  <span>Shipping Charges</span>
                 </div>
+                <div className="relative w-28 flex items-center">
+                  <span className="absolute left-2 text-xs font-semibold text-outline pointer-events-none">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={shippingAmount || ''}
+                    onChange={(e) => setShippingAmount(Math.max(0, Number(e.target.value) || 0))}
+                    placeholder="0.00"
+                    className="w-full pl-5 pr-2 py-0.5 rounded bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                  />
+                </div>
+              </div>
 
-                <div className="h-px bg-outline-variant/20 my-1"></div>
+              {/* Overall Discount (Below Roundoff) */}
+              <div className="flex items-center justify-between text-xs text-on-surface-variant py-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px] text-outline">percent</span>
+                  <span>Bill Discount</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsExtraDiscountModalOpen(true)}
+                    className={`px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border ${
+                      overallDiscountAmount > 0
+                        ? 'bg-secondary/15 text-secondary border-secondary/30'
+                        : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-outline-variant/30'
+                    }`}
+                  >
+                    {overallDiscountAmount > 0 ? (
+                      <>
+                        <span>-{formatINR(overallDiscountAmount)}</span>
+                        <span className="text-[10px] opacity-80">({overallDiscountPercent}%)</span>
+                        <span className="material-symbols-outlined text-[12px]">edit</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[13px]">add</span>
+                        <span>Add Discount</span>
+                      </>
+                    )}
+                  </button>
+                  {overallDiscountAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOverallDiscountPercent(0)}
+                      title="Remove discount"
+                      className="w-5 h-5 rounded flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">close</span>
+                    </button>
+                  )}
+                </div>
+              </div>
 
-                {/* Grand Total Ledger Highlight Box */}
-                <div className="p-3 rounded-lg bg-surface-container text-on-surface flex items-center justify-between border border-outline-variant/30">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant block">
-                      Grand Total Amount
-                    </span>
-                    <span className="text-[11px] text-on-surface-variant">
-                      {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} Total Units
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-tabular-data text-xl sm:text-2xl font-black text-secondary tracking-tight block">
-                      {formatINR(finalGrandTotal)}
-                    </span>
-                  </div>
+              <div className="h-px bg-outline-variant/20 my-1"></div>
+
+              {/* Grand Total Ledger Highlight Box */}
+              <div className="p-3 rounded-lg bg-surface-container text-on-surface flex items-center justify-between border border-outline-variant/30">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant block">
+                    Grand Total Amount
+                  </span>
+                  <span className="text-[11px] text-on-surface-variant">
+                    {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} Total Units
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-tabular-data text-xl sm:text-2xl font-black text-secondary tracking-tight block">
+                    {formatINR(finalGrandTotal)}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Payment Settlement (Moved to Bottom) */}
+          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
+            {/* Header with Title and Auto-Identified Status */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                <span className="font-bold text-xs text-on-surface">Payment Settlement</span>
+              </div>
+
+              {/* Auto-identified Payment Status Badge */}
+              <div>
+                {autoPaymentStatus === 'PAID' && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                    <span>Paid</span>
+                  </span>
+                )}
+                {autoPaymentStatus === 'PARTIAL' && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">timelapse</span>
+                    <span>Partial · Due: {formatINR(balanceDue)}</span>
+                  </span>
+                )}
+                {autoPaymentStatus === 'UNPAID' && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-error/15 text-error border border-error/30 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">schedule</span>
+                    <span>Unpaid · Due: {formatINR(balanceDue)}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Splits (Payment Type + Amount + Plus Button for Split) */}
+            <div className="flex flex-col gap-2 pt-1 border-t border-outline-variant/15">
+              {paymentSplits.map((split, index) => (
+                <div key={split.id} className="flex items-center gap-2">
+                  {/* Payment Type Selector */}
+                  <div className="relative flex-1 sm:max-w-[170px]">
+                    <select
+                      value={split.mode}
+                      onChange={(e) => handleUpdateSplitMode(split.id, e.target.value as PaymentMode)}
+                      className="w-full h-8 pl-2 pr-6 rounded-lg bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-colors cursor-pointer appearance-none"
+                    >
+                      {PAYMENT_MODES.map((pm) => (
+                        <option key={pm.value} value={pm.value}>
+                          {pm.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined text-[16px] text-outline absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                      arrow_drop_down
+                    </span>
+                  </div>
+
+                  {/* Amount Input (or ledger banner if Credit) */}
+                  {split.mode !== 'CREDIT' ? (
+                    <div className="relative flex-1 flex items-center">
+                      <span className="absolute left-2 text-xs font-semibold text-outline pointer-events-none">₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={split.amount || ''}
+                        onChange={(e) => handleUpdateSplitAmount(split.id, Number(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full h-8 pl-5 pr-2 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex-1 h-8 px-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 font-medium flex items-center justify-between">
+                      <span className="truncate">Ledger Balance</span>
+                      <span className="font-tabular-data font-bold shrink-0">{formatINR(finalGrandTotal)}</span>
+                    </div>
+                  )}
+
+                  {/* Plus button next to it for split payment modes */}
+                  {index === 0 && split.mode !== 'CREDIT' && (
+                    <button
+                      type="button"
+                      onClick={handleAddSplitMode}
+                      title="Add split payment mode"
+                      className="h-8 px-2 sm:px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs flex items-center gap-1 border border-outline-variant/30 transition-all cursor-pointer shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px] text-secondary">add</span>
+                      <span className="hidden sm:inline">Split</span>
+                    </button>
+                  )}
+
+                  {/* Remove button for secondary splits */}
+                  {index > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSplit(split.id)}
+                      title="Remove split"
+                      className="h-8 w-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Bottom spacing clearance to prevent overlap with sticky action dock */}
+          <div className="h-8" aria-hidden="true" />
         </div>
       </main>
 
