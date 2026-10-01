@@ -484,135 +484,113 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       {/* Main Full-Width Scrollable Workstation */}
       <main className="flex-1 flex flex-col relative w-full pt-14 pb-24 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
-          {/* Document Header Band: Billed To Customer & Invoice Metadata */}
-          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xs overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-outline-variant/20">
-            {/* Customer / Billed To Section */}
-            <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                    Billed To (Customer)
-                  </span>
+          {/* Ultra-Compact Document Header Bar */}
+          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-2 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
+            {/* Customer Pill / Selector */}
+            <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+              <button
+                type="button"
+                onClick={() => setIsPartyModalOpen(true)}
+                className="flex items-center gap-2 hover:bg-surface-container-low px-2 py-1 rounded-lg transition-colors cursor-pointer group min-w-0 text-left"
+                title="Select or Change Customer"
+              >
+                <div className="w-7 h-7 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0 group-hover:bg-secondary group-hover:text-on-secondary transition-colors">
+                  <span className="material-symbols-outlined text-[17px]">person</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPartyModalOpen(true)}
-                  className="inline-flex items-center gap-1 text-secondary font-bold text-xs hover:underline cursor-pointer"
-                >
-                  <span>{selectedParty ? 'Change Customer' : '+ Select Customer'}</span>
-                  <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="font-bold text-sm sm:text-base text-on-surface truncate">
-                    {selectedParty ? selectedParty.name : 'Cash Sale / Walk-in Customer'}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-on-surface-variant">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-secondary">
+                      {selectedParty ? selectedParty.name : 'Walk-in Customer'}
+                    </span>
+                    <span className="material-symbols-outlined text-[14px] text-outline group-hover:text-secondary shrink-0">
+                      swap_horiz
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate">
                     {selectedParty?.gstin && isGstActive ? (
-                      <span className="font-mono text-[11px] font-semibold bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/20">
+                      <span className="font-mono font-semibold text-secondary">
                         GSTIN: {selectedParty.gstin}
                       </span>
                     ) : (
-                      <span className="text-[11px] bg-surface-container px-1.5 py-0.5 rounded font-medium">
-                        Unregistered / Retail
-                      </span>
+                      <span className="text-outline">Cash Sale / Retail</span>
                     )}
-                    <span>· Place of Supply: <strong className="text-on-surface">{posStateCode}</strong></span>
-                    {selectedParty?.billingAddress && (
-                      <span className="truncate max-w-xs">· {selectedParty.billingAddress}</span>
+                    {posStateCode && (
+                      <span>· PoS: {posStateCode}</span>
                     )}
                   </div>
                 </div>
+              </button>
 
-                {selectedParty && (
-                  <div className="text-right shrink-0">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                        (selectedParty?.currentBalance || 0) > 0
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                          : (selectedParty?.currentBalance || 0) < 0
-                          ? 'bg-error-container text-on-error-container'
-                          : 'bg-secondary-container text-on-secondary-container'
-                      }`}
-                    >
-                      {(selectedParty?.currentBalance || 0) > 0
-                        ? `Balance Due: ${formatINR(selectedParty?.currentBalance || 0)}`
-                        : 'Balance: Settled'}
+              {selectedParty && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {(selectedParty.currentBalance || 0) > 0 ? (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/60">
+                      Due: {formatINR(selectedParty.currentBalance || 0)}
                     </span>
-                  </div>
-                )}
-              </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedParty(null);
+                    }}
+                    title="Clear customer (revert to Walk-in)"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Invoice Meta Grid Section (Invoice No, Dates, Mode) */}
-            <div className="p-3 sm:p-4 md:w-80 lg:w-96 bg-surface-container-low/30 flex flex-col justify-between gap-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Invoice Number */}
-                <button
-                  type="button"
-                  onClick={() => setIsInvoiceNumberModalOpen(true)}
-                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
-                    Invoice No.
-                  </span>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="font-bold text-xs sm:text-sm text-on-surface group-hover:text-secondary truncate">
-                      #{invoiceNumber}
-                    </span>
-                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">edit</span>
-                  </div>
-                </button>
+            {/* Invoice Metadata Pills (Invoice No, Dates, Billing Mode) */}
+            <div className="flex items-center flex-wrap gap-1.5">
+              {/* Invoice Number */}
+              <button
+                type="button"
+                onClick={() => setIsInvoiceNumberModalOpen(true)}
+                className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+                title="Change Invoice Number"
+              >
+                <span className="text-[9px] uppercase font-bold text-outline">No:</span>
+                <span className="font-bold text-on-surface truncate max-w-[120px]">#{invoiceNumber}</span>
+                <span className="material-symbols-outlined text-[12px] text-outline">edit</span>
+              </button>
 
-                {/* Invoice Date */}
-                <button
-                  type="button"
-                  onClick={() => setIsInvoiceNumberModalOpen(true)}
-                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
-                    Invoice Date
-                  </span>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="font-semibold text-xs sm:text-sm text-on-surface group-hover:text-secondary truncate">
-                      {formatDateDisplay(invoiceDate)}
-                    </span>
-                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">calendar_today</span>
-                  </div>
-                </button>
-              </div>
+              {/* Invoice Date */}
+              <button
+                type="button"
+                onClick={() => setIsInvoiceNumberModalOpen(true)}
+                className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+                title="Change Invoice Date"
+              >
+                <span className="material-symbols-outlined text-[13px] text-outline">calendar_today</span>
+                <span>{formatDateDisplay(invoiceDate)}</span>
+              </button>
 
-              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-outline-variant/20">
-                {/* Due Date */}
-                <button
-                  type="button"
-                  onClick={() => setIsDueDateModalOpen(true)}
-                  className="text-left p-1.5 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group"
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
-                    Due Date
-                  </span>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="font-semibold text-xs text-on-surface group-hover:text-secondary truncate">
-                      {formatDateDisplay(dueDate)}
-                    </span>
-                    <span className="material-symbols-outlined text-[13px] text-outline group-hover:text-secondary">event</span>
-                  </div>
-                </button>
+              {/* Due Date */}
+              <button
+                type="button"
+                onClick={() => setIsDueDateModalOpen(true)}
+                className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+                title="Change Due Date"
+              >
+                <span className="text-[9px] uppercase font-bold text-outline">Due:</span>
+                <span>{formatDateDisplay(dueDate)}</span>
+                <span className="material-symbols-outlined text-[12px] text-outline">event</span>
+              </button>
 
-                {/* Tax / Retail Mode Status */}
-                <div className="p-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant block">
-                    Billing Mode
-                  </span>
-                  <span className="font-bold text-xs text-secondary truncate block mt-0.5">
-                    {isGstActive ? 'GST Invoice' : 'Non-GST Bill'}
-                  </span>
+              {/* Mode & PoS */}
+              {isGstActive ? (
+                <div className="h-7 px-2 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1 border border-secondary/20">
+                  <span>GST</span>
+                  <span className="text-[10px] font-mono opacity-80">({posStateCode})</span>
                 </div>
-              </div>
+              ) : (
+                <div className="h-7 px-2 rounded-lg bg-surface-container text-on-surface-variant font-medium text-[11px] flex items-center border border-outline-variant/20">
+                  Non-GST
+                </div>
+              )}
             </div>
           </div>
 
