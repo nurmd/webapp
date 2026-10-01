@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const brandInitial = (company.tradeName || company.businessName || 'V')[0].toUpperCase();
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 bg-surface-container-lowest/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-outline-variant/25 shadow-[0_1px_6px_rgba(0,0,0,0.03)] pt-safe transition-colors">
+    <header className="sticky top-0 z-40 bg-surface-container-lowest/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-outline-variant/25 shadow-[0_1px_6px_rgba(0,0,0,0.03)] pt-safe transition-colors">
       <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 max-w-7xl mx-auto">
         {/* Left: Navigation Menu Toggle & Brand Identity */}
         <div className="flex items-center gap-2 min-w-0 flex-1">

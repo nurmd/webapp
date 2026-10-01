@@ -368,7 +368,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Scrollable View Area with safe-area padding */}
-      <main className="flex-1 w-full pt-16 pb-20">
+      <main className="flex-1 w-full pb-24">
         {activeTab === 'dashboard' && (
           <DashboardView
             company={company}
