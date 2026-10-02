@@ -7,6 +7,8 @@ import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
+import { db } from '../../services/db.ts';
+import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
 
 interface QuickBillingViewProps {
   company: CompanyProfile;
@@ -133,7 +135,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
-      invoiceNumber: `${company.invoicePrefix || 'POS-'}${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: generateNextInvoiceNumber(company.invoicePrefix || 'POS-', db.getInvoices()),
       invoiceType: 'B2CS',
       date: new Date().toISOString().split('T')[0],
       partyName: customerPhone ? `Retail (${customerPhone})` : 'Walk-in Retail Customer',

@@ -13,12 +13,20 @@ import { InvoicePreviewModal } from './InvoicePreviewModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
+import { db } from '../../services/db.ts';
+import {
+  generateNextInvoiceNumber,
+  findConflictingInvoice,
+  suggestNextUniqueInvoiceNumber,
+} from '../../core/utils/invoiceNumber.ts';
 
 interface TableGridInvoiceModalProps {
   company: CompanyProfile;
   parties: Party[];
   itemsCatalog: InventoryItem[];
   initialInvoice?: Invoice | null;
+  initialParty?: Party | null;
+  existingInvoices?: Invoice[];
   onClose: () => void;
   onSave: (invoice: Invoice) => void;
   onAddNewParty: () => void;
@@ -31,10 +39,17 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   parties,
   itemsCatalog,
   initialInvoice,
+  initialParty,
+  existingInvoices,
   onClose,
   onSave,
   onAddNewParty,
 }) => {
+  // All invoices in database for uniqueness verification
+  const allInvoices = useMemo(() => {
+    return existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+  }, [existingInvoices]);
+
   // Party selection - clean start without dummy selection
   const [selectedParty, setSelectedParty] = useState<Party | null>(() => {
     if (initialInvoice) {
@@ -56,18 +71,32 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         updatedAt: new Date().toISOString(),
       };
     }
+    if (initialParty) {
+      return initialParty;
+    }
     return null;
   });
 
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
 
-  // Invoice numbers & dates
-  const [invoiceNumber, setInvoiceNumber] = useState<string>(
-    initialInvoice?.invoiceNumber ||
-      `${company.invoicePrefix || 'INV-'}${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-  );
+  // Invoice numbers & dates (Sequential & Guaranteed Unique)
+  const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
+    if (initialInvoice?.invoiceNumber) return initialInvoice.invoiceNumber;
+    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    return generateNextInvoiceNumber(company.invoicePrefix || 'INV-', invs);
+  });
   const [isInvoiceNumberModalOpen, setIsInvoiceNumberModalOpen] = useState(false);
   const [customInvoiceNumberInput, setCustomInvoiceNumberInput] = useState(invoiceNumber);
+  const [invoiceConflictError, setInvoiceConflictError] = useState<string | null>(null);
+
+  // Real-time conflict checks against all invoices
+  const currentConflict = useMemo(() => {
+    return findConflictingInvoice(invoiceNumber, initialInvoice?.id, allInvoices);
+  }, [invoiceNumber, initialInvoice, allInvoices]);
+
+  const dialogConflict = useMemo(() => {
+    return findConflictingInvoice(customInvoiceNumberInput, initialInvoice?.id, allInvoices);
+  }, [customInvoiceNumberInput, initialInvoice, allInvoices]);
 
   const [invoiceDate, setInvoiceDate] = useState<string>(
     initialInvoice ? initialInvoice.date : new Date().toISOString().split('T')[0]
@@ -471,6 +500,22 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       return;
     }
 
+    // Validate invoice number uniqueness under GST compliance
+    const trimmedNumber = invoiceNumber.trim();
+    if (!trimmedNumber) {
+      setInvoiceConflictError('Please enter a valid invoice number.');
+      setIsInvoiceNumberModalOpen(true);
+      return;
+    }
+
+    const conflict = findConflictingInvoice(trimmedNumber, initialInvoice?.id, allInvoices);
+    if (conflict) {
+      const errMsg = `Cannot issue invoice: Invoice number "${trimmedNumber}" already exists for ${conflict.partyName || 'Customer'} (${conflict.date || 'prior bill'}). Only unique invoice numbers are allowed under GST compliance.`;
+      setInvoiceConflictError(errMsg);
+      setIsInvoiceNumberModalOpen(true);
+      return;
+    }
+
     const newInvoice = constructInvoiceObject();
     onSave(newInvoice);
 
@@ -604,13 +649,27 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               {/* Invoice Number */}
               <button
                 type="button"
-                onClick={() => setIsInvoiceNumberModalOpen(true)}
-                className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-                title="Change Invoice Number"
+                onClick={() => {
+                  setCustomInvoiceNumberInput(invoiceNumber);
+                  setInvoiceConflictError(null);
+                  setIsInvoiceNumberModalOpen(true);
+                }}
+                className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border ${
+                  currentConflict
+                    ? 'bg-error/15 text-error border-error/50 hover:bg-error/25 animate-pulse'
+                    : 'bg-surface-container-low hover:bg-surface-container text-on-surface border-outline-variant/20'
+                }`}
+                title={
+                  currentConflict
+                    ? `Conflicting invoice number! #${invoiceNumber} is already used by ${currentConflict.partyName || 'Customer'}`
+                    : 'Change Invoice Number'
+                }
               >
                 <span className="text-[9px] uppercase font-bold text-outline">No:</span>
-                <span className="font-bold text-on-surface truncate max-w-[120px]">#{invoiceNumber}</span>
-                <span className="material-symbols-outlined text-[12px] text-outline">edit</span>
+                <span className="font-bold truncate max-w-[120px]">#{invoiceNumber}</span>
+                <span className={`material-symbols-outlined text-[12px] ${currentConflict ? 'text-error font-bold' : 'text-outline'}`}>
+                  {currentConflict ? 'warning' : 'edit'}
+                </span>
               </button>
 
               {/* Invoice Date */}
@@ -649,6 +708,34 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Conflicting Invoice Alert Banner */}
+          {(currentConflict || invoiceConflictError) && (
+            <div className="bg-error-container/40 border border-error/40 text-error rounded-xl p-2.5 sm:p-3 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[20px] shrink-0 text-error">warning</span>
+                <div className="min-w-0">
+                  <span className="font-bold block">Conflicting Invoice Number: #{invoiceNumber}</span>
+                  <span className="text-[11px] opacity-90 truncate block">
+                    {invoiceConflictError || `Already issued to ${currentConflict?.partyName || 'Customer'} (${currentConflict?.date || 'earlier'}). Only unique invoice numbers are allowed.`}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const autoNext = suggestNextUniqueInvoiceNumber(invoiceNumber, initialInvoice?.id, allInvoices);
+                  setInvoiceNumber(autoNext);
+                  setCustomInvoiceNumberInput(autoNext);
+                  setInvoiceConflictError(null);
+                }}
+                className="shrink-0 px-2.5 py-1.5 rounded-lg bg-error text-on-error font-bold text-xs hover:bg-error/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+              >
+                <span className="material-symbols-outlined text-[14px]">auto_fix_high</span>
+                <span>Auto-Fix</span>
+              </button>
+            </div>
+          )}
 
           {/* Full-Width Line Items Table Sheet */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xs overflow-hidden">
@@ -1244,16 +1331,59 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             </h3>
 
             <div>
-              <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
-                Invoice Number Series
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-on-surface-variant block">
+                  Invoice Number Series
+                </label>
+                {dialogConflict ? (
+                  <span className="text-[10px] font-bold text-error flex items-center gap-0.5">
+                    <span className="material-symbols-outlined text-[13px]">cancel</span>
+                    Number in use
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                    Available
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 value={customInvoiceNumberInput}
-                onChange={(e) => setCustomInvoiceNumberInput(e.target.value)}
+                onChange={(e) => {
+                  setCustomInvoiceNumberInput(e.target.value);
+                  setInvoiceConflictError(null);
+                }}
                 placeholder="e.g. INV-2024-001"
-                className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40"
+                className={`w-full bg-surface-container-low border rounded-xl px-3 py-2 text-sm font-semibold outline-none transition-colors ${
+                  dialogConflict
+                    ? 'border-error text-error focus:ring-2 focus:ring-error/40'
+                    : 'border-outline-variant/40 text-on-surface focus:ring-2 focus:ring-secondary/40'
+                }`}
               />
+
+              {dialogConflict && (
+                <div className="mt-1.5 p-2.5 rounded-lg bg-error-container/30 border border-error/40 text-error text-[11px] flex flex-col gap-1.5 animate-shake">
+                  <div className="flex items-start gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] shrink-0 text-error mt-0.5">error</span>
+                    <span>
+                      <strong>#{customInvoiceNumberInput.trim()}</strong> is already issued to <strong>{dialogConflict.partyName || 'Customer'}</strong> ({dialogConflict.date || 'prior bill'}). Duplicate invoice numbers are not allowed under GST compliance.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextUnique = suggestNextUniqueInvoiceNumber(customInvoiceNumberInput, initialInvoice?.id, allInvoices);
+                      setCustomInvoiceNumberInput(nextUnique);
+                      setInvoiceConflictError(null);
+                    }}
+                    className="self-start px-2 py-1 rounded bg-error text-on-error font-bold text-[10px] hover:bg-error/90 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">auto_fix_high</span>
+                    <span>Use Next Available Unique ({suggestNextUniqueInvoiceNumber(customInvoiceNumberInput, initialInvoice?.id, allInvoices)})</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -1295,11 +1425,18 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               </button>
               <button
                 type="button"
+                disabled={Boolean(dialogConflict) || !customInvoiceNumberInput.trim()}
                 onClick={() => {
-                  setInvoiceNumber(customInvoiceNumberInput.trim() || invoiceNumber);
+                  if (dialogConflict || !customInvoiceNumberInput.trim()) return;
+                  setInvoiceNumber(customInvoiceNumberInput.trim());
+                  setInvoiceConflictError(null);
                   setIsInvoiceNumberModalOpen(false);
                 }}
-                className="flex-1 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm cursor-pointer"
+                className={`flex-1 py-2 rounded-xl font-label-md text-xs font-bold shadow-sm cursor-pointer transition-all ${
+                  dialogConflict || !customInvoiceNumberInput.trim()
+                    ? 'bg-outline-variant/30 text-outline cursor-not-allowed'
+                    : 'bg-secondary text-on-secondary hover:bg-secondary/90'
+                }`}
               >
                 Apply
               </button>

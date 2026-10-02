@@ -11,12 +11,15 @@ import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
+import { db } from '../../services/db.ts';
+import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
 
 interface TableGridPurchaseModalProps {
   company: CompanyProfile;
   parties: Party[];
   itemsCatalog: InventoryItem[];
   initialBill?: PurchaseBill | null;
+  initialSupplier?: Party | null;
   onClose: () => void;
   onSave: (bill: PurchaseBill) => void;
   onAddNewParty: () => void;
@@ -55,6 +58,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   parties,
   itemsCatalog,
   initialBill,
+  initialSupplier,
   onClose,
   onSave,
   onAddNewParty,
@@ -79,15 +83,23 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         }
       );
     }
+    if (initialSupplier) {
+      return initialSupplier;
+    }
     return suppliers[0] || null;
   });
 
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
 
-  // Bill metadata
-  const [billNumber, setBillNumber] = useState<string>(
-    initialBill?.billNumber || `PB-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-  );
+  // Bill metadata (Sequential & Unique)
+  const [billNumber, setBillNumber] = useState<string>(() => {
+    if (initialBill?.billNumber) return initialBill.billNumber;
+    const purchases = db.getPurchases();
+    return generateNextInvoiceNumber(
+      'PB-',
+      purchases.map((p) => ({ id: p.id, invoiceNumber: p.billNumber }))
+    );
+  });
   const [billDate, setBillDate] = useState<string>(
     initialBill ? initialBill.date : new Date().toISOString().split('T')[0]
   );

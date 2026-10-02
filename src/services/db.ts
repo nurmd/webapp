@@ -482,6 +482,15 @@ class StorageService {
 
   saveInvoice(invoice: Invoice): void {
     const list = this.getInvoices();
+    // Enforce unique invoice number under GST compliance
+    const norm = (invoice.invoiceNumber || '').trim().toUpperCase();
+    const conflict = list.find(
+      (inv) => inv.id !== invoice.id && (inv.invoiceNumber || '').trim().toUpperCase() === norm
+    );
+    if (conflict) {
+      throw new Error(`Invoice number "${invoice.invoiceNumber}" is already in use by invoice for ${conflict.partyName}. Invoices must have unique numbers.`);
+    }
+
     const idx = list.findIndex((inv) => inv.id === invoice.id);
     if (idx >= 0) {
       list[idx] = invoice;

@@ -7,6 +7,8 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { PartyDetailModal } from './PartyDetailModal.tsx';
+import { getStateList, getStateByCode } from '../../core/gst/stateCodes.ts';
+import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 
 interface PartiesViewProps {
   parties: Party[];
@@ -17,6 +19,8 @@ interface PartiesViewProps {
   onDeleteParty: (id: string) => void;
   onRecordPartyPayment?: (party: Party, amount: number, paymentMode: string, notes: string) => void;
   onViewInvoice?: (invoice: Invoice) => void;
+  onCreateInvoice?: (party: Party) => void;
+  onCreatePurchase?: (party: Party) => void;
 }
 
 export const PartiesView: React.FC<PartiesViewProps> = ({
@@ -28,24 +32,41 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   onDeleteParty,
   onRecordPartyPayment,
   onViewInvoice,
+  onCreateInvoice,
+  onCreatePurchase,
 }) => {
   const company = db.getCompany();
   const allVouchers = vouchers || db.getVouchers();
+  const allStates = getStateList();
+
   // Segmented switch: Customers vs Suppliers (Stitch parties_ledger_simplified)
   const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED' | 'CREDIT_EXCEEDED'>('ALL');
+  const [sortBy, setSortBy] = useState<'HIGHEST_DUE' | 'NAME_ASC' | 'RECENT'>('HIGHEST_DUE');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyForLedger, setSelectedPartyForLedger] = useState<Party | null>(null);
 
+  // Quick Card Payment Modal State
+  const [quickPaymentParty, setQuickPaymentParty] = useState<Party | null>(null);
+  const [quickPayAmount, setQuickPayAmount] = useState<string>('');
+  const [quickPayMode, setQuickPayMode] = useState<string>('UPI');
+  const [quickPayNotes, setQuickPayNotes] = useState<string>('');
+  const [quickPayDate, setQuickPayDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
   // Party Form State
   const [name, setName] = useState('');
   const [type, setType] = useState<'CUSTOMER' | 'SUPPLIER'>('CUSTOMER');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [gstin, setGstin] = useState('');
+  const [pan, setPan] = useState('');
   const [stateCode, setStateCode] = useState('27');
   const [address, setAddress] = useState('');
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [hasSeparateShipping, setHasSeparateShipping] = useState(false);
+  const [creditLimit, setCreditLimit] = useState<string>('');
   const [openingBalance, setOpeningBalance] = useState<number>(0);
 
   // Partitioned lists
@@ -68,32 +89,63 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
   const activePartiesList = activeSegment === 'CUSTOMERS' ? customers : suppliers;
 
-  const filtered = activePartiesList.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.phone && p.phone.includes(search)) ||
-      (p.gstin && p.gstin.toLowerCase().includes(search.toLowerCase())) ||
-      p.billingAddress.toLowerCase().includes(search.toLowerCase());
+  const creditExceededCount = activePartiesList.filter(
+    (p) => p.creditLimit && p.creditLimit > 0 && p.currentBalance > p.creditLimit
+  ).length;
 
-    if (!matchesSearch) return false;
+  // Filter & Search
+  const filtered = activePartiesList
+    .filter((p) => {
+      const q = search.toLowerCase();
+      const matchesSearch =
+        p.name.toLowerCase().includes(q) ||
+        (p.phone && p.phone.includes(q)) ||
+        (p.gstin && p.gstin.toLowerCase().includes(q)) ||
+        (p.pan && p.pan.toLowerCase().includes(q)) ||
+        (p.email && p.email.toLowerCase().includes(q)) ||
+        p.billingAddress.toLowerCase().includes(q);
 
-    if (statusFilter === 'OVERDUE') {
-      return activeSegment === 'CUSTOMERS' ? p.currentBalance > 0 : p.currentBalance < 0;
-    }
-    if (statusFilter === 'SETTLED') {
-      return p.currentBalance === 0;
-    }
-    return true;
-  });
+      if (!matchesSearch) return false;
+
+      if (statusFilter === 'OVERDUE') {
+        return activeSegment === 'CUSTOMERS' ? p.currentBalance > 0 : p.currentBalance < 0;
+      }
+      if (statusFilter === 'SETTLED') {
+        return p.currentBalance === 0;
+      }
+      if (statusFilter === 'CREDIT_EXCEEDED') {
+        return !!(p.creditLimit && p.creditLimit > 0 && p.currentBalance > p.creditLimit);
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'HIGHEST_DUE') {
+        return Math.abs(b.currentBalance) - Math.abs(a.currentBalance);
+      }
+      if (sortBy === 'NAME_ASC') {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === 'RECENT') {
+        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+        return dateB - dateA;
+      }
+      return 0;
+    });
 
   const handleOpenAddModal = () => {
     setEditingParty(null);
     setName('');
     setType(activeSegment === 'CUSTOMERS' ? 'CUSTOMER' : 'SUPPLIER');
     setPhone('');
+    setEmail('');
     setGstin('');
+    setPan('');
     setStateCode('27');
     setAddress('');
+    setShippingAddress('');
+    setHasSeparateShipping(false);
+    setCreditLimit('');
     setOpeningBalance(0);
     setIsModalOpen(true);
   };
@@ -103,25 +155,72 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     setName(party.name);
     setType(party.type);
     setPhone(party.phone);
+    setEmail(party.email || '');
     setGstin(party.gstin || '');
-    setStateCode(party.stateCode);
-    setAddress(party.billingAddress);
+    setPan(party.pan || '');
+    setStateCode(party.stateCode || '27');
+    setAddress(party.billingAddress || '');
+    setShippingAddress(party.shippingAddress || '');
+    setHasSeparateShipping(!!party.shippingAddress && party.shippingAddress !== party.billingAddress);
+    setCreditLimit(party.creditLimit ? party.creditLimit.toString() : '');
     setOpeningBalance(party.currentBalance);
     setIsModalOpen(true);
   };
 
+  const handleGstinInputChange = (val: string) => {
+    const uppercaseVal = val.toUpperCase().trim();
+    setGstin(uppercaseVal);
+
+    // Auto extract State Code
+    const detectedState = extractStateCodeFromGstin(uppercaseVal);
+    if (detectedState) {
+      setStateCode(detectedState);
+    }
+
+    // Auto extract PAN
+    const detectedPan = extractPanFromGstin(uppercaseVal);
+    if (detectedPan) {
+      setPan(detectedPan);
+    }
+  };
+
+  // Duplicate validations
+  const duplicatePhoneParty = phone.trim()
+    ? parties.find(
+        (p) =>
+          p.id !== editingParty?.id &&
+          p.phone.replace(/\D/g, '') === phone.trim().replace(/\D/g, '') &&
+          p.phone !== '9999999999'
+      )
+    : null;
+
+  const duplicateGstinParty = gstin.trim()
+    ? parties.find(
+        (p) =>
+          p.id !== editingParty?.id &&
+          p.gstin &&
+          p.gstin.trim().toUpperCase() === gstin.trim().toUpperCase()
+      )
+    : null;
+
   const handleSavePartyForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+
+    const numCreditLimit = creditLimit.trim() ? parseFloat(creditLimit) : undefined;
 
     const partyToSave: Party = {
       id: editingParty ? editingParty.id : 'PTY-' + Date.now(),
       name: name.trim(),
       type,
       phone: phone.trim() || '9999999999',
+      email: email.trim() || undefined,
       gstin: gstin.trim().toUpperCase() || undefined,
+      pan: pan.trim().toUpperCase() || undefined,
       stateCode: stateCode.trim() || '27',
       billingAddress: address.trim() || 'Local Counter',
+      shippingAddress: hasSeparateShipping ? shippingAddress.trim() : undefined,
+      creditLimit: numCreditLimit && numCreditLimit > 0 ? numCreditLimit : undefined,
       currentBalance: editingParty ? editingParty.currentBalance : openingBalance,
       createdAt: editingParty ? editingParty.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -154,6 +253,15 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     }
   };
 
+  const handleOpenQuickCollect = (e: React.MouseEvent, party: Party) => {
+    e.stopPropagation();
+    setQuickPaymentParty(party);
+    setQuickPayAmount(party.currentBalance !== 0 ? Math.abs(party.currentBalance).toString() : '');
+    setQuickPayMode('UPI');
+    setQuickPayNotes('');
+    setQuickPayDate(new Date().toISOString().split('T')[0]);
+  };
+
   // Find latest document reference for a party
   const getLatestDocRef = (party: Party) => {
     if (party.type === 'CUSTOMER') {
@@ -174,7 +282,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     : null;
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-2 sm:py-3 gap-2 sm:gap-3">
+    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-2 sm:py-3 gap-2.5 sm:gap-3">
       {/* 1. Unified 1-Glance Financial Balance Summary */}
       <section className="pt-0.5">
         <div className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 shadow-sm border border-outline-variant/20 grid grid-cols-2 divide-x divide-outline-variant/20">
@@ -271,32 +379,47 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         </div>
       </section>
 
-      {/* 3. Search & Quick Filter Pills */}
+      {/* 3. Search, Sort & Quick Filter Pills */}
       <section className="flex flex-col gap-1.5">
-        <div className="relative flex items-center">
-          <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">
-            search
-          </span>
-          <input
-            type="text"
-            placeholder={
-              activeSegment === 'CUSTOMERS'
-                ? 'Search customer by name, phone, GSTIN...'
-                : 'Search supplier by name, phone, GSTIN...'
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-container-lowest pl-9 pr-8 py-2 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-xs border border-outline-variant/20 transition-all"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 flex items-center">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder={
+                activeSegment === 'CUSTOMERS'
+                  ? 'Search by name, phone, GSTIN, PAN...'
+                  : 'Search supplier by name, phone, GSTIN...'
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-surface-container-lowest pl-9 pr-8 py-2 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-xs border border-outline-variant/20 transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative flex-shrink-0">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl px-2.5 py-2 text-[11px] font-semibold text-on-surface focus:outline-none shadow-xs cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          )}
+              <option value="HIGHEST_DUE">Sort: Highest Due</option>
+              <option value="NAME_ASC">Sort: Name (A-Z)</option>
+              <option value="RECENT">Sort: Recent</option>
+            </select>
+          </div>
         </div>
 
         {/* Filter Pills */}
@@ -336,11 +459,25 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
+          {creditExceededCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('CREDIT_EXCEEDED')}
+              className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
+                statusFilter === 'CREDIT_EXCEEDED'
+                  ? 'bg-error text-on-error'
+                  : 'bg-error/10 text-error border border-error/20'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[13px]">warning</span>
+              <span>Credit Exceeded ({creditExceededCount})</span>
+            </button>
+          )}
         </div>
       </section>
 
-      {/* 4. Streamlined Passbook-Style Parties Feed */}
-      <section className="flex flex-col gap-2">
+      {/* 4. Streamlined Passbook-Style Parties Card Feed (Stitch parties_ledger_simplified) */}
+      <section className="flex flex-col gap-2.5">
         {filtered.length === 0 ? (
           <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             <span className="material-symbols-outlined text-[32px] text-outline mb-1">
@@ -356,58 +493,62 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             const isReceivable = party.currentBalance > 0;
             const isPayable = party.currentBalance < 0;
             const isSettled = party.currentBalance === 0;
+            const isCreditExceeded = !!(party.creditLimit && party.creditLimit > 0 && party.currentBalance > party.creditLimit);
+            const latestDoc = getLatestDocRef(party);
 
             return (
               <div
                 key={party.id}
                 onClick={() => setSelectedPartyForLedger(party)}
-                className="w-full bg-surface-container-lowest rounded-xl p-3 shadow-xs border border-outline-variant/20 flex items-center justify-between gap-3 active:scale-[0.99] transition-all cursor-pointer hover:shadow-md hover:border-secondary/30"
+                className="w-full bg-surface-container-lowest rounded-2xl p-3.5 shadow-xs border border-outline-variant/20 flex flex-col gap-2.5 active:bg-surface-container-low transition-all cursor-pointer hover:shadow-md hover:border-secondary/30"
               >
-                {/* Left: Avatar + Details */}
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <div
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-extrabold flex-shrink-0 ${
-                      isReceivable
-                        ? 'bg-error/10 text-error'
-                        : isPayable
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                        : 'bg-secondary/10 text-secondary'
-                    }`}
-                  >
-                    {party.name.charAt(0).toUpperCase()}
-                  </div>
+                {/* Top Row: Avatar + Name + Balance */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-extrabold flex-shrink-0 shadow-xs ${
+                        isReceivable
+                          ? 'bg-error/15 text-error'
+                          : isPayable
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          : 'bg-secondary/15 text-secondary'
+                      }`}
+                    >
+                      {party.name.charAt(0).toUpperCase()}
+                    </div>
 
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
-                        {party.name}
-                      </span>
-                      {party.gstin && (
-                        <span
-                          className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0"
-                          title={`GSTIN: ${party.gstin}`}
-                        >
-                          verified
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-headline-sm text-sm text-on-surface font-bold truncate">
+                          {party.name}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5 truncate">
-                      <span>{party.phone}</span>
-                      {party.billingAddress && party.billingAddress !== 'Local Counter' && (
-                        <>
-                          <span className="text-outline-variant">•</span>
-                          <span className="truncate">{party.billingAddress}</span>
-                        </>
-                      )}
+                        {party.gstin && (
+                          <span
+                            className="inline-flex items-center gap-0.5 text-[10px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.2 rounded-full flex-shrink-0"
+                            title={`GSTIN: ${party.gstin}`}
+                          >
+                            <span className="material-symbols-outlined text-[12px]">verified</span>
+                            <span>GST</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5 truncate">
+                        <span>{party.phone}</span>
+                        {party.billingAddress && party.billingAddress !== 'Local Counter' && (
+                          <>
+                            <span className="text-outline-variant">•</span>
+                            <span className="truncate">{party.billingAddress}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Right: Balance + Quick WhatsApp Icon */}
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                  <div className="flex flex-col items-end text-right">
+                  {/* Balance Display */}
+                  <div className="flex flex-col items-end text-right flex-shrink-0">
                     <span
-                      className={`font-currency-display-mobile text-xs sm:text-sm font-extrabold tracking-tight ${
+                      className={`font-currency-display-mobile text-sm sm:text-base font-extrabold tracking-tight ${
                         isReceivable
                           ? 'text-error'
                           : isPayable
@@ -429,32 +570,98 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       {isReceivable ? 'To Collect' : isPayable ? 'To Pay' : 'Settled'}
                     </span>
                   </div>
+                </div>
 
-                  {/* WhatsApp Reminder Shortcut (if pending balance) */}
-                  {party.currentBalance !== 0 && (
+                {/* Credit Limit Alert Banner (if set) */}
+                {party.creditLimit && party.creditLimit > 0 && (
+                  <div className="flex items-center justify-between text-[10px] px-2 py-1 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                    <span className="text-on-surface-variant font-medium">
+                      Credit: {formatINR(Math.abs(party.currentBalance))} / {formatINR(party.creditLimit)}
+                    </span>
+                    <span className={`font-bold ${isCreditExceeded ? 'text-error' : 'text-secondary'}`}>
+                      {isCreditExceeded
+                        ? `Limit Exceeded by ${formatINR(party.currentBalance - party.creditLimit)}`
+                        : `${Math.round((Math.max(0, party.currentBalance) / party.creditLimit) * 100)}% Used`}
+                    </span>
+                  </div>
+                )}
+
+                {/* Bottom Strip: Latest Document + Actions (matching Stitch parties_ledger_simplified) */}
+                <div className="flex items-center justify-between pt-1.5 border-t border-outline-variant/20">
+                  <div className="flex items-center gap-1.5 text-on-surface-variant text-[11px] truncate">
+                    <span className="material-symbols-outlined text-[15px] text-outline">receipt</span>
+                    <span className="truncate">{latestDoc}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* WhatsApp Reminder Shortcut */}
+                    {party.currentBalance !== 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = getPaymentReminderWhatsAppUrl(
+                            party.name,
+                            party.phone,
+                            party.currentBalance,
+                            company.tradeName || company.businessName,
+                            company.upiId
+                          );
+                          window.open(url, '_blank');
+                        }}
+                        className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                        title="Send WhatsApp Reminder"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">chat</span>
+                      </button>
+                    )}
+
+                    {/* Quick Action Button: Collect (Customer) / Pay (Supplier) */}
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const url = getPaymentReminderWhatsAppUrl(
-                          party.name,
-                          party.phone,
-                          party.currentBalance,
-                          company.tradeName || company.businessName,
-                          company.upiId
-                        );
-                        window.open(url, '_blank');
-                      }}
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-surface-container-low text-secondary hover:bg-secondary/10 flex items-center justify-center active:scale-95 transition-all cursor-pointer ml-0.5"
-                      title="Send WhatsApp Reminder"
+                      onClick={(e) => handleOpenQuickCollect(e, party)}
+                      className="h-8 px-2.5 sm:px-3 rounded-xl bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer shadow-xs"
+                      title={activeSegment === 'CUSTOMERS' ? 'Quick Collect Payment' : 'Quick Record Payment'}
                     >
-                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chat</span>
+                      <span className="material-symbols-outlined text-[15px]">payments</span>
+                      <span>{activeSegment === 'CUSTOMERS' ? 'Collect' : 'Pay'}</span>
                     </button>
-                  )}
 
-                  <span className="material-symbols-outlined text-[16px] text-outline-variant">
-                    chevron_right
-                  </span>
+                    {/* Quick Bill / Invoice shortcut */}
+                    {activeSegment === 'CUSTOMERS' && onCreateInvoice && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCreateInvoice(party);
+                        }}
+                        className="h-8 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                        title="New Sale Invoice for this customer"
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-secondary">receipt_long</span>
+                        <span className="hidden sm:inline">Invoice</span>
+                      </button>
+                    )}
+
+                    {activeSegment === 'SUPPLIERS' && onCreatePurchase && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCreatePurchase(party);
+                        }}
+                        className="h-8 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high text-xs font-semibold flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
+                        title="New Purchase Bill for this supplier"
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-primary">shopping_bag</span>
+                        <span className="hidden sm:inline">Bill</span>
+                      </button>
+                    )}
+
+                    <span className="material-symbols-outlined text-[16px] text-outline-variant pl-0.5">
+                      chevron_right
+                    </span>
+                  </div>
                 </div>
               </div>
             );
@@ -474,43 +681,231 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         </button>
       </div>
 
-      {/* Add / Edit Party Modal */}
+      {/* Quick Collect / Pay Modal directly from Card */}
+      {quickPaymentParty && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-outline-variant/30 flex flex-col gap-3.5">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-full bg-secondary/15 text-secondary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[18px]">payments</span>
+                </span>
+                <div>
+                  <h4 className="font-bold text-xs text-on-surface">
+                    {quickPaymentParty.type === 'CUSTOMER' ? 'Collect from' : 'Pay Supplier'}
+                  </h4>
+                  <p className="font-bold text-sm text-secondary truncate max-w-[200px]">
+                    {quickPaymentParty.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickPaymentParty(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-surface-container-low p-2 rounded-xl text-xs">
+              <span className="text-on-surface-variant font-medium">Outstanding Balance:</span>
+              <span
+                className={`font-bold ${
+                  quickPaymentParty.currentBalance > 0
+                    ? 'text-error'
+                    : quickPaymentParty.currentBalance < 0
+                    ? 'text-amber-600'
+                    : 'text-secondary'
+                }`}
+              >
+                {formatINR(Math.abs(quickPaymentParty.currentBalance))}
+              </span>
+            </div>
+
+            {/* Quick Chips */}
+            {quickPaymentParty.currentBalance !== 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setQuickPayAmount(Math.abs(quickPaymentParty.currentBalance).toString())}
+                  className="px-2.5 py-1 rounded-lg bg-secondary/15 text-secondary text-xs font-bold hover:bg-secondary/25 cursor-pointer"
+                >
+                  Full Due ({formatINR(Math.abs(quickPaymentParty.currentBalance))})
+                </button>
+                {Math.abs(quickPaymentParty.currentBalance) > 100 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setQuickPayAmount(Math.round(Math.abs(quickPaymentParty.currentBalance) / 2).toString())
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface text-xs font-medium cursor-pointer"
+                  >
+                    50%
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const amt = parseFloat(quickPayAmount);
+                if (!amt || amt <= 0) return;
+                handleRecordPayment(
+                  quickPaymentParty,
+                  amt,
+                  quickPayMode,
+                  quickPayNotes || `Quick settlement via ${quickPayMode} on ${quickPayDate}`
+                );
+                setQuickPaymentParty(null);
+              }}
+              className="flex flex-col gap-2.5 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Amount (₹) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  placeholder="0.00"
+                  value={quickPayAmount}
+                  onChange={(e) => setQuickPayAmount(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-base font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Payment Mode</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['UPI', 'CASH', 'BANK', 'CHEQUE'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setQuickPayMode(m)}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        quickPayMode === m
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Date</label>
+                <input
+                  type="date"
+                  value={quickPayDate}
+                  onChange={(e) => setQuickPayDate(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">Notes / Reference No.</label>
+                <input
+                  type="text"
+                  placeholder="e.g. UTR / Cheque No / Cash note"
+                  value={quickPayNotes}
+                  onChange={(e) => setQuickPayNotes(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickPaymentParty(null)}
+                  className="px-3.5 py-1.5 rounded-xl text-on-surface-variant font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold shadow-xs active:scale-95 cursor-pointer"
+                >
+                  Record Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Comprehensive Add / Edit Party Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl border border-outline-variant/30 flex flex-col gap-4">
-            <h3 className="font-headline-sm text-lg font-bold text-on-surface">
-              {editingParty ? 'Edit Party Details' : 'Add New Party'}
-            </h3>
+        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3">
+          <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-lg shadow-xl border border-outline-variant/30 flex flex-col gap-3.5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+              <h3 className="font-headline-sm text-base font-bold text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-secondary">person</span>
+                <span>{editingParty ? 'Edit Party Details' : 'Add New Party'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Duplicate phone/gstin warning banners */}
+            {duplicatePhoneParty && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] flex-shrink-0">warning</span>
+                <span>
+                  Another party <strong>{duplicatePhoneParty.name}</strong> already has this mobile number.
+                </span>
+              </div>
+            )}
+            {duplicateGstinParty && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] flex-shrink-0">warning</span>
+                <span>
+                  This GSTIN is already registered to <strong>{duplicateGstinParty.name}</strong>.
+                </span>
+              </div>
+            )}
 
             <form onSubmit={handleSavePartyForm} className="flex flex-col gap-3 text-xs">
+              {/* Type Switcher */}
               <div>
-                <label className="block font-bold text-on-surface-variant mb-1">Party Type</label>
+                <label className="block font-bold text-on-surface-variant mb-1">Party Category</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setType('CUSTOMER')}
-                    className={`py-2 rounded-xl font-bold cursor-pointer transition-colors ${
+                    className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 ${
                       type === 'CUSTOMER'
                         ? 'bg-secondary text-on-secondary shadow-sm'
                         : 'bg-surface-container-low text-on-surface'
                     }`}
                   >
-                    Customer (Buyer)
+                    <span className="material-symbols-outlined text-[16px]">groups</span>
+                    <span>Customer (Buyer)</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setType('SUPPLIER')}
-                    className={`py-2 rounded-xl font-bold cursor-pointer transition-colors ${
+                    className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 ${
                       type === 'SUPPLIER'
                         ? 'bg-secondary text-on-secondary shadow-sm'
                         : 'bg-surface-container-low text-on-surface'
                     }`}
                   >
-                    Supplier (Vendor)
+                    <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+                    <span>Supplier (Vendor)</span>
                   </button>
                 </div>
               </div>
 
+              {/* Name */}
               <div>
                 <label className="block font-bold text-on-surface-variant mb-1">
                   Party / Business Name *
@@ -525,7 +920,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {/* Mobile & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block font-bold text-on-surface-variant mb-1">
                     Mobile Number *
@@ -541,60 +937,148 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-bold text-on-surface-variant mb-1">
-                    {editingParty ? 'Current Balance (₹)' : 'Opening Balance (₹)'}
+                    Email Address (Optional)
                   </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. contact@business.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+              </div>
+
+              {/* GSTIN & State Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-on-surface-variant">GSTIN (Optional)</label>
+                    {gstin && (
+                      <span
+                        className={`text-[10px] font-bold ${
+                          isValidGstin(gstin) ? 'text-secondary' : 'text-outline'
+                        }`}
+                      >
+                        {isValidGstin(gstin) ? '✓ Valid Format' : '15 characters expected'}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="15-digit GSTIN"
+                    value={gstin}
+                    onChange={(e) => handleGstinInputChange(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">State / POS</label>
+                  <select
+                    value={stateCode}
+                    onChange={(e) => setStateCode(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  >
+                    {allStates.map((st) => (
+                      <option key={st.code} value={st.code}>
+                        {st.code} - {st.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* PAN & Credit Limit */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">PAN Number</label>
+                  <input
+                    type="text"
+                    maxLength={10}
+                    placeholder="10-digit PAN"
+                    value={pan}
+                    onChange={(e) => setPan(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1">
+                    Credit Limit (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 50000"
+                    value={creditLimit}
+                    onChange={(e) => setCreditLimit(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+              </div>
+
+              {/* Opening / Current Balance */}
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1">
+                  {editingParty ? 'Current Balance (₹)' : 'Opening Balance (₹)'}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-on-surface-variant font-bold">₹</span>
                   <input
                     type="number"
                     placeholder="0"
                     value={openingBalance || ''}
                     disabled={!!editingParty}
                     onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40 ${
+                    className={`w-full pl-8 pr-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40 ${
                       editingParty ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   />
                 </div>
+                {!editingParty && (
+                  <span className="text-[10px] text-outline mt-0.5 block">
+                    Positive: Customer owes you (Receivable) • Negative: You owe supplier (Payable)
+                  </span>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">
-                    GSTIN (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={15}
-                    placeholder="15-digit GSTIN"
-                    value={gstin}
-                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-on-surface-variant mb-1">State Code</label>
-                  <input
-                    type="text"
-                    maxLength={2}
-                    placeholder="e.g. 27"
-                    value={stateCode}
-                    onChange={(e) => setStateCode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                  />
-                </div>
-              </div>
-
+              {/* Billing Address */}
               <div>
-                <label className="block font-bold text-on-surface-variant mb-1">Address</label>
+                <label className="block font-bold text-on-surface-variant mb-1">Billing Address</label>
                 <input
                   type="text"
-                  placeholder="Street / Market / City"
+                  placeholder="Street / Shop No / Market / City"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 mt-2">
+              {/* Separate Shipping Address Toggle */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer py-1">
+                  <input
+                    type="checkbox"
+                    checked={hasSeparateShipping}
+                    onChange={(e) => setHasSeparateShipping(e.target.checked)}
+                    className="w-4 h-4 rounded text-secondary focus:ring-secondary/40"
+                  />
+                  <span className="font-semibold text-on-surface">Different Shipping / Delivery Address</span>
+                </label>
+                {hasSeparateShipping && (
+                  <input
+                    type="text"
+                    placeholder="Delivery warehouse / Site address"
+                    value={shippingAddress}
+                    onChange={(e) => setShippingAddress(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40 mt-1.5"
+                  />
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-outline-variant/20">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -633,6 +1117,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           }}
           onRecordPayment={handleRecordPayment}
           onViewInvoice={onViewInvoice}
+          onCreateInvoice={onCreateInvoice}
+          onCreatePurchase={onCreatePurchase}
         />
       )}
     </div>

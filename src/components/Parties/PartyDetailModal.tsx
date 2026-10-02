@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { printPartyLedgerStatement } from '../../core/utils/ledgerStatementPrinter.ts';
 
 interface PartyDetailModalProps {
   party: Party;
@@ -17,6 +18,8 @@ interface PartyDetailModalProps {
   onDeleteParty?: (id: string) => void;
   onRecordPayment: (party: Party, amount: number, paymentMode: string, notes: string) => void;
   onViewInvoice?: (invoice: Invoice) => void;
+  onCreateInvoice?: (party: Party) => void;
+  onCreatePurchase?: (party: Party) => void;
 }
 
 interface PassbookEntry {
@@ -44,8 +47,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   onDeleteParty,
   onRecordPayment,
   onViewInvoice,
+  onCreateInvoice,
+  onCreatePurchase,
 }) => {
   const [txnFilter, setTxnFilter] = useState<'ALL' | 'BILLS' | 'PAYMENTS'>('ALL');
+  const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH' | 'LAST_30_DAYS'>('ALL');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   // Payment Form State
@@ -223,12 +229,44 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
 
   // Filtered passbook list
   const filteredPassbook = useMemo(() => {
+    const now = new Date();
+    const currentMonthPrefix = now.toISOString().slice(0, 7); // "YYYY-MM"
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
     return passbook.filter((entry) => {
-      if (txnFilter === 'BILLS') return entry.type === 'SALE' || entry.type === 'PURCHASE';
-      if (txnFilter === 'PAYMENTS') return entry.type === 'PAYMENT_IN' || entry.type === 'PAYMENT_OUT';
+      // Type filter
+      if (txnFilter === 'BILLS' && entry.type !== 'SALE' && entry.type !== 'PURCHASE') return false;
+      if (txnFilter === 'PAYMENTS' && entry.type !== 'PAYMENT_IN' && entry.type !== 'PAYMENT_OUT') return false;
+
+      // Date filter
+      if (dateFilter === 'THIS_MONTH') {
+        if (!entry.date.startsWith(currentMonthPrefix)) return false;
+      } else if (dateFilter === 'LAST_30_DAYS') {
+        if (new Date(entry.date) < thirtyDaysAgo) return false;
+      }
+
       return true;
     });
-  }, [passbook, txnFilter]);
+  }, [passbook, txnFilter, dateFilter]);
+
+  const handlePrintStatement = () => {
+    const printable = filteredPassbook.map((e) => ({
+      date: e.date,
+      docNumber: e.docNumber,
+      type: e.type,
+      description: e.description,
+      debit: e.debit,
+      credit: e.credit,
+      runningBalance: e.runningBalance,
+    }));
+    const periodLabel =
+      dateFilter === 'THIS_MONTH'
+        ? 'Current Month'
+        : dateFilter === 'LAST_30_DAYS'
+        ? 'Last 30 Days'
+        : 'All Time Passbook';
+    printPartyLedgerStatement(party, company, printable, periodLabel);
+  };
 
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -361,6 +399,41 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           </div>
         </div>
 
+        {/* Credit Limit Indicator Bar */}
+        {party.creditLimit && party.creditLimit > 0 && (
+          <div className="mx-3 mt-2 p-2 rounded-xl bg-surface-container-low/70 border border-outline-variant/30 text-xs flex-shrink-0">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-on-surface-variant mb-1">
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px] text-secondary">credit_score</span>
+                <span>Credit Line: {formatINR(Math.abs(party.currentBalance))} of {formatINR(party.creditLimit)}</span>
+              </span>
+              <span
+                className={`text-[10px] font-bold ${
+                  party.currentBalance > party.creditLimit ? 'text-error' : 'text-on-surface'
+                }`}
+              >
+                {Math.round((Math.max(0, party.currentBalance) / party.creditLimit) * 100)}% Used
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-surface-container overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  party.currentBalance > party.creditLimit ? 'bg-error' : 'bg-secondary'
+                }`}
+                style={{
+                  width: `${Math.min(100, (Math.max(0, party.currentBalance) / party.creditLimit) * 100)}%`,
+                }}
+              />
+            </div>
+            {party.currentBalance > party.creditLimit && (
+              <p className="text-[10px] text-error font-semibold mt-1 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px]">warning</span>
+                <span>Credit limit exceeded by {formatINR(party.currentBalance - party.creditLimit)}</span>
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Inline Record Payment Form (Slides down when button is tapped) */}
         {isPaymentOpen && (
           <form
@@ -455,24 +528,65 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           </form>
         )}
 
-        {/* Filter Tabs Header */}
-        <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1 flex-shrink-0">
-          <span className="text-xs font-bold text-on-surface">Ledger Passbook</span>
-          <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
-            {(['ALL', 'BILLS', 'PAYMENTS'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setTxnFilter(tab)}
-                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer capitalize ${
-                  txnFilter === tab
-                    ? 'bg-surface-container-lowest text-on-surface shadow-xs font-bold'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                {tab === 'ALL' ? 'All' : tab.toLowerCase()}
-              </button>
-            ))}
+        {/* Filter Tabs & Date Controls Header */}
+        <div className="px-3 pt-2 pb-1 flex flex-col gap-1.5 flex-shrink-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-xs font-bold text-on-surface flex items-center gap-1.5">
+              <span>Ledger Passbook</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container font-semibold text-on-surface-variant">
+                {filteredPassbook.length}
+              </span>
+            </span>
+            <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
+              {(['ALL', 'BILLS', 'PAYMENTS'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setTxnFilter(tab)}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer capitalize ${
+                    txnFilter === tab
+                      ? 'bg-surface-container-lowest text-on-surface shadow-xs font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {tab === 'ALL' ? 'All' : tab.toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Date range filter & Statement Export */}
+          <div className="flex items-center justify-between gap-1 text-[10px]">
+            <div className="flex items-center gap-1">
+              {[
+                { key: 'ALL', label: 'All Time' },
+                { key: 'THIS_MONTH', label: 'This Month' },
+                { key: 'LAST_30_DAYS', label: 'Last 30 Days' },
+              ].map((d) => (
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => setDateFilter(d.key as any)}
+                  className={`px-2 py-0.5 rounded-md transition-all cursor-pointer font-medium ${
+                    dateFilter === d.key
+                      ? 'bg-secondary/15 text-secondary font-bold'
+                      : 'text-on-surface-variant hover:bg-surface-container'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handlePrintStatement}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold cursor-pointer transition-colors"
+              title="Print / Save Passbook Statement"
+            >
+              <span className="material-symbols-outlined text-[13px]">print</span>
+              <span>Statement</span>
+            </button>
           </div>
         </div>
 
@@ -481,7 +595,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           {filteredPassbook.length === 0 ? (
             <div className="py-8 text-center text-on-surface-variant flex flex-col items-center gap-1">
               <span className="material-symbols-outlined text-[24px] text-outline">receipt_long</span>
-              <p className="text-xs">No transactions recorded yet</p>
+              <p className="text-xs">No transactions recorded in this period</p>
             </div>
           ) : (
             filteredPassbook.map((entry) => {
@@ -580,7 +694,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           )}
         </div>
 
-        {/* Minimal Action Footer */}
+        {/* Action Footer */}
         <div className="p-3 border-t border-outline-variant/20 flex items-center justify-between gap-2 bg-surface-container-low/40 flex-shrink-0">
           <button
             type="button"
@@ -588,7 +702,46 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             className="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">payments</span>
-            <span>{isCustomer ? '+ Record Payment In' : '+ Record Payment Out'}</span>
+            <span>{isCustomer ? '+ Payment In' : '+ Payment Out'}</span>
+          </button>
+
+          {isCustomer && onCreateInvoice && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onCreateInvoice(party);
+              }}
+              className="py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              title="Create new sales invoice for this customer"
+            >
+              <span className="material-symbols-outlined text-[16px] text-secondary">receipt_long</span>
+              <span>+ Invoice</span>
+            </button>
+          )}
+
+          {!isCustomer && onCreatePurchase && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onCreatePurchase(party);
+              }}
+              className="py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              title="Create new purchase bill for this supplier"
+            >
+              <span className="material-symbols-outlined text-[16px] text-primary">shopping_bag</span>
+              <span>+ Bill</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handlePrintStatement}
+            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center cursor-pointer transition-colors"
+            title="Print Passbook Statement"
+          >
+            <span className="material-symbols-outlined text-[18px]">print</span>
           </button>
 
           <button

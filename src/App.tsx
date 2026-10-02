@@ -22,10 +22,12 @@ import { BottomNav } from './components/Shell/BottomNav.tsx';
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
 import { SalesHubView } from './components/Sales/SalesHubView.tsx';
 import { PurchasesHubView } from './components/Purchases/PurchasesHubView.tsx';
+import { TableGridPurchaseModal } from './components/Purchases/TableGridPurchaseModal.tsx';
 import { ExpensesView } from './components/Expenses/ExpensesView.tsx';
 import { CreateInvoiceModal } from './components/Invoicing/CreateInvoiceModal.tsx';
 import { TableGridInvoiceModal } from './components/Invoicing/TableGridInvoiceModal.tsx';
 import { InvoicePreviewModal } from './components/Invoicing/InvoicePreviewModal.tsx';
+import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
 import { QuickBillingView } from './components/POS/QuickBillingView.tsx';
 import { InventoryView } from './components/Inventory/InventoryView.tsx';
 import { PartiesView } from './components/Parties/PartiesView.tsx';
@@ -64,7 +66,10 @@ export const App: React.FC = () => {
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
   const [isTableGridInvoiceOpen, setIsTableGridInvoiceOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [selectedPartyForInvoice, setSelectedPartyForInvoice] = useState<Party | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
+  const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
 
   // Sync state on change
   const refreshData = () => {
@@ -138,7 +143,19 @@ export const App: React.FC = () => {
   };
 
   const handleSaveInvoice = (newInvoice: Invoice) => {
-    db.saveInvoice(newInvoice);
+    // Enforce uniqueness of invoice number under GST compliance
+    const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, invoices);
+    if (conflict) {
+      showToast(`Conflict: Invoice #${newInvoice.invoiceNumber} already exists for ${conflict.partyName} (${conflict.date}). Only unique numbers allowed.`);
+      return;
+    }
+
+    try {
+      db.saveInvoice(newInvoice);
+    } catch (err: any) {
+      showToast(err.message || 'Cannot save invoice.');
+      return;
+    }
 
     // Auto-create Double-Entry Accounting Voucher for Sales
     const voucher = createSalesInvoiceVoucher({
@@ -165,7 +182,19 @@ export const App: React.FC = () => {
 
   const handleEditInvoice = (inv: Invoice) => {
     setEditingInvoice(inv);
+    setSelectedPartyForInvoice(null);
     setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleCreateInvoiceForParty = (party: Party) => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(party);
+    setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleCreatePurchaseForParty = (party: Party) => {
+    setSelectedSupplierForPurchase(party);
+    setIsTableGridPurchaseOpen(true);
   };
 
   const handleSavePurchase = (newBill: PurchaseBill) => {
@@ -450,6 +479,8 @@ export const App: React.FC = () => {
             onDeleteParty={handleDeleteParty}
             onRecordPartyPayment={handleRecordPartyPayment}
             onViewInvoice={setPreviewInvoice}
+            onCreateInvoice={handleCreateInvoiceForParty}
+            onCreatePurchase={handleCreatePurchaseForParty}
           />
         )}
 
@@ -526,11 +557,33 @@ export const App: React.FC = () => {
           parties={parties}
           itemsCatalog={items}
           initialInvoice={editingInvoice}
+          initialParty={selectedPartyForInvoice}
+          existingInvoices={invoices}
           onClose={() => {
             setIsTableGridInvoiceOpen(false);
             setEditingInvoice(null);
+            setSelectedPartyForInvoice(null);
           }}
           onSave={handleSaveInvoice}
+          onAddNewParty={() => setActiveTab('parties')}
+        />
+      )}
+
+      {isTableGridPurchaseOpen && (
+        <TableGridPurchaseModal
+          company={company}
+          parties={parties}
+          itemsCatalog={items}
+          initialSupplier={selectedSupplierForPurchase}
+          onClose={() => {
+            setIsTableGridPurchaseOpen(false);
+            setSelectedSupplierForPurchase(null);
+          }}
+          onSave={(bill) => {
+            handleSavePurchase(bill);
+            setIsTableGridPurchaseOpen(false);
+            setSelectedSupplierForPurchase(null);
+          }}
           onAddNewParty={() => setActiveTab('parties')}
         />
       )}

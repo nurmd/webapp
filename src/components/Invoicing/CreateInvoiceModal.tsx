@@ -7,6 +7,8 @@ import { calculateInvoice, InvoiceItemCalculationInput } from '../../core/gst/ca
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
+import { db } from '../../services/db.ts';
+import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
 
 interface CreateInvoiceModalProps {
   company: CompanyProfile;
@@ -135,7 +137,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
     const newInvoice: Invoice = {
       id: 'INV-' + Date.now(),
-      invoiceNumber: `${company.invoicePrefix || 'INV-'}${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: generateNextInvoiceNumber(company.invoicePrefix || 'INV-', db.getInvoices()),
       invoiceType,
       date: invoiceDate,
       partyId: selectedPartyId,
