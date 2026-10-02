@@ -13,7 +13,6 @@ export type AppTab =
   | 'reports'
   | 'accounting'
   | 'pos'
-  | 'stitch'
   | 'settings'
   | 'menu';
 
@@ -55,7 +54,6 @@ export const Drawer: React.FC<DrawerProps> = ({
     { id: 'reports', label: 'Reports & Analytics (GSTR)', icon: 'analytics' },
     { id: 'accounting', label: 'Daybook & Journal', icon: 'menu_book' },
     { id: 'pos', label: 'Fast Retail POS Counter', icon: 'storefront' },
-    { id: 'stitch', label: 'Stitch Showcase Gallery', icon: 'layers' },
     { id: 'settings', label: 'Settings & Business Profile', icon: 'settings' },
   ];
 

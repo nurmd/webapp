@@ -34,7 +34,6 @@ import { PartiesView } from './components/Parties/PartiesView.tsx';
 import { BusinessReportsView } from './components/Reports/BusinessReportsView.tsx';
 import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
-import { StitchShowcaseView } from './components/StitchShowcase/StitchShowcaseView.tsx';
 import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHubView.tsx';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
@@ -619,10 +618,6 @@ export const App: React.FC = () => {
             items={items}
             parties={parties}
           />
-        )}
-
-        {activeTab === 'stitch' && (
-          <StitchShowcaseView />
         )}
 
         {activeTab === 'settings' && (
