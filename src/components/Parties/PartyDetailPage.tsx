@@ -798,6 +798,56 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           )}
         </section>
 
+        {/* Quick Actions Bar */}
+        <section className="flex items-center gap-2">
+          {/* Record Payment */}
+          <button
+            type="button"
+            onClick={() => setIsPaymentOpen(!isPaymentOpen)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
+              isPaymentOpen
+                ? 'bg-secondary text-on-secondary'
+                : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[17px]">payments</span>
+            <span>Payment</span>
+          </button>
+
+          {/* New Invoice (for Customers) / New Bill (for Suppliers) */}
+          {isCustomer
+            ? onCreateInvoice && (
+                <button
+                  type="button"
+                  onClick={() => onCreateInvoice(party)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+                  <span>New Invoice</span>
+                </button>
+              )
+            : onCreatePurchase && (
+                <button
+                  type="button"
+                  onClick={() => onCreatePurchase(party)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
+                  <span>New Bill</span>
+                </button>
+              )}
+
+          {/* Print Statement */}
+          <button
+            type="button"
+            onClick={handlePrintStatement}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+            title="Print Ledger Statement"
+          >
+            <span className="material-symbols-outlined text-[18px]">print</span>
+          </button>
+        </section>
+
         {/* Collapsible Record Payment Drawer */}
         {isPaymentOpen && (
           <form
@@ -959,16 +1009,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                   </button>
                 ))}
               </div>
-
-              {/* Statement Button */}
-              <button
-                type="button"
-                onClick={handlePrintStatement}
-                className="p-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer ml-1"
-                title="Print Statement"
-              >
-                <span className="material-symbols-outlined text-[16px]">print</span>
-              </button>
             </div>
           </div>
 

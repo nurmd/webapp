@@ -32,8 +32,18 @@ export interface InventoryItem {
   batchNumber?: string;
   expiryDate?: string;
   manufacturingDate?: string;
+  isActive?: boolean;
+  isDisabled?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export function isItemDisabled(item: InventoryItem): boolean {
+  return item.isDisabled === true || item.isActive === false;
+}
+
+export function isItemActive(item: InventoryItem): boolean {
+  return !isItemDisabled(item);
 }
 
 export type StockAdjustmentType = 'STOCK_IN' | 'STOCK_OUT' | 'WASTAGE' | 'CORRECTION';

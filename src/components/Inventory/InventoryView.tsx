@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { InventoryItem, StockAdjustment, UnitOfMeasurement } from '../../models/item.ts';
+import { InventoryItem, StockAdjustment, UnitOfMeasurement, isItemDisabled, isItemActive } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { db } from '../../services/db.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { isItemInBills } from '../../core/utils/itemStatus.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export type ItemTransactionType = 'SALE' | 'PURCHASE' | 'STOCK_IN' | 'STOCK_OUT' | 'WASTAGE' | 'CORRECTION';
 
@@ -42,12 +44,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onSaveAdjustment,
   onScanBarcodeClick,
 }) => {
-  // Filter & Sort State (Name, Available Stock, Category, Created Date)
+  // Filter & Sort State (Name, Available Stock, Category, Created Date, Disabled Items)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterStockStatus, setFilterStockStatus] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
   const [filterCreatedTimeframe, setFilterCreatedTimeframe] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
   const [sortOption, setSortOption] = useState<'DEFAULT' | 'NAME_ASC' | 'NAME_DESC' | 'STOCK_HIGH' | 'STOCK_LOW' | 'CREATED_DESC' | 'CREATED_ASC'>('DEFAULT');
+  const [showDisabled, setShowDisabled] = useState(false);
 
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,6 +60,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
   const [adjQty, setAdjQty] = useState<number>(1);
   const [adjReason, setAdjReason] = useState('New inventory arrival');
+
+  // Back Navigation for modals
+  useBackNavigation(() => {
+    if (isModalOpen) { setIsModalOpen(false); return true; }
+    if (isFilterModalOpen) { setIsFilterModalOpen(false); return true; }
+    if (adjustmentItem !== null) { setAdjustmentItem(null); return true; }
+    if (activeItemDetail !== null) { setActiveItemDetail(null); return true; }
+    return false;
+  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null);
 
   // Privacy toggles: Buy price visibility per item
   const [revealedBuyPrices, setRevealedBuyPrices] = useState<Record<string, boolean>>({});
@@ -71,17 +83,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }));
   };
 
+  const disabledItemsCount = useMemo(() => items.filter(isItemDisabled).length, [items]);
+
   const activeFilterCount =
     (filterCategory !== 'ALL' ? 1 : 0) +
     (filterStockStatus !== 'ALL' ? 1 : 0) +
     (filterCreatedTimeframe !== 'ALL' ? 1 : 0) +
-    (sortOption !== 'DEFAULT' ? 1 : 0);
+    (sortOption !== 'DEFAULT' ? 1 : 0) +
+    (showDisabled ? 1 : 0);
 
   const resetAllFilters = () => {
     setFilterCategory('ALL');
     setFilterStockStatus('ALL');
     setFilterCreatedTimeframe('ALL');
     setSortOption('DEFAULT');
+    setShowDisabled(false);
     setSearch('');
   };
 
@@ -230,6 +246,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [gstRate, setGstRate] = useState<number>(18);
   const [currentStock, setCurrentStock] = useState<number>(10);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
+  const [isDisabledState, setIsDisabledState] = useState(false);
 
   // Financial Metrics (Tactile Fintech Card)
   const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
@@ -243,10 +260,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       ? `₹${(totalStockValue / 100000).toFixed(2)} Lakh`
       : formatINR(totalStockValue);
 
-  // Multi-criteria filtering & sorting (Name, Available Stock, Category, Created)
+  // Multi-criteria filtering & sorting (Name, Available Stock, Category, Created, Disabled)
   const filtered = useMemo(() => {
     return items
       .filter((item) => {
+        // 0. Disabled Filter: Hide disabled items by default unless showDisabled is true
+        if (!showDisabled && isItemDisabled(item)) {
+          return false;
+        }
+
         // 1. Search query (Matches Name, SKU, Barcode, HSN)
         const s = search.toLowerCase().trim();
         const matchesSearch =
@@ -311,7 +333,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             return 0;
         }
       });
-  }, [items, search, filterCategory, filterStockStatus, filterCreatedTimeframe, sortOption]);
+  }, [items, search, filterCategory, filterStockStatus, filterCreatedTimeframe, sortOption, showDisabled]);
+
+  const handleToggleItemStatus = (item: InventoryItem) => {
+    const currentlyDisabled = isItemDisabled(item);
+    const updated: InventoryItem = {
+      ...item,
+      isDisabled: !currentlyDisabled,
+      isActive: currentlyDisabled,
+      updatedAt: new Date().toISOString(),
+    };
+    onSaveItem(updated);
+    if (activeItemDetail && activeItemDetail.id === item.id) {
+      setActiveItemDetail(updated);
+    }
+  };
 
   const handleOpenAdd = () => {
     setEditingItem(null);
@@ -327,6 +363,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setGstRate(18);
     setCurrentStock(10);
     setMinStockAlert(5);
+    setIsDisabledState(false);
     setIsModalOpen(true);
   };
 
@@ -344,6 +381,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setGstRate(item.gstRate);
     setCurrentStock(item.currentStock);
     setMinStockAlert(item.minStockAlert);
+    setIsDisabledState(isItemDisabled(item));
     setIsModalOpen(true);
     setActiveItemDetail(null);
   };
@@ -365,6 +403,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       gstRate: Number(gstRate),
       currentStock: itemType === 'SERVICE' ? 9999 : Number(currentStock),
       minStockAlert: itemType === 'SERVICE' ? 0 : Number(minStockAlert),
+      isActive: !isDisabledState,
+      isDisabled: isDisabledState,
       createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -551,6 +591,17 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
               )}
 
+              {showDisabled && (
+                <button
+                  type="button"
+                  onClick={() => setShowDisabled(false)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-amber-500/25"
+                >
+                  <span>Disabled items shown ({disabledItemsCount})</span>
+                  <span className="material-symbols-outlined text-[13px]">close</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={resetAllFilters}
@@ -567,7 +618,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
             <button
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-                filterCategory === 'ALL' && filterStockStatus === 'ALL'
+                filterCategory === 'ALL' && filterStockStatus === 'ALL' && !showDisabled
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container-lowest text-on-surface-variant active:bg-surface-container-low'
               }`}
@@ -575,6 +626,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               onClick={() => {
                 setFilterCategory('ALL');
                 setFilterStockStatus('ALL');
+                setShowDisabled(false);
               }}
             >
               <span>All Items</span>
@@ -597,11 +649,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               Low Stock ({lowStockCount})
             </button>
 
+            {disabledItemsCount > 0 && (
+              <button
+                className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  showDisabled
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'
+                }`}
+                type="button"
+                onClick={() => setShowDisabled(!showDisabled)}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {showDisabled ? 'check_box' : 'check_box_outline_blank'}
+                </span>
+                <span>Disabled ({disabledItemsCount})</span>
+              </button>
+            )}
+
             {categories.map((cat) => (
               <button
                 key={cat}
                 className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                  filterCategory === cat
+                  filterCategory === cat && !showDisabled
                     ? 'bg-primary text-on-primary'
                     : 'bg-surface-container-lowest text-on-surface-variant'
                 }`}
@@ -628,6 +697,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </div>
           ) : (
             filtered.map((item) => {
+              const itemDisabled = isItemDisabled(item);
               const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
               const isOut = item.currentStock <= 0;
 
@@ -635,12 +705,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <div
                   key={item.id}
                   onClick={() => setActiveItemDetail(item)}
-                  className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                  className={`w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99] ${
+                    itemDisabled ? 'opacity-70 border border-dashed border-outline-variant/60 bg-surface-container-low/40' : ''
+                  }`}
                 >
                   {/* Thumbnail / Item Avatar */}
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-surface-container-low flex-shrink-0 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-secondary text-[22px] sm:text-[24px]">
-                      inventory_2
+                  <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex-shrink-0 flex items-center justify-center ${
+                    itemDisabled ? 'bg-surface-container-high text-outline' : 'bg-surface-container-low text-secondary'
+                  }`}>
+                    <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
+                      {itemDisabled ? 'block' : 'inventory_2'}
                     </span>
                   </div>
 
@@ -648,9 +722,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex flex-col min-w-0 flex-1 justify-center">
                     {/* Top Row: Item Name (left) & Available Stock Badge (right) */}
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-headline-sm text-sm sm:text-base text-on-surface truncate font-semibold">
-                        {item.name}
-                      </h3>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className={`font-headline-sm text-sm sm:text-base truncate font-semibold ${
+                          itemDisabled ? 'text-on-surface-variant line-through' : 'text-on-surface'
+                        }`}>
+                          {item.name}
+                        </h3>
+                        {itemDisabled && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-bold uppercase tracking-wider flex-shrink-0">
+                            Disabled
+                          </span>
+                        )}
+                      </div>
 
                       {/* Available Stock Badge */}
                       <span
@@ -765,6 +848,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </button>
             </div>
 
+            {/* Disabled Item Banner */}
+            {isItemDisabled(activeItemDetail) && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="material-symbols-outlined text-amber-600 text-[18px] flex-shrink-0">block</span>
+                  <span className="font-semibold truncate">Item is disabled (hidden from billing)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleItemStatus(activeItemDetail)}
+                  className="px-3 py-1 rounded-lg bg-secondary text-on-secondary font-bold text-xs cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
+                >
+                  Enable
+                </button>
+              </div>
+            )}
+
+            {/* Historical Bills Reference Banner */}
+            {isItemInBills(activeItemDetail.id, allInvoices, allPurchases) && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-[11px] text-outline flex-shrink-0">
+                <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">verified_user</span>
+                <span>Referenced in historical bills. Cannot be deleted to preserve accounting records.</span>
+              </div>
+            )}
+
             {/* Compact Pricing Bar */}
             <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-surface-container-low text-xs flex-shrink-0">
               <div>
@@ -877,7 +985,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
 
-            {/* Bottom Actions: Stock In, Stock Out, Edit, Delete */}
+            {/* Bottom Actions: Stock In, Stock Out, Edit, Toggle Enable/Disable, Delete */}
             <div className="pt-2 border-t border-outline-variant/20 flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
@@ -887,7 +995,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   setAdjQty(1);
                   setActiveItemDetail(null);
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-xs"
+                className="flex-1 py-2 px-2.5 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer shadow-xs"
               >
                 <span className="material-symbols-outlined text-[16px]">add</span>
                 <span>Stock In</span>
@@ -901,7 +1009,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   setAdjQty(1);
                   setActiveItemDetail(null);
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer hover:bg-surface-container-high"
+                className="flex-1 py-2 px-2.5 rounded-xl bg-surface-container text-on-surface font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer hover:bg-surface-container-high"
               >
                 <span className="material-symbols-outlined text-[16px]">remove</span>
                 <span>Stock Out</span>
@@ -916,16 +1024,55 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <span className="material-symbols-outlined text-[18px]">edit</span>
               </button>
 
+              {/* Disable / Enable Toggle Button */}
+              <button
+                type="button"
+                onClick={() => handleToggleItemStatus(activeItemDetail)}
+                className={`h-9 px-2.5 rounded-xl font-label-md text-xs font-bold flex items-center justify-center gap-1 active:scale-95 cursor-pointer transition-colors ${
+                  isItemDisabled(activeItemDetail)
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                }`}
+                title={isItemDisabled(activeItemDetail) ? 'Enable this item' : 'Disable this item'}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {isItemDisabled(activeItemDetail) ? 'check_circle' : 'block'}
+                </span>
+                <span className="hidden sm:inline">
+                  {isItemDisabled(activeItemDetail) ? 'Enable' : 'Disable'}
+                </span>
+              </button>
+
+              {/* Delete Button with Protection for Items in Bills */}
               <button
                 type="button"
                 onClick={() => {
-                  onDeleteItem(activeItemDetail.id);
-                  setActiveItemDetail(null);
+                  const inBills = isItemInBills(activeItemDetail.id, allInvoices, allPurchases);
+                  if (inBills) {
+                    if (window.confirm('This item is referenced in existing bills and CANNOT be deleted to preserve financial records.\n\nWould you like to DISABLE this item instead to hide it from billing?')) {
+                      handleToggleItemStatus(activeItemDetail);
+                    }
+                    return;
+                  }
+                  if (window.confirm(`Delete item "${activeItemDetail.name}"?`)) {
+                    onDeleteItem(activeItemDetail.id);
+                    setActiveItemDetail(null);
+                  }
                 }}
-                className="w-9 h-9 rounded-xl bg-error/10 text-error flex items-center justify-center active:scale-95 cursor-pointer hover:bg-error/20 transition-colors"
-                title="Delete Item"
+                className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 cursor-pointer transition-colors ${
+                  isItemInBills(activeItemDetail.id, allInvoices, allPurchases)
+                    ? 'bg-surface-container text-outline hover:text-error'
+                    : 'bg-error/10 text-error hover:bg-error/20'
+                }`}
+                title={
+                  isItemInBills(activeItemDetail.id, allInvoices, allPurchases)
+                    ? 'Item is in bills (Cannot delete - Click to disable)'
+                    : 'Delete Item'
+                }
               >
-                <span className="material-symbols-outlined text-[18px]">delete</span>
+                <span className="material-symbols-outlined text-[18px]">
+                  {isItemInBills(activeItemDetail.id, allInvoices, allPurchases) ? 'lock' : 'delete'}
+                </span>
               </button>
             </div>
           </div>
@@ -1175,6 +1322,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
 
+              {/* Section 4: Item Status (Active vs Disabled) */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low/50 border border-outline-variant/20">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-on-surface">Item Status</span>
+                  <span className="text-[11px] text-outline">
+                    {isDisabledState
+                      ? 'Disabled (hidden from billing & item pickers)'
+                      : 'Active (available for sales & purchases)'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDisabledState(!isDisabledState)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    isDisabledState
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                      : 'bg-secondary/15 text-secondary border border-secondary/30'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {isDisabledState ? 'block' : 'check_circle'}
+                  </span>
+                  <span>{isDisabledState ? 'Disabled' : 'Active'}</span>
+                </button>
+              </div>
+
               {/* Modal Action Buttons */}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
                 <button
@@ -1418,6 +1591,27 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* 5. Disabled Items Visibility */}
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container border border-outline-variant/20">
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-on-surface">Show Disabled Items</span>
+                <span className="text-[11px] text-outline">
+                  {disabledItemsCount === 0
+                    ? 'No disabled items'
+                    : `${disabledItemsCount} disabled items hidden by default`}
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showDisabled}
+                  onChange={(e) => setShowDisabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-secondary"></div>
+              </label>
             </div>
 
             {/* Apply Button */}

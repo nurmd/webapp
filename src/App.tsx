@@ -41,6 +41,7 @@ import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
 import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
+import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -395,12 +396,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const activeItems = React.useMemo(() => getActiveItems(items), [items]);
+
   const handleSaveItem = (item: InventoryItem) => {
     db.saveItem(item);
     refreshData();
   };
 
   const handleDeleteItem = (id: string) => {
+    if (isItemInBills(id, invoices, purchases)) {
+      showToast('Cannot delete: This item exists in bills. You can disable it instead.');
+      return;
+    }
     if (window.confirm('Delete this inventory item?')) {
       db.deleteItem(id);
       refreshData();
@@ -475,7 +482,7 @@ export const App: React.FC = () => {
         {activeTab === 'pos' && (
           <QuickBillingView
             company={company}
-            items={items}
+            items={activeItems}
             onCompleteSale={handleSaveInvoice}
           />
         )}
@@ -501,7 +508,7 @@ export const App: React.FC = () => {
             purchases={purchases}
             parties={parties}
             company={company}
-            itemsCatalog={items}
+            itemsCatalog={activeItems}
             onSavePurchase={handleSavePurchase}
             onDeletePurchase={handleDeletePurchase}
           />
@@ -605,7 +612,7 @@ export const App: React.FC = () => {
         <CreateInvoiceModal
           company={company}
           parties={parties}
-          itemsCatalog={items}
+          itemsCatalog={activeItems}
           onClose={() => setIsStandardInvoiceOpen(false)}
           onSave={handleSaveInvoice}
         />
@@ -615,7 +622,7 @@ export const App: React.FC = () => {
         <TableGridInvoiceModal
           company={company}
           parties={parties}
-          itemsCatalog={items}
+          itemsCatalog={activeItems}
           initialInvoice={editingInvoice}
           initialParty={selectedPartyForInvoice}
           existingInvoices={invoices}
@@ -633,7 +640,7 @@ export const App: React.FC = () => {
         <TableGridPurchaseModal
           company={company}
           parties={parties}
-          itemsCatalog={items}
+          itemsCatalog={activeItems}
           initialSupplier={selectedSupplierForPurchase}
           onClose={() => {
             setIsTableGridPurchaseOpen(false);
