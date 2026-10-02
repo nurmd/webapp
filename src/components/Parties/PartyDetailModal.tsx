@@ -347,13 +347,45 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer flex-shrink-0"
-          >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
+          {/* Action Tools in Header */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <a
+              href={`tel:${party.phone}`}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-secondary hover:bg-surface-container transition-colors"
+              title="Call Party"
+            >
+              <span className="material-symbols-outlined text-[18px]">call</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => onEditParty(party)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              title="Edit Details"
+            >
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+            </button>
+
+            {onDeleteParty && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                title="Delete Party"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer ml-0.5"
+              title="Close"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
         </div>
 
         {/* Compact Financial Strip */}
@@ -694,15 +726,15 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           )}
         </div>
 
-        {/* Action Footer */}
-        <div className="p-3 border-t border-outline-variant/20 flex items-center justify-between gap-2 bg-surface-container-low/40 flex-shrink-0">
+        {/* Simplified & Clean Action Footer */}
+        <div className="p-3 border-t border-outline-variant/20 flex items-center gap-2 bg-surface-container-low/40 flex-shrink-0">
           <button
             type="button"
             onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            className="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 py-2.5 px-4 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">payments</span>
-            <span>{isCustomer ? '+ Payment In' : '+ Payment Out'}</span>
+            <span className="material-symbols-outlined text-[18px]">payments</span>
+            <span>{isCustomer ? '+ Record Payment' : '+ Pay Supplier'}</span>
           </button>
 
           {isCustomer && onCreateInvoice && (
@@ -712,10 +744,10 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 onClose();
                 onCreateInvoice(party);
               }}
-              className="py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              className="py-2.5 px-3.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               title="Create new sales invoice for this customer"
             >
-              <span className="material-symbols-outlined text-[16px] text-secondary">receipt_long</span>
+              <span className="material-symbols-outlined text-[17px] text-secondary">receipt_long</span>
               <span>+ Invoice</span>
             </button>
           )}
@@ -727,59 +759,22 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 onClose();
                 onCreatePurchase(party);
               }}
-              className="py-2 px-3 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              className="py-2.5 px-3.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-bold shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               title="Create new purchase bill for this supplier"
             >
-              <span className="material-symbols-outlined text-[16px] text-primary">shopping_bag</span>
+              <span className="material-symbols-outlined text-[17px] text-primary">shopping_bag</span>
               <span>+ Bill</span>
             </button>
           )}
 
           <button
             type="button"
-            onClick={handlePrintStatement}
-            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface flex items-center justify-center cursor-pointer transition-colors"
-            title="Print Passbook Statement"
-          >
-            <span className="material-symbols-outlined text-[18px]">print</span>
-          </button>
-
-          <button
-            type="button"
             onClick={handleWhatsAppReminder}
-            className="w-9 h-9 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors"
+            className="w-10 h-10 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors active:scale-95 flex-shrink-0"
             title="Send WhatsApp Statement"
           >
-            <span className="material-symbols-outlined text-[18px]">chat</span>
+            <span className="material-symbols-outlined text-[20px]">chat</span>
           </button>
-
-          <a
-            href={`tel:${party.phone}`}
-            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high text-secondary flex items-center justify-center cursor-pointer transition-colors"
-            title="Call Party"
-          >
-            <span className="material-symbols-outlined text-[18px]">call</span>
-          </a>
-
-          <button
-            type="button"
-            onClick={() => onEditParty(party)}
-            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center cursor-pointer transition-colors"
-            title="Edit Details"
-          >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
-          </button>
-
-          {onDeleteParty && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="w-9 h-9 rounded-xl bg-error/10 hover:bg-error/20 text-error flex items-center justify-center cursor-pointer transition-colors"
-              title="Delete Party"
-            >
-              <span className="material-symbols-outlined text-[18px]">delete</span>
-            </button>
-          )}
         </div>
       </div>
     </div>
