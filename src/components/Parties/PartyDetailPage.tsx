@@ -1496,32 +1496,37 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
             {/* Purchased Items Table View */}
             <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-              <div className="max-h-48 overflow-y-auto">
-                <table className="w-full text-left text-[11px] border-collapse">
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+                <table className="w-full text-left text-[11px] border-collapse table-fixed">
                   <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
                     <tr>
-                      <th className="py-1.5 px-2.5 font-semibold">Item</th>
-                      <th className="py-1.5 px-1.5 text-center font-semibold">Qty</th>
-                      <th className="py-1.5 px-1.5 text-right font-semibold">Rate</th>
-                      <th className="py-1.5 px-1.5 text-center font-semibold">Tax</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold">Total</th>
+                      <th className="py-1.5 px-2.5 font-semibold w-[46%]">Item</th>
+                      <th className="py-1.5 px-2 text-right font-semibold w-[27%]">Qty × Rate</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold w-[27%]">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/15 text-on-surface">
                     {selectedPurchaseBill.items.map((item, idx) => (
                       <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 font-medium max-w-[140px]">
-                          <div className="truncate font-bold text-on-surface">{item.name}</div>
-                          {item.hsnSacCode && <span className="text-[9px] text-outline block font-mono">HSN: {item.hsnSacCode}</span>}
+                        <td className="py-1.5 px-2.5 min-w-0">
+                          <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
+                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
+                            {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
+                            {item.hsnSacCode && <span>•</span>}
+                            <span className="text-orange-600 dark:text-orange-400 font-semibold">GST {item.gstRate || 0}%</span>
+                          </div>
                         </td>
-                        <td className="py-1.5 px-1.5 text-center font-mono">
-                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                        <td className="py-1.5 px-2 text-right min-w-0">
+                          <div className="font-mono font-medium text-on-surface truncate">
+                            {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant font-mono truncate">
+                            @ {formatINR(item.unitPrice)}
+                          </div>
                         </td>
-                        <td className="py-1.5 px-1.5 text-right font-mono">{formatINR(item.unitPrice)}</td>
-                        <td className="py-1.5 px-1.5 text-center">
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-surface-container font-mono">{item.gstRate || 0}%</span>
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap">
+                          {formatINR(item.totalAmount)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold">{formatINR(item.totalAmount)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1639,32 +1644,37 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
             {/* Purchased Items Table View */}
             <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-              <div className="max-h-48 overflow-y-auto">
-                <table className="w-full text-left text-[11px] border-collapse">
+              <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+                <table className="w-full text-left text-[11px] border-collapse table-fixed">
                   <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
                     <tr>
-                      <th className="py-1.5 px-2.5 font-semibold">Item</th>
-                      <th className="py-1.5 px-1.5 text-center font-semibold">Qty</th>
-                      <th className="py-1.5 px-1.5 text-right font-semibold">Rate</th>
-                      <th className="py-1.5 px-1.5 text-center font-semibold">Tax</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold">Total</th>
+                      <th className="py-1.5 px-2.5 font-semibold w-[46%]">Item</th>
+                      <th className="py-1.5 px-2 text-right font-semibold w-[27%]">Qty × Rate</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold w-[27%]">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/15 text-on-surface">
                     {selectedInvoiceForView.items.map((item, idx) => (
                       <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 font-medium max-w-[140px]">
-                          <div className="truncate font-bold text-on-surface">{item.name}</div>
-                          {item.hsnSacCode && <span className="text-[9px] text-outline block font-mono">HSN: {item.hsnSacCode}</span>}
+                        <td className="py-1.5 px-2.5 min-w-0">
+                          <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
+                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
+                            {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
+                            {item.hsnSacCode && <span>•</span>}
+                            <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>
+                          </div>
                         </td>
-                        <td className="py-1.5 px-1.5 text-center font-mono">
-                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                        <td className="py-1.5 px-2 text-right min-w-0">
+                          <div className="font-mono font-medium text-on-surface truncate">
+                            {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant font-mono truncate">
+                            @ {formatINR(item.unitPrice)}
+                          </div>
                         </td>
-                        <td className="py-1.5 px-1.5 text-right font-mono">{formatINR(item.unitPrice)}</td>
-                        <td className="py-1.5 px-1.5 text-center">
-                          <span className="text-[9px] px-1 py-0.2 rounded bg-surface-container font-mono">{item.gstRate || 0}%</span>
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap">
+                          {formatINR(item.totalAmount)}
                         </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold">{formatINR(item.totalAmount)}</td>
                       </tr>
                     ))}
                   </tbody>
