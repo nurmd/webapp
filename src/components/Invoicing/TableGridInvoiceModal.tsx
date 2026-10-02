@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
@@ -45,6 +45,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onSave,
   onAddNewParty,
 }) => {
+  // Items catalog synchronized with direct additions
+  const [catalog, setCatalog] = useState<InventoryItem[]>(itemsCatalog);
+  useEffect(() => {
+    setCatalog(itemsCatalog);
+  }, [itemsCatalog]);
+
+  const handleItemCreated = (newItem: InventoryItem) => {
+    setCatalog((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
+  };
+
   // All invoices in database for uniqueness verification
   const allInvoices = useMemo(() => {
     return existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
@@ -1636,7 +1646,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         }
         onSaveItem={handleSaveItemModal}
         onDeleteItem={editingRowIndex !== null ? handleDeleteItemModal : undefined}
-        itemsCatalog={itemsCatalog}
+        itemsCatalog={catalog}
+        onItemCreated={handleItemCreated}
         isIntraState={calcSummary.isIntraState}
         isGstActive={isGstActive}
       />

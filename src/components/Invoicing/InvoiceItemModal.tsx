@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { db } from '../../services/db.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -25,6 +26,7 @@ interface InvoiceItemModalProps {
   isIntraState: boolean;
   isGstActive?: boolean;
   mode?: 'sale' | 'purchase';
+  onItemCreated?: (newItem: InventoryItem) => void;
 }
 
 const COMMON_UNITS: UnitOfMeasurement[] = [
@@ -51,6 +53,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   isIntraState,
   isGstActive = true,
   mode = 'sale',
+  onItemCreated,
 }) => {
   const isPurchase = mode === 'purchase';
   const defaultHsn = isPurchase ? '844332' : '998313';
@@ -77,6 +80,17 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Integrated Search Dropdown State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [justAddedCount, setJustAddedCount] = useState(0);
+
+  // Quick Create New Item State
+  const [isCreateItemModalOpen, setIsCreateItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemSalePrice, setNewItemSalePrice] = useState('');
+  const [newItemPurchasePrice, setNewItemPurchasePrice] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState<UnitOfMeasurement>('PCS');
+  const [newItemHsn, setNewItemHsn] = useState(defaultHsn);
+  const [newItemGstRate, setNewGstRate] = useState<number>(18);
+  const [newItemStock, setNewItemStock] = useState('0');
+  const [newItemCategory, setNewItemCategory] = useState('General');
 
   // Editable Total State
   const [totalInput, setTotalInput] = useState<string>('');
@@ -158,6 +172,49 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setMrp(item.mrp || item.salePrice || 0);
     setGstRate(item.gstRate ?? 18);
     setIsDropdownOpen(false);
+  };
+
+  const handleOpenCreateItem = (prefillName?: string) => {
+    const initialName = (prefillName !== undefined ? prefillName : name).trim();
+    setNewItemName(initialName);
+    setNewItemSalePrice(mode === 'sale' && unitPrice > 0 ? unitPrice.toString() : '');
+    setNewItemPurchasePrice(mode === 'purchase' && unitPrice > 0 ? unitPrice.toString() : '');
+    setNewItemUnit((unit as UnitOfMeasurement) || 'PCS');
+    setNewItemHsn(hsnSacCode || defaultHsn);
+    setNewGstRate(gstRate ?? 18);
+    setNewItemStock('0');
+    setNewItemCategory('General');
+    setIsDropdownOpen(false);
+    setIsCreateItemModalOpen(true);
+  };
+
+  const handleSaveQuickItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemName.trim()) return;
+
+    const sale = parseFloat(newItemSalePrice) || 0;
+    const purchase = parseFloat(newItemPurchasePrice) || (mode === 'purchase' ? sale : 0);
+
+    const createdItem: InventoryItem = {
+      id: 'ITM-' + Date.now(),
+      name: newItemName.trim(),
+      salePrice: sale,
+      purchasePrice: purchase,
+      unit: newItemUnit,
+      hsnSacCode: newItemHsn.trim() || defaultHsn,
+      gstRate: isGstActive ? (Number(newItemGstRate) || 0) : 0,
+      currentStock: parseFloat(newItemStock) || 0,
+      minStockAlert: 5,
+      category: newItemCategory.trim() || 'General',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.saveItem(createdItem);
+    onItemCreated?.(createdItem);
+    handleSelectCatalogItem(createdItem);
+    setIsCreateItemModalOpen(false);
   };
 
   // Live item total calculation ("etitae total")
@@ -346,15 +403,30 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         <form onSubmit={handleSaveAndClose} className="p-4 overflow-y-auto flex flex-col gap-3.5 flex-1">
           {/* 1. Item Name with Integrated Search Dropdown */}
           <div className="relative flex flex-col gap-1">
-            <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-              <span>Item Name / Search Inventory <span className="text-error">*</span></span>
-              {itemId && (
-                <span className={`text-[10px] ${accentColorClass} font-bold flex items-center gap-0.5`}>
-                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                  Catalog Linked
-                </span>
-              )}
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1">
+                <span>Item Name / Search Inventory</span>
+                <span className="text-error">*</span>
+              </label>
+
+              <div className="flex items-center gap-2">
+                {itemId && (
+                  <span className={`text-[10px] ${accentColorClass} font-bold flex items-center gap-0.5`}>
+                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                    Catalog Linked
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleOpenCreateItem(name)}
+                  className={`text-[11px] ${accentColorClass} font-bold hover:underline flex items-center gap-0.5 cursor-pointer`}
+                  title="Create new inventory item directly"
+                >
+                  <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                  <span>+ New Item</span>
+                </button>
+              </div>
+            </div>
 
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
@@ -391,43 +463,94 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
 
             {/* Integrated Autocomplete / Suggestions Popover */}
-            {isDropdownOpen && suggestions.length > 0 && (
-              <div className="absolute top-[68px] left-0 right-0 z-30 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl max-h-48 overflow-y-auto divide-y divide-outline-variant/20 animate-fade-in">
+            {isDropdownOpen && (
+              <div className="absolute top-[68px] left-0 right-0 z-30 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl max-h-56 overflow-y-auto divide-y divide-outline-variant/20 animate-fade-in">
+                {/* Popover Header */}
                 <div className="px-3 py-1.5 bg-surface-container-low text-[10px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
-                  <span>Inventory Catalog Matches</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsDropdownOpen(false)}
-                    className={`${accentColorClass} hover:underline cursor-pointer`}
-                  >
-                    Close
-                  </button>
+                  <span>Inventory Catalog {suggestions.length > 0 ? `(${suggestions.length})` : ''}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCreateItem(name)}
+                      className={`${accentColorClass} hover:underline cursor-pointer font-bold flex items-center gap-0.5 normal-case text-xs`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                      <span>+ New Item</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="text-on-surface-variant hover:text-on-surface cursor-pointer p-0.5"
+                      title="Close suggestions"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">close</span>
+                    </button>
+                  </div>
                 </div>
-                {suggestions.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSelectCatalogItem(item)}
-                    className="p-2.5 flex items-center justify-between gap-2 hover:bg-surface-container-low cursor-pointer transition-colors"
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-bold text-on-surface truncate">
-                        {item.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
-                        <span>Stock: {item.currentStock} {item.unit}</span>
-                        {item.mrp && <span>• MRP ₹{item.mrp}</span>}
+
+                {suggestions.length > 0 ? (
+                  <>
+                    {suggestions.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleSelectCatalogItem(item)}
+                        className="p-2.5 flex items-center justify-between gap-2 hover:bg-surface-container-low cursor-pointer transition-colors"
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold text-on-surface truncate">
+                            {item.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
+                            <span>Stock: {item.currentStock} {item.unit}</span>
+                            {item.mrp && <span>• MRP ₹{item.mrp}</span>}
+                            {item.hsnSacCode && <span>• HSN {item.hsnSacCode}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className={`font-tabular-data text-xs font-black ${accentColorClass} block`}>
+                            {formatINR(isPurchase ? (item.purchasePrice || item.salePrice || 0) : item.salePrice)}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
+                            {isPurchase ? `Cost / ${item.unit}` : `per ${item.unit}`}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Bottom Direct Add Action */}
+                    <div
+                      onClick={() => handleOpenCreateItem(name)}
+                      className="p-2.5 bg-surface-container-low/60 hover:bg-surface-container-low flex items-center gap-2 cursor-pointer transition-colors text-xs font-bold"
+                    >
+                      <div className={`w-6 h-6 rounded-lg ${accentBgLightClass} flex items-center justify-center flex-shrink-0`}>
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={`${accentColorClass} truncate`}>
+                          + Add &quot;{name.trim() || 'New Item'}&quot; to Inventory
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant font-normal">
+                          Save as permanent product in inventory catalog
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <span className={`font-tabular-data text-xs font-black ${accentColorClass} block`}>
-                        {formatINR(isPurchase ? (item.purchasePrice || item.salePrice || 0) : item.salePrice)}
-                      </span>
-                      <span className="text-[10px] text-on-surface-variant block uppercase font-medium">
-                        {isPurchase ? `Cost / ${item.unit}` : `per ${item.unit}`}
-                      </span>
-                    </div>
+                  </>
+                ) : (
+                  /* Empty state when no catalog item matches */
+                  <div className="p-3 text-center flex flex-col items-center gap-2">
+                    <span className="text-xs text-on-surface-variant">
+                      No matching items found {name.trim() ? <>for &quot;<strong className="text-on-surface">{name}</strong>&quot;</> : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCreateItem(name)}
+                      className={`py-1.5 px-3 rounded-xl ${accentBgLightClass} ${accentColorClass} font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                      <span>+ Add &quot;{name.trim() || 'New Item'}&quot; Directly to Inventory</span>
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -715,6 +838,188 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Quick Add New Item to Inventory Modal */}
+      {isCreateItemModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 animate-fade-in">
+          <div className="bg-surface-container-lowest w-full max-w-md rounded-2xl shadow-2xl border border-outline-variant/30 flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-4 py-3 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/40">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-xl ${accentBgLightClass} flex items-center justify-center`}>
+                  <span className="material-symbols-outlined text-[18px]">add_box</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-on-surface">Add New Item to Inventory</h3>
+                  <span className="text-[10px] text-on-surface-variant">
+                    Saves to catalog & selects for current bill
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateItemModalOpen(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Quick Item Form */}
+            <form onSubmit={handleSaveQuickItem} className="p-4 flex flex-col gap-3 overflow-y-auto text-xs">
+              {/* Item Name */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                  Item Name <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="e.g. Wireless Mouse, Cotton Shirt..."
+                  className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 ${focusInputClass}`}
+                />
+              </div>
+
+              {/* Prices: Sale Price & Purchase Price */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    Sale Price (₹) <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={newItemSalePrice}
+                    onChange={(e) => setNewItemSalePrice(e.target.value)}
+                    placeholder="0.00"
+                    className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 ${focusInputClass}`}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    Purchase Cost (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newItemPurchasePrice}
+                    onChange={(e) => setNewItemPurchasePrice(e.target.value)}
+                    placeholder="0.00"
+                    className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 ${focusInputClass}`}
+                  />
+                </div>
+              </div>
+
+              {/* Unit & GST Rate */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    Unit of Measurement
+                  </label>
+                  <select
+                    value={newItemUnit}
+                    onChange={(e) => setNewItemUnit(e.target.value as UnitOfMeasurement)}
+                    className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                  >
+                    {COMMON_UNITS.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    GST Rate
+                  </label>
+                  <select
+                    value={newItemGstRate}
+                    onChange={(e) => setNewGstRate(Number(e.target.value))}
+                    className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                  >
+                    <option value={0}>0% (Exempt)</option>
+                    <option value={5}>5%</option>
+                    <option value={12}>12%</option>
+                    <option value={18}>18% (Standard)</option>
+                    <option value={28}>28%</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* HSN & Opening Stock */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    HSN / SAC Code
+                  </label>
+                  <input
+                    type="text"
+                    value={newItemHsn}
+                    onChange={(e) => setNewItemHsn(e.target.value)}
+                    placeholder="e.g. 8471"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-mono text-on-surface border border-outline-variant/30 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                    Opening Stock (Qty)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newItemStock}
+                    onChange={(e) => setNewItemStock(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={newItemCategory}
+                  onChange={(e) => setNewItemCategory(e.target.value)}
+                  placeholder="General"
+                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateItemModalOpen(false)}
+                  className="px-3 py-2 rounded-xl text-on-surface-variant font-bold text-xs hover:bg-surface-container cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`px-4 py-2 rounded-xl font-bold text-xs text-white shadow-xs cursor-pointer active:scale-95 transition-all flex items-center gap-1 ${
+                    isPurchase ? 'bg-orange-600 hover:bg-orange-700' : 'bg-secondary hover:bg-secondary/90 text-on-secondary'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">check</span>
+                  <span>Save & Use in Bill</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
