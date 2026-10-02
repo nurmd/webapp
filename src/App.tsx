@@ -467,7 +467,7 @@ export const App: React.FC = () => {
           <DashboardView
             company={company}
             invoices={invoices}
-            items={items}
+            items={activeItems}
             parties={parties}
             onNewInvoice={() => {
               setEditingInvoice(null);

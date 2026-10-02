@@ -799,49 +799,54 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </section>
 
         {/* Quick Actions Bar */}
-        <section className="flex items-center gap-2">
+        <section className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Record Payment */}
           <button
             type="button"
             onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
               isPaymentOpen
                 ? 'bg-secondary text-on-secondary'
                 : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">payments</span>
-            <span>Payment</span>
+            <span className="material-symbols-outlined text-[17px]">
+              {isPaymentOpen ? 'close' : 'payments'}
+            </span>
+            <span>{isPaymentOpen ? 'Close Payment' : 'Record Payment'}</span>
           </button>
 
-          {/* New Invoice (for Customers) / New Bill (for Suppliers) */}
-          {isCustomer
-            ? onCreateInvoice && (
-                <button
-                  type="button"
-                  onClick={() => onCreateInvoice(party)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-                  <span>New Invoice</span>
-                </button>
-              )
-            : onCreatePurchase && (
-                <button
-                  type="button"
-                  onClick={() => onCreatePurchase(party)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
-                  <span>New Bill</span>
-                </button>
-              )}
+          {/* New Invoice Button (Always available for billing any party) */}
+          {onCreateInvoice && (
+            <button
+              type="button"
+              onClick={() => onCreateInvoice(party)}
+              className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+              title="Create new sales invoice for this party"
+            >
+              <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+              <span>New Invoice</span>
+            </button>
+          )}
+
+          {/* New Bill Button (For suppliers or inward purchases) */}
+          {onCreatePurchase && (
+            <button
+              type="button"
+              onClick={() => onCreatePurchase(party)}
+              className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:bg-surface-container-high"
+              title="Create new purchase bill from this party"
+            >
+              <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
+              <span>New Bill</span>
+            </button>
+          )}
 
           {/* Print Statement */}
           <button
             type="button"
             onClick={handlePrintStatement}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
             title="Print Ledger Statement"
           >
             <span className="material-symbols-outlined text-[18px]">print</span>
@@ -1309,7 +1314,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             <span>{isCustomer ? '+ Record Payment' : '+ Pay Supplier'}</span>
           </button>
 
-          {isCustomer && onCreateInvoice && (
+          {onCreateInvoice && (
             <button
               type="button"
               onClick={() => onCreateInvoice(party)}
@@ -1321,11 +1326,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             </button>
           )}
 
-          {!isCustomer && onCreatePurchase && (
+          {onCreatePurchase && (
             <button
               type="button"
               onClick={() => onCreatePurchase(party)}
-              className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+              className="py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
               title="New Purchase Bill"
             >
               <span className="material-symbols-outlined text-[16px] text-primary">shopping_bag</span>
