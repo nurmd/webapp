@@ -451,6 +451,70 @@ class StorageService {
     pouch.deleteDoc('party', id);
   }
 
+  // Recalculate and persist a party's balance based on explicit opening balance and unpaid bills/invoices
+  recalculatePartyBalance(partyId: string): number {
+    const parties = this.getParties();
+    const partyIndex = parties.findIndex((p) => p.id === partyId);
+    if (partyIndex < 0) return 0;
+
+    const party = parties[partyIndex];
+    const isCustomer = party.type === 'CUSTOMER';
+    const partyNameNorm = (party.name || '').trim().toLowerCase();
+
+    // 1. Explicit Opening Balance
+    let balance = 0;
+    if (typeof party.openingBalance === 'number' && party.openingBalance > 0) {
+      const amt = party.openingBalance;
+      const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
+      if (opType === 'TO_RECEIVE') {
+        balance += amt;
+      } else {
+        balance -= amt;
+      }
+    }
+
+    if (isCustomer) {
+      // Invoices: customer owes remaining unpaid balance (positive = receivable)
+      const invoices = this.getInvoices();
+      const partyInvoices = invoices.filter(
+        (inv) => inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm)
+      );
+      partyInvoices.forEach((inv) => {
+        const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
+        balance += unpaid;
+      });
+    } else {
+      // Purchases: we owe vendor remaining unpaid balance (negative = payable)
+      const purchases = this.getPurchases();
+      const partyPurchases = purchases.filter(
+        (pur) => pur.supplierId === party.id || (pur.supplierName && pur.supplierName.trim().toLowerCase() === partyNameNorm)
+      );
+      partyPurchases.forEach((pur) => {
+        const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
+        balance -= unpaid;
+      });
+    }
+
+    const netBalance = Math.round(balance * 100) / 100;
+    if (party.currentBalance !== netBalance) {
+      party.currentBalance = netBalance;
+      party.updatedAt = new Date().toISOString();
+      parties[partyIndex] = party;
+      this.set(STORAGE_KEYS.PARTIES, parties);
+      pouch.putDoc('party', party);
+    }
+
+    return netBalance;
+  }
+
+  // Synchronize balances for all parties
+  syncAllPartyBalances(): void {
+    const parties = this.getParties();
+    for (const party of parties) {
+      this.recalculatePartyBalance(party.id);
+    }
+  }
+
   // Items
   getItems(): InventoryItem[] {
     return this.get<InventoryItem[]>(STORAGE_KEYS.ITEMS, DEFAULT_ITEMS);
@@ -509,12 +573,20 @@ class StorageService {
         this.saveItem(match);
       }
     }
+
+    if (invoice.partyId) {
+      this.recalculatePartyBalance(invoice.partyId);
+    }
   }
 
   deleteInvoice(id: string): void {
-    const list = this.getInvoices().filter((inv) => inv.id !== id);
+    const inv = this.getInvoices().find((i) => i.id === id);
+    const list = this.getInvoices().filter((i) => i.id !== id);
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.deleteDoc('invoice', id);
+    if (inv?.partyId) {
+      this.recalculatePartyBalance(inv.partyId);
+    }
   }
 
   // Purchases
@@ -591,12 +663,20 @@ class StorageService {
         }
       }
     }
+
+    if (bill.supplierId) {
+      this.recalculatePartyBalance(bill.supplierId);
+    }
   }
 
   deletePurchase(id: string): void {
+    const bill = this.getPurchases().find((b) => b.id === id);
     const list = this.getPurchases().filter((b) => b.id !== id);
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.deleteDoc('purchase', id);
+    if (bill?.supplierId) {
+      this.recalculatePartyBalance(bill.supplierId);
+    }
   }
 
   // Stock Adjustments

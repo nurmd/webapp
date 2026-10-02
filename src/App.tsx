@@ -89,6 +89,8 @@ export const App: React.FC = () => {
   activeTabRef.current = activeTab;
 
   React.useEffect(() => {
+    db.syncAllPartyBalances();
+    refreshData();
     initBackNavigation(() => {
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');
@@ -233,6 +235,10 @@ export const App: React.FC = () => {
     db.saveVoucher(voucher);
 
     refreshData();
+    if (newInvoice.partyId) {
+      db.recalculatePartyBalance(newInvoice.partyId);
+      refreshData();
+    }
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
     setEditingInvoice(null);
@@ -282,6 +288,10 @@ export const App: React.FC = () => {
     });
     db.saveVoucher(voucher);
 
+    if (newBill.supplierId) {
+      db.recalculatePartyBalance(newBill.supplierId);
+    }
+
     refreshData();
   };
 
@@ -291,15 +301,23 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
+    const inv = db.getInvoices().find((i) => i.id === id);
     if (window.confirm('Delete this invoice?')) {
       db.deleteInvoice(id);
+      if (inv?.partyId) {
+        db.recalculatePartyBalance(inv.partyId);
+      }
       refreshData();
     }
   };
 
   const handleDeletePurchase = (id: string) => {
+    const bill = db.getPurchases().find((b) => b.id === id);
     if (window.confirm('Delete this purchase bill?')) {
       db.deletePurchase(id);
+      if (bill?.supplierId) {
+        db.recalculatePartyBalance(bill.supplierId);
+      }
       refreshData();
     }
   };
@@ -381,7 +399,7 @@ export const App: React.FC = () => {
         remaining -= settleAmt;
       }
     } else {
-      // Create Double-Entry Payment Out Voucher
+      // 1. Create Double-Entry Payment Out Voucher
       const voucher = createPaymentOutVoucher({
         voucherNumber: `PYMT-${docId}`,
         date: new Date().toISOString().split('T')[0],
@@ -392,8 +410,36 @@ export const App: React.FC = () => {
         narration: notes || `Payment disbursed to ${party.name}`,
       });
       db.saveVoucher(voucher);
+
+      // 2. FIFO settlement across unpaid purchases for this supplier
+      let remaining = amount;
+      const unpaidPurchases = db
+        .getPurchases()
+        .filter(
+          (pur) =>
+            (pur.supplierId === party.id || pur.supplierName.toLowerCase() === party.name.toLowerCase()) &&
+            pur.balanceAmount > 0
+        )
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      for (const pur of unpaidPurchases) {
+        if (remaining <= 0) break;
+        const settleAmt = Math.min(remaining, pur.balanceAmount);
+        const newPaid = pur.paidAmount + settleAmt;
+        const newBalPur = pur.grandTotal - newPaid;
+        const updatedPur: PurchaseBill = {
+          ...pur,
+          paidAmount: newPaid,
+          balanceAmount: Math.max(0, newBalPur),
+          paymentStatus: newBalPur <= 0.01 ? 'PAID' : 'PARTIAL',
+          updatedAt: new Date().toISOString(),
+        };
+        db.savePurchase(updatedPur);
+        remaining -= settleAmt;
+      }
     }
 
+    db.recalculatePartyBalance(party.id);
     refreshData();
   };
 

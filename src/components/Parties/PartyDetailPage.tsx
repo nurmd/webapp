@@ -91,8 +91,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
 
   const isCustomer = party.type === 'CUSTOMER';
-  const isReceivable = party.currentBalance > 0;
-  const isPayable = party.currentBalance < 0;
 
   // System back navigation handling
   useBackNavigation(() => {
@@ -246,41 +244,23 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       }
     });
 
-    // Opening Balance
-    const totalDebits = rawEntries.reduce((s, e) => s + e.debit, 0);
-    const totalCredits = rawEntries.reduce((s, e) => s + e.credit, 0);
-    const calculatedNet = isCustomer ? totalDebits - totalCredits : totalCredits - totalDebits;
-    const openingDifference = party.currentBalance - calculatedNet;
-
+    // Only genuine, explicit opening balance (no fake synthesized opening balances)
     const hasExplicitOpening = typeof party.openingBalance === 'number' && party.openingBalance > 0;
     const openingDate = party.openingBalanceDate || (party.createdAt ? party.createdAt.split('T')[0] : '2026-01-01');
 
     if (hasExplicitOpening) {
       const amt = party.openingBalance!;
       const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
-      const isReceivable = opType === 'TO_RECEIVE';
+      const isRec = opType === 'TO_RECEIVE';
       rawEntries.push({
         id: `opening-${party.id}`,
         rawId: party.id,
         date: openingDate,
         docNumber: 'OPENING',
         type: 'OPENING',
-        description: `Opening Balance (${isReceivable ? "You'll Get" : "You'll Give"})`,
-        debit: isReceivable ? amt : 0,
-        credit: isReceivable ? 0 : amt,
-        status: 'OPENING',
-        isOpening: true,
-      });
-    } else if (Math.abs(openingDifference) >= 1) {
-      rawEntries.push({
-        id: `opening-${party.id}`,
-        rawId: party.id,
-        date: openingDate,
-        docNumber: 'OPENING',
-        type: 'OPENING',
-        description: 'Opening Balance',
-        debit: openingDifference > 0 ? openingDifference : 0,
-        credit: openingDifference < 0 ? Math.abs(openingDifference) : 0,
+        description: `Opening Balance (${isRec ? "You'll Get" : "You'll Give"})`,
+        debit: isRec ? amt : 0,
+        credit: isRec ? 0 : amt,
         status: 'OPENING',
         isOpening: true,
       });
@@ -298,6 +278,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       return { ...entry, runningBalance: running };
     });
   }, [party, partyInvoices, partyPurchases, vouchers, isCustomer]);
+
+  // Derived current net balance directly from passbook running balance
+  const liveNetBalance = useMemo(() => {
+    if (passbook.length === 0) {
+      if (typeof party.openingBalance === 'number' && party.openingBalance > 0) {
+        const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
+        return opType === 'TO_RECEIVE' ? party.openingBalance : -party.openingBalance;
+      }
+      return party.currentBalance || 0;
+    }
+    const lastRunning = passbook[passbook.length - 1].runningBalance;
+    return isCustomer ? lastRunning : -lastRunning;
+  }, [passbook, party.openingBalance, party.openingBalanceType, party.currentBalance, isCustomer]);
+
+  const isReceivable = liveNetBalance > 0;
+  const isPayable = liveNetBalance < 0;
 
   // Filtered passbook list
   const filteredPassbook = useMemo(() => {
@@ -370,7 +366,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     const bizName = company.tradeName || company.businessName || 'Vyapar Books';
     const upiLink = company.upiId
       ? `upi://pay?pa=${encodeURIComponent(company.upiId)}&pn=${encodeURIComponent(bizName)}&am=${Math.abs(
-          party.currentBalance
+          liveNetBalance
         )}&cu=INR`
       : '';
 
@@ -380,7 +376,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       `Date: ${new Date().toLocaleDateString('en-IN')}\n\n` +
       `Total Bills: ${formatINR(totalBilled)}\n` +
       `Total Paid: ${formatINR(totalPaid)}\n` +
-      `*Net Balance Due: ${formatINR(Math.abs(party.currentBalance))} ${
+      `*Net Balance Due: ${formatINR(Math.abs(liveNetBalance))} ${
         isReceivable ? '(To Collect)' : isPayable ? '(To Pay)' : '(Settled)'
       }*\n\n` +
       (upiLink ? `*Instant UPI Payment Link:*\n${upiLink}\n\n` : '') +
@@ -637,8 +633,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     // 6. Opening balance edit
     else if (editingLedgerEntry.isOpening) {
       const hasOldExplicit = typeof party.openingBalance === 'number';
-      const oldRawOpening = hasOldExplicit ? party.openingBalance! : Math.abs(editingLedgerEntry.debit || editingLedgerEntry.credit || 0);
-      const oldType = party.openingBalanceType || (editingLedgerEntry.debit > 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldRawOpening = hasOldExplicit ? party.openingBalance! : 0;
+      const oldType = party.openingBalanceType || (party.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
       const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
 
       const newSignedOpening = newAmt > 0 ? (editOpeningType === 'RECEIVABLE' ? newAmt : -newAmt) : 0;
@@ -654,6 +650,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         updatedAt: new Date().toISOString(),
       };
       db.saveParty(updatedParty);
+      db.recalculatePartyBalance(party.id);
     }
 
     setEditingLedgerEntry(null);
@@ -674,6 +671,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       }
       db.deleteVoucher(v.id);
       db.saveParty({ ...party, currentBalance: adjustedBal, updatedAt: new Date().toISOString() });
+      db.recalculatePartyBalance(party.id);
     } else if (entry.id.startsWith('pay-inv-') && entry.rawInvoice) {
       const inv = entry.rawInvoice;
       const amt = entry.credit;
@@ -686,6 +684,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       };
       db.saveInvoice(updatedInv);
       db.saveParty({ ...party, currentBalance: party.currentBalance + amt, updatedAt: new Date().toISOString() });
+      db.recalculatePartyBalance(party.id);
     } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
       const pur = entry.rawPurchase;
       const amt = entry.debit;
@@ -698,10 +697,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       };
       db.savePurchase(updatedPur);
       db.saveParty({ ...party, currentBalance: party.currentBalance - amt, updatedAt: new Date().toISOString() });
+      db.recalculatePartyBalance(party.id);
     } else if (entry.isOpening) {
       const hasOldExplicit = typeof party.openingBalance === 'number';
-      const oldRawOpening = hasOldExplicit ? party.openingBalance! : Math.abs(entry.debit || entry.credit || 0);
-      const oldType = party.openingBalanceType || (entry.debit > 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldRawOpening = hasOldExplicit ? party.openingBalance! : 0;
+      const oldType = party.openingBalanceType || (party.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
       const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
 
       const updatedParty: Party = {
@@ -713,6 +713,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         updatedAt: new Date().toISOString(),
       };
       db.saveParty(updatedParty);
+      db.recalculatePartyBalance(party.id);
     }
 
     setEditingLedgerEntry(null);
@@ -824,7 +825,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                     : 'text-secondary'
                 }`}
               >
-                {party.currentBalance === 0 ? '₹0 (Settled)' : formatINR(Math.abs(party.currentBalance))}
+                {liveNetBalance === 0 ? '₹0 (Settled)' : formatINR(Math.abs(liveNetBalance))}
               </span>
             </div>
 
@@ -941,18 +942,18 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               {party.creditLimit && party.creditLimit > 0 && (
                 <div className="pt-1">
                   <div className="flex justify-between text-[10px] text-on-surface-variant font-semibold mb-0.5">
-                    <span>Credit Line: {formatINR(Math.abs(party.currentBalance))} / {formatINR(party.creditLimit)}</span>
-                    <span className={party.currentBalance > party.creditLimit ? 'text-error font-bold' : ''}>
-                      {Math.round((Math.max(0, party.currentBalance) / party.creditLimit) * 100)}%
+                    <span>Credit Line: {formatINR(Math.abs(liveNetBalance))} / {formatINR(party.creditLimit)}</span>
+                    <span className={liveNetBalance > party.creditLimit ? 'text-error font-bold' : ''}>
+                      {Math.round((Math.max(0, liveNetBalance) / party.creditLimit) * 100)}%
                     </span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-surface-container overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
-                        party.currentBalance > party.creditLimit ? 'bg-error' : 'bg-secondary'
+                        liveNetBalance > party.creditLimit ? 'bg-error' : 'bg-secondary'
                       }`}
                       style={{
-                        width: `${Math.min(100, (Math.max(0, party.currentBalance) / party.creditLimit) * 100)}%`,
+                        width: `${Math.min(100, (Math.max(0, liveNetBalance) / party.creditLimit) * 100)}%`,
                       }}
                     />
                   </div>
@@ -1083,19 +1084,19 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             </div>
 
             {/* Quick Chips */}
-            {party.currentBalance !== 0 && (
+            {liveNetBalance !== 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setPaymentAmount(Math.abs(party.currentBalance).toString())}
+                  onClick={() => setPaymentAmount(Math.abs(liveNetBalance).toString())}
                   className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[11px] font-bold cursor-pointer hover:bg-secondary/25"
                 >
-                  Full Due ({formatINR(Math.abs(party.currentBalance))})
+                  Full Due ({formatINR(Math.abs(liveNetBalance))})
                 </button>
-                {Math.abs(party.currentBalance) > 100 && (
+                {Math.abs(liveNetBalance) > 100 && (
                   <button
                     type="button"
-                    onClick={() => setPaymentAmount(Math.round(Math.abs(party.currentBalance) / 2).toString())}
+                    onClick={() => setPaymentAmount(Math.round(Math.abs(liveNetBalance) / 2).toString())}
                     className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[11px] font-medium cursor-pointer"
                   >
                     50%

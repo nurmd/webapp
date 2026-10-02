@@ -53,11 +53,11 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setCreditLimit(editingParty.creditLimit ? editingParty.creditLimit.toString() : '');
 
       const hasExplicit = typeof editingParty.openingBalance === 'number';
-      const rawOpening = hasExplicit ? editingParty.openingBalance! : Math.abs(editingParty.currentBalance);
+      const rawOpening = hasExplicit ? editingParty.openingBalance! : 0;
       setOpeningBalance(rawOpening > 0 ? rawOpening.toString() : '');
       setOpeningBalanceType(
         editingParty.openingBalanceType ||
-        (editingParty.currentBalance >= 0 ? 'TO_RECEIVE' : 'TO_PAY')
+        (editingParty.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY')
       );
       setOpeningBalanceDate(
         editingParty.openingBalanceDate ||
@@ -135,8 +135,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
     let finalCurrentBalance = newSignedOpening;
     if (editingParty) {
       const hasOldExplicit = typeof editingParty.openingBalance === 'number';
-      const oldRawOpening = hasOldExplicit ? editingParty.openingBalance! : Math.abs(editingParty.currentBalance);
-      const oldType = editingParty.openingBalanceType || (editingParty.currentBalance >= 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldRawOpening = hasOldExplicit ? editingParty.openingBalance! : 0;
+      const oldType = editingParty.openingBalanceType || (editingParty.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
       const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
 
       const delta = newSignedOpening - oldSignedOpening;

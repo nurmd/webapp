@@ -605,9 +605,13 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
               {selectedSupplier && (
                 <div className="flex items-center gap-1 shrink-0">
-                  {(selectedSupplier.currentBalance || 0) > 0 ? (
+                  {(selectedSupplier.currentBalance || 0) < 0 ? (
                     <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/60">
-                      Payable: {formatINR(selectedSupplier.currentBalance || 0)}
+                      Payable: {formatINR(Math.abs(selectedSupplier.currentBalance || 0))}
+                    </span>
+                  ) : (selectedSupplier.currentBalance || 0) > 0 ? (
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-300/60">
+                      Advance: {formatINR(selectedSupplier.currentBalance || 0)}
                     </span>
                   ) : null}
                 </div>
