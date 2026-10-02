@@ -48,6 +48,7 @@ export interface PassbookEntry {
   rawPurchase?: PurchaseBill;
   rawVoucher?: Voucher;
   isOpening?: boolean;
+  billAmount?: number;
 }
 
 export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
@@ -81,12 +82,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
   const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
 
+  // Simplified Purchase View Modal state
+  const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
+  const [purchasePayAmount, setPurchasePayAmount] = useState<string>('');
+  const [purchasePayMode, setPurchasePayMode] = useState<PaymentMode>('UPI');
+  const [purchasePayNotes, setPurchasePayNotes] = useState<string>('');
+
   const isCustomer = party.type === 'CUSTOMER';
   const isReceivable = party.currentBalance > 0;
   const isPayable = party.currentBalance < 0;
 
   // System back navigation handling
   useBackNavigation(() => {
+    if (selectedPurchaseBill) {
+      setSelectedPurchaseBill(null);
+      return true;
+    }
     if (editingLedgerEntry) {
       setEditingLedgerEntry(null);
       return true;
@@ -178,35 +189,24 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
     // Purchase Bills
     partyPurchases.forEach((pur) => {
+      const balance = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
       rawEntries.push({
         id: `pur-${pur.id}`,
         rawId: pur.id,
         date: pur.date,
         docNumber: pur.billNumber,
         type: 'PURCHASE',
-        description: `Purchase Bill #${pur.billNumber}`,
+        description: pur.items && pur.items.length > 0
+          ? `${pur.items.length} items (${pur.items.map((i) => i.name).slice(0, 2).join(', ')})`
+          : `Purchase Bill #${pur.billNumber}`,
         debit: 0,
-        credit: pur.grandTotal,
+        credit: balance,
+        billAmount: pur.grandTotal,
         status: pur.paymentStatus,
         paymentMode: pur.paymentMode,
         rawPurchase: pur,
       });
-
-      if (pur.paidAmount > 0) {
-        rawEntries.push({
-          id: `pay-pur-${pur.id}`,
-          rawId: pur.id,
-          date: pur.date,
-          docNumber: `PYMT-${pur.billNumber}`,
-          type: 'PAYMENT_OUT',
-          description: `Payment made to vendor (${pur.paymentMode})`,
-          debit: pur.paidAmount,
-          credit: 0,
-          status: 'PAID',
-          paymentMode: pur.paymentMode,
-          rawPurchase: pur,
-        });
-      }
+      // NOTE: Payment out is handled within the purchase bill; no extra pay-pur transaction is generated.
     });
 
     // Accounting Vouchers (Receipts / Payments)
@@ -399,9 +399,88 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const handleTransactionClick = (entry: PassbookEntry) => {
     if (entry.type === 'SALE' && entry.rawInvoice && onViewInvoice) {
       onViewInvoice(entry.rawInvoice);
+    } else if (entry.type === 'PURCHASE' && entry.rawPurchase) {
+      setSelectedPurchaseBill(entry.rawPurchase);
+      setPurchasePayAmount(
+        entry.rawPurchase.balanceAmount > 0
+          ? entry.rawPurchase.balanceAmount.toString()
+          : ''
+      );
+      setPurchasePayMode((entry.rawPurchase.paymentMode as PaymentMode) || 'UPI');
+      setPurchasePayNotes('');
     } else {
       handleOpenEditLedgerItem(entry);
     }
+  };
+
+  // Record payment out directly inside purchase bill
+  const handleRecordPaymentForPurchase = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPurchaseBill) return;
+
+    const payAmt = parseFloat(purchasePayAmount);
+    if (isNaN(payAmt) || payAmt <= 0) {
+      alert('Please enter a valid payment amount.');
+      return;
+    }
+
+    const currentPaid = selectedPurchaseBill.paidAmount || 0;
+    const newPaid = Math.min(selectedPurchaseBill.grandTotal, currentPaid + payAmt);
+    const newBal = Math.max(0, selectedPurchaseBill.grandTotal - newPaid);
+    const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = newBal <= 0.01 ? 'PAID' : 'PARTIAL';
+
+    const updatedBill: PurchaseBill = {
+      ...selectedPurchaseBill,
+      paidAmount: newPaid,
+      balanceAmount: newBal,
+      paymentStatus: newStatus,
+      paymentMode: purchasePayMode,
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.savePurchase(updatedBill);
+
+    // Call onRecordPayment to handle party balance adjustment & create accounting payment voucher
+    onRecordPayment(
+      party,
+      payAmt,
+      purchasePayMode,
+      purchasePayNotes || `Payment out for Bill #${selectedPurchaseBill.billNumber}`,
+      'OUT'
+    );
+
+    setSelectedPurchaseBill(updatedBill);
+    setPurchasePayAmount(newBal > 0 ? newBal.toString() : '');
+    onRefresh?.();
+  };
+
+  // Delete purchase bill from simplified purchase view
+  const handleDeletePurchaseBill = (bill: PurchaseBill) => {
+    if (!window.confirm(`Delete Purchase Bill #${bill.billNumber}? This will revert any stock added by this bill.`)) return;
+
+    // Rollback stock
+    const allItems = db.getItems();
+    for (const line of bill.items) {
+      if (line.itemId) {
+        const itm = allItems.find((i) => i.id === line.itemId);
+        if (itm) {
+          itm.currentStock = Math.max(0, itm.currentStock - line.quantity);
+          db.saveItem(itm);
+        }
+      }
+    }
+
+    // Rollback party balance: when deleted, liability is reduced by the unpaid balance
+    const unpaidBal = typeof bill.balanceAmount === 'number' ? bill.balanceAmount : (bill.grandTotal - (bill.paidAmount || 0));
+    db.saveParty({
+      ...party,
+      currentBalance: party.currentBalance + unpaidBal,
+      updatedAt: new Date().toISOString(),
+    });
+
+    db.deletePurchase(bill.id);
+    setSelectedPurchaseBill(null);
+    onRefresh?.();
   };
 
   // Save changes to ledger item
@@ -1135,7 +1214,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                         </div>
 
                         <p className="text-[10px] text-on-surface-variant truncate">
-                          {entry.date} {entry.description ? `• ${entry.description}` : ''}
+                          {entry.type === 'PURCHASE' && entry.rawPurchase ? (
+                            <>
+                              {entry.date} • {entry.rawPurchase.paymentStatus === 'PAID'
+                                ? `Fully Paid (${entry.rawPurchase.paymentMode || 'Cash'})`
+                                : entry.rawPurchase.paidAmount > 0
+                                ? `Paid: ${formatINR(entry.rawPurchase.paidAmount)} • Due: ${formatINR(entry.rawPurchase.balanceAmount)}`
+                                : `Unpaid: ${formatINR(entry.rawPurchase.balanceAmount)}`}
+                            </>
+                          ) : (
+                            <>{entry.date} {entry.description ? `• ${entry.description}` : ''}</>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1145,10 +1234,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                       <div>
                         <span
                           className={`font-currency-display-mobile text-xs font-black block ${
-                            isCredit ? 'text-secondary' : isDebit ? 'text-error' : 'text-on-surface'
+                            entry.type === 'PURCHASE'
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : isCredit
+                              ? 'text-secondary'
+                              : isDebit
+                              ? 'text-error'
+                              : 'text-on-surface'
                           }`}
                         >
-                          {isCredit ? `+ ${formatINR(entry.credit)}` : isDebit ? `- ${formatINR(entry.debit)}` : '₹0'}
+                          {entry.type === 'PURCHASE'
+                            ? `- ${formatINR(entry.billAmount || entry.credit)}`
+                            : isCredit
+                            ? `+ ${formatINR(entry.credit)}`
+                            : isDebit
+                            ? `- ${formatINR(entry.debit)}`
+                            : '₹0'}
                         </span>
                         <span className="text-[9px] font-mono text-outline block">
                           Bal: {formatINR(Math.abs(entry.runningBalance))}
@@ -1355,6 +1456,237 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Simplified Purchase View Modal with In-Bill Payment Out Tracking */}
+      {selectedPurchaseBill && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-bold text-sm text-on-surface truncate">
+                      Bill #{selectedPurchaseBill.billNumber}
+                    </h3>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                        selectedPurchaseBill.paymentStatus === 'PAID'
+                          ? 'bg-secondary/10 text-secondary'
+                          : selectedPurchaseBill.paymentStatus === 'PARTIAL'
+                          ? 'bg-amber-500/10 text-amber-600'
+                          : 'bg-error/10 text-error'
+                      }`}
+                    >
+                      {selectedPurchaseBill.paymentStatus}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant truncate block">
+                    {selectedPurchaseBill.supplierName} • {selectedPurchaseBill.date}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPurchaseBill(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Bill Details Summary */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2 rounded-xl bg-surface-container-low">
+                <span className="text-[10px] text-outline block">SUPPLIER GSTIN</span>
+                <span className="font-mono font-bold text-on-surface text-[11px] truncate block">
+                  {selectedPurchaseBill.supplierGstin || 'Unregistered'}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-surface-container-low">
+                <span className="text-[10px] text-outline block">ITC ELIGIBILITY</span>
+                <span className="font-bold text-on-surface text-[11px] truncate block">
+                  {selectedPurchaseBill.itcEligibility === 'INELIGIBLE_17_5' ? 'Ineligible (Blocked)' : 'Eligible ITC'}
+                </span>
+              </div>
+            </div>
+
+            {/* Purchased Items List */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-on-surface-variant px-1">
+                <span>Purchased Items ({selectedPurchaseBill.items.length})</span>
+                <span>Amount</span>
+              </div>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {selectedPurchaseBill.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-xl bg-surface-container-low/70 flex items-center justify-between text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-on-surface block truncate">{item.name}</span>
+                      <span className="text-[10px] text-on-surface-variant">
+                        {item.quantity} {item.unit || 'PCS'} × {formatINR(item.unitPrice)}
+                        {item.gstRate ? ` • GST ${item.gstRate}%` : ''}
+                        {item.hsnSacCode ? ` • HSN ${item.hsnSacCode}` : ''}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-on-surface text-xs flex-shrink-0">
+                      {formatINR(item.totalAmount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Financial Breakdown */}
+            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1.5 text-xs">
+              <div className="flex justify-between text-on-surface-variant">
+                <span>Taxable Amount</span>
+                <span className="font-bold text-on-surface">{formatINR(selectedPurchaseBill.totalTaxableAmount)}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant">
+                <span>Total GST (CGST/SGST/IGST)</span>
+                <span className="font-bold text-orange-600 dark:text-orange-400">
+                  {formatINR(selectedPurchaseBill.totalTax)}
+                </span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
+                <span>Total Bill Value</span>
+                <span className="font-black text-on-surface font-currency-display-mobile">
+                  {formatINR(selectedPurchaseBill.grandTotal)}
+                </span>
+              </div>
+            </div>
+
+            {/* In-Bill Payment Out Section */}
+            <div className="p-3 rounded-xl bg-surface-container border border-outline-variant/30 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                  <span>Payment Out Tracking</span>
+                </span>
+                <span className="text-[11px] font-bold text-on-surface-variant">
+                  Mode: {selectedPurchaseBill.paymentMode || 'Cash'}
+                </span>
+              </div>
+
+              {/* 3 Metric Cards: Total, Paid, Balance */}
+              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-outline block">Total Bill</span>
+                  <span className="font-bold text-on-surface text-xs">{formatINR(selectedPurchaseBill.grandTotal)}</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-secondary block">Paid Out</span>
+                  <span className="font-bold text-secondary text-xs">{formatINR(selectedPurchaseBill.paidAmount)}</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-error block">Balance Due</span>
+                  <span className="font-bold text-error text-xs">{formatINR(selectedPurchaseBill.balanceAmount)}</span>
+                </div>
+              </div>
+
+              {/* Payment Out Recording Form */}
+              {selectedPurchaseBill.balanceAmount > 0 ? (
+                <form onSubmit={handleRecordPaymentForPurchase} className="mt-1 flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
+                  <span className="text-[11px] font-bold text-on-surface">Record Payment to Vendor</span>
+
+                  {/* Quick Chip to fill full balance */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setPurchasePayAmount(selectedPurchaseBill.balanceAmount.toString())}
+                      className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/25"
+                    >
+                      Clear Due ({formatINR(selectedPurchaseBill.balanceAmount)})
+                    </button>
+                    {selectedPurchaseBill.balanceAmount > 200 && (
+                      <button
+                        type="button"
+                        onClick={() => setPurchasePayAmount(Math.round(selectedPurchaseBill.balanceAmount / 2).toString())}
+                        className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[10px] font-medium cursor-pointer"
+                      >
+                        Half Due ({formatINR(Math.round(selectedPurchaseBill.balanceAmount / 2))})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Pay Amount (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        max={selectedPurchaseBill.balanceAmount}
+                        required
+                        value={purchasePayAmount}
+                        onChange={(e) => setPurchasePayAmount(e.target.value)}
+                        placeholder="Amount..."
+                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Mode</label>
+                      <select
+                        value={purchasePayMode}
+                        onChange={(e) => setPurchasePayMode(e.target.value as PaymentMode)}
+                        className="w-full px-2 py-1.5 bg-surface rounded-xl text-xs text-on-surface border border-outline-variant/30 focus:outline-none"
+                      >
+                        <option value="UPI">UPI</option>
+                        <option value="CASH">Cash</option>
+                        <option value="NET_BANKING">Net Banking</option>
+                        <option value="CHEQUE">Cheque</option>
+                        <option value="CARD">Card</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Save Payment Out</span>
+                  </button>
+                </form>
+              ) : (
+                <div className="p-2 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-between text-xs text-secondary">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Fully Settled</span>
+                  </div>
+                  <span className="text-[11px] text-secondary/80 font-medium">No balance due</span>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20">
+              <button
+                type="button"
+                onClick={() => handleDeletePurchaseBill(selectedPurchaseBill)}
+                className="px-3 py-1.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <span className="material-symbols-outlined text-[15px]">delete</span>
+                <span>Delete Bill</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPurchaseBill(null)}
+                className="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
