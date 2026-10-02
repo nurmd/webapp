@@ -395,6 +395,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     setEditOpeningType(entry.debit > 0 ? 'RECEIVABLE' : 'PAYABLE');
   };
 
+  // Click handler for any transaction item
+  const handleTransactionClick = (entry: PassbookEntry) => {
+    if (entry.type === 'SALE' && entry.rawInvoice && onViewInvoice) {
+      onViewInvoice(entry.rawInvoice);
+    } else {
+      handleOpenEditLedgerItem(entry);
+    }
+  };
+
   // Save changes to ledger item
   const handleSaveLedgerItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1066,7 +1075,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 return (
                   <div
                     key={entry.id}
-                    className="p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-colors flex items-center justify-between gap-2"
+                    onClick={() => handleTransactionClick(entry)}
+                    className="p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low active:scale-[0.99] transition-all flex items-center justify-between gap-2 cursor-pointer"
                   >
                     {/* Left Icon and Details */}
                     <div className="flex items-center gap-2 min-w-0">
@@ -1130,8 +1140,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                       </div>
                     </div>
 
-                    {/* Right Amount & Edit Action */}
-                    <div className="flex items-center gap-2 flex-shrink-0 text-right">
+                    {/* Right Amount & Chevron */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0 text-right">
                       <div>
                         <span
                           className={`font-currency-display-mobile text-xs font-black block ${
@@ -1145,26 +1155,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                         </span>
                       </div>
 
-                      {/* Small Quick Edit Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEditLedgerItem(entry)}
-                        className="p-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface cursor-pointer transition-colors active:scale-95"
-                        title="Edit ledger item"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">edit</span>
-                      </button>
-
-                      {/* View bill for sales */}
-                      {entry.rawInvoice && onViewInvoice && (
-                        <button
-                          type="button"
-                          onClick={() => onViewInvoice(entry.rawInvoice!)}
-                          className="text-[10px] text-secondary font-bold hover:underline cursor-pointer"
-                        >
-                          View
-                        </button>
-                      )}
+                      <span className="material-symbols-outlined text-[16px] text-outline ml-0.5">
+                        chevron_right
+                      </span>
                     </div>
                   </div>
                 );
@@ -1180,8 +1173,24 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-sm shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
               <h3 className="font-bold text-sm text-on-surface flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[18px] text-secondary">edit_note</span>
-                <span>Edit Ledger Transaction</span>
+                <span className="material-symbols-outlined text-[18px] text-secondary">
+                  {editingLedgerEntry.type === 'SALE'
+                    ? 'receipt_long'
+                    : editingLedgerEntry.type === 'PURCHASE'
+                    ? 'shopping_bag'
+                    : 'payments'}
+                </span>
+                <span>
+                  {editingLedgerEntry.type === 'SALE'
+                    ? 'Sales Invoice Details'
+                    : editingLedgerEntry.type === 'PURCHASE'
+                    ? 'Purchase Bill Details'
+                    : editingLedgerEntry.type === 'PAYMENT_IN'
+                    ? 'Payment In Details'
+                    : editingLedgerEntry.type === 'PAYMENT_OUT'
+                    ? 'Payment Out Details'
+                    : 'Transaction Details'}
+                </span>
               </h3>
               <button
                 type="button"
@@ -1195,8 +1204,45 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             <form onSubmit={handleSaveLedgerItem} className="flex flex-col gap-2.5 text-xs">
               <div className="p-2 rounded-xl bg-surface-container-low text-[11px] text-on-surface-variant flex items-center justify-between">
                 <span>Doc: <strong>{editingLedgerEntry.docNumber}</strong></span>
-                <span className="font-semibold">{editingLedgerEntry.type}</span>
+                <span className="font-semibold">{editingLedgerEntry.type.replace('_', ' ')}</span>
               </div>
+
+              {/* View/Edit Invoice buttons if linked to a full sales invoice */}
+              {editingLedgerEntry.rawInvoice && (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-primary/10 border border-primary/20 text-xs">
+                  <span className="text-primary font-bold">Invoice #{editingLedgerEntry.rawInvoice.invoiceNumber}</span>
+                  <div className="flex items-center gap-1.5">
+                    {onViewInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const inv = editingLedgerEntry.rawInvoice!;
+                          setEditingLedgerEntry(null);
+                          onViewInvoice(inv);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-primary text-on-primary font-bold text-[11px] shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">visibility</span>
+                        <span>View</span>
+                      </button>
+                    )}
+                    {onEditInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const inv = editingLedgerEntry.rawInvoice!;
+                          setEditingLedgerEntry(null);
+                          onEditInvoice(inv);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-[11px] cursor-pointer flex items-center gap-1 active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Payment Type switch if payment */}
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
