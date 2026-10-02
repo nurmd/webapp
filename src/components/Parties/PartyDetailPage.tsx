@@ -604,7 +604,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col animate-fade-in pb-20">
+    <div className="min-h-screen bg-surface flex flex-col animate-fade-in pb-8">
       {/* 1. Mobile-Optimized Sticky Top Navigation */}
       <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 px-3 py-2 sm:px-6 sm:py-3 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
@@ -799,12 +799,12 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </section>
 
         {/* Quick Actions Bar */}
-        <section className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <section className="flex items-center gap-2">
           {/* Record Payment */}
           <button
             type="button"
             onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
               isPaymentOpen
                 ? 'bg-secondary text-on-secondary'
                 : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
@@ -816,30 +816,41 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             <span>{isPaymentOpen ? 'Close Payment' : 'Record Payment'}</span>
           </button>
 
-          {/* New Invoice Button (Always available for billing any party) */}
-          {onCreateInvoice && (
-            <button
-              type="button"
-              onClick={() => onCreateInvoice(party)}
-              className="flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-              title="Create new sales invoice for this party"
-            >
-              <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-              <span>New Invoice</span>
-            </button>
-          )}
-
-          {/* New Bill Button (For suppliers or inward purchases) */}
-          {onCreatePurchase && (
-            <button
-              type="button"
-              onClick={() => onCreatePurchase(party)}
-              className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:bg-surface-container-high"
-              title="Create new purchase bill from this party"
-            >
-              <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
-              <span>New Bill</span>
-            </button>
+          {/* Single Action: New Invoice for Customer, New Bill for Supplier */}
+          {isCustomer ? (
+            onCreateInvoice && (
+              <button
+                type="button"
+                onClick={() => onCreateInvoice(party)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                title="Create new sales invoice for this customer"
+              >
+                <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+                <span>New Invoice</span>
+              </button>
+            )
+          ) : (
+            onCreatePurchase ? (
+              <button
+                type="button"
+                onClick={() => onCreatePurchase(party)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                title="Create new purchase bill from this supplier"
+              >
+                <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
+                <span>New Bill</span>
+              </button>
+            ) : onCreateInvoice && (
+              <button
+                type="button"
+                onClick={() => onCreateInvoice(party)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                title="Create new sales invoice"
+              >
+                <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+                <span>New Invoice</span>
+              </button>
+            )
           )}
 
           {/* Print Statement */}
@@ -1301,53 +1312,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           </div>
         </div>
       )}
-
-      {/* 5. Mobile Floating / Sticky Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 bg-surface/95 backdrop-blur-md border-t border-outline-variant/20 py-2 px-3 shadow-lg">
-        <div className="max-w-4xl mx-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            className="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[17px]">payments</span>
-            <span>{isCustomer ? '+ Record Payment' : '+ Pay Supplier'}</span>
-          </button>
-
-          {onCreateInvoice && (
-            <button
-              type="button"
-              onClick={() => onCreateInvoice(party)}
-              className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
-              title="New Sales Invoice"
-            >
-              <span className="material-symbols-outlined text-[16px] text-secondary">receipt_long</span>
-              <span>+ Invoice</span>
-            </button>
-          )}
-
-          {onCreatePurchase && (
-            <button
-              type="button"
-              onClick={() => onCreatePurchase(party)}
-              className="py-2 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
-              title="New Purchase Bill"
-            >
-              <span className="material-symbols-outlined text-[16px] text-primary">shopping_bag</span>
-              <span>+ Bill</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleWhatsAppReminder}
-            className="w-9 h-9 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors active:scale-95 flex-shrink-0"
-            title="WhatsApp Statement"
-          >
-            <span className="material-symbols-outlined text-[18px]">chat</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
