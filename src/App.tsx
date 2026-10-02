@@ -40,6 +40,7 @@ import { rbac, UserProfile } from './services/rbac.ts';
 import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
 import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
+import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -81,6 +82,62 @@ export const App: React.FC = () => {
     setExpenses(db.getExpenses());
     setVouchers(db.getVouchers());
   };
+
+  const activeTabRef = React.useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  React.useEffect(() => {
+    initBackNavigation(() => {
+      if (activeTabRef.current !== 'dashboard') {
+        setActiveTab('dashboard');
+      }
+    });
+  }, []);
+
+  // System Back Navigation for Modals and Tabs
+  useBackNavigation(() => {
+    setIsDrawerOpen(false);
+    return true;
+  }, isDrawerOpen);
+
+  useBackNavigation(() => {
+    setIsStandardInvoiceOpen(false);
+    return true;
+  }, isStandardInvoiceOpen);
+
+  useBackNavigation(() => {
+    setIsTableGridInvoiceOpen(false);
+    setEditingInvoice(null);
+    return true;
+  }, isTableGridInvoiceOpen);
+
+  useBackNavigation(() => {
+    setIsTableGridPurchaseOpen(false);
+    setSelectedSupplierForPurchase(null);
+    return true;
+  }, isTableGridPurchaseOpen);
+
+  useBackNavigation(() => {
+    setPreviewInvoice(null);
+    return true;
+  }, !!previewInvoice);
+
+  useBackNavigation(() => {
+    setIsRoleSwitchOpen(false);
+    return true;
+  }, isRoleSwitchOpen);
+
+  useBackNavigation(() => {
+    setIsUpdateModalOpen(false);
+    return true;
+  }, isUpdateModalOpen);
+
+  useBackNavigation(() => {
+    if (activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+      return true;
+    }
+  }, activeTab !== 'dashboard');
 
   React.useEffect(() => {
     // Listen for PouchDB data changes (local or synced from remote CouchDB)
@@ -259,10 +316,11 @@ export const App: React.FC = () => {
     party: Party,
     amount: number,
     paymentMode: string,
-    notes: string
+    notes: string,
+    paymentType?: 'IN' | 'OUT'
   ) => {
-    const isCustomer = party.type === 'CUSTOMER';
-    const newBal = isCustomer
+    const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
+    const newBal = isPaymentIn
       ? party.currentBalance - amount
       : party.currentBalance + amount;
 
@@ -274,7 +332,7 @@ export const App: React.FC = () => {
     db.saveParty(updatedParty);
 
     const docId = Date.now().toString().slice(-6);
-    if (isCustomer) {
+    if (isPaymentIn) {
       // 1. Create Double-Entry Receipt Voucher
       const voucher = createPaymentReceiptVoucher({
         receiptNumber: `RCPT-${docId}`,
@@ -479,8 +537,10 @@ export const App: React.FC = () => {
             onDeleteParty={handleDeleteParty}
             onRecordPartyPayment={handleRecordPartyPayment}
             onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
             onCreateInvoice={handleCreateInvoiceForParty}
             onCreatePurchase={handleCreatePurchaseForParty}
+            onRefresh={refreshData}
           />
         )}
 

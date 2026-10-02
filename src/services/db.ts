@@ -630,9 +630,20 @@ class StorageService {
 
   saveVoucher(voucher: Voucher): void {
     const list = this.getVouchers();
-    list.unshift(voucher);
+    const idx = list.findIndex((v) => v.id === voucher.id);
+    if (idx >= 0) {
+      list[idx] = voucher;
+    } else {
+      list.unshift(voucher);
+    }
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.putDoc('voucher', voucher);
+  }
+
+  deleteVoucher(id: string): void {
+    const list = this.getVouchers().filter((v) => v.id !== id);
+    this.set(STORAGE_KEYS.VOUCHERS, list);
+    pouch.deleteDoc('voucher', id);
   }
 
   // Expenses
