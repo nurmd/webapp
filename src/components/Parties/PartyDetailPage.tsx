@@ -84,15 +84,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
   // Simplified Purchase View Modal state
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
-  const [purchasePayAmount, setPurchasePayAmount] = useState<string>('');
-  const [purchasePayMode, setPurchasePayMode] = useState<PaymentMode>('UPI');
-  const [purchasePayNotes, setPurchasePayNotes] = useState<string>('');
 
   // Simplified Invoice View Modal state
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
-  const [invoicePayAmount, setInvoicePayAmount] = useState<string>('');
-  const [invoicePayMode, setInvoicePayMode] = useState<PaymentMode>('UPI');
-  const [invoicePayNotes, setInvoicePayNotes] = useState<string>('');
 
   const isCustomer = party.type === 'CUSTOMER';
   const isReceivable = party.currentBalance > 0;
@@ -398,66 +392,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const handleTransactionClick = (entry: PassbookEntry) => {
     if (entry.type === 'SALE' && entry.rawInvoice) {
       setSelectedInvoiceForView(entry.rawInvoice);
-      setInvoicePayAmount(
-        entry.rawInvoice.balanceAmount > 0
-          ? entry.rawInvoice.balanceAmount.toString()
-          : ''
-      );
-      setInvoicePayMode(entry.rawInvoice.paymentMode || 'UPI');
-      setInvoicePayNotes('');
     } else if (entry.type === 'PURCHASE' && entry.rawPurchase) {
       setSelectedPurchaseBill(entry.rawPurchase);
-      setPurchasePayAmount(
-        entry.rawPurchase.balanceAmount > 0
-          ? entry.rawPurchase.balanceAmount.toString()
-          : ''
-      );
-      setPurchasePayMode((entry.rawPurchase.paymentMode as PaymentMode) || 'UPI');
-      setPurchasePayNotes('');
     } else {
       handleOpenEditLedgerItem(entry);
     }
-  };
-
-  // Record payment in directly inside sales invoice
-  const handleRecordPaymentForInvoice = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedInvoiceForView) return;
-
-    const payAmt = parseFloat(invoicePayAmount);
-    if (isNaN(payAmt) || payAmt <= 0) {
-      alert('Please enter a valid payment amount.');
-      return;
-    }
-
-    const currentPaid = selectedInvoiceForView.paidAmount || 0;
-    const newPaid = Math.min(selectedInvoiceForView.grandTotal, currentPaid + payAmt);
-    const newBal = Math.max(0, selectedInvoiceForView.grandTotal - newPaid);
-    const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = newBal <= 0.01 ? 'PAID' : 'PARTIAL';
-
-    const updatedInvoice: Invoice = {
-      ...selectedInvoiceForView,
-      paidAmount: newPaid,
-      balanceAmount: newBal,
-      paymentStatus: newStatus,
-      paymentMode: invoicePayMode,
-      updatedAt: new Date().toISOString(),
-    };
-
-    db.saveInvoice(updatedInvoice);
-
-    // Call onRecordPayment to handle party balance adjustment & create accounting receipt voucher
-    onRecordPayment(
-      party,
-      payAmt,
-      invoicePayMode,
-      invoicePayNotes || `Payment received for Invoice #${selectedInvoiceForView.invoiceNumber}`,
-      'IN'
-    );
-
-    setSelectedInvoiceForView(updatedInvoice);
-    setInvoicePayAmount(newBal > 0 ? newBal.toString() : '');
-    onRefresh?.();
   };
 
   // Delete invoice from simplified invoice view
@@ -486,47 +425,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
     db.deleteInvoice(inv.id);
     setSelectedInvoiceForView(null);
-    onRefresh?.();
-  };
-
-  // Record payment out directly inside purchase bill
-  const handleRecordPaymentForPurchase = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPurchaseBill) return;
-
-    const payAmt = parseFloat(purchasePayAmount);
-    if (isNaN(payAmt) || payAmt <= 0) {
-      alert('Please enter a valid payment amount.');
-      return;
-    }
-
-    const currentPaid = selectedPurchaseBill.paidAmount || 0;
-    const newPaid = Math.min(selectedPurchaseBill.grandTotal, currentPaid + payAmt);
-    const newBal = Math.max(0, selectedPurchaseBill.grandTotal - newPaid);
-    const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = newBal <= 0.01 ? 'PAID' : 'PARTIAL';
-
-    const updatedBill: PurchaseBill = {
-      ...selectedPurchaseBill,
-      paidAmount: newPaid,
-      balanceAmount: newBal,
-      paymentStatus: newStatus,
-      paymentMode: purchasePayMode,
-      updatedAt: new Date().toISOString(),
-    };
-
-    db.savePurchase(updatedBill);
-
-    // Call onRecordPayment to handle party balance adjustment & create accounting payment voucher
-    onRecordPayment(
-      party,
-      payAmt,
-      purchasePayMode,
-      purchasePayNotes || `Payment out for Bill #${selectedPurchaseBill.billNumber}`,
-      'OUT'
-    );
-
-    setSelectedPurchaseBill(updatedBill);
-    setPurchasePayAmount(newBal > 0 ? newBal.toString() : '');
     onRefresh?.();
   };
 
@@ -1548,12 +1446,12 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       )}
 
-      {/* 5. Simplified Purchase View Modal with In-Bill Payment Out Tracking */}
+      {/* 5. Simplified Purchase View Modal */}
       {selectedPurchaseBill && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3 max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-2.5 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
@@ -1590,58 +1488,55 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               </button>
             </div>
 
-            {/* Bill Details Summary */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2 rounded-xl bg-surface-container-low">
-                <span className="text-[10px] text-outline block">SUPPLIER GSTIN</span>
-                <span className="font-mono font-bold text-on-surface text-[11px] truncate block">
-                  {selectedPurchaseBill.supplierGstin || 'Unregistered'}
-                </span>
-              </div>
-              <div className="p-2 rounded-xl bg-surface-container-low">
-                <span className="text-[10px] text-outline block">ITC ELIGIBILITY</span>
-                <span className="font-bold text-on-surface text-[11px] truncate block">
-                  {selectedPurchaseBill.itcEligibility === 'INELIGIBLE_17_5' ? 'Ineligible (Blocked)' : 'Eligible ITC'}
-                </span>
-              </div>
+            {/* Compact Supplier Details */}
+            <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
+              <span>GSTIN: <strong className="font-mono text-on-surface">{selectedPurchaseBill.supplierGstin || 'Unregistered'}</strong></span>
+              <span>ITC: <strong className="text-on-surface">{selectedPurchaseBill.itcEligibility === 'INELIGIBLE_17_5' ? 'Blocked' : 'Eligible'}</strong></span>
             </div>
 
-            {/* Purchased Items List */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-on-surface-variant px-1">
-                <span>Purchased Items ({selectedPurchaseBill.items.length})</span>
-                <span>Amount</span>
-              </div>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                {selectedPurchaseBill.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded-xl bg-surface-container-low/70 flex items-center justify-between text-xs"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <span className="font-bold text-on-surface block truncate">{item.name}</span>
-                      <span className="text-[10px] text-on-surface-variant">
-                        {item.quantity} {item.unit || 'PCS'} × {formatINR(item.unitPrice)}
-                        {item.gstRate ? ` • GST ${item.gstRate}%` : ''}
-                        {item.hsnSacCode ? ` • HSN ${item.hsnSacCode}` : ''}
-                      </span>
-                    </div>
-                    <span className="font-mono font-bold text-on-surface text-xs flex-shrink-0">
-                      {formatINR(item.totalAmount)}
-                    </span>
-                  </div>
-                ))}
+            {/* Purchased Items Table View */}
+            <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
+                    <tr>
+                      <th className="py-1.5 px-2.5 font-semibold">Item</th>
+                      <th className="py-1.5 px-1.5 text-center font-semibold">Qty</th>
+                      <th className="py-1.5 px-1.5 text-right font-semibold">Rate</th>
+                      <th className="py-1.5 px-1.5 text-center font-semibold">Tax</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/15 text-on-surface">
+                    {selectedPurchaseBill.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-surface-container-low/40">
+                        <td className="py-1.5 px-2.5 font-medium max-w-[140px]">
+                          <div className="truncate font-bold text-on-surface">{item.name}</div>
+                          {item.hsnSacCode && <span className="text-[9px] text-outline block font-mono">HSN: {item.hsnSacCode}</span>}
+                        </td>
+                        <td className="py-1.5 px-1.5 text-center font-mono">
+                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                        </td>
+                        <td className="py-1.5 px-1.5 text-right font-mono">{formatINR(item.unitPrice)}</td>
+                        <td className="py-1.5 px-1.5 text-center">
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-surface-container font-mono">{item.gstRate || 0}%</span>
+                        </td>
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold">{formatINR(item.totalAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
             {/* Financial Breakdown */}
-            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1.5 text-xs">
-              <div className="flex justify-between text-on-surface-variant">
+            <div className="p-2 rounded-xl bg-surface-container-low space-y-1 text-xs">
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
                 <span>Taxable Amount</span>
                 <span className="font-bold text-on-surface">{formatINR(selectedPurchaseBill.totalTaxableAmount)}</span>
               </div>
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Total GST (CGST/SGST/IGST)</span>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Total Tax (GST)</span>
                 <span className="font-bold text-orange-600 dark:text-orange-400">
                   {formatINR(selectedPurchaseBill.totalTax)}
                 </span>
@@ -1654,123 +1549,38 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               </div>
             </div>
 
-            {/* In-Bill Payment Out Section */}
-            <div className="p-3 rounded-xl bg-surface-container border border-outline-variant/30 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
-                  <span>Payment Out Tracking</span>
-                </span>
-                <span className="text-[11px] font-bold text-on-surface-variant">
-                  Mode: {selectedPurchaseBill.paymentMode || 'Cash'}
-                </span>
-              </div>
-
-              {/* 3 Metric Cards: Total, Paid, Balance */}
-              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-outline block">Total Bill</span>
-                  <span className="font-bold text-on-surface text-xs">{formatINR(selectedPurchaseBill.grandTotal)}</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-secondary block">Paid Out</span>
-                  <span className="font-bold text-secondary text-xs">{formatINR(selectedPurchaseBill.paidAmount)}</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-error block">Balance Due</span>
-                  <span className="font-bold text-error text-xs">{formatINR(selectedPurchaseBill.balanceAmount)}</span>
-                </div>
-              </div>
-
-              {/* Payment Out Recording Form */}
-              {selectedPurchaseBill.balanceAmount > 0 ? (
-                <form onSubmit={handleRecordPaymentForPurchase} className="mt-1 flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
-                  <span className="text-[11px] font-bold text-on-surface">Record Payment to Vendor</span>
-
-                  {/* Quick Chip to fill full balance */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => setPurchasePayAmount(selectedPurchaseBill.balanceAmount.toString())}
-                      className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/25"
-                    >
-                      Clear Due ({formatINR(selectedPurchaseBill.balanceAmount)})
-                    </button>
-                    {selectedPurchaseBill.balanceAmount > 200 && (
-                      <button
-                        type="button"
-                        onClick={() => setPurchasePayAmount(Math.round(selectedPurchaseBill.balanceAmount / 2).toString())}
-                        className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[10px] font-medium cursor-pointer"
-                      >
-                        Half Due ({formatINR(Math.round(selectedPurchaseBill.balanceAmount / 2))})
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Pay Amount (₹)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        max={selectedPurchaseBill.balanceAmount}
-                        required
-                        value={purchasePayAmount}
-                        onChange={(e) => setPurchasePayAmount(e.target.value)}
-                        placeholder="Amount..."
-                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Mode</label>
-                      <select
-                        value={purchasePayMode}
-                        onChange={(e) => setPurchasePayMode(e.target.value as PaymentMode)}
-                        className="w-full px-2 py-1.5 bg-surface rounded-xl text-xs text-on-surface border border-outline-variant/30 focus:outline-none"
-                      >
-                        <option value="UPI">UPI</option>
-                        <option value="CASH">Cash</option>
-                        <option value="NET_BANKING">Net Banking</option>
-                        <option value="CHEQUE">Cheque</option>
-                        <option value="CARD">Card</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    <span>Save Payment Out</span>
-                  </button>
-                </form>
-              ) : (
-                <div className="p-2 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-between text-xs text-secondary">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    <span>Fully Settled</span>
-                  </div>
-                  <span className="text-[11px] text-secondary/80 font-medium">No balance due</span>
-                </div>
-              )}
+            {/* Compact Payment Status Bar */}
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container text-xs">
+              <span className="text-[11px] text-on-surface-variant font-medium">Payment ({selectedPurchaseBill.paymentMode || 'Cash'}):</span>
+              <span className="text-[11px] font-bold">
+                {selectedPurchaseBill.balanceAmount <= 0.01 ? (
+                  <span className="text-secondary flex items-center gap-1 font-bold">
+                    <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                    Fully Settled
+                  </span>
+                ) : (
+                  <span className="text-on-surface">
+                    Paid: <span className="text-secondary">{formatINR(selectedPurchaseBill.paidAmount)}</span> • Due: <span className="text-error">{formatINR(selectedPurchaseBill.balanceAmount)}</span>
+                  </span>
+                )}
+              </span>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20">
+            {/* Bottom Actions Bar */}
+            <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20 gap-2">
               <button
                 type="button"
                 onClick={() => handleDeletePurchaseBill(selectedPurchaseBill)}
-                className="px-3 py-1.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
               >
-                <span className="material-symbols-outlined text-[15px]">delete</span>
+                <span className="material-symbols-outlined text-[16px]">delete</span>
                 <span>Delete Bill</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setSelectedPurchaseBill(null)}
-                className="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer"
+                className="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer active:scale-95"
               >
                 Close
               </button>
@@ -1779,12 +1589,12 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       )}
 
-      {/* 6. Simplified Invoice View Modal with In-Bill Payment In Tracking */}
+      {/* 6. Simplified Invoice View Modal */}
       {selectedInvoiceForView && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3 max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-2.5 max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-[18px]">receipt_long</span>
@@ -1821,58 +1631,55 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               </button>
             </div>
 
-            {/* Invoice Details Summary */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2 rounded-xl bg-surface-container-low">
-                <span className="text-[10px] text-outline block">CUSTOMER GSTIN</span>
-                <span className="font-mono font-bold text-on-surface text-[11px] truncate block">
-                  {selectedInvoiceForView.partyGstin || 'Unregistered'}
-                </span>
-              </div>
-              <div className="p-2 rounded-xl bg-surface-container-low">
-                <span className="text-[10px] text-outline block">PLACE OF SUPPLY</span>
-                <span className="font-bold text-on-surface text-[11px] truncate block">
-                  State {selectedInvoiceForView.placeOfSupplyStateCode || company.stateCode}
-                </span>
-              </div>
+            {/* Compact Customer Details */}
+            <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
+              <span>GSTIN: <strong className="font-mono text-on-surface">{selectedInvoiceForView.partyGstin || 'Unregistered'}</strong></span>
+              <span>POS: <strong className="text-on-surface">State {selectedInvoiceForView.placeOfSupplyStateCode || company.stateCode}</strong></span>
             </div>
 
-            {/* Purchased Items List */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-[11px] font-bold text-on-surface-variant px-1">
-                <span>Items ({selectedInvoiceForView.items.length})</span>
-                <span>Amount</span>
-              </div>
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                {selectedInvoiceForView.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded-xl bg-surface-container-low/70 flex items-center justify-between text-xs"
-                  >
-                    <div className="min-w-0 pr-2">
-                      <span className="font-bold text-on-surface block truncate">{item.name}</span>
-                      <span className="text-[10px] text-on-surface-variant">
-                        {item.quantity} {item.unit || 'PCS'} × {formatINR(item.unitPrice)}
-                        {item.gstRate ? ` • GST ${item.gstRate}%` : ''}
-                        {item.hsnSacCode ? ` • HSN ${item.hsnSacCode}` : ''}
-                      </span>
-                    </div>
-                    <span className="font-mono font-bold text-on-surface text-xs flex-shrink-0">
-                      {formatINR(item.totalAmount)}
-                    </span>
-                  </div>
-                ))}
+            {/* Purchased Items Table View */}
+            <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
+                    <tr>
+                      <th className="py-1.5 px-2.5 font-semibold">Item</th>
+                      <th className="py-1.5 px-1.5 text-center font-semibold">Qty</th>
+                      <th className="py-1.5 px-1.5 text-right font-semibold">Rate</th>
+                      <th className="py-1.5 px-1.5 text-center font-semibold">Tax</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/15 text-on-surface">
+                    {selectedInvoiceForView.items.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-surface-container-low/40">
+                        <td className="py-1.5 px-2.5 font-medium max-w-[140px]">
+                          <div className="truncate font-bold text-on-surface">{item.name}</div>
+                          {item.hsnSacCode && <span className="text-[9px] text-outline block font-mono">HSN: {item.hsnSacCode}</span>}
+                        </td>
+                        <td className="py-1.5 px-1.5 text-center font-mono">
+                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                        </td>
+                        <td className="py-1.5 px-1.5 text-right font-mono">{formatINR(item.unitPrice)}</td>
+                        <td className="py-1.5 px-1.5 text-center">
+                          <span className="text-[9px] px-1 py-0.2 rounded bg-surface-container font-mono">{item.gstRate || 0}%</span>
+                        </td>
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold">{formatINR(item.totalAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
             {/* Financial Breakdown */}
-            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1.5 text-xs">
-              <div className="flex justify-between text-on-surface-variant">
+            <div className="p-2 rounded-xl bg-surface-container-low space-y-1 text-xs">
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
                 <span>Taxable Amount</span>
                 <span className="font-bold text-on-surface">{formatINR(selectedInvoiceForView.totalTaxableAmount)}</span>
               </div>
-              <div className="flex justify-between text-on-surface-variant">
-                <span>Total Tax (CGST/SGST/IGST)</span>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Total Tax (GST)</span>
                 <span className="font-bold text-secondary">
                   {formatINR(selectedInvoiceForView.totalTax)}
                 </span>
@@ -1885,106 +1692,21 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               </div>
             </div>
 
-            {/* In-Bill Payment In Section */}
-            <div className="p-3 rounded-xl bg-surface-container border border-outline-variant/30 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
-                  <span>Payment In Tracking</span>
-                </span>
-                <span className="text-[11px] font-bold text-on-surface-variant">
-                  Mode: {selectedInvoiceForView.paymentMode || 'Cash'}
-                </span>
-              </div>
-
-              {/* 3 Metric Cards: Total, Paid, Balance */}
-              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-outline block">Total Bill</span>
-                  <span className="font-bold text-on-surface text-xs">{formatINR(selectedInvoiceForView.grandTotal)}</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-secondary block">Paid In</span>
-                  <span className="font-bold text-secondary text-xs">{formatINR(selectedInvoiceForView.paidAmount)}</span>
-                </div>
-                <div className="p-1.5 rounded-lg bg-surface">
-                  <span className="text-[9px] text-error block">Balance Due</span>
-                  <span className="font-bold text-error text-xs">{formatINR(selectedInvoiceForView.balanceAmount)}</span>
-                </div>
-              </div>
-
-              {/* Payment In Recording Form */}
-              {selectedInvoiceForView.balanceAmount > 0 ? (
-                <form onSubmit={handleRecordPaymentForInvoice} className="mt-1 flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
-                  <span className="text-[11px] font-bold text-on-surface">Record Customer Payment</span>
-
-                  {/* Quick Chip to fill full balance */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => setInvoicePayAmount(selectedInvoiceForView.balanceAmount.toString())}
-                      className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/25"
-                    >
-                      Clear Due ({formatINR(selectedInvoiceForView.balanceAmount)})
-                    </button>
-                    {selectedInvoiceForView.balanceAmount > 200 && (
-                      <button
-                        type="button"
-                        onClick={() => setInvoicePayAmount(Math.round(selectedInvoiceForView.balanceAmount / 2).toString())}
-                        className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[10px] font-medium cursor-pointer"
-                      >
-                        Half Due ({formatINR(Math.round(selectedInvoiceForView.balanceAmount / 2))})
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Amount (₹)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        max={selectedInvoiceForView.balanceAmount}
-                        required
-                        value={invoicePayAmount}
-                        onChange={(e) => setInvoicePayAmount(e.target.value)}
-                        placeholder="Amount..."
-                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Mode</label>
-                      <select
-                        value={invoicePayMode}
-                        onChange={(e) => setInvoicePayMode(e.target.value as PaymentMode)}
-                        className="w-full px-2 py-1.5 bg-surface rounded-xl text-xs text-on-surface border border-outline-variant/30 focus:outline-none"
-                      >
-                        <option value="UPI">UPI</option>
-                        <option value="CASH">Cash</option>
-                        <option value="CARD">Card</option>
-                        <option value="NET_BANKING">Net Banking</option>
-                        <option value="CHEQUE">Cheque</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    <span>Save Payment In</span>
-                  </button>
-                </form>
-              ) : (
-                <div className="p-2 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-between text-xs text-secondary">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    <span>Fully Settled</span>
-                  </div>
-                  <span className="text-[11px] text-secondary/80 font-medium">No balance due</span>
-                </div>
-              )}
+            {/* Compact Payment Status Bar */}
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container text-xs">
+              <span className="text-[11px] text-on-surface-variant font-medium">Payment ({selectedInvoiceForView.paymentMode || 'Cash'}):</span>
+              <span className="text-[11px] font-bold">
+                {selectedInvoiceForView.balanceAmount <= 0.01 ? (
+                  <span className="text-secondary flex items-center gap-1 font-bold">
+                    <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                    Fully Settled
+                  </span>
+                ) : (
+                  <span className="text-on-surface">
+                    Paid: <span className="text-secondary">{formatINR(selectedInvoiceForView.paidAmount)}</span> • Due: <span className="text-error">{formatINR(selectedInvoiceForView.balanceAmount)}</span>
+                  </span>
+                )}
+              </span>
             </div>
 
             {/* Bottom Actions Bar */}
@@ -2019,7 +1741,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                   title="Edit Invoice in Grid Workstation"
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>
-                  <span>Edit</span>
+                  <span>Edit Grid</span>
                 </button>
               )}
 
