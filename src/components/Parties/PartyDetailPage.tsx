@@ -88,12 +88,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [purchasePayMode, setPurchasePayMode] = useState<PaymentMode>('UPI');
   const [purchasePayNotes, setPurchasePayNotes] = useState<string>('');
 
+  // Simplified Invoice View Modal state
+  const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
+  const [invoicePayAmount, setInvoicePayAmount] = useState<string>('');
+  const [invoicePayMode, setInvoicePayMode] = useState<PaymentMode>('UPI');
+  const [invoicePayNotes, setInvoicePayNotes] = useState<string>('');
+
   const isCustomer = party.type === 'CUSTOMER';
   const isReceivable = party.currentBalance > 0;
   const isPayable = party.currentBalance < 0;
 
   // System back navigation handling
   useBackNavigation(() => {
+    if (selectedInvoiceForView) {
+      setSelectedInvoiceForView(null);
+      return true;
+    }
     if (selectedPurchaseBill) {
       setSelectedPurchaseBill(null);
       return true;
@@ -156,35 +166,24 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
     // Sales Invoices
     partyInvoices.forEach((inv) => {
+      const balance = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
       rawEntries.push({
         id: `sale-${inv.id}`,
         rawId: inv.id,
         date: inv.date,
         docNumber: inv.invoiceNumber,
         type: 'SALE',
-        description: `Sale #${inv.invoiceNumber} (${inv.items.length} items)`,
-        debit: inv.grandTotal,
+        description: inv.items && inv.items.length > 0
+          ? `${inv.items.length} items (${inv.items.map((i) => i.name).slice(0, 2).join(', ')})`
+          : `Sale #${inv.invoiceNumber}`,
+        debit: balance,
         credit: 0,
+        billAmount: inv.grandTotal,
         status: inv.paymentStatus,
         paymentMode: inv.paymentMode,
         rawInvoice: inv,
       });
-
-      if (inv.paidAmount > 0) {
-        rawEntries.push({
-          id: `pay-inv-${inv.id}`,
-          rawId: inv.id,
-          date: inv.date,
-          docNumber: `RCPT-${inv.invoiceNumber}`,
-          type: 'PAYMENT_IN',
-          description: `Payment received (${inv.paymentMode})`,
-          debit: 0,
-          credit: inv.paidAmount,
-          status: 'PAID',
-          paymentMode: inv.paymentMode,
-          rawInvoice: inv,
-        });
-      }
+      // NOTE: Payment in is handled within the sales invoice; no extra pay-inv transaction is generated.
     });
 
     // Purchase Bills
@@ -397,8 +396,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
   // Click handler for any transaction item
   const handleTransactionClick = (entry: PassbookEntry) => {
-    if (entry.type === 'SALE' && entry.rawInvoice && onViewInvoice) {
-      onViewInvoice(entry.rawInvoice);
+    if (entry.type === 'SALE' && entry.rawInvoice) {
+      setSelectedInvoiceForView(entry.rawInvoice);
+      setInvoicePayAmount(
+        entry.rawInvoice.balanceAmount > 0
+          ? entry.rawInvoice.balanceAmount.toString()
+          : ''
+      );
+      setInvoicePayMode(entry.rawInvoice.paymentMode || 'UPI');
+      setInvoicePayNotes('');
     } else if (entry.type === 'PURCHASE' && entry.rawPurchase) {
       setSelectedPurchaseBill(entry.rawPurchase);
       setPurchasePayAmount(
@@ -411,6 +417,76 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     } else {
       handleOpenEditLedgerItem(entry);
     }
+  };
+
+  // Record payment in directly inside sales invoice
+  const handleRecordPaymentForInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForView) return;
+
+    const payAmt = parseFloat(invoicePayAmount);
+    if (isNaN(payAmt) || payAmt <= 0) {
+      alert('Please enter a valid payment amount.');
+      return;
+    }
+
+    const currentPaid = selectedInvoiceForView.paidAmount || 0;
+    const newPaid = Math.min(selectedInvoiceForView.grandTotal, currentPaid + payAmt);
+    const newBal = Math.max(0, selectedInvoiceForView.grandTotal - newPaid);
+    const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' = newBal <= 0.01 ? 'PAID' : 'PARTIAL';
+
+    const updatedInvoice: Invoice = {
+      ...selectedInvoiceForView,
+      paidAmount: newPaid,
+      balanceAmount: newBal,
+      paymentStatus: newStatus,
+      paymentMode: invoicePayMode,
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.saveInvoice(updatedInvoice);
+
+    // Call onRecordPayment to handle party balance adjustment & create accounting receipt voucher
+    onRecordPayment(
+      party,
+      payAmt,
+      invoicePayMode,
+      invoicePayNotes || `Payment received for Invoice #${selectedInvoiceForView.invoiceNumber}`,
+      'IN'
+    );
+
+    setSelectedInvoiceForView(updatedInvoice);
+    setInvoicePayAmount(newBal > 0 ? newBal.toString() : '');
+    onRefresh?.();
+  };
+
+  // Delete invoice from simplified invoice view
+  const handleDeleteInvoiceBill = (inv: Invoice) => {
+    if (!window.confirm(`Delete Invoice #${inv.invoiceNumber}? This will restore inventory stock.`)) return;
+
+    // Restore stock
+    const allItems = db.getItems();
+    for (const line of inv.items) {
+      if (line.itemId) {
+        const itm = allItems.find((i) => i.id === line.itemId);
+        if (itm) {
+          itm.currentStock += line.quantity;
+          db.saveItem(itm);
+        }
+      }
+    }
+
+    // Rollback party balance: when deleted, receivable is reduced by unpaid balance
+    const unpaidBal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : (inv.grandTotal - (inv.paidAmount || 0));
+    db.saveParty({
+      ...party,
+      currentBalance: party.currentBalance - unpaidBal,
+      updatedAt: new Date().toISOString(),
+    });
+
+    db.deleteInvoice(inv.id);
+    setSelectedInvoiceForView(null);
+    onRefresh?.();
   };
 
   // Record payment out directly inside purchase bill
@@ -1214,7 +1290,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                         </div>
 
                         <p className="text-[10px] text-on-surface-variant truncate">
-                          {entry.type === 'PURCHASE' && entry.rawPurchase ? (
+                          {entry.type === 'SALE' && entry.rawInvoice ? (
+                            <>
+                              {entry.date} • {entry.rawInvoice.paymentStatus === 'PAID'
+                                ? `Fully Paid (${entry.rawInvoice.paymentMode || 'Cash'})`
+                                : entry.rawInvoice.paidAmount > 0
+                                ? `Paid: ${formatINR(entry.rawInvoice.paidAmount)} • Due: ${formatINR(entry.rawInvoice.balanceAmount)}`
+                                : `Unpaid: ${formatINR(entry.rawInvoice.balanceAmount)}`}
+                            </>
+                          ) : entry.type === 'PURCHASE' && entry.rawPurchase ? (
                             <>
                               {entry.date} • {entry.rawPurchase.paymentStatus === 'PAID'
                                 ? `Fully Paid (${entry.rawPurchase.paymentMode || 'Cash'})`
@@ -1236,6 +1320,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                           className={`font-currency-display-mobile text-xs font-black block ${
                             entry.type === 'PURCHASE'
                               ? 'text-orange-600 dark:text-orange-400'
+                              : entry.type === 'SALE'
+                              ? 'text-blue-600 dark:text-blue-400'
                               : isCredit
                               ? 'text-secondary'
                               : isDebit
@@ -1245,6 +1331,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                         >
                           {entry.type === 'PURCHASE'
                             ? `- ${formatINR(entry.billAmount || entry.credit)}`
+                            : entry.type === 'SALE'
+                            ? `+ ${formatINR(entry.billAmount || entry.debit)}`
                             : isCredit
                             ? `+ ${formatINR(entry.credit)}`
                             : isDebit
@@ -1683,6 +1771,273 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 type="button"
                 onClick={() => setSelectedPurchaseBill(null)}
                 className="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Simplified Invoice View Modal with In-Bill Payment In Tracking */}
+      {selectedInvoiceForView && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-bold text-sm text-on-surface truncate">
+                      Invoice #{selectedInvoiceForView.invoiceNumber}
+                    </h3>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                        selectedInvoiceForView.paymentStatus === 'PAID'
+                          ? 'bg-secondary/10 text-secondary'
+                          : selectedInvoiceForView.paymentStatus === 'PARTIAL'
+                          ? 'bg-amber-500/10 text-amber-600'
+                          : 'bg-error/10 text-error'
+                      }`}
+                    >
+                      {selectedInvoiceForView.paymentStatus}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant truncate block">
+                    {selectedInvoiceForView.partyName} • {selectedInvoiceForView.date}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedInvoiceForView(null)}
+                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Invoice Details Summary */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2 rounded-xl bg-surface-container-low">
+                <span className="text-[10px] text-outline block">CUSTOMER GSTIN</span>
+                <span className="font-mono font-bold text-on-surface text-[11px] truncate block">
+                  {selectedInvoiceForView.partyGstin || 'Unregistered'}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-surface-container-low">
+                <span className="text-[10px] text-outline block">PLACE OF SUPPLY</span>
+                <span className="font-bold text-on-surface text-[11px] truncate block">
+                  State {selectedInvoiceForView.placeOfSupplyStateCode || company.stateCode}
+                </span>
+              </div>
+            </div>
+
+            {/* Purchased Items List */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-on-surface-variant px-1">
+                <span>Items ({selectedInvoiceForView.items.length})</span>
+                <span>Amount</span>
+              </div>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {selectedInvoiceForView.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-xl bg-surface-container-low/70 flex items-center justify-between text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-on-surface block truncate">{item.name}</span>
+                      <span className="text-[10px] text-on-surface-variant">
+                        {item.quantity} {item.unit || 'PCS'} × {formatINR(item.unitPrice)}
+                        {item.gstRate ? ` • GST ${item.gstRate}%` : ''}
+                        {item.hsnSacCode ? ` • HSN ${item.hsnSacCode}` : ''}
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-on-surface text-xs flex-shrink-0">
+                      {formatINR(item.totalAmount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Financial Breakdown */}
+            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1.5 text-xs">
+              <div className="flex justify-between text-on-surface-variant">
+                <span>Taxable Amount</span>
+                <span className="font-bold text-on-surface">{formatINR(selectedInvoiceForView.totalTaxableAmount)}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant">
+                <span>Total Tax (CGST/SGST/IGST)</span>
+                <span className="font-bold text-secondary">
+                  {formatINR(selectedInvoiceForView.totalTax)}
+                </span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
+                <span>Total Invoice Value</span>
+                <span className="font-black text-on-surface font-currency-display-mobile">
+                  {formatINR(selectedInvoiceForView.grandTotal)}
+                </span>
+              </div>
+            </div>
+
+            {/* In-Bill Payment In Section */}
+            <div className="p-3 rounded-xl bg-surface-container border border-outline-variant/30 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
+                  <span>Payment In Tracking</span>
+                </span>
+                <span className="text-[11px] font-bold text-on-surface-variant">
+                  Mode: {selectedInvoiceForView.paymentMode || 'Cash'}
+                </span>
+              </div>
+
+              {/* 3 Metric Cards: Total, Paid, Balance */}
+              <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-outline block">Total Bill</span>
+                  <span className="font-bold text-on-surface text-xs">{formatINR(selectedInvoiceForView.grandTotal)}</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-secondary block">Paid In</span>
+                  <span className="font-bold text-secondary text-xs">{formatINR(selectedInvoiceForView.paidAmount)}</span>
+                </div>
+                <div className="p-1.5 rounded-lg bg-surface">
+                  <span className="text-[9px] text-error block">Balance Due</span>
+                  <span className="font-bold text-error text-xs">{formatINR(selectedInvoiceForView.balanceAmount)}</span>
+                </div>
+              </div>
+
+              {/* Payment In Recording Form */}
+              {selectedInvoiceForView.balanceAmount > 0 ? (
+                <form onSubmit={handleRecordPaymentForInvoice} className="mt-1 flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
+                  <span className="text-[11px] font-bold text-on-surface">Record Customer Payment</span>
+
+                  {/* Quick Chip to fill full balance */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setInvoicePayAmount(selectedInvoiceForView.balanceAmount.toString())}
+                      className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/25"
+                    >
+                      Clear Due ({formatINR(selectedInvoiceForView.balanceAmount)})
+                    </button>
+                    {selectedInvoiceForView.balanceAmount > 200 && (
+                      <button
+                        type="button"
+                        onClick={() => setInvoicePayAmount(Math.round(selectedInvoiceForView.balanceAmount / 2).toString())}
+                        className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[10px] font-medium cursor-pointer"
+                      >
+                        Half Due ({formatINR(Math.round(selectedInvoiceForView.balanceAmount / 2))})
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Amount (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        max={selectedInvoiceForView.balanceAmount}
+                        required
+                        value={invoicePayAmount}
+                        onChange={(e) => setInvoicePayAmount(e.target.value)}
+                        placeholder="Amount..."
+                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-on-surface-variant block mb-0.5">Payment Mode</label>
+                      <select
+                        value={invoicePayMode}
+                        onChange={(e) => setInvoicePayMode(e.target.value as PaymentMode)}
+                        className="w-full px-2 py-1.5 bg-surface rounded-xl text-xs text-on-surface border border-outline-variant/30 focus:outline-none"
+                      >
+                        <option value="UPI">UPI</option>
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                        <option value="NET_BANKING">Net Banking</option>
+                        <option value="CHEQUE">Cheque</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Save Payment In</span>
+                  </button>
+                </form>
+              ) : (
+                <div className="p-2 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center justify-between text-xs text-secondary">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <span>Fully Settled</span>
+                  </div>
+                  <span className="text-[11px] text-secondary/80 font-medium">No balance due</span>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/20 flex-wrap sm:flex-nowrap">
+              {/* Separate PDF A4 Bill Preview Button */}
+              {onViewInvoice && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inv = selectedInvoiceForView;
+                    setSelectedInvoiceForView(null);
+                    onViewInvoice(inv);
+                  }}
+                  className="flex-1 min-w-[120px] py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
+                  title="Open full A4 / PDF print preview"
+                >
+                  <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                  <span>Preview A4 / PDF</span>
+                </button>
+              )}
+
+              {/* Edit in Grid Button */}
+              {onEditInvoice && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inv = selectedInvoiceForView;
+                    setSelectedInvoiceForView(null);
+                    onEditInvoice(inv);
+                  }}
+                  className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+                  title="Edit Invoice in Grid Workstation"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                  <span>Edit</span>
+                </button>
+              )}
+
+              {/* Delete Invoice Button */}
+              <button
+                type="button"
+                onClick={() => handleDeleteInvoiceBill(selectedInvoiceForView)}
+                className="w-9 h-9 rounded-xl text-error hover:bg-error/10 flex items-center justify-center cursor-pointer transition-colors active:scale-95 flex-shrink-0"
+                title="Delete Invoice"
+              >
+                <span className="material-symbols-outlined text-[17px]">delete</span>
+              </button>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedInvoiceForView(null)}
+                className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer"
               >
                 Close
               </button>
