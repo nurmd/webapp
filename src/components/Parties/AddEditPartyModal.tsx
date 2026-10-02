@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Party } from '../../models/party.ts';
+import { Party, BalanceType } from '../../models/party.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
+import { formatINR } from '../../core/utils/formatters.ts';
 
 export interface AddEditPartyModalProps {
   isOpen: boolean;
@@ -33,7 +34,9 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const [shippingAddress, setShippingAddress] = useState('');
   const [hasSeparateShipping, setHasSeparateShipping] = useState(false);
   const [creditLimit, setCreditLimit] = useState<string>('');
-  const [openingBalance, setOpeningBalance] = useState<number>(0);
+  const [openingBalance, setOpeningBalance] = useState<string>('');
+  const [openingBalanceType, setOpeningBalanceType] = useState<BalanceType>(initialType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
+  const [openingBalanceDate, setOpeningBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (editingParty) {
@@ -48,7 +51,18 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setShippingAddress(editingParty.shippingAddress || '');
       setHasSeparateShipping(!!editingParty.shippingAddress && editingParty.shippingAddress !== editingParty.billingAddress);
       setCreditLimit(editingParty.creditLimit ? editingParty.creditLimit.toString() : '');
-      setOpeningBalance(editingParty.currentBalance);
+
+      const hasExplicit = typeof editingParty.openingBalance === 'number';
+      const rawOpening = hasExplicit ? editingParty.openingBalance! : Math.abs(editingParty.currentBalance);
+      setOpeningBalance(rawOpening > 0 ? rawOpening.toString() : '');
+      setOpeningBalanceType(
+        editingParty.openingBalanceType ||
+        (editingParty.currentBalance >= 0 ? 'TO_RECEIVE' : 'TO_PAY')
+      );
+      setOpeningBalanceDate(
+        editingParty.openingBalanceDate ||
+        (editingParty.createdAt ? editingParty.createdAt.split('T')[0] : new Date().toISOString().split('T')[0])
+      );
     } else {
       setName('');
       setType(initialType);
@@ -61,7 +75,9 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setShippingAddress('');
       setHasSeparateShipping(false);
       setCreditLimit('');
-      setOpeningBalance(0);
+      setOpeningBalance('');
+      setOpeningBalanceType(initialType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
+      setOpeningBalanceDate(new Date().toISOString().split('T')[0]);
     }
   }, [editingParty, initialType, isOpen]);
 
@@ -101,11 +117,31 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       )
     : null;
 
+  const handleTypeChange = (newType: 'CUSTOMER' | 'SUPPLIER') => {
+    setType(newType);
+    if (!editingParty && !openingBalance) {
+      setOpeningBalanceType(newType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
+    }
+  };
+
   const handleSavePartyForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
     const numCreditLimit = creditLimit.trim() ? parseFloat(creditLimit) : undefined;
+    const numOpening = openingBalance.trim() ? Math.abs(parseFloat(openingBalance)) : 0;
+    const newSignedOpening = numOpening > 0 ? (openingBalanceType === 'TO_RECEIVE' ? numOpening : -numOpening) : 0;
+
+    let finalCurrentBalance = newSignedOpening;
+    if (editingParty) {
+      const hasOldExplicit = typeof editingParty.openingBalance === 'number';
+      const oldRawOpening = hasOldExplicit ? editingParty.openingBalance! : Math.abs(editingParty.currentBalance);
+      const oldType = editingParty.openingBalanceType || (editingParty.currentBalance >= 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
+
+      const delta = newSignedOpening - oldSignedOpening;
+      finalCurrentBalance = editingParty.currentBalance + delta;
+    }
 
     const partyToSave: Party = {
       id: editingParty ? editingParty.id : 'PTY-' + Date.now(),
@@ -119,7 +155,10 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       billingAddress: address.trim() || 'Local Counter',
       shippingAddress: hasSeparateShipping ? shippingAddress.trim() : undefined,
       creditLimit: numCreditLimit && numCreditLimit > 0 ? numCreditLimit : undefined,
-      currentBalance: editingParty ? editingParty.currentBalance : openingBalance,
+      openingBalance: numOpening > 0 ? numOpening : undefined,
+      openingBalanceType: numOpening > 0 ? openingBalanceType : undefined,
+      openingBalanceDate: numOpening > 0 ? openingBalanceDate : undefined,
+      currentBalance: finalCurrentBalance,
       createdAt: editingParty ? editingParty.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -170,7 +209,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setType('CUSTOMER')}
+                onClick={() => handleTypeChange('CUSTOMER')}
                 className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 ${
                   type === 'CUSTOMER'
                     ? 'bg-secondary text-on-secondary shadow-sm'
@@ -182,7 +221,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setType('SUPPLIER')}
+                onClick={() => handleTypeChange('SUPPLIER')}
                 className={`py-2 rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 ${
                   type === 'SUPPLIER'
                     ? 'bg-secondary text-on-secondary shadow-sm'
@@ -309,29 +348,86 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
             </div>
           </div>
 
-          {/* Opening / Current Balance */}
-          <div>
-            <label className="block font-bold text-on-surface-variant mb-1">
-              {editingParty ? 'Current Balance (₹)' : 'Opening Balance (₹)'}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-on-surface-variant font-bold">₹</span>
-              <input
-                type="number"
-                placeholder="0"
-                value={openingBalance || ''}
-                disabled={!!editingParty}
-                onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
-                className={`w-full pl-8 pr-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40 ${
-                  editingParty ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
-              />
+          {/* Opening Balance Section */}
+          <div className="p-3 rounded-xl bg-surface-container-low/70 border border-outline-variant/30 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-xs text-on-surface flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-secondary">account_balance_wallet</span>
+                <span>Opening Balance</span>
+              </label>
+              {editingParty && (
+                <span className="text-[10px] text-on-surface-variant font-medium">
+                  Current Balance: <strong className={editingParty.currentBalance >= 0 ? 'text-secondary' : 'text-error'}>{formatINR(Math.abs(editingParty.currentBalance))} {editingParty.currentBalance >= 0 ? 'Dr' : 'Cr'}</strong>
+                </span>
+              )}
             </div>
-            {!editingParty && (
-              <span className="text-[10px] text-outline mt-0.5 block">
-                Positive: Customer owes you (Receivable) • Negative: You owe supplier (Payable)
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Amount */}
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant block mb-1">Amount (₹)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-on-surface-variant font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={openingBalance}
+                    onChange={(e) => setOpeningBalance(e.target.value)}
+                    className="w-full pl-7 pr-3 py-1.5 rounded-xl border border-outline-variant/40 bg-surface text-on-surface text-xs font-bold focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+              </div>
+
+              {/* As of Date */}
+              <div>
+                <label className="text-[10px] font-bold text-on-surface-variant block mb-1">As of Date</label>
+                <input
+                  type="date"
+                  value={openingBalanceDate}
+                  onChange={(e) => setOpeningBalanceDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-xl border border-outline-variant/40 bg-surface text-on-surface text-xs focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                />
+              </div>
+            </div>
+
+            {/* Type selector (To Receive vs To Pay) */}
+            <div className="flex flex-col gap-1 pt-0.5">
+              <label className="text-[10px] font-bold text-on-surface-variant">Balance Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpeningBalanceType('TO_RECEIVE')}
+                  className={`py-1.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    openingBalanceType === 'TO_RECEIVE'
+                      ? 'bg-secondary/15 text-secondary border-secondary/40 shadow-xs'
+                      : 'bg-surface text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">call_received</span>
+                  <span>To Receive (Dr)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOpeningBalanceType('TO_PAY')}
+                  className={`py-1.5 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    openingBalanceType === 'TO_PAY'
+                      ? 'bg-error/15 text-error border-error/40 shadow-xs'
+                      : 'bg-surface text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">call_made</span>
+                  <span>To Pay (Cr)</span>
+                </button>
+              </div>
+              <span className="text-[10px] text-outline mt-0.5">
+                {openingBalanceType === 'TO_RECEIVE'
+                  ? '• Customer/Supplier owes you this amount (Receivable)'
+                  : '• You owe this amount to Customer/Supplier (Payable)'}
               </span>
-            )}
+            </div>
           </div>
 
           {/* Billing Address */}

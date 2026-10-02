@@ -250,8 +250,26 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     const calculatedNet = isCustomer ? totalDebits - totalCredits : totalCredits - totalDebits;
     const openingDifference = party.currentBalance - calculatedNet;
 
-    if (Math.abs(openingDifference) >= 1) {
-      const openingDate = party.createdAt ? party.createdAt.split('T')[0] : '2026-01-01';
+    const hasExplicitOpening = typeof party.openingBalance === 'number' && party.openingBalance > 0;
+    const openingDate = party.openingBalanceDate || (party.createdAt ? party.createdAt.split('T')[0] : '2026-01-01');
+
+    if (hasExplicitOpening) {
+      const amt = party.openingBalance!;
+      const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
+      const isReceivable = opType === 'TO_RECEIVE';
+      rawEntries.push({
+        id: `opening-${party.id}`,
+        rawId: party.id,
+        date: openingDate,
+        docNumber: 'OPENING',
+        type: 'OPENING',
+        description: `Opening Balance (${isReceivable ? "You'll Get" : "You'll Give"})`,
+        debit: isReceivable ? amt : 0,
+        credit: isReceivable ? 0 : amt,
+        status: 'OPENING',
+        isOpening: true,
+      });
+    } else if (Math.abs(openingDifference) >= 1) {
       rawEntries.push({
         id: `opening-${party.id}`,
         rawId: party.id,
@@ -385,7 +403,14 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     setEditMode(entry.paymentMode || 'UPI');
     setEditNotes(entry.description || '');
     setEditType(entry.type === 'PAYMENT_IN' ? 'IN' : 'OUT');
-    setEditOpeningType(entry.debit > 0 ? 'RECEIVABLE' : 'PAYABLE');
+    if (entry.isOpening) {
+      const isRec = party.openingBalanceType
+        ? party.openingBalanceType === 'TO_RECEIVE'
+        : entry.debit > 0;
+      setEditOpeningType(isRec ? 'RECEIVABLE' : 'PAYABLE');
+    } else {
+      setEditOpeningType(entry.debit > 0 ? 'RECEIVABLE' : 'PAYABLE');
+    }
   };
 
   // Click handler for any transaction item
@@ -609,12 +634,24 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     }
     // 6. Opening balance edit
     else if (editingLedgerEntry.isOpening) {
-      const finalBal = editOpeningType === 'RECEIVABLE' ? newAmt : -newAmt;
-      db.saveParty({
+      const hasOldExplicit = typeof party.openingBalance === 'number';
+      const oldRawOpening = hasOldExplicit ? party.openingBalance! : Math.abs(editingLedgerEntry.debit || editingLedgerEntry.credit || 0);
+      const oldType = party.openingBalanceType || (editingLedgerEntry.debit > 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
+
+      const newSignedOpening = newAmt > 0 ? (editOpeningType === 'RECEIVABLE' ? newAmt : -newAmt) : 0;
+      const delta = newSignedOpening - oldSignedOpening;
+      const finalBal = party.currentBalance + delta;
+
+      const updatedParty: Party = {
         ...party,
+        openingBalance: newAmt > 0 ? newAmt : undefined,
+        openingBalanceType: newAmt > 0 ? (editOpeningType === 'RECEIVABLE' ? 'TO_RECEIVE' : 'TO_PAY') : undefined,
+        openingBalanceDate: editDate,
         currentBalance: finalBal,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      db.saveParty(updatedParty);
     }
 
     setEditingLedgerEntry(null);
@@ -659,6 +696,21 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       };
       db.savePurchase(updatedPur);
       db.saveParty({ ...party, currentBalance: party.currentBalance - amt, updatedAt: new Date().toISOString() });
+    } else if (entry.isOpening) {
+      const hasOldExplicit = typeof party.openingBalance === 'number';
+      const oldRawOpening = hasOldExplicit ? party.openingBalance! : Math.abs(entry.debit || entry.credit || 0);
+      const oldType = party.openingBalanceType || (entry.debit > 0 ? 'TO_RECEIVE' : 'TO_PAY');
+      const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
+
+      const updatedParty: Party = {
+        ...party,
+        openingBalance: undefined,
+        openingBalanceType: undefined,
+        openingBalanceDate: undefined,
+        currentBalance: party.currentBalance - oldSignedOpening,
+        updatedAt: new Date().toISOString(),
+      };
+      db.saveParty(updatedParty);
     }
 
     setEditingLedgerEntry(null);
@@ -812,6 +864,34 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             </div>
           </div>
 
+          {/* Opening Balance info chip if set */}
+          {((typeof party.openingBalance === 'number' && party.openingBalance > 0) || party.openingBalanceDate) && (
+            <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-xl bg-surface-container-low text-on-surface-variant">
+              <span className="flex items-center gap-1 font-medium">
+                <span className="material-symbols-outlined text-[14px] text-secondary">account_balance_wallet</span>
+                <span>Opening Balance:</span>
+              </span>
+              <div className="flex items-center gap-1.5 font-bold">
+                <span className={party.openingBalanceType === 'TO_PAY' ? 'text-error' : 'text-secondary'}>
+                  {formatINR(party.openingBalance || 0)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
+                </span>
+                {party.openingBalanceDate && (
+                  <span className="text-[10px] text-outline font-normal">
+                    • {party.openingBalanceDate}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onEditParty(party)}
+                  className="p-0.5 text-on-surface-variant hover:text-secondary rounded cursor-pointer ml-1"
+                  title="Edit Opening Balance"
+                >
+                  <span className="material-symbols-outlined text-[13px]">edit</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Collapsible Info Drawer */}
           {showPartyDetails && (
             <div className="pt-2.5 border-t border-outline-variant/20 text-xs text-on-surface space-y-1.5 animate-in fade-in">
@@ -833,6 +913,26 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                   <span className="font-medium text-on-surface truncate block">
                     {party.billingAddress || 'Local Counter'}
                   </span>
+                </div>
+                <div className="col-span-2 pt-1 border-t border-outline-variant/15 flex items-center justify-between">
+                  <span className="text-outline">Opening Balance</span>
+                  <div className="flex items-center gap-1.5">
+                    {party.openingBalance ? (
+                      <span className="font-bold">
+                        {formatINR(party.openingBalance)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
+                      </span>
+                    ) : (
+                      <span className="text-outline italic">Not set</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onEditParty(party)}
+                      className="text-secondary font-semibold hover:underline cursor-pointer text-[10px] flex items-center gap-0.5"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">edit</span>
+                      <span>{party.openingBalance ? 'Edit' : 'Set'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1412,16 +1512,45 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 />
               </div>
 
+              {/* Opening Balance Type Switcher */}
+              {editingLedgerEntry.isOpening && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-on-surface-variant">Opening Balance Type</label>
+                  <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
+                    <button
+                      type="button"
+                      onClick={() => setEditOpeningType('RECEIVABLE')}
+                      className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                        editOpeningType === 'RECEIVABLE' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">call_received</span>
+                      <span>To Receive (Dr)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditOpeningType('PAYABLE')}
+                      className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
+                        editOpeningType === 'PAYABLE' ? 'bg-error text-on-error shadow-xs' : 'text-on-surface-variant'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">call_made</span>
+                      <span>To Pay (Cr)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/20">
-                {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-')) ? (
+                {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
                   <button
                     type="button"
                     onClick={() => handleDeleteLedgerItem(editingLedgerEntry)}
                     className="px-2.5 py-1.5 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
-                    <span>Delete</span>
+                    <span>{editingLedgerEntry.isOpening ? 'Clear' : 'Delete'}</span>
                   </button>
                 ) : <div />}
 
