@@ -409,23 +409,12 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <span className="text-error">*</span>
               </label>
 
-              <div className="flex items-center gap-2">
-                {itemId && (
-                  <span className={`text-[10px] ${accentColorClass} font-bold flex items-center gap-0.5`}>
-                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                    Catalog Linked
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleOpenCreateItem(name)}
-                  className={`text-[11px] ${accentColorClass} font-bold hover:underline flex items-center gap-0.5 cursor-pointer`}
-                  title="Create new inventory item directly"
-                >
-                  <span className="material-symbols-outlined text-[14px]">add_circle</span>
-                  <span>+ New Item</span>
-                </button>
-              </div>
+              {itemId && (
+                <span className={`text-[10px] ${accentColorClass} font-bold flex items-center gap-0.5`}>
+                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                  Catalog Linked
+                </span>
+              )}
             </div>
 
             <div className="relative">
@@ -468,24 +457,14 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 {/* Popover Header */}
                 <div className="px-3 py-1.5 bg-surface-container-low text-[10px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center justify-between">
                   <span>Inventory Catalog {suggestions.length > 0 ? `(${suggestions.length})` : ''}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCreateItem(name)}
-                      className={`${accentColorClass} hover:underline cursor-pointer font-bold flex items-center gap-0.5 normal-case text-xs`}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">add_circle</span>
-                      <span>+ New Item</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsDropdownOpen(false)}
-                      className="text-on-surface-variant hover:text-on-surface cursor-pointer p-0.5"
-                      title="Close suggestions"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">close</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="text-on-surface-variant hover:text-on-surface cursor-pointer p-0.5"
+                    title="Close suggestions"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">close</span>
+                  </button>
                 </div>
 
                 {suggestions.length > 0 ? (
@@ -517,37 +496,39 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                       </div>
                     ))}
 
-                    {/* Bottom Direct Add Action */}
+                    {/* Single Add New Item action in search dropdown */}
                     <div
                       onClick={() => handleOpenCreateItem(name)}
-                      className="p-2.5 bg-surface-container-low/60 hover:bg-surface-container-low flex items-center gap-2 cursor-pointer transition-colors text-xs font-bold"
+                      className="p-2.5 bg-surface-container-low/70 hover:bg-surface-container-low flex items-center gap-2 cursor-pointer transition-colors text-xs font-bold border-t border-outline-variant/20"
                     >
                       <div className={`w-6 h-6 rounded-lg ${accentBgLightClass} flex items-center justify-center flex-shrink-0`}>
                         <span className="material-symbols-outlined text-[16px]">add</span>
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className={`${accentColorClass} truncate`}>
-                          + Add &quot;{name.trim() || 'New Item'}&quot; to Inventory
+                          + Add New Item
                         </span>
-                        <span className="text-[10px] text-on-surface-variant font-normal">
-                          Save as permanent product in inventory catalog
-                        </span>
+                        {name.trim() && (
+                          <span className="text-[10px] text-on-surface-variant font-normal truncate">
+                            Create &quot;{name.trim()}&quot; in inventory
+                          </span>
+                        )}
                       </div>
                     </div>
                   </>
                 ) : (
                   /* Empty state when no catalog item matches */
-                  <div className="p-3 text-center flex flex-col items-center gap-2">
+                  <div className="p-3.5 text-center flex flex-col items-center gap-2.5">
                     <span className="text-xs text-on-surface-variant">
                       No matching items found {name.trim() ? <>for &quot;<strong className="text-on-surface">{name}</strong>&quot;</> : ''}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleOpenCreateItem(name)}
-                      className={`py-1.5 px-3 rounded-xl ${accentBgLightClass} ${accentColorClass} font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs`}
+                      className={`py-2 px-3.5 rounded-xl ${accentBgLightClass} ${accentColorClass} font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs`}
                     >
-                      <span className="material-symbols-outlined text-[16px]">add_circle</span>
-                      <span>+ Add &quot;{name.trim() || 'New Item'}&quot; Directly to Inventory</span>
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      <span>+ Add New Item</span>
                     </button>
                   </div>
                 )}
