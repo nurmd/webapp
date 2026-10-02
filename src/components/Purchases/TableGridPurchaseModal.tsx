@@ -8,6 +8,7 @@ import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
+import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
@@ -22,7 +23,8 @@ interface TableGridPurchaseModalProps {
   initialSupplier?: Party | null;
   onClose: () => void;
   onSave: (bill: PurchaseBill) => void;
-  onAddNewParty: () => void;
+  onAddNewParty?: () => void;
+  onPartyCreated?: (party: Party) => void;
 }
 
 interface PurchaseGridRow {
@@ -62,7 +64,16 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   onClose,
   onSave,
   onAddNewParty,
+  onPartyCreated,
 }) => {
+  // Parties synchronized with direct additions
+  const [localParties, setLocalParties] = useState<Party[]>(parties);
+  useEffect(() => {
+    setLocalParties(parties);
+  }, [parties]);
+
+  const [isAddPartyModalOpen, setIsAddPartyModalOpen] = useState(false);
+
   // Items catalog synchronized with direct additions
   const [catalog, setCatalog] = useState<InventoryItem[]>(itemsCatalog);
   useEffect(() => {
@@ -73,8 +84,18 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     setCatalog((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
   };
 
+  const handlePartyCreated = (newParty: Party) => {
+    db.saveParty(newParty);
+    setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
+    setSelectedSupplier(newParty);
+    setSupplierStateCode(newParty.stateCode);
+    setIsAddPartyModalOpen(false);
+    setIsPartyModalOpen(false);
+    onPartyCreated?.(newParty);
+  };
+
   // Supplier selection
-  const suppliers = parties.filter((p) => p.type === 'SUPPLIER' || p.type === 'CUSTOMER');
+  const suppliers = localParties.filter((p) => p.type === 'SUPPLIER' || p.type === 'CUSTOMER');
   const [selectedSupplier, setSelectedSupplier] = useState<Party | null>(() => {
     if (initialBill) {
       return (
@@ -591,6 +612,17 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   ) : null}
                 </div>
               )}
+
+              {/* Direct Add New Supplier Button */}
+              <button
+                type="button"
+                onClick={() => setIsAddPartyModalOpen(true)}
+                className="px-2 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 active:scale-95"
+                title="Add New Supplier Directly"
+              >
+                <span className="material-symbols-outlined text-[15px]">person_add</span>
+                <span className="hidden sm:inline">+ New</span>
+              </button>
             </div>
 
             {/* Bill Metadata Pills */}
@@ -1161,8 +1193,20 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
           onClose={() => setIsPartyModalOpen(false)}
           onAddNewParty={() => {
             setIsPartyModalOpen(false);
-            onAddNewParty();
+            setIsAddPartyModalOpen(true);
           }}
+        />
+      )}
+
+      {/* Add New Supplier Modal directly in Purchase Bill workflow */}
+      {isAddPartyModalOpen && (
+        <AddEditPartyModal
+          isOpen={isAddPartyModalOpen}
+          onClose={() => setIsAddPartyModalOpen(false)}
+          editingParty={null}
+          initialType="SUPPLIER"
+          parties={localParties}
+          onSave={handlePartyCreated}
         />
       )}
 

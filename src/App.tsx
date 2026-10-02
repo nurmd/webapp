@@ -633,6 +633,7 @@ export const App: React.FC = () => {
           }}
           onSave={handleSaveInvoice}
           onAddNewParty={() => setActiveTab('parties')}
+          onPartyCreated={handleSaveParty}
         />
       )}
 
@@ -652,6 +653,7 @@ export const App: React.FC = () => {
             setSelectedSupplierForPurchase(null);
           }}
           onAddNewParty={() => setActiveTab('parties')}
+          onPartyCreated={handleSaveParty}
         />
       )}
 

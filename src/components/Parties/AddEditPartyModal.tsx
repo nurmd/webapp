@@ -168,7 +168,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
+    <div className="fixed inset-0 z-[70] bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
       <div className="bg-surface-container-lowest rounded-2xl p-5 w-full max-w-lg shadow-xl border border-outline-variant/30 flex flex-col gap-3.5 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2.5">
           <h3 className="font-headline-sm text-base font-bold text-on-surface flex items-center gap-2">

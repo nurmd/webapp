@@ -8,6 +8,7 @@ import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
+import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { InvoicePreviewModal } from './InvoicePreviewModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
@@ -29,7 +30,8 @@ interface TableGridInvoiceModalProps {
   existingInvoices?: Invoice[];
   onClose: () => void;
   onSave: (invoice: Invoice) => void;
-  onAddNewParty: () => void;
+  onAddNewParty?: () => void;
+  onPartyCreated?: (party: Party) => void;
 }
 
 export type GridRow = InvoiceItemData;
@@ -44,7 +46,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onClose,
   onSave,
   onAddNewParty,
+  onPartyCreated,
 }) => {
+  // Parties synchronized with direct additions
+  const [localParties, setLocalParties] = useState<Party[]>(parties);
+  useEffect(() => {
+    setLocalParties(parties);
+  }, [parties]);
+
+  const [isAddPartyModalOpen, setIsAddPartyModalOpen] = useState(false);
+
   // Items catalog synchronized with direct additions
   const [catalog, setCatalog] = useState<InventoryItem[]>(itemsCatalog);
   useEffect(() => {
@@ -53,6 +64,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   const handleItemCreated = (newItem: InventoryItem) => {
     setCatalog((prev) => [newItem, ...prev.filter((i) => i.id !== newItem.id)]);
+  };
+
+  const handlePartyCreated = (newParty: Party) => {
+    db.saveParty(newParty);
+    setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
+    setSelectedParty(newParty);
+    setPosStateCode(newParty.stateCode);
+    setIsAddPartyModalOpen(false);
+    setIsPartyModalOpen(false);
+    onPartyCreated?.(newParty);
   };
 
   // All invoices in database for uniqueness verification
@@ -652,6 +673,17 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* Direct Add New Customer Button */}
+              <button
+                type="button"
+                onClick={() => setIsAddPartyModalOpen(true)}
+                className="px-2 py-1 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 active:scale-95"
+                title="Add New Customer Directly"
+              >
+                <span className="material-symbols-outlined text-[15px]">person_add</span>
+                <span className="hidden sm:inline">+ New</span>
+              </button>
             </div>
 
             {/* Invoice Metadata Pills (Invoice No, Dates, Billing Mode) */}
@@ -1289,7 +1321,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       {/* Select Party Modal */}
       {isPartyModalOpen && (
         <SelectPartyModal
-          parties={parties}
+          parties={localParties}
           onSelectParty={(p) => {
             setSelectedParty(p);
             setPosStateCode(p.stateCode);
@@ -1298,8 +1330,20 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           onClose={() => setIsPartyModalOpen(false)}
           onAddNewParty={() => {
             setIsPartyModalOpen(false);
-            onAddNewParty();
+            setIsAddPartyModalOpen(true);
           }}
+        />
+      )}
+
+      {/* Add New Customer Modal directly in Invoice workflow */}
+      {isAddPartyModalOpen && (
+        <AddEditPartyModal
+          isOpen={isAddPartyModalOpen}
+          onClose={() => setIsAddPartyModalOpen(false)}
+          editingParty={null}
+          initialType="CUSTOMER"
+          parties={localParties}
+          onSave={handlePartyCreated}
         />
       )}
 
