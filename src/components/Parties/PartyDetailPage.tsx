@@ -1572,7 +1572,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20 gap-2">
+            <div className="flex items-center justify-end pt-1 border-t border-outline-variant/20 gap-2">
               <button
                 type="button"
                 onClick={() => handleDeletePurchaseBill(selectedPurchaseBill)}
@@ -1580,14 +1580,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
                 <span>Delete Bill</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedPurchaseBill(null)}
-                className="px-4 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer active:scale-95"
-              >
-                Close
               </button>
             </div>
           </div>
@@ -1738,7 +1730,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 </button>
               )}
 
-              {/* Edit in Grid Button */}
+              {/* Edit Invoice Button */}
               {onEditInvoice && (
                 <button
                   type="button"
@@ -1748,10 +1740,10 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                     onEditInvoice(inv);
                   }}
                   className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-                  title="Edit Invoice in Grid Workstation"
+                  title="Edit Invoice"
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>
-                  <span>Edit Grid</span>
+                  <span>Edit</span>
                 </button>
               )}
 
@@ -1763,15 +1755,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 title="Delete Invoice"
               >
                 <span className="material-symbols-outlined text-[17px]">delete</span>
-              </button>
-
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={() => setSelectedInvoiceForView(null)}
-                className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer"
-              >
-                Close
               </button>
             </div>
           </div>
