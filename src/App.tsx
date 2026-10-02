@@ -71,6 +71,7 @@ export const App: React.FC = () => {
   const [selectedPartyForInvoice, setSelectedPartyForInvoice] = useState<Party | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
 
   // Sync state on change
@@ -251,7 +252,14 @@ export const App: React.FC = () => {
   };
 
   const handleCreatePurchaseForParty = (party: Party) => {
+    setEditingPurchase(null);
     setSelectedSupplierForPurchase(party);
+    setIsTableGridPurchaseOpen(true);
+  };
+
+  const handleEditPurchase = (bill: PurchaseBill) => {
+    setEditingPurchase(bill);
+    setSelectedSupplierForPurchase(null);
     setIsTableGridPurchaseOpen(true);
   };
 
@@ -545,6 +553,7 @@ export const App: React.FC = () => {
             onRecordPartyPayment={handleRecordPartyPayment}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
+            onEditPurchase={handleEditPurchase}
             onCreateInvoice={handleCreateInvoiceForParty}
             onCreatePurchase={handleCreatePurchaseForParty}
             onRefresh={refreshData}
@@ -642,14 +651,17 @@ export const App: React.FC = () => {
           company={company}
           parties={parties}
           itemsCatalog={activeItems}
+          initialBill={editingPurchase}
           initialSupplier={selectedSupplierForPurchase}
           onClose={() => {
             setIsTableGridPurchaseOpen(false);
+            setEditingPurchase(null);
             setSelectedSupplierForPurchase(null);
           }}
           onSave={(bill) => {
             handleSavePurchase(bill);
             setIsTableGridPurchaseOpen(false);
+            setEditingPurchase(null);
             setSelectedSupplierForPurchase(null);
           }}
           onAddNewParty={() => setActiveTab('parties')}

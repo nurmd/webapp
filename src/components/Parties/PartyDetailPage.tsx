@@ -27,6 +27,7 @@ export interface PartyDetailPageProps {
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
+  onEditPurchase?: (bill: PurchaseBill) => void;
   onCreateInvoice?: (party: Party) => void;
   onCreatePurchase?: (party: Party) => void;
   onRefresh?: () => void;
@@ -63,6 +64,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   onRecordPayment,
   onViewInvoice,
   onEditInvoice,
+  onEditPurchase,
   onCreateInvoice,
   onCreatePurchase,
   onRefresh,
@@ -1431,6 +1433,41 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 </div>
               )}
 
+              {/* View/Edit Purchase buttons if linked to a purchase bill */}
+              {editingLedgerEntry.rawPurchase && (
+                <div className="flex items-center justify-between p-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs">
+                  <span className="text-orange-600 dark:text-orange-400 font-bold">Purchase Bill #{editingLedgerEntry.rawPurchase.billNumber}</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const bill = editingLedgerEntry.rawPurchase!;
+                        setEditingLedgerEntry(null);
+                        setSelectedPurchaseBill(bill);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">visibility</span>
+                      <span>View</span>
+                    </button>
+                    {onEditPurchase && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const bill = editingLedgerEntry.rawPurchase!;
+                          setEditingLedgerEntry(null);
+                          onEditPurchase(bill);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-[11px] cursor-pointer flex items-center gap-1 active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Payment Type switch if payment */}
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
                 <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
@@ -1629,15 +1666,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 <table className="w-full text-left text-[11px] border-collapse table-fixed">
                   <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
                     <tr>
-                      <th className="py-1.5 px-2.5 font-semibold w-[46%]">Item</th>
-                      <th className="py-1.5 px-2 text-right font-semibold w-[27%]">Qty × Rate</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold w-[27%]">Total</th>
+                      <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
+                      <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
+                        <span className="block text-right">Total</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/15 text-on-surface">
                     {selectedPurchaseBill.items.map((item, idx) => (
                       <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0">
+                        <td className="py-1.5 px-2.5 min-w-0 text-left">
                           <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
                           <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
                             {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
@@ -1645,16 +1684,18 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                             <span className="text-orange-600 dark:text-orange-400 font-semibold">GST {item.gstRate || 0}%</span>
                           </div>
                         </td>
-                        <td className="py-1.5 px-2 text-right min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate">
+                        <td className="py-1.5 px-2 text-center min-w-0">
+                          <div className="font-mono font-medium text-on-surface truncate text-center">
                             {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
                           </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate">
+                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
                             @ {formatINR(item.unitPrice)}
                           </div>
                         </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap">
-                          {formatINR(item.totalAmount)}
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
+                          <div className="w-full text-right flex justify-end">
+                            <span>{formatINR(item.totalAmount)}</span>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1710,6 +1751,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 <span className="material-symbols-outlined text-[16px]">delete</span>
                 <span>Delete Bill</span>
               </button>
+
+              {onEditPurchase && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bill = selectedPurchaseBill;
+                    setSelectedPurchaseBill(null);
+                    onEditPurchase(bill);
+                  }}
+                  className="py-1.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
+                  title="Edit Purchase Bill"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                  <span>Edit Bill</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1769,15 +1826,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 <table className="w-full text-left text-[11px] border-collapse table-fixed">
                   <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
                     <tr>
-                      <th className="py-1.5 px-2.5 font-semibold w-[46%]">Item</th>
-                      <th className="py-1.5 px-2 text-right font-semibold w-[27%]">Qty × Rate</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold w-[27%]">Total</th>
+                      <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
+                      <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
+                      <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
+                        <span className="block text-right">Total</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-outline-variant/15 text-on-surface">
                     {selectedInvoiceForView.items.map((item, idx) => (
                       <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0">
+                        <td className="py-1.5 px-2.5 min-w-0 text-left">
                           <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
                           <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
                             {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
@@ -1785,16 +1844,18 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                             <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>
                           </div>
                         </td>
-                        <td className="py-1.5 px-2 text-right min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate">
+                        <td className="py-1.5 px-2 text-center min-w-0">
+                          <div className="font-mono font-medium text-on-surface truncate text-center">
                             {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
                           </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate">
+                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
                             @ {formatINR(item.unitPrice)}
                           </div>
                         </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap">
-                          {formatINR(item.totalAmount)}
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
+                          <div className="w-full text-right flex justify-end">
+                            <span>{formatINR(item.totalAmount)}</span>
+                          </div>
                         </td>
                       </tr>
                     ))}
