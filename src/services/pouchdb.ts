@@ -17,8 +17,14 @@ export interface PouchSyncState {
   pendingChanges: number;
 }
 
-type SyncListener = (state: PouchSyncState) => void;
-type DataChangeListener = () => void;
+export interface PouchDocChange {
+  id: string;
+  doc?: any;
+  deleted?: boolean;
+}
+
+export type SyncListener = (state: PouchSyncState) => void;
+export type DataChangeListener = (change?: PouchDocChange) => void;
 
 class PouchService {
   private localDB: PouchDB.Database;
@@ -35,15 +41,39 @@ class PouchService {
   constructor() {
     this.localDB = new PouchDB('vyapar_fintech_store', { auto_compaction: true });
 
-    // Listen for local/remote changes
+    // Listen for local and remote changes continuously
     this.localDB
       .changes({ since: 'now', live: true, include_docs: true })
-      .on('change', () => {
-        this.notifyDataChange();
+      .on('change', (change) => {
+        this.notifyDataChange({
+          id: change.id,
+          doc: change.doc,
+          deleted: change.deleted,
+        });
       })
       .on('error', (err) => {
         console.warn('PouchDB changes feed error:', err);
       });
+
+    // Auto-reconnect when device comes online or screen/app becomes visible
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        const saved = localStorage.getItem('couchdb_remote_url');
+        if (saved && saved.trim()) {
+          this.startSync(saved.trim());
+        }
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const saved = localStorage.getItem('couchdb_remote_url');
+          if (saved && saved.trim()) {
+            if (!this.syncHandler || this.currentState.status === 'error' || this.currentState.status === 'offline') {
+              this.startSync(saved.trim());
+            }
+          }
+        }
+      });
+    }
 
     // Auto-restore remote sync URL from settings
     const savedRemote = localStorage.getItem('couchdb_remote_url');
@@ -74,8 +104,30 @@ class PouchService {
     this.listeners.forEach((l) => l(this.currentState));
   }
 
-  private notifyDataChange() {
-    this.changeListeners.forEach((l) => l());
+  private notifyDataChange(change?: PouchDocChange) {
+    this.changeListeners.forEach((l) => l(change));
+  }
+
+  private createRemoteDB(remoteUrl: string): PouchDB.Database {
+    const cleanUrl = remoteUrl.trim();
+    let authConfig: { username?: string; password?: string } | undefined;
+
+    try {
+      const parsed = new URL(cleanUrl);
+      if (parsed.username || parsed.password) {
+        authConfig = {
+          username: decodeURIComponent(parsed.username),
+          password: decodeURIComponent(parsed.password),
+        };
+      }
+    } catch {
+      // Retain cleanUrl as-is if unparseable
+    }
+
+    return new PouchDB(cleanUrl, {
+      skip_setup: true,
+      auth: authConfig?.username ? { username: authConfig.username, password: authConfig.password || '' } : undefined,
+    });
   }
 
   public startSync(remoteUrl: string): void {
@@ -86,7 +138,7 @@ class PouchService {
 
     if (!remoteUrl.trim()) {
       localStorage.removeItem('couchdb_remote_url');
-      this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined });
+      this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined, pendingChanges: 0 });
       return;
     }
 
@@ -94,63 +146,44 @@ class PouchService {
     this.notifySyncState({ status: 'connecting', remoteUrl: remoteUrl.trim(), error: undefined });
 
     try {
-      let cleanUrl = remoteUrl.trim();
-      let authConfig: { username?: string; password?: string } | undefined;
-
-      try {
-        const parsed = new URL(cleanUrl);
-        if (parsed.username || parsed.password) {
-          authConfig = {
-            username: decodeURIComponent(parsed.username),
-            password: decodeURIComponent(parsed.password),
-          };
-          parsed.username = '';
-          parsed.password = '';
-          cleanUrl = parsed.toString();
-        }
-      } catch {
-        // Retain cleanUrl as-is if unparseable
-      }
-
-      const remoteDB = new PouchDB(cleanUrl, {
-        skip_setup: true,
-        auth: authConfig?.username ? { username: authConfig.username, password: authConfig.password || '' } : undefined,
-        fetch: authConfig?.username
-          ? (url: string | URL | Request, opts?: RequestInit) => {
-              const headers = new Headers(opts?.headers || {});
-              if (!headers.has('Authorization')) {
-                headers.set('Authorization', 'Basic ' + btoa(`${authConfig!.username}:${authConfig!.password || ''}`));
-              }
-              return fetch(url, { ...opts, headers });
-            }
-          : undefined,
-      });
+      const remoteDB = this.createRemoteDB(remoteUrl);
 
       this.syncHandler = PouchDB.sync(this.localDB, remoteDB, {
         live: true,
         retry: true,
-        back_off_function: (delay) => (delay === 0 ? 1000 : Math.min(delay * 2, 30000)),
+        back_off_function: (delay) => (delay === 0 ? 1000 : Math.min(delay * 1.5, 10000)),
+        pull: {
+          heartbeat: 10000,
+          batch_size: 100,
+          batches_limit: 10,
+        },
+        push: {
+          heartbeat: 10000,
+          batch_size: 100,
+          batches_limit: 10,
+        },
       })
         .on('change', (info) => {
           this.notifySyncState({
             status: 'syncing',
             lastSyncedAt: new Date().toISOString(),
-            pendingChanges: info.change.docs.length,
+            pendingChanges: info.change?.docs?.length || 0,
           });
+          // Docs pulled into localDB trigger localDB.changes automatically.
           this.notifyDataChange();
         })
         .on('paused', (err) => {
           if (err) {
             this.notifySyncState({ status: 'error', error: String(err) });
           } else {
-            this.notifySyncState({ status: 'synced', error: undefined });
+            this.notifySyncState({ status: 'synced', error: undefined, lastSyncedAt: new Date().toISOString() });
           }
         })
         .on('active', () => {
           this.notifySyncState({ status: 'syncing' });
         })
         .on('denied', (err) => {
-          this.notifySyncState({ status: 'error', error: 'Authentication Denied' });
+          this.notifySyncState({ status: 'error', error: 'Authentication Denied: ' + (err || '') });
         })
         .on('error', (err) => {
           this.notifySyncState({ status: 'error', error: String(err) });
@@ -166,19 +199,38 @@ class PouchService {
       this.syncHandler = null;
     }
     localStorage.removeItem('couchdb_remote_url');
-    this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined });
+    this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined, pendingChanges: 0 });
   }
 
   public async syncNow(): Promise<void> {
     const savedRemote = localStorage.getItem('couchdb_remote_url');
     if (savedRemote && savedRemote.trim()) {
-      this.startSync(savedRemote.trim());
+      this.notifySyncState({ status: 'syncing' });
+      try {
+        const remoteDB = this.createRemoteDB(savedRemote.trim());
+        await PouchDB.replicate(remoteDB, this.localDB, { batch_size: 100 });
+        await PouchDB.replicate(this.localDB, remoteDB, { batch_size: 100 });
+        this.notifySyncState({
+          status: 'synced',
+          lastSyncedAt: new Date().toISOString(),
+          error: undefined,
+          pendingChanges: 0,
+        });
+      } catch (err: any) {
+        console.warn('Manual syncNow error:', err);
+        this.notifySyncState({
+          status: 'error',
+          error: err?.message || 'Sync failed',
+        });
+      }
+      this.notifyDataChange();
     } else {
       this.notifyDataChange();
       this.notifySyncState({
         status: 'synced',
         lastSyncedAt: new Date().toISOString(),
         error: undefined,
+        pendingChanges: 0,
       });
     }
   }
@@ -203,7 +255,11 @@ class PouchService {
         docType: type,
         syncedAt: new Date().toISOString(),
       });
-      this.notifyDataChange();
+      this.notifyDataChange({
+        id: docId,
+        doc: { ...doc, docType: type },
+        deleted: false,
+      });
     } catch (e) {
       console.error(`PouchDB putDoc error [${docId}]:`, e);
     }
@@ -214,6 +270,10 @@ class PouchService {
     try {
       const existing = await this.localDB.get(docId);
       await this.localDB.remove(existing);
+      this.notifyDataChange({
+        id: docId,
+        deleted: true,
+      });
     } catch (e: any) {
       if (e.status !== 404) {
         console.error(`PouchDB deleteDoc error [${docId}]:`, e);
@@ -238,7 +298,7 @@ class PouchService {
     }
   }
 
-  // --- Migration from localStorage ---
+  // --- Fast Batch Migration from localStorage ---
   public async migrateFromLocalStorage(data: {
     company: CompanyProfile;
     parties: Party[];
@@ -253,15 +313,23 @@ class PouchService {
     if (isMigrated) return;
 
     try {
-      await this.putDoc('company', data.company);
-      for (const p of data.parties) await this.putDoc('party', p);
-      for (const i of data.items) await this.putDoc('item', i);
-      for (const inv of data.invoices) await this.putDoc('invoice', inv);
-      for (const pur of data.purchases) await this.putDoc('purchase', pur);
-      for (const exp of data.expenses) await this.putDoc('expense', exp);
-      for (const adj of data.adjustments) await this.putDoc('adjustment', adj);
-      for (const v of data.vouchers) await this.putDoc('voucher', v);
+      const docs: any[] = [];
+      const timestamp = new Date().toISOString();
 
+      if (data.company) {
+        docs.push({ ...data.company, _id: `company:${data.company.id || 'COMP-001'}`, docType: 'company', syncedAt: timestamp });
+      }
+      data.parties.forEach((p) => docs.push({ ...p, _id: `party:${p.id}`, docType: 'party', syncedAt: timestamp }));
+      data.items.forEach((i) => docs.push({ ...i, _id: `item:${i.id}`, docType: 'item', syncedAt: timestamp }));
+      data.invoices.forEach((inv) => docs.push({ ...inv, _id: `invoice:${inv.id}`, docType: 'invoice', syncedAt: timestamp }));
+      data.purchases.forEach((pur) => docs.push({ ...pur, _id: `purchase:${pur.id}`, docType: 'purchase', syncedAt: timestamp }));
+      data.expenses.forEach((exp) => docs.push({ ...exp, _id: `expense:${exp.id}`, docType: 'expense', syncedAt: timestamp }));
+      data.adjustments.forEach((adj) => docs.push({ ...adj, _id: `adjustment:${adj.id}`, docType: 'adjustment', syncedAt: timestamp }));
+      data.vouchers.forEach((v) => docs.push({ ...v, _id: `voucher:${v.id}`, docType: 'voucher', syncedAt: timestamp }));
+
+      if (docs.length > 0) {
+        await this.localDB.bulkDocs(docs);
+      }
       localStorage.setItem('pouchdb_initial_migrated', 'true');
     } catch (e) {
       console.error('PouchDB initial migration error:', e);

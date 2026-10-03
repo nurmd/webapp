@@ -164,8 +164,8 @@ export const App: React.FC = () => {
   }, activeTab !== 'dashboard', 0);
 
   React.useEffect(() => {
-    // Listen for PouchDB data changes (local or synced from remote CouchDB)
-    const unsub = pouch.subscribeDataChange(() => {
+    // Listen for reactive DB data updates (from local writes, remote CouchDB/PouchDB, or multi-tab BroadcastChannel)
+    const unsub = db.subscribe(() => {
       refreshData();
     });
     return unsub;

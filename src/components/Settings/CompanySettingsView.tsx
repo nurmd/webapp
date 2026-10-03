@@ -124,7 +124,21 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
-  const handleStartSync = () => {
+  const handleSyncNow = async () => {
+    if (!syncState.remoteUrl && !syncUrlInput.trim()) {
+      setIsSyncConfigOpen(true);
+      return;
+    }
+    setIsSyncStarting(true);
+    try {
+      await pouch.syncNow();
+      await db.syncAllFromPouch();
+    } finally {
+      setIsSyncStarting(false);
+    }
+  };
+
+  const handleConnectSync = () => {
     if (!syncUrlInput.trim()) {
       pouch.stopSync();
       return;
@@ -514,7 +528,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               type="button"
-              onClick={handleStartSync}
+              onClick={handleSyncNow}
               className="px-3 py-1.5 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer"
             >
               {isSyncStarting ? 'Syncing...' : 'Sync Now'}
@@ -546,7 +560,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               />
               <button
                 type="button"
-                onClick={handleStartSync}
+                onClick={handleConnectSync}
                 className="px-3 py-2 bg-secondary text-on-secondary rounded-xl text-xs font-bold cursor-pointer"
               >
                 Connect

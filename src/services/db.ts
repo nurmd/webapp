@@ -6,7 +6,7 @@ import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { PurchaseBill } from '../models/purchase.ts';
 import { StockAdjustment } from '../models/item.ts';
 import { Expense } from '../models/expense.ts';
-import { pouch } from './pouchdb.ts';
+import { pouch, type PouchDocChange } from './pouchdb.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -262,12 +262,16 @@ export const DEFAULT_INVOICES: Invoice[] = [
  *   are strictly retained locally and excluded from remote sync to prevent counter conflicts.
  */
 class StorageService {
+  private listeners: Set<() => void> = new Set();
+  private batchNotifyTimeout: any = null;
+  private broadcastChannel: BroadcastChannel | null = null;
+
   constructor() {
     // Cross-tab / cross-window multi-device real-time sync channel
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
-        const bc = new BroadcastChannel('vyapar_multi_device_sync');
-        bc.onmessage = (event) => {
+        this.broadcastChannel = new BroadcastChannel('vyapar_multi_device_sync');
+        this.broadcastChannel.onmessage = (event) => {
           if (event.data?.type === 'ALL_SETTINGS_SYNC' && event.data.settings) {
             // Apply all settings, strictly excluding and preserving local device printing settings
             const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = event.data.settings;
@@ -276,9 +280,13 @@ class StorageService {
             if (syncable.company) {
               this.set(STORAGE_KEYS.COMPANY, syncable.company);
             }
+            this.notifyListeners();
           } else if (event.data?.type === 'COMPANY_PROFILE_SYNC' && event.data.company) {
             this.set(STORAGE_KEYS.COMPANY, event.data.company);
-            pouch.putDoc('company', event.data.company);
+            this.notifyListeners();
+          } else if (event.data?.type === 'ENTITY_MUTATION') {
+            const { entity, action, id, data } = event.data;
+            this.applyLocalEntityMutation(entity, action, id, data);
           }
         };
       } catch (e) {
@@ -286,49 +294,366 @@ class StorageService {
       }
     }
 
-    // Perform initial PouchDB migration and setup live synchronization hooks
-    setTimeout(() => {
-      pouch.migrateFromLocalStorage({
-        company: this.getCompany(),
-        parties: this.getParties(),
-        items: this.getItems(),
-        invoices: this.getInvoices(),
-        purchases: this.getPurchases(),
-        expenses: this.getExpenses(),
-        adjustments: this.getStockAdjustments(),
-        vouchers: this.getVouchers(),
-      });
-
-      pouch.subscribeDataChange(async () => {
-        // Synchronize remote changes from other counter devices into local storage cache
-        try {
-          // Synchronize all settings (taxes, invoices, banking, alerts, security) excluding printing
-          const remoteSettings = await pouch.getAllDocs<SyncedSettings>('settings');
-          if (remoteSettings.length > 0) {
-            const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = remoteSettings[0] as any;
-            const current = this.getSettings();
-            this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
-            if (syncable.company) {
-              this.set(STORAGE_KEYS.COMPANY, syncable.company);
-            }
-          }
-
-          const remoteCompany = await pouch.getAllDocs<CompanyProfile>('company');
-          if (remoteCompany.length > 0) this.set(STORAGE_KEYS.COMPANY, remoteCompany[0]);
-
-          const remoteInvoices = await pouch.getAllDocs<Invoice>('invoice');
-          if (remoteInvoices.length > 0) this.set(STORAGE_KEYS.INVOICES, remoteInvoices);
-
-          const remoteParties = await pouch.getAllDocs<Party>('party');
-          if (remoteParties.length > 0) this.set(STORAGE_KEYS.PARTIES, remoteParties);
-
-          const remoteItems = await pouch.getAllDocs<InventoryItem>('item');
-          if (remoteItems.length > 0) this.set(STORAGE_KEYS.ITEMS, remoteItems);
-        } catch (e) {
-          console.warn('Error applying remote PouchDB changes:', e);
+    // Cross-tab storage event fallback
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event) => {
+        if (event.key && (event.key.startsWith('gst_') || event.key === 'couchdb_remote_url')) {
+          this.notifyListeners();
         }
       });
+    }
+
+    // Perform initial PouchDB migration and setup live synchronization hooks
+    setTimeout(() => {
+      pouch
+        .migrateFromLocalStorage({
+          company: this.getCompany(),
+          parties: this.getParties(),
+          items: this.getItems(),
+          invoices: this.getInvoices(),
+          purchases: this.getPurchases(),
+          expenses: this.getExpenses(),
+          adjustments: this.getStockAdjustments(),
+          vouchers: this.getVouchers(),
+        })
+        .then(() => {
+          // Hydrate from PouchDB in case remote CouchDB already had data
+          this.syncAllFromPouch();
+        });
+
+      // Realtime continuous change listener
+      pouch.subscribeDataChange((change) => {
+        this.applyIncomingChange(change);
+      });
     }, 100);
+  }
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  public notifyListeners(): void {
+    if (this.batchNotifyTimeout) return;
+    this.batchNotifyTimeout = setTimeout(() => {
+      this.batchNotifyTimeout = null;
+      this.listeners.forEach((listener) => {
+        try {
+          listener();
+        } catch (e) {
+          console.error('DB listener error:', e);
+        }
+      });
+    }, 16);
+  }
+
+  private broadcastChange(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        if (!this.broadcastChannel) {
+          this.broadcastChannel = new BroadcastChannel('vyapar_multi_device_sync');
+        }
+        this.broadcastChannel.postMessage({
+          type: 'ENTITY_MUTATION',
+          entity,
+          action,
+          id,
+          data,
+          timestamp: Date.now(),
+        });
+      } catch (e) {}
+    }
+  }
+
+  private applyLocalEntityMutation(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
+    if (action === 'delete') {
+      switch (entity) {
+        case 'invoice': this.set(STORAGE_KEYS.INVOICES, this.getInvoices().filter((i) => i.id !== id)); break;
+        case 'purchase': this.set(STORAGE_KEYS.PURCHASES, this.getPurchases().filter((p) => p.id !== id)); break;
+        case 'party': this.set(STORAGE_KEYS.PARTIES, this.getParties().filter((p) => p.id !== id)); break;
+        case 'item': this.set(STORAGE_KEYS.ITEMS, this.getItems().filter((i) => i.id !== id)); break;
+        case 'expense': this.set(STORAGE_KEYS.EXPENSES, this.getExpenses().filter((e) => e.id !== id)); break;
+        case 'voucher': this.set(STORAGE_KEYS.VOUCHERS, this.getVouchers().filter((v) => v.id !== id)); break;
+        case 'adjustment': this.set(STORAGE_KEYS.ADJUSTMENTS, this.getStockAdjustments().filter((a) => a.id !== id)); break;
+      }
+      this.syncAllPartyBalances();
+    } else if (data) {
+      switch (entity) {
+        case 'invoice': {
+          const list = this.getInvoices();
+          const idx = list.findIndex((i) => i.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.INVOICES, list);
+          break;
+        }
+        case 'purchase': {
+          const list = this.getPurchases();
+          const idx = list.findIndex((p) => p.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.PURCHASES, list);
+          break;
+        }
+        case 'party': {
+          const list = this.getParties();
+          const idx = list.findIndex((p) => p.id === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.set(STORAGE_KEYS.PARTIES, list);
+          break;
+        }
+        case 'item': {
+          const list = this.getItems();
+          const idx = list.findIndex((i) => i.id === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.set(STORAGE_KEYS.ITEMS, list);
+          break;
+        }
+        case 'expense': {
+          const list = this.getExpenses();
+          const idx = list.findIndex((e) => e.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.EXPENSES, list);
+          break;
+        }
+        case 'voucher': {
+          const list = this.getVouchers();
+          const idx = list.findIndex((v) => v.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.VOUCHERS, list);
+          break;
+        }
+        case 'adjustment': {
+          const list = this.getStockAdjustments();
+          const idx = list.findIndex((a) => a.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+          break;
+        }
+      }
+      this.syncAllPartyBalances();
+    }
+    this.notifyListeners();
+  }
+
+  public applyIncomingChange(change?: PouchDocChange): void {
+    if (!change || !change.id) {
+      this.syncAllFromPouch();
+      return;
+    }
+
+    const colonIdx = change.id.indexOf(':');
+    if (colonIdx === -1) {
+      this.syncAllFromPouch();
+      return;
+    }
+
+    const docType = change.id.substring(0, colonIdx);
+    const docId = change.id.substring(colonIdx + 1);
+
+    if (change.deleted) {
+      switch (docType) {
+        case 'invoice': {
+          const list = this.getInvoices().filter((i) => i.id !== docId);
+          this.set(STORAGE_KEYS.INVOICES, list);
+          this.syncAllPartyBalances();
+          break;
+        }
+        case 'purchase': {
+          const list = this.getPurchases().filter((p) => p.id !== docId);
+          this.set(STORAGE_KEYS.PURCHASES, list);
+          this.syncAllPartyBalances();
+          break;
+        }
+        case 'party': {
+          const list = this.getParties().filter((p) => p.id !== docId);
+          this.set(STORAGE_KEYS.PARTIES, list);
+          break;
+        }
+        case 'item': {
+          const list = this.getItems().filter((i) => i.id !== docId);
+          this.set(STORAGE_KEYS.ITEMS, list);
+          break;
+        }
+        case 'expense': {
+          const list = this.getExpenses().filter((e) => e.id !== docId);
+          this.set(STORAGE_KEYS.EXPENSES, list);
+          break;
+        }
+        case 'voucher': {
+          const list = this.getVouchers().filter((v) => v.id !== docId);
+          this.set(STORAGE_KEYS.VOUCHERS, list);
+          this.syncAllPartyBalances();
+          break;
+        }
+        case 'adjustment': {
+          const list = this.getStockAdjustments().filter((a) => a.id !== docId);
+          this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+          break;
+        }
+      }
+      this.notifyListeners();
+      return;
+    }
+
+    const doc = change.doc;
+    if (!doc) {
+      this.syncAllFromPouch();
+      return;
+    }
+
+    const { _id, _rev, docType: _dt, syncedAt: _sa, ...cleanEntity } = doc;
+
+    switch (docType) {
+      case 'invoice': {
+        const inv = cleanEntity as Invoice;
+        const list = this.getInvoices();
+        const idx = list.findIndex((i) => i.id === docId);
+        if (idx >= 0) {
+          list[idx] = inv;
+        } else {
+          list.unshift(inv);
+        }
+        this.set(STORAGE_KEYS.INVOICES, list);
+        if (inv.partyId) {
+          this.recalculatePartyBalance(inv.partyId);
+        }
+        break;
+      }
+      case 'purchase': {
+        const pur = cleanEntity as PurchaseBill;
+        const list = this.getPurchases();
+        const idx = list.findIndex((p) => p.id === docId);
+        if (idx >= 0) {
+          list[idx] = pur;
+        } else {
+          list.unshift(pur);
+        }
+        this.set(STORAGE_KEYS.PURCHASES, list);
+        if (pur.supplierId) {
+          this.recalculatePartyBalance(pur.supplierId);
+        }
+        break;
+      }
+      case 'party': {
+        const list = this.getParties();
+        const idx = list.findIndex((p) => p.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as Party;
+        } else {
+          list.push(cleanEntity as Party);
+        }
+        this.set(STORAGE_KEYS.PARTIES, list);
+        break;
+      }
+      case 'item': {
+        const list = this.getItems();
+        const idx = list.findIndex((i) => i.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as InventoryItem;
+        } else {
+          list.push(cleanEntity as InventoryItem);
+        }
+        this.set(STORAGE_KEYS.ITEMS, list);
+        break;
+      }
+      case 'expense': {
+        const list = this.getExpenses();
+        const idx = list.findIndex((e) => e.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as Expense;
+        } else {
+          list.unshift(cleanEntity as Expense);
+        }
+        this.set(STORAGE_KEYS.EXPENSES, list);
+        break;
+      }
+      case 'voucher': {
+        const list = this.getVouchers();
+        const idx = list.findIndex((v) => v.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as Voucher;
+        } else {
+          list.unshift(cleanEntity as Voucher);
+        }
+        this.set(STORAGE_KEYS.VOUCHERS, list);
+        this.syncAllPartyBalances();
+        break;
+      }
+      case 'adjustment': {
+        const list = this.getStockAdjustments();
+        const idx = list.findIndex((a) => a.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as StockAdjustment;
+        } else {
+          list.unshift(cleanEntity as StockAdjustment);
+        }
+        this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+        break;
+      }
+      case 'company': {
+        this.set(STORAGE_KEYS.COMPANY, cleanEntity as CompanyProfile);
+        break;
+      }
+      case 'settings': {
+        const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = cleanEntity as any;
+        const current = this.getSettings();
+        this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+        if (syncable.company) {
+          this.set(STORAGE_KEYS.COMPANY, syncable.company);
+        }
+        break;
+      }
+    }
+
+    this.notifyListeners();
+  }
+
+  public async syncAllFromPouch(): Promise<void> {
+    try {
+      const [
+        remoteSettings,
+        remoteCompany,
+        remoteInvoices,
+        remotePurchases,
+        remoteParties,
+        remoteItems,
+        remoteExpenses,
+        remoteAdjustments,
+        remoteVouchers,
+      ] = await Promise.all([
+        pouch.getAllDocs<SyncedSettings>('settings'),
+        pouch.getAllDocs<CompanyProfile>('company'),
+        pouch.getAllDocs<Invoice>('invoice'),
+        pouch.getAllDocs<PurchaseBill>('purchase'),
+        pouch.getAllDocs<Party>('party'),
+        pouch.getAllDocs<InventoryItem>('item'),
+        pouch.getAllDocs<Expense>('expense'),
+        pouch.getAllDocs<StockAdjustment>('adjustment'),
+        pouch.getAllDocs<Voucher>('voucher'),
+      ]);
+
+      if (remoteSettings.length > 0) {
+        const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = remoteSettings[0] as any;
+        const current = this.getSettings();
+        this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+        if (syncable.company) {
+          this.set(STORAGE_KEYS.COMPANY, syncable.company);
+        }
+      }
+
+      if (remoteCompany.length > 0) this.set(STORAGE_KEYS.COMPANY, remoteCompany[0]);
+      if (remoteInvoices.length > 0) this.set(STORAGE_KEYS.INVOICES, remoteInvoices);
+      if (remotePurchases.length > 0) this.set(STORAGE_KEYS.PURCHASES, remotePurchases);
+      if (remoteParties.length > 0) this.set(STORAGE_KEYS.PARTIES, remoteParties);
+      if (remoteItems.length > 0) this.set(STORAGE_KEYS.ITEMS, remoteItems);
+      if (remoteExpenses.length > 0) this.set(STORAGE_KEYS.EXPENSES, remoteExpenses);
+      if (remoteAdjustments.length > 0) this.set(STORAGE_KEYS.ADJUSTMENTS, remoteAdjustments);
+      if (remoteVouchers.length > 0) this.set(STORAGE_KEYS.VOUCHERS, remoteVouchers);
+
+      this.syncAllPartyBalances();
+      this.notifyListeners();
+    } catch (e) {
+      console.warn('Error applying full PouchDB sync:', e);
+    }
   }
 
   private get<T>(key: string, defaultValue: T): T {
@@ -356,13 +681,8 @@ class StorageService {
   saveCompany(company: CompanyProfile): void {
     this.set(STORAGE_KEYS.COMPANY, company);
     pouch.putDoc('company', company);
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        const bc = new BroadcastChannel('vyapar_multi_device_sync');
-        bc.postMessage({ type: 'COMPANY_PROFILE_SYNC', company, timestamp: Date.now() });
-        bc.close();
-      } catch (e) {}
-    }
+    this.broadcastChange('company', 'save', company.id || 'COMP-001', company);
+    this.notifyListeners();
   }
 
   async syncBusinessProfileAcrossDevices(company: CompanyProfile): Promise<{ success: boolean; lastSyncedAt: string }> {
@@ -405,14 +725,8 @@ class StorageService {
       pouch.putDoc('company', merged.company);
     }
     pouch.putDoc('settings', merged);
-
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        const bc = new BroadcastChannel('vyapar_multi_device_sync');
-        bc.postMessage({ type: 'ALL_SETTINGS_SYNC', settings: merged, timestamp: Date.now() });
-        bc.close();
-      } catch (e) {}
-    }
+    this.broadcastChange('settings', 'save', 'app_settings', merged);
+    this.notifyListeners();
   }
 
   async syncAllSettingsAcrossDevices(settingsPayload?: Partial<SyncedSettings>): Promise<{ success: boolean; lastSyncedAt: string }> {
@@ -443,12 +757,16 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.PARTIES, list);
     pouch.putDoc('party', party);
+    this.broadcastChange('party', 'save', party.id, party);
+    this.notifyListeners();
   }
 
   deleteParty(id: string): void {
     const list = this.getParties().filter((p) => p.id !== id);
     this.set(STORAGE_KEYS.PARTIES, list);
     pouch.deleteDoc('party', id);
+    this.broadcastChange('party', 'delete', id);
+    this.notifyListeners();
   }
 
   // Recalculate and persist a party's balance based on explicit opening balance and unpaid bills/invoices
@@ -502,6 +820,7 @@ class StorageService {
       parties[partyIndex] = party;
       this.set(STORAGE_KEYS.PARTIES, parties);
       pouch.putDoc('party', party);
+      this.broadcastChange('party', 'save', party.id, party);
     }
 
     return netBalance;
@@ -530,12 +849,16 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.ITEMS, list);
     pouch.putDoc('item', item);
+    this.broadcastChange('item', 'save', item.id, item);
+    this.notifyListeners();
   }
 
   deleteItem(id: string): void {
     const list = this.getItems().filter((i) => i.id !== id);
     this.set(STORAGE_KEYS.ITEMS, list);
     pouch.deleteDoc('item', id);
+    this.broadcastChange('item', 'delete', id);
+    this.notifyListeners();
   }
 
   // Invoices
@@ -563,6 +886,7 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.putDoc('invoice', invoice);
+    this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
     // Update stock levels
     const items = this.getItems();
@@ -577,6 +901,7 @@ class StorageService {
     if (invoice.partyId) {
       this.recalculatePartyBalance(invoice.partyId);
     }
+    this.notifyListeners();
   }
 
   deleteInvoice(id: string): void {
@@ -584,9 +909,11 @@ class StorageService {
     const list = this.getInvoices().filter((i) => i.id !== id);
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.deleteDoc('invoice', id);
+    this.broadcastChange('invoice', 'delete', id);
     if (inv?.partyId) {
       this.recalculatePartyBalance(inv.partyId);
     }
+    this.notifyListeners();
   }
 
   // Purchases
@@ -651,6 +978,7 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.putDoc('purchase', bill);
+    this.broadcastChange('purchase', 'save', bill.id, bill);
 
     // Increase stock levels for purchased items
     const items = this.getItems();
@@ -667,6 +995,7 @@ class StorageService {
     if (bill.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
     }
+    this.notifyListeners();
   }
 
   deletePurchase(id: string): void {
@@ -674,9 +1003,11 @@ class StorageService {
     const list = this.getPurchases().filter((b) => b.id !== id);
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.deleteDoc('purchase', id);
+    this.broadcastChange('purchase', 'delete', id);
     if (bill?.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
     }
+    this.notifyListeners();
   }
 
   // Stock Adjustments
@@ -689,6 +1020,7 @@ class StorageService {
     list.unshift(adj);
     this.set(STORAGE_KEYS.ADJUSTMENTS, list);
     pouch.putDoc('adjustment', adj);
+    this.broadcastChange('adjustment', 'save', adj.id, adj);
 
     // Update item stock
     const items = this.getItems();
@@ -701,6 +1033,7 @@ class StorageService {
       }
       this.saveItem(match);
     }
+    this.notifyListeners();
   }
 
   // Vouchers
@@ -718,12 +1051,16 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.putDoc('voucher', voucher);
+    this.broadcastChange('voucher', 'save', voucher.id, voucher);
+    this.notifyListeners();
   }
 
   deleteVoucher(id: string): void {
     const list = this.getVouchers().filter((v) => v.id !== id);
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.deleteDoc('voucher', id);
+    this.broadcastChange('voucher', 'delete', id);
+    this.notifyListeners();
   }
 
   // Expenses
@@ -815,12 +1152,16 @@ class StorageService {
     }
     this.set(STORAGE_KEYS.EXPENSES, list);
     pouch.putDoc('expense', expense);
+    this.broadcastChange('expense', 'save', expense.id, expense);
+    this.notifyListeners();
   }
 
   deleteExpense(id: string): void {
     const list = this.getExpenses().filter((e) => e.id !== id);
     this.set(STORAGE_KEYS.EXPENSES, list);
     pouch.deleteDoc('expense', id);
+    this.broadcastChange('expense', 'delete', id);
+    this.notifyListeners();
   }
 }
 
