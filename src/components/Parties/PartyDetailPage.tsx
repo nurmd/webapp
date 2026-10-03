@@ -8,6 +8,8 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { printPartyLedgerStatement } from '../../core/utils/ledgerStatementPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
+import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
+import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 
 export interface PartyDetailPageProps {
   party: Party;
@@ -1615,341 +1617,34 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
       {/* 5. Simplified Purchase View Modal */}
       {selectedPurchaseBill && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-2.5 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center flex-shrink-0">
-                  <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-bold text-sm text-on-surface truncate">
-                      Bill #{selectedPurchaseBill.billNumber}
-                    </h3>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                        selectedPurchaseBill.paymentStatus === 'PAID'
-                          ? 'bg-secondary/10 text-secondary'
-                          : selectedPurchaseBill.paymentStatus === 'PARTIAL'
-                          ? 'bg-amber-500/10 text-amber-600'
-                          : 'bg-error/10 text-error'
-                      }`}
-                    >
-                      {selectedPurchaseBill.paymentStatus}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-on-surface-variant truncate block">
-                    {selectedPurchaseBill.supplierName} • {selectedPurchaseBill.date}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedPurchaseBill(null)}
-                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            {/* Compact Supplier Details */}
-            <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
-              <span>GSTIN: <strong className="font-mono text-on-surface">{selectedPurchaseBill.supplierGstin || 'Unregistered'}</strong></span>
-              <span>ITC: <strong className="text-on-surface">{selectedPurchaseBill.itcEligibility === 'INELIGIBLE_17_5' ? 'Blocked' : 'Eligible'}</strong></span>
-            </div>
-
-            {/* Purchased Items Table View */}
-            <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-              <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-                <table className="w-full text-left text-[11px] border-collapse table-fixed">
-                  <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
-                    <tr>
-                      <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
-                      <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
-                        <span className="block text-right">Total</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/15 text-on-surface">
-                    {selectedPurchaseBill.items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0 text-left">
-                          <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
-                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                            {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                            {item.hsnSacCode && <span>•</span>}
-                            <span className="text-orange-600 dark:text-orange-400 font-semibold">GST {item.gstRate || 0}%</span>
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2 text-center min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate text-center">
-                            {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
-                          </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
-                            @ {formatINR(item.unitPrice)}
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
-                          <div className="w-full text-right flex justify-end">
-                            <span>{formatINR(item.totalAmount)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Financial Breakdown */}
-            <div className="p-2 rounded-xl bg-surface-container-low space-y-1 text-xs">
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Taxable Amount</span>
-                <span className="font-bold text-on-surface">{formatINR(selectedPurchaseBill.totalTaxableAmount)}</span>
-              </div>
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Total Tax (GST)</span>
-                <span className="font-bold text-orange-600 dark:text-orange-400">
-                  {formatINR(selectedPurchaseBill.totalTax)}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
-                <span>Total Bill Value</span>
-                <span className="font-black text-on-surface font-currency-display-mobile">
-                  {formatINR(selectedPurchaseBill.grandTotal)}
-                </span>
-              </div>
-            </div>
-
-            {/* Compact Payment Status Bar */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container text-xs">
-              <span className="text-[11px] text-on-surface-variant font-medium">Payment ({selectedPurchaseBill.paymentMode || 'Cash'}):</span>
-              <span className="text-[11px] font-bold">
-                {selectedPurchaseBill.balanceAmount <= 0.01 ? (
-                  <span className="text-secondary flex items-center gap-1 font-bold">
-                    <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                    Fully Settled
-                  </span>
-                ) : (
-                  <span className="text-on-surface">
-                    Paid: <span className="text-secondary">{formatINR(selectedPurchaseBill.paidAmount)}</span> • Due: <span className="text-error">{formatINR(selectedPurchaseBill.balanceAmount)}</span>
-                  </span>
-                )}
-              </span>
-            </div>
-
-            {/* Bottom Actions Bar */}
-            <div className="flex items-center justify-end pt-1 border-t border-outline-variant/20 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDeletePurchaseBill(selectedPurchaseBill)}
-                className="px-3 py-1.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                <span>Delete Bill</span>
-              </button>
-
-              {onEditPurchase && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const bill = selectedPurchaseBill;
-                    setSelectedPurchaseBill(null);
-                    onEditPurchase(bill);
-                  }}
-                  className="py-1.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
-                  title="Edit Purchase Bill"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit</span>
-                  <span>Edit Bill</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <SimplifiedPurchaseModal
+          bill={selectedPurchaseBill}
+          company={company}
+          onClose={() => setSelectedPurchaseBill(null)}
+          onEditPurchase={(bill) => {
+            setSelectedPurchaseBill(null);
+            if (onEditPurchase) onEditPurchase(bill);
+          }}
+          onDeletePurchase={() => handleDeletePurchaseBill(selectedPurchaseBill)}
+        />
       )}
 
       {/* 6. Simplified Invoice View Modal */}
       {selectedInvoiceForView && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-2.5 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-                  <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-bold text-sm text-on-surface truncate">
-                      Invoice #{selectedInvoiceForView.invoiceNumber}
-                    </h3>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                        selectedInvoiceForView.paymentStatus === 'PAID'
-                          ? 'bg-secondary/10 text-secondary'
-                          : selectedInvoiceForView.paymentStatus === 'PARTIAL'
-                          ? 'bg-amber-500/10 text-amber-600'
-                          : 'bg-error/10 text-error'
-                      }`}
-                    >
-                      {selectedInvoiceForView.paymentStatus}
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-on-surface-variant truncate block">
-                    {selectedInvoiceForView.partyName} • {selectedInvoiceForView.date}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedInvoiceForView(null)}
-                className="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            {/* Compact Customer Details */}
-            <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
-              <span>GSTIN: <strong className="font-mono text-on-surface">{selectedInvoiceForView.partyGstin || 'Unregistered'}</strong></span>
-              <span>POS: <strong className="text-on-surface">State {selectedInvoiceForView.placeOfSupplyStateCode || company.stateCode}</strong></span>
-            </div>
-
-            {/* Purchased Items Table View */}
-            <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-              <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-                <table className="w-full text-left text-[11px] border-collapse table-fixed">
-                  <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
-                    <tr>
-                      <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
-                      <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
-                      <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
-                        <span className="block text-right">Total</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant/15 text-on-surface">
-                    {selectedInvoiceForView.items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0 text-left">
-                          <div className="truncate font-bold text-on-surface" title={item.name}>{item.name}</div>
-                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                            {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                            {item.hsnSacCode && <span>•</span>}
-                            <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2 text-center min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate text-center">
-                            {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
-                          </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
-                            @ {formatINR(item.unitPrice)}
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
-                          <div className="w-full text-right flex justify-end">
-                            <span>{formatINR(item.totalAmount)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Financial Breakdown */}
-            <div className="p-2 rounded-xl bg-surface-container-low space-y-1 text-xs">
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Taxable Amount</span>
-                <span className="font-bold text-on-surface">{formatINR(selectedInvoiceForView.totalTaxableAmount)}</span>
-              </div>
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Total Tax (GST)</span>
-                <span className="font-bold text-secondary">
-                  {formatINR(selectedInvoiceForView.totalTax)}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
-                <span>Total Invoice Value</span>
-                <span className="font-black text-on-surface font-currency-display-mobile">
-                  {formatINR(selectedInvoiceForView.grandTotal)}
-                </span>
-              </div>
-            </div>
-
-            {/* Compact Payment Status Bar */}
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container text-xs">
-              <span className="text-[11px] text-on-surface-variant font-medium">Payment ({selectedInvoiceForView.paymentMode || 'Cash'}):</span>
-              <span className="text-[11px] font-bold">
-                {selectedInvoiceForView.balanceAmount <= 0.01 ? (
-                  <span className="text-secondary flex items-center gap-1 font-bold">
-                    <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                    Fully Settled
-                  </span>
-                ) : (
-                  <span className="text-on-surface">
-                    Paid: <span className="text-secondary">{formatINR(selectedInvoiceForView.paidAmount)}</span> • Due: <span className="text-error">{formatINR(selectedInvoiceForView.balanceAmount)}</span>
-                  </span>
-                )}
-              </span>
-            </div>
-
-            {/* Bottom Actions Bar */}
-            <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/20 flex-wrap sm:flex-nowrap">
-              {/* Separate PDF A4 Bill Preview Button */}
-              {onViewInvoice && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const inv = selectedInvoiceForView;
-                    setSelectedInvoiceForView(null);
-                    onViewInvoice(inv);
-                  }}
-                  className="flex-1 min-w-[120px] py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
-                  title="Open full A4 / PDF print preview"
-                >
-                  <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-                  <span>Preview A4 / PDF</span>
-                </button>
-              )}
-
-              {/* Edit Invoice Button */}
-              {onEditInvoice && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const inv = selectedInvoiceForView;
-                    setSelectedInvoiceForView(null);
-                    onEditInvoice(inv);
-                  }}
-                  className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-                  title="Edit Invoice"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit</span>
-                  <span>Edit</span>
-                </button>
-              )}
-
-              {/* Delete Invoice Button */}
-              <button
-                type="button"
-                onClick={() => handleDeleteInvoiceBill(selectedInvoiceForView)}
-                className="w-9 h-9 rounded-xl text-error hover:bg-error/10 flex items-center justify-center cursor-pointer transition-colors active:scale-95 flex-shrink-0"
-                title="Delete Invoice"
-              >
-                <span className="material-symbols-outlined text-[17px]">delete</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <SimplifiedInvoiceModal
+          invoice={selectedInvoiceForView}
+          company={company}
+          onClose={() => setSelectedInvoiceForView(null)}
+          onEditInvoice={(inv) => {
+            setSelectedInvoiceForView(null);
+            if (onEditInvoice) onEditInvoice(inv);
+          }}
+          onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView)}
+          onOpenFullA4Preview={(inv) => {
+            setSelectedInvoiceForView(null);
+            if (onViewInvoice) onViewInvoice(inv);
+          }}
+        />
       )}
     </div>
   );

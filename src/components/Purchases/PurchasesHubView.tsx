@@ -5,6 +5,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { TableGridPurchaseModal } from './TableGridPurchaseModal.tsx';
+import { SimplifiedPurchaseModal } from './SimplifiedPurchaseModal.tsx';
 
 interface PurchasesHubViewProps {
   purchases: PurchaseBill[];
@@ -13,6 +14,7 @@ interface PurchasesHubViewProps {
   itemsCatalog: InventoryItem[];
   onSavePurchase: (bill: PurchaseBill) => void;
   onDeletePurchase: (id: string) => void;
+  onEditPurchase?: (bill: PurchaseBill) => void;
   onAddNewParty?: () => void;
 }
 
@@ -23,6 +25,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   itemsCatalog,
   onSavePurchase,
   onDeletePurchase,
+  onEditPurchase,
   onAddNewParty,
 }) => {
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNPAID' | 'DUE' | 'PAID'>('ALL');
@@ -70,6 +73,22 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-3 gap-space-sm">
+      {/* Header Banner & Quick Status (Simplified Purchase Ledger) */}
+      <div className="flex items-center justify-between pt-space-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
+          <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
+            Purchase Ledger
+          </span>
+        </div>
+        <div className="flex items-center gap-1 bg-surface-container-low px-space-sm py-1 rounded-full shadow-sm text-xs font-semibold">
+          <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400" style={{ fontVariationSettings: "'FILL' 1" }}>
+            shopping_bag
+          </span>
+          <span className="font-label-sm text-on-surface">{currentMonthName}</span>
+        </div>
+      </div>
+
       {/* 1. Dynamic Micro Financial Insight Metric Carousel (Stitch purchases_hub_simplified) */}
       <section className="pt-space-xs">
         <div className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30">
@@ -251,7 +270,8 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             return (
               <div
                 key={bill.id}
-                className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-orange-500/40"
+                onClick={() => setSelectedBillForPreview(bill)}
+                className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-orange-500/40 cursor-pointer active:scale-[0.99]"
               >
                 <div className="flex items-start justify-between gap-2 sm:gap-space-sm">
                   <div className="flex items-center gap-2 sm:gap-space-sm min-w-0 flex-1">
@@ -326,7 +346,10 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                 <div className="flex items-center justify-between pt-0.5">
                   <button
                     type="button"
-                    onClick={() => setSelectedBillForPreview(bill)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedBillForPreview(bill);
+                    }}
                     className="h-8 px-2.5 rounded-lg bg-surface-container-low text-on-surface font-label-sm text-label-sm flex items-center gap-1 active:bg-surface-container transition-colors cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px] text-on-surface-variant">
@@ -339,7 +362,10 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                     {isUnpaid || isPartial ? (
                       <button
                         type="button"
-                        onClick={() => handleQuickPay(bill)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickPay(bill);
+                        }}
                         className="h-8 px-space-md rounded-lg bg-error text-on-error font-label-md text-label-md flex items-center gap-1 shadow-sm active:scale-95 transition-transform cursor-pointer font-bold"
                       >
                         <span className="material-symbols-outlined text-[16px]">send_money</span>
@@ -356,7 +382,14 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => setEditingBill(bill)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEditPurchase) {
+                          onEditPurchase(bill);
+                        } else {
+                          setEditingBill(bill);
+                        }
+                      }}
                       className="w-7 h-7 rounded-lg text-outline hover:text-on-surface flex items-center justify-center cursor-pointer"
                       title="Edit Purchase Bill"
                     >
@@ -365,7 +398,10 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => onDeletePurchase(bill.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeletePurchase(bill.id);
+                      }}
                       className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
                       title="Delete Record"
                     >
@@ -401,62 +437,25 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         />
       )}
 
-      {/* Bill Preview Details Modal */}
+      {/* Simplified Mobile Purchase Bill Preview Modal */}
       {selectedBillForPreview && (
-        <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
-              <div>
-                <h3 className="font-headline-sm text-base font-bold text-on-surface">
-                  {selectedBillForPreview.billNumber}
-                </h3>
-                <span className="text-xs text-on-surface-variant">
-                  {selectedBillForPreview.supplierName} • {formatDate(selectedBillForPreview.date)}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedBillForPreview(null)}
-                className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-outline-variant/10">
-                <span className="text-on-surface-variant">Taxable Value:</span>
-                <span className="font-bold text-on-surface">
-                  {formatINR(selectedBillForPreview.totalTaxableAmount)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-outline-variant/10">
-                <span className="text-on-surface-variant">Input Tax Credit (ITC):</span>
-                <span className="font-bold text-orange-600 dark:text-orange-400">
-                  {formatINR(selectedBillForPreview.totalTax)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-outline-variant/10">
-                <span className="text-on-surface-variant">Total Bill Value:</span>
-                <span className="font-bold text-base text-on-surface">
-                  {formatINR(selectedBillForPreview.grandTotal)}
-                </span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-on-surface-variant">Payment Status:</span>
-                <span className="font-bold text-orange-600 dark:text-orange-400">{selectedBillForPreview.paymentStatus}</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelectedBillForPreview(null)}
-              className="mt-2 w-full py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+        <SimplifiedPurchaseModal
+          bill={selectedBillForPreview}
+          company={company}
+          onClose={() => setSelectedBillForPreview(null)}
+          onEditPurchase={(bill) => {
+            setSelectedBillForPreview(null);
+            if (onEditPurchase) {
+              onEditPurchase(bill);
+            } else {
+              setEditingBill(bill);
+            }
+          }}
+          onDeletePurchase={(id) => {
+            setSelectedBillForPreview(null);
+            onDeletePurchase(id);
+          }}
+        />
       )}
     </div>
   );

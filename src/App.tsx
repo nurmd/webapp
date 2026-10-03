@@ -586,6 +586,7 @@ export const App: React.FC = () => {
             itemsCatalog={activeItems}
             onSavePurchase={handleSavePurchase}
             onDeletePurchase={handleDeletePurchase}
+            onEditPurchase={handleEditPurchase}
           />
         )}
 

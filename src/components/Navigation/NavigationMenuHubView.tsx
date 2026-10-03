@@ -136,7 +136,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         ? { text: `${unpaidInvoicesCount} Pending`, type: 'error' }
         : { text: `${invoices.length} Bills`, type: 'neutral' },
       action: () => onNavigate('sales'),
-      keywords: ['sales', 'bill', 'invoice', 'gst', 'tax', 'cash', 'credit'],
+      keywords: ['sales', 'bill', 'invoice', 'gst', 'tax', 'cash', 'credit', 'sales ledger', 'ledger'],
     },
     {
       id: 'quick_pos',
@@ -197,7 +197,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         ? { text: `${formatInr(unpaidPurchasesTotal)} due`, type: 'warning' }
         : { text: `${purchases.length} Inward`, type: 'neutral' },
       action: () => onNavigate('purchases'),
-      keywords: ['purchase', 'vendor bill', 'inward', 'itc', 'procurement'],
+      keywords: ['purchase', 'vendor bill', 'inward', 'itc', 'procurement', 'purchase ledger', 'ledger'],
     },
     {
       id: 'purchase_orders',

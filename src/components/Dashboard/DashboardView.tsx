@@ -184,13 +184,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 3. Fast Quick Action Buttons (Uniform 4-Column Grid) */}
       <section className="grid grid-cols-4 gap-2 sm:gap-3">
-        {/* + Sale Bill (Primary Green) */}
+        {/* Sale Bill -> Navigates to Sales Ledger */}
         <button
-          onClick={onNewInvoice}
+          onClick={() => onNavigateTab('sales')}
           type="button"
           className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-secondary text-on-secondary shadow-sm active:scale-95 transition-all cursor-pointer"
+          title="Open Sales Ledger"
         >
-          <span className="material-symbols-outlined text-[22px]">add_notes</span>
+          <span className="material-symbols-outlined text-[22px]">receipt_long</span>
           <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Sale Bill</span>
         </button>
 
@@ -204,13 +205,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Quick POS</span>
         </button>
 
-        {/* Purchase */}
+        {/* Purchase -> Navigates to Simplified Purchase Ledger */}
         <button
           onClick={() => onNavigateTab('purchases')}
           type="button"
-          className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs active:scale-95 transition-all cursor-pointer hover:border-secondary"
+          className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs active:scale-95 transition-all cursor-pointer hover:border-orange-500/50"
+          title="Open Purchase Ledger"
         >
-          <span className="material-symbols-outlined text-[22px] text-on-surface-variant">shopping_bag</span>
+          <span className="material-symbols-outlined text-[22px] text-orange-600 dark:text-orange-400">shopping_bag</span>
           <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Purchase</span>
         </button>
 

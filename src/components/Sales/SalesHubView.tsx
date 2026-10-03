@@ -88,14 +88,16 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           <div className="flex items-center gap-space-xs">
             <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
             <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Sales Overview
+              Sales Ledger
             </span>
           </div>
           <div className="flex items-center gap-1 bg-surface-container-low px-space-sm py-1 rounded-full shadow-sm text-xs font-semibold">
             <span className="material-symbols-outlined text-[15px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
               calendar_today
             </span>
-            <span className="font-label-sm text-on-surface">Oct 2024</span>
+            <span className="font-label-sm text-on-surface">
+              {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}
+            </span>
           </div>
         </div>
 
