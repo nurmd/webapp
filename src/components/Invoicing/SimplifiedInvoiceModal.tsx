@@ -4,6 +4,8 @@ import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
+import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
+import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -230,6 +232,28 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
               <span>Edit</span>
             </button>
           )}
+
+          {/* E-Way JSON export */}
+          <button
+            type="button"
+            onClick={() => downloadEWayBillJson(company, invoice)}
+            className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+            title="Download E-Way Bill JSON"
+          >
+            <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+            <span>E-Way</span>
+          </button>
+
+          {/* E-Invoice JSON export */}
+          <button
+            type="button"
+            onClick={() => downloadEInvoiceJson(company, invoice)}
+            className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+            title="Download E-Invoice JSON"
+          >
+            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+            <span>E-Inv</span>
+          </button>
 
           {/* Delete Invoice Button */}
           {onDeleteInvoice && (

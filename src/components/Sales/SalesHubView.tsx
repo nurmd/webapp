@@ -82,338 +82,253 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto">
-      {/* Header Banner & Quick Metrics Hub (Stitch Sales Hub) */}
-      <div className="px-margin-mobile pt-space-sm pb-space-xs">
-        <div className="flex items-center justify-between mb-space-sm">
-          <div className="flex items-center gap-space-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse"></span>
+      {/* Header Banner */}
+      <div className="px-margin-mobile pt-space-xs pb-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
             <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
               Sales Ledger
             </span>
           </div>
-          <div className="flex items-center gap-1 bg-surface-container-low px-space-sm py-1 rounded-full shadow-sm text-xs font-semibold">
-            <span className="material-symbols-outlined text-[15px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
+          <div className="flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-full shadow-xs text-xs font-semibold">
+            <span className="material-symbols-outlined text-[14px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
               calendar_today
             </span>
-            <span className="font-label-sm text-on-surface">
+            <span className="text-on-surface font-medium text-[11px]">
               {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}
             </span>
           </div>
         </div>
 
-        {/* KPI Bento Stack */}
-        <div className="grid grid-cols-2 gap-space-xs">
-          {/* Main Metric: Monthly Sales */}
-          <div className="col-span-2 bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 relative overflow-hidden flex flex-col justify-between">
-            <div className="flex items-start justify-between relative z-10">
-              <div>
-                <span className="font-label-sm text-label-sm text-on-surface-variant font-bold flex items-center gap-1 uppercase tracking-wider">
-                  Monthly Sales
-                  <span className="material-symbols-outlined text-[14px] text-secondary">trending_up</span>
-                </span>
-                <div className="font-currency-display-mobile text-currency-display-mobile text-on-surface font-extrabold mt-0.5">
-                  {formatINR(totalSales || 482500)}
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5 bg-surface-container-high px-space-xs py-0.5 rounded-full">
-                <span className="material-symbols-outlined text-[14px] text-secondary">arrow_upward</span>
-                <span className="font-label-sm text-label-sm text-secondary font-bold">+12.4%</span>
-              </div>
-            </div>
-
-            <div className="mt-space-sm flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant relative z-10 pt-space-xs text-xs">
-              <span>Target ₹5.50L ({targetPercent}% achieved)</span>
-              <div className="w-28 h-2 bg-surface-container-low rounded-full overflow-hidden">
-                <div className="bg-secondary h-full rounded-full transition-all" style={{ width: `${targetPercent}%` }}></div>
-              </div>
-            </div>
+        {/* Compact 3-Column Financial Summary Strip */}
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate">
+              Total Sales
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-on-surface mt-0.5 truncate">
+              {formatINR(totalSales)}
+            </span>
+            <span className="text-[10px] text-on-surface-variant truncate">
+              {invoices.length} Bills
+            </span>
           </div>
 
-          {/* Pending Due Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="font-label-sm text-label-sm text-error font-bold uppercase tracking-wider">Pending Due</span>
-              <span className="w-2 h-2 rounded-full bg-error"></span>
-            </div>
-            <div className="mt-1">
-              <div className="font-headline-sm text-headline-sm text-error font-bold">
-                {formatINR(totalPending || 42500)}
-              </div>
-              <div className="font-label-sm text-label-sm text-on-surface-variant mt-0.5 text-xs">
-                {overdueCount} Invoices Overdue
-              </div>
-            </div>
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-error uppercase tracking-wider truncate">
+              To Collect
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-error mt-0.5 truncate">
+              {formatINR(totalPending)}
+            </span>
+            <span className="text-[10px] text-error font-medium truncate">
+              {overdueCount} Overdue
+            </span>
           </div>
 
-          {/* Avg Ticket Size */}
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider">Avg Ticket</span>
-              <span className="material-symbols-outlined text-[16px] text-secondary">receipt</span>
-            </div>
-            <div className="mt-1">
-              <div className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                {formatINR(avgTicket || 11400)}
-              </div>
-              <div className="font-label-sm text-label-sm text-secondary mt-0.5 font-bold text-xs">
-                {invoices.length} bills cleared
-              </div>
-            </div>
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-secondary uppercase tracking-wider truncate">
+              Received
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-secondary mt-0.5 truncate">
+              {formatINR(totalPaid)}
+            </span>
+            <span className="text-[10px] text-secondary font-medium truncate">
+              {invoices.filter((i) => i.paymentStatus === 'PAID').length} Settled
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* Operational Quick Action Ribbon (Stitch Sales Hub) */}
-      <div className="px-margin-mobile mt-space-sm">
-        <div className="bg-surface-container-low rounded-xl p-space-xs flex items-center justify-between gap-space-xs">
-          {/* Create Invoice CTA */}
+        {/* Search & Action Row */}
+        <div className="flex items-center gap-2 mt-2.5">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">
+              search
+            </span>
+            <input
+              className="w-full h-10 pl-9 pr-8 bg-surface-container-lowest text-on-surface text-xs rounded-xl shadow-xs border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
+              placeholder="Search by customer, bill no, GSTIN..."
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-2.5 text-outline hover:text-on-surface"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+          </div>
+
           <button
             onClick={onOpenTableGridInvoice}
-            className="flex-1 h-12 bg-secondary text-on-secondary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-space-xs shadow-sm active:scale-95 transition-all cursor-pointer"
+            className="h-10 px-3.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all flex-shrink-0 cursor-pointer"
             type="button"
           >
-            <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              add_circle
-            </span>
-            <span>+ New Bill</span>
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span>Sale Bill</span>
           </button>
-
-          {/* Standard Form */}
-          <button
-            onClick={onOpenStandardInvoice}
-            className="w-12 h-12 bg-surface-container-lowest text-on-surface rounded-lg flex flex-col items-center justify-center active:scale-95 transition-all shadow-sm cursor-pointer"
-            title="Standard Form Invoice"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px] text-on-surface-variant">edit_note</span>
-            <span className="font-label-sm text-[9px] text-on-surface-variant -mt-0.5">Form</span>
-          </button>
-
-          {/* POS Counter Mode */}
-          {onQuickPos && (
-            <button
-              onClick={onQuickPos}
-              className="px-space-sm h-12 bg-surface-container-lowest text-on-surface rounded-lg flex items-center gap-1 active:scale-95 transition-all shadow-sm cursor-pointer"
-              title="Fast POS Mode"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[18px] text-secondary">point_of_sale</span>
-              <div className="flex flex-col text-left">
-                <span className="font-label-sm text-label-sm font-bold text-on-surface leading-tight">POS</span>
-                <span className="text-[9px] text-secondary font-semibold">Counter</span>
-              </div>
-            </button>
-          )}
         </div>
-      </div>
 
-      {/* Search Input Bar */}
-      <div className="px-margin-mobile mt-space-sm">
-        <div className="relative w-full">
-          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-outline">
-            search
-          </span>
-          <input
-            className="w-full bg-surface-container-lowest text-on-surface font-body-md text-body-md pl-11 pr-10 py-3 rounded-xl shadow-sm border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-secondary/30"
-            placeholder="Search invoices by customer, bill no, GSTIN..."
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-outline-variant hover:text-on-surface cursor-pointer"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[18px]">cancel</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter Segmented Tabs */}
-      <div className="px-margin-mobile mt-space-sm">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {/* Filter Segmented Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 mt-1.5">
           <button
             onClick={() => setActiveTab('ALL')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               activeTab === 'ALL'
-                ? 'bg-secondary text-on-secondary shadow-sm'
+                ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
             }`}
             type="button"
           >
-            All Invoices ({invoices.length})
+            <span>All</span>
+            <span className="text-[10px] opacity-80">({invoices.length})</span>
           </button>
+
           <button
             onClick={() => setActiveTab('UNPAID')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               activeTab === 'UNPAID'
-                ? 'bg-error text-on-error shadow-sm'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+                ? 'bg-error text-on-error shadow-xs'
+                : 'bg-surface-container-lowest text-error border border-outline-variant/30'
             }`}
             type="button"
           >
-            Pending Due ({overdueCount})
+            <span className="w-1.5 h-1.5 rounded-full bg-error" />
+            <span>Due</span>
+            <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
           </button>
+
           <button
             onClick={() => setActiveTab('PAID')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               activeTab === 'PAID'
-                ? 'bg-secondary text-on-secondary shadow-sm'
+                ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
             }`}
             type="button"
           >
-            Paid in Full ({invoices.filter((i) => i.paymentStatus === 'PAID').length})
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+            <span>Paid</span>
+            <span className="text-[10px] opacity-80">({invoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
           </button>
+
           <button
             onClick={() => setActiveTab('ESTIMATES')}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'ESTIMATES'
-                ? 'bg-secondary text-on-secondary shadow-sm'
+                ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
             }`}
             type="button"
           >
-            Estimates / Quotes
+            Estimates
           </button>
         </div>
       </div>
 
-      {/* Invoices List Feed */}
-      <div className="px-margin-mobile mt-space-sm space-y-2">
+      {/* Invoices List Feed (Clean Passbook Row Cards) */}
+      <div className="px-margin-mobile mt-1 space-y-2">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No invoices found matching your criteria.
           </div>
         ) : (
           filtered.map((inv) => {
             const isPaid = inv.paymentStatus === 'PAID';
+            const isPartial = inv.paymentStatus === 'PARTIAL';
+            const itemDesc = inv.items && inv.items.length > 0
+              ? inv.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')
+              : null;
+
             return (
               <div
                 key={inv.id}
-                className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-2 hover:border-secondary/40 transition-colors"
+                onClick={() => onViewInvoice(inv)}
+                className="bg-surface-container-lowest rounded-2xl p-3 sm:p-3.5 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-secondary/40 active:scale-[0.99] transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="font-headline-sm text-sm sm:text-[16px] text-on-surface font-bold truncate">
-                      {inv.partyName}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-on-surface-variant mt-0.5 flex-wrap">
-                      <span className="font-semibold text-secondary">{inv.invoiceNumber}</span>
-                      <span>•</span>
-                      <span>{formatDate(inv.date)}</span>
-                      {inv.partyGstin && (
-                        <>
-                          <span>•</span>
-                          <span className="text-[10px] sm:text-[11px] text-on-surface-variant font-mono truncate">{inv.partyGstin}</span>
-                        </>
-                      )}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      {(inv.partyName || 'C').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                        {inv.partyName || 'Cash Customer'}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5">
+                        <span className="font-semibold text-secondary">{inv.invoiceNumber}</span>
+                        <span>•</span>
+                        <span>{formatDate(inv.date)}</span>
+                        {inv.partyGstin && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-[10px] text-outline truncate max-w-[80px] sm:max-w-none">
+                              {inv.partyGstin}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
-                    <span className="font-tabular-data text-xs sm:text-[17px] font-extrabold text-on-surface whitespace-nowrap">
+                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2">
+                    <span className="font-extrabold text-xs sm:text-base text-on-surface whitespace-nowrap tabular-nums">
                       {formatINR(inv.grandTotal)}
                     </span>
                     <span
-                      className={`text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5 whitespace-nowrap ${
-                        isPaid ? 'bg-secondary-container text-on-secondary-container' : 'bg-error-container text-on-error-container'
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-0.5 whitespace-nowrap flex items-center gap-0.5 ${
+                        isPaid
+                          ? 'bg-secondary/15 text-secondary'
+                          : isPartial
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          : 'bg-error/15 text-error'
                       }`}
                     >
-                      {inv.paymentStatus}
+                      {isPaid ? (
+                        <>
+                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                          <span>Paid</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[12px]">schedule</span>
+                          <span>Due {formatINR(inv.balanceAmount)}</span>
+                        </>
+                      )}
                     </span>
                   </div>
                 </div>
 
-                {inv.balanceAmount > 0 && (
-                  <div className="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-error-container/40 border border-error-container">
-                    <span className="text-error font-medium">Balance Due:</span>
-                    <strong className="text-error font-bold">{formatINR(inv.balanceAmount)}</strong>
-                  </div>
-                )}
+                {/* Subtitle items line & quick collect */}
+                <div className="flex items-center justify-between text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/15 gap-2">
+                  <span className="truncate text-on-surface-variant font-medium">
+                    {itemDesc || `${inv.items?.length || 0} items`}
+                  </span>
 
-                {/* Card Actions Ribbon */}
-                <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20 gap-2">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <button
-                      onClick={() => onViewInvoice(inv)}
-                      className="px-2 py-1 rounded-lg bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1 active:bg-surface-container cursor-pointer"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">visibility</span>
-                      <span>View</span>
-                    </button>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="font-mono text-[9px] text-outline">
+                      {inv.paymentMode || 'CASH'}
+                    </span>
 
-                    {onEditInvoice && (
-                      <button
-                        onClick={() => onEditInvoice(inv)}
-                        className="px-2 py-1 rounded-lg bg-secondary/10 text-secondary text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
-                        title="Edit and update invoice details"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">edit_document</span>
-                        <span>Edit</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        const url = getWhatsAppShareUrl(inv, company);
-                        window.open(url, '_blank');
-                      }}
-                      className="px-2 py-1 rounded-lg bg-[#25D366]/15 text-[#25D366] text-xs font-bold flex items-center gap-1 active:scale-95 cursor-pointer"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">send</span>
-                      <span>WA</span>
-                    </button>
-
-                    <button
-                      onClick={() => downloadEWayBillJson(company, inv)}
-                      className="px-2 py-1 rounded-lg bg-surface-container-low text-blue-600 text-xs font-semibold flex items-center gap-0.5 active:bg-surface-container cursor-pointer"
-                      title="Download official NIC E-Way Bill JSON"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">local_shipping</span>
-                      <span>E-Way</span>
-                    </button>
-
-                    <button
-                      onClick={() => downloadEInvoiceJson(company, inv)}
-                      className="px-2 py-1 rounded-lg bg-surface-container-low text-purple-600 text-xs font-semibold flex items-center gap-0.5 active:bg-surface-container cursor-pointer"
-                      title="Download official IRP E-Invoice JSON"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">receipt_long</span>
-                      <span>E-Inv</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
                     {inv.balanceAmount > 0 && (
                       <button
-                        onClick={() => {
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setPaymentModalInvoice(inv);
                           setPaymentAmount(inv.balanceAmount);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-secondary text-on-secondary text-xs font-bold active:scale-95 cursor-pointer"
-                        type="button"
+                        className="px-2 py-0.5 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
                       >
-                        ₹ Pay
+                        <span className="material-symbols-outlined text-[12px]">payments</span>
+                        <span>Record Pay</span>
                       </button>
                     )}
-
-                    <button
-                      onClick={() => onDeleteInvoice(inv.id)}
-                      className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
-                      title="Delete"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
                   </div>
                 </div>
               </div>

@@ -73,340 +73,243 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-3 gap-space-sm">
-      {/* Header Banner & Quick Status (Simplified Purchase Ledger) */}
-      <div className="flex items-center justify-between pt-space-xs">
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></span>
-          <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-            Purchase Ledger
-          </span>
+      {/* Header Banner */}
+      <div className="pt-space-xs pb-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
+            <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
+              Purchase Ledger
+            </span>
+          </div>
+          <div className="flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-full shadow-xs text-xs font-semibold">
+            <span className="material-symbols-outlined text-[14px] text-orange-600 dark:text-orange-400" style={{ fontVariationSettings: "'FILL' 1" }}>
+              shopping_bag
+            </span>
+            <span className="text-on-surface font-medium text-[11px]">{currentMonthName}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1 bg-surface-container-low px-space-sm py-1 rounded-full shadow-sm text-xs font-semibold">
-          <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400" style={{ fontVariationSettings: "'FILL' 1" }}>
-            shopping_bag
-          </span>
-          <span className="font-label-sm text-on-surface">{currentMonthName}</span>
-        </div>
-      </div>
 
-      {/* 1. Dynamic Micro Financial Insight Metric Carousel (Stitch purchases_hub_simplified) */}
-      <section className="pt-space-xs">
-        <div className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30">
-          <div className="flex items-center justify-between pb-space-xs border-b border-outline-variant/20 mb-space-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[18px] text-orange-600 dark:text-orange-400">
-                shopping_bag
-              </span>
-              <span className="font-label-md text-label-md text-on-surface font-semibold">
-                {currentMonthName} Purchases
-              </span>
-            </div>
-            <span className="font-label-sm text-label-sm text-orange-600 dark:text-orange-400 flex items-center gap-0.5 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full font-medium">
-              <span className="material-symbols-outlined text-[13px]">trending_up</span> +8.2%
+        {/* Compact 3-Column Financial Summary Strip */}
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate">
+              Purchases
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-on-surface mt-0.5 truncate">
+              {formatINR(totalPurchases)}
+            </span>
+            <span className="text-[10px] text-on-surface-variant truncate">
+              {purchases.length} Bills
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <div className="flex flex-col">
-              <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
-                Total Purchases
-              </span>
-              <span className="font-headline-sm text-headline-sm text-on-surface font-bold mt-0.5">
-                {formatINR(totalPurchases)}
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                {purchases.length} Bills
-              </span>
-            </div>
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-error uppercase tracking-wider truncate">
+              To Pay
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-error mt-0.5 truncate">
+              {formatINR(totalToPay)}
+            </span>
+            <span className="text-[10px] text-error font-medium truncate">
+              {unpaidPurchases.length} Pending
+            </span>
+          </div>
 
-            <div className="flex flex-col border-l border-outline-variant/30 pl-2">
-              <span className="font-label-sm text-label-sm text-error flex items-center gap-1 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-error" /> To Pay
-              </span>
-              <span className="font-headline-sm text-headline-sm text-error font-bold mt-0.5">
-                {formatINR(totalToPay)}
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                {unpaidPurchases.length} Pending
-              </span>
-            </div>
-
-            <div className="flex flex-col border-l border-outline-variant/30 pl-2">
-              <span className="font-label-sm text-label-sm text-orange-600 dark:text-orange-400 flex items-center gap-1 font-medium">
-                <span className="material-symbols-outlined text-[13px]">account_balance</span> ITC
-              </span>
-              <span className="font-headline-sm text-headline-sm text-orange-600 dark:text-orange-400 font-bold mt-0.5">
-                {formatINR(totalItcClaimable)}
-              </span>
-              <span className="font-body-sm text-body-sm text-orange-600/80 dark:text-orange-400/80 font-medium">Eligible</span>
-            </div>
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
+            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider truncate">
+              ITC Credit
+            </span>
+            <span className="font-extrabold text-xs sm:text-sm text-orange-600 dark:text-orange-400 mt-0.5 truncate">
+              {formatINR(totalItcClaimable)}
+            </span>
+            <span className="text-[10px] text-orange-600/80 dark:text-orange-400/80 font-medium truncate">
+              Eligible
+            </span>
           </div>
         </div>
-      </section>
 
-      {/* 2. Tactical Quick Actions Carousel (Stitch purchases_hub_simplified) */}
-      <section className="pt-space-xs">
-        <div className="grid grid-cols-2 gap-space-sm">
-          <button
-            onClick={() => {
-              setEditingBill(null);
-              setIsModalOpen(true);
-            }}
-            className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm shadow-orange-600/25 px-space-md py-2.5 rounded-xl flex items-center justify-center gap-1.5 flex-1 active:scale-95 transition-all cursor-pointer font-bold"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[18px]">post_add</span>
-            <span className="font-label-md text-label-md whitespace-nowrap">+ Purchase Bill</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingBill(null);
-              setIsModalOpen(true);
-            }}
-            className="bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-sm px-space-md py-2.5 rounded-xl flex items-center justify-center gap-1.5 flex-1 active:bg-surface-container-low transition-colors cursor-pointer font-bold"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[18px] text-on-surface-variant">
-              description
-            </span>
-            <span className="font-label-md text-label-md whitespace-nowrap">+ Purchase Order</span>
-          </button>
-        </div>
-      </section>
-
-      {/* 3. Smart Search & Filter Segmented Bar (Stitch purchases_hub_simplified) */}
-      <section className="pt-space-xs flex flex-col gap-2">
-        <div className="flex items-center gap-2">
+        {/* Search & Action Row */}
+        <div className="flex items-center gap-2 mt-2.5">
           <div className="relative flex-1">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[20px]">
+            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">
               search
             </span>
             <input
-              type="text"
+              className="w-full h-10 pl-9 pr-8 bg-surface-container-lowest text-on-surface text-xs rounded-xl shadow-xs border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
               placeholder="Search bill, supplier..."
+              type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 pl-10 pr-10 bg-surface-container-lowest rounded-xl font-body-md text-body-md text-on-surface shadow-sm border border-outline-variant/30 focus:outline-none placeholder:text-outline"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-2.5 text-outline hover:text-on-surface"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
           </div>
+
+          <button
+            onClick={() => {
+              setEditingBill(null);
+              setIsModalOpen(true);
+            }}
+            className="h-10 px-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all flex-shrink-0 cursor-pointer"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span>Purchase</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-space-xs overflow-x-auto no-scrollbar py-0.5">
+        {/* Filter Segmented Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 mt-1.5">
           <button
-            type="button"
             onClick={() => setFilterStatus('ALL')}
-            className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               filterStatus === 'ALL'
-                ? 'bg-orange-600 text-white'
-                : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
             }`}
+            type="button"
           >
             <span>All</span>
-            <span className="bg-surface-container-lowest/20 px-1.5 py-0.2 rounded-full text-label-sm">
-              {purchases.length}
-            </span>
+            <span className="text-[10px] opacity-80">({purchases.length})</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setFilterStatus('UNPAID')}
-            className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm border shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               filterStatus === 'UNPAID'
-                ? 'bg-error text-on-error border-error'
-                : 'bg-surface-container-lowest border-outline-variant/30 text-error'
+                ? 'bg-error text-on-error shadow-xs'
+                : 'bg-surface-container-lowest text-error border border-outline-variant/30'
             }`}
+            type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-error" />
-            <span>Unpaid</span>
-            <span className="bg-error-container text-on-error-container px-1.5 py-0.2 rounded-full text-label-sm font-bold">
-              {unpaidPurchases.length}
-            </span>
+            <span>Due</span>
+            <span className="text-[10px] opacity-90 font-bold">({unpaidPurchases.length})</span>
           </button>
 
           <button
-            type="button"
-            onClick={() => setFilterStatus('DUE')}
-            className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm border shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
-              filterStatus === 'DUE'
-                ? 'bg-amber-600 text-white border-amber-600'
-                : 'bg-surface-container-lowest border-outline-variant/30 text-amber-700 dark:text-amber-400'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-            <span>Due Soon</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setFilterStatus('PAID')}
-            className={`px-3.5 py-1 rounded-full font-label-sm text-label-sm border shadow-sm flex items-center gap-1.5 flex-shrink-0 cursor-pointer transition-all ${
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
               filterStatus === 'PAID'
-                ? 'bg-orange-600 text-white border-orange-600'
-                : 'bg-surface-container-lowest border-outline-variant/30 text-orange-600 dark:text-orange-400'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
             }`}
+            type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-            <span>Paid</span>
-            <span className="bg-orange-500/15 text-orange-700 dark:text-orange-300 px-1.5 py-0.2 rounded-full text-label-sm font-bold">
-              {purchases.filter((p) => p.paymentStatus === 'PAID').length}
-            </span>
+            <span>Settled</span>
+            <span className="text-[10px] opacity-80">({purchases.filter((p) => p.paymentStatus === 'PAID').length})</span>
           </button>
         </div>
-      </section>
+      </div>
 
-      {/* 4. Purchase Bills List Stream (Stitch purchases_hub_simplified) */}
-      <section className="flex flex-col gap-2.5">
+      {/* 4. Purchase Bills List Stream (Clean Passbook Row Cards) */}
+      <section className="flex flex-col gap-2 mt-1">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-sm">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No purchase records found.
           </div>
         ) : (
           filtered.map((bill) => {
             const isUnpaid = bill.paymentStatus === 'UNPAID';
             const isPartial = bill.paymentStatus === 'PARTIAL';
-            const itemDesc = bill.items.map((i) => `${i.quantity}x ${i.name}`).join(', ');
+            const isPaid = bill.paymentStatus === 'PAID';
+            const itemDesc = bill.items && bill.items.length > 0
+              ? bill.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')
+              : null;
+            const dueAmt = bill.balanceAmount || (isUnpaid ? bill.grandTotal : 0);
 
             return (
               <div
                 key={bill.id}
                 onClick={() => setSelectedBillForPreview(bill)}
-                className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col gap-2.5 transition-all hover:border-orange-500/40 cursor-pointer active:scale-[0.99]"
+                className="bg-surface-container-lowest rounded-2xl p-3 sm:p-3.5 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-orange-500/40 active:scale-[0.99] transition-all cursor-pointer"
               >
-                <div className="flex items-start justify-between gap-2 sm:gap-space-sm">
-                  <div className="flex items-center gap-2 sm:gap-space-sm min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center flex-shrink-0 font-bold text-orange-600 dark:text-orange-400 text-base">
-                      {bill.supplierName.charAt(0).toUpperCase()}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      {(bill.supplierName || 'S').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="font-label-md text-xs sm:text-label-md text-on-surface font-semibold truncate">
+                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
                         {bill.supplierName}
                       </span>
-                      <div className="flex items-center gap-1.5 text-on-surface-variant font-body-sm text-[11px] sm:text-xs">
-                        <span>{bill.billNumber}</span>
-                        <span className="w-1 h-1 rounded-full bg-outline-variant" />
+                      <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5">
+                        <span className="font-semibold text-orange-600 dark:text-orange-400">{bill.billNumber}</span>
+                        <span>•</span>
                         <span>{formatDate(bill.date)}</span>
+                        {bill.supplierGstin && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-[10px] text-outline truncate max-w-[80px] sm:max-w-none">
+                              {bill.supplierGstin}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2 min-w-[76px] sm:min-w-[95px]">
-                    <span
-                      className={`font-headline-sm text-xs sm:text-base font-bold whitespace-nowrap ${
-                        isUnpaid ? 'text-error' : 'text-on-surface'
-                      }`}
-                    >
+                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2">
+                    <span className="font-extrabold text-xs sm:text-base text-on-surface whitespace-nowrap tabular-nums">
                       {formatINR(bill.grandTotal)}
                     </span>
                     <span
-                      className={`font-label-sm text-[10px] sm:text-label-sm px-2 py-0.5 rounded-full mt-0.5 flex items-center gap-0.5 font-bold whitespace-nowrap ${
-                        isUnpaid
-                          ? 'text-error bg-error-container/60'
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-0.5 whitespace-nowrap flex items-center gap-0.5 ${
+                        isPaid
+                          ? 'bg-secondary/15 text-secondary'
                           : isPartial
-                          ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15'
-                          : 'text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-500/20'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                          : 'bg-error/15 text-error'
                       }`}
                     >
-                      {isUnpaid ? (
+                      {isPaid ? (
                         <>
-                          <span className="material-symbols-outlined text-[13px]">warning</span>
-                          <span>Overdue</span>
-                        </>
-                      ) : isPartial ? (
-                        <>
-                          <span className="material-symbols-outlined text-[13px]">schedule</span>
-                          <span>Due soon</span>
+                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                          <span>Settled</span>
                         </>
                       ) : (
                         <>
-                          <span
-                            className="material-symbols-outlined text-[13px]"
-                            style={{ fontVariationSettings: "'FILL' 1" }}
-                          >
-                            check_circle
-                          </span>
-                          <span>Paid</span>
+                          <span className="material-symbols-outlined text-[12px]">schedule</span>
+                          <span>Due {formatINR(dueAmt)}</span>
                         </>
                       )}
                     </span>
                   </div>
                 </div>
 
-                {/* Line items summary pill with ITC badge */}
-                <div className="bg-surface-container-low/60 rounded-xl px-3 py-1.5 flex items-center justify-between text-body-sm">
-                  <span className="text-on-surface-variant truncate font-body-sm text-xs">
-                    {itemDesc || `${bill.items.length} purchased items`}
+                {/* Subtitle items line & ITC chip */}
+                <div className="flex items-center justify-between text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/15 gap-2">
+                  <span className="truncate text-on-surface-variant font-medium">
+                    {itemDesc || `${bill.items?.length || 0} items`}
                   </span>
-                  <span className="font-tabular-data text-tabular-data text-orange-600 dark:text-orange-400 flex-shrink-0 font-bold text-xs ml-2">
-                    +{formatINR(bill.totalTax)} ITC
-                  </span>
-                </div>
 
-                {/* Bottom row actions */}
-                <div className="flex items-center justify-between pt-0.5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedBillForPreview(bill);
-                    }}
-                    className="h-8 px-2.5 rounded-lg bg-surface-container-low text-on-surface font-label-sm text-label-sm flex items-center gap-1 active:bg-surface-container transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-on-surface-variant">
-                      picture_as_pdf
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="font-bold text-[9px] text-orange-600 dark:text-orange-400">
+                      +{formatINR(bill.totalTax)} ITC
                     </span>
-                    <span>Bill Details</span>
-                  </button>
 
-                  <div className="flex items-center gap-2">
-                    {isUnpaid || isPartial ? (
+                    {(isUnpaid || isPartial) && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleQuickPay(bill);
                         }}
-                        className="h-8 px-space-md rounded-lg bg-error text-on-error font-label-md text-label-md flex items-center gap-1 shadow-sm active:scale-95 transition-transform cursor-pointer font-bold"
+                        className="px-2 py-0.5 rounded-lg bg-error/15 hover:bg-error/25 text-error font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
                       >
-                        <span className="material-symbols-outlined text-[16px]">send_money</span>
-                        <span>Pay Now</span>
+                        <span className="material-symbols-outlined text-[12px]">payments</span>
+                        <span>Pay</span>
                       </button>
-                    ) : (
-                      <div className="flex items-center gap-1 text-on-surface-variant font-body-sm text-xs">
-                        <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">
-                          sync
-                        </span>
-                        <span>Settled</span>
-                      </div>
                     )}
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (onEditPurchase) {
-                          onEditPurchase(bill);
-                        } else {
-                          setEditingBill(bill);
-                        }
-                      }}
-                      className="w-7 h-7 rounded-lg text-outline hover:text-on-surface flex items-center justify-center cursor-pointer"
-                      title="Edit Purchase Bill"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeletePurchase(bill.id);
-                      }}
-                      className="w-7 h-7 rounded-lg text-error/60 hover:text-error flex items-center justify-center cursor-pointer"
-                      title="Delete Record"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
                   </div>
                 </div>
               </div>
