@@ -15,6 +15,7 @@ interface DashboardViewProps {
   onQuickPos: () => void;
   onViewInvoice: (invoice: Invoice) => void;
   onNavigateTab: (tab: AppTab) => void;
+  onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -26,6 +27,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onQuickPos,
   onViewInvoice,
   onNavigateTab,
+  onNavigateToParties,
 }) => {
   const [txFilter, setTxFilter] = useState<'ALL' | 'UNPAID' | 'PAID'>('ALL');
 
@@ -122,7 +124,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="grid grid-cols-2 gap-2 sm:gap-3">
           {/* To Collect (Receivables) */}
           <div
-            onClick={() => onNavigateTab('parties')}
+            onClick={() => {
+              if (onNavigateToParties) {
+                onNavigateToParties('CUSTOMERS', debtorParties.length > 0 ? 'OVERDUE' : 'ALL');
+              } else {
+                onNavigateTab('parties');
+              }
+            }}
             className="p-3 sm:p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
           >
             <div className="flex items-center justify-between gap-1">
@@ -145,7 +153,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* To Pay (Payables) */}
           <div
-            onClick={() => onNavigateTab('purchases')}
+            onClick={() => {
+              if (onNavigateToParties) {
+                onNavigateToParties('SUPPLIERS', creditorParties.length > 0 ? 'OVERDUE' : 'ALL');
+              } else {
+                onNavigateTab('parties');
+              }
+            }}
             className="p-3 sm:p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/50 dark:border-rose-800/30 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
           >
             <div className="flex items-center justify-between gap-1">

@@ -27,6 +27,7 @@ import { ExpensesView } from './components/Expenses/ExpensesView.tsx';
 import { CreateInvoiceModal } from './components/Invoicing/CreateInvoiceModal.tsx';
 import { TableGridInvoiceModal } from './components/Invoicing/TableGridInvoiceModal.tsx';
 import { InvoicePreviewModal } from './components/Invoicing/InvoicePreviewModal.tsx';
+import { SimplifiedInvoiceModal } from './components/Invoicing/SimplifiedInvoiceModal.tsx';
 import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
 import { QuickBillingView } from './components/POS/QuickBillingView.tsx';
 import { InventoryView } from './components/Inventory/InventoryView.tsx';
@@ -69,9 +70,23 @@ export const App: React.FC = () => {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [selectedPartyForInvoice, setSelectedPartyForInvoice] = useState<Party | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
+
+  // Dedicated Party View Navigation State (Customers vs Suppliers & Status Filter)
+  const [partiesSegment, setPartiesSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
+  const [partiesFilter, setPartiesFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>('ALL');
+
+  const handleNavigateToParties = (
+    segment: 'CUSTOMERS' | 'SUPPLIERS' = 'CUSTOMERS',
+    filter: 'ALL' | 'OVERDUE' | 'SETTLED' = 'ALL'
+  ) => {
+    setPartiesSegment(segment);
+    setPartiesFilter(filter);
+    setActiveTab('parties');
+  };
 
   // Sync state on change
   const refreshData = () => {
@@ -124,6 +139,11 @@ export const App: React.FC = () => {
     setPreviewInvoice(null);
     return true;
   }, !!previewInvoice, 25);
+
+  useBackNavigation(() => {
+    setFullA4Invoice(null);
+    return true;
+  }, !!fullA4Invoice, 25);
 
   useBackNavigation(() => {
     setIsRoleSwitchOpen(false);
@@ -530,6 +550,7 @@ export const App: React.FC = () => {
             onQuickPos={() => setActiveTab('pos')}
             onViewInvoice={setPreviewInvoice}
             onNavigateTab={setActiveTab}
+            onNavigateToParties={handleNavigateToParties}
           />
         )}
 
@@ -594,10 +615,12 @@ export const App: React.FC = () => {
             invoices={invoices}
             purchases={purchases}
             vouchers={vouchers}
+            initialSegment={partiesSegment}
+            initialStatusFilter={partiesFilter}
             onSaveParty={handleSaveParty}
             onDeleteParty={handleDeleteParty}
             onRecordPartyPayment={handleRecordPartyPayment}
-            onViewInvoice={setPreviewInvoice}
+            onViewInvoice={setFullA4Invoice}
             onEditInvoice={handleEditInvoice}
             onEditPurchase={handleEditPurchase}
             onCreateInvoice={handleCreateInvoiceForParty}
@@ -638,6 +661,7 @@ export const App: React.FC = () => {
             expenses={expenses}
             vouchers={vouchers}
             onNavigate={handleSelectTab}
+            onNavigateToParties={handleNavigateToParties}
             onNewInvoice={() => {
               setEditingInvoice(null);
               setIsTableGridInvoiceOpen(true);
@@ -711,12 +735,37 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Simplified Mobile Invoice Preview Modal (Home transactions, Invoice Save, etc.) */}
       {previewInvoice && (
-        <InvoicePreviewModal
+        <SimplifiedInvoiceModal
           invoice={previewInvoice}
           company={company}
           onClose={() => setPreviewInvoice(null)}
-          onEditInvoice={handleEditInvoice}
+          onEditInvoice={(inv) => {
+            setPreviewInvoice(null);
+            handleEditInvoice(inv);
+          }}
+          onDeleteInvoice={(id) => {
+            setPreviewInvoice(null);
+            handleDeleteInvoice(id);
+          }}
+          onOpenFullA4Preview={(inv) => {
+            setPreviewInvoice(null);
+            setFullA4Invoice(inv);
+          }}
+        />
+      )}
+
+      {/* Full A4 / Thermal Document Preview & Print Modal */}
+      {fullA4Invoice && (
+        <InvoicePreviewModal
+          invoice={fullA4Invoice}
+          company={company}
+          onClose={() => setFullA4Invoice(null)}
+          onEditInvoice={(inv) => {
+            setFullA4Invoice(null);
+            handleEditInvoice(inv);
+          }}
         />
       )}
 

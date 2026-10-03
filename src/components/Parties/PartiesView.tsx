@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -17,6 +17,8 @@ interface PartiesViewProps {
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
   vouchers?: Voucher[];
+  initialSegment?: 'CUSTOMERS' | 'SUPPLIERS';
+  initialStatusFilter?: 'ALL' | 'OVERDUE' | 'SETTLED';
   onSaveParty: (party: Party) => void;
   onDeleteParty: (id: string) => void;
   onRecordPartyPayment?: (
@@ -39,6 +41,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   invoices = [],
   purchases = [],
   vouchers,
+  initialSegment = 'CUSTOMERS',
+  initialStatusFilter = 'ALL',
   onSaveParty,
   onDeleteParty,
   onRecordPartyPayment,
@@ -54,12 +58,25 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   const allStates = getStateList();
 
   // Segmented switch: Customers vs Suppliers (Simplified clean layout)
-  const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>('ALL');
+  const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>(initialSegment);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>(initialStatusFilter);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyForLedger, setSelectedPartyForLedger] = useState<Party | null>(null);
+
+  // Sync segment and status filter if parent props change (e.g. from Dashboard click)
+  useEffect(() => {
+    if (initialSegment) {
+      setActiveSegment(initialSegment);
+    }
+  }, [initialSegment]);
+
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter);
+    }
+  }, [initialStatusFilter]);
 
   // System back navigation handling
   useBackNavigation(() => {

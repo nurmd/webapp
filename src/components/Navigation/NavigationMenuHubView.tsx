@@ -19,6 +19,7 @@ interface NavigationMenuHubViewProps {
   expenses: Expense[];
   vouchers: Voucher[];
   onNavigate: (tab: AppTab) => void;
+  onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
   onNewInvoice: () => void;
   onOpenRoleSwitch?: () => void;
   onCheckUpdate?: () => void;
@@ -61,6 +62,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   expenses,
   vouchers,
   onNavigate,
+  onNavigateToParties,
   onNewInvoice,
   onOpenRoleSwitch,
   onCheckUpdate,
@@ -226,7 +228,13 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       badge: totalReceivable > 0
         ? { text: `${formatInr(totalReceivable)} to collect`, type: 'success' }
         : { text: 'All Cleared', type: 'neutral' },
-      action: () => onNavigate('parties'),
+      action: () => {
+        if (onNavigateToParties) {
+          onNavigateToParties('CUSTOMERS', 'ALL');
+        } else {
+          onNavigate('parties');
+        }
+      },
       keywords: ['customer', 'client', 'buyer', 'debtor', 'receivable'],
     },
     {
@@ -238,7 +246,13 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       badge: totalPayable > 0
         ? { text: `${formatInr(totalPayable)} to pay`, type: 'error' }
         : { text: 'Settled', type: 'neutral' },
-      action: () => onNavigate('parties'),
+      action: () => {
+        if (onNavigateToParties) {
+          onNavigateToParties('SUPPLIERS', 'ALL');
+        } else {
+          onNavigate('parties');
+        }
+      },
       keywords: ['supplier', 'vendor', 'wholesaler', 'creditor', 'payable'],
     },
     {
