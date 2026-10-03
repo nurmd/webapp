@@ -6,6 +6,7 @@ import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { PurchaseBill } from '../models/purchase.ts';
 import { StockAdjustment } from '../models/item.ts';
 import { Expense } from '../models/expense.ts';
+import { BankAccount, CashBankTransaction } from '../models/bankAccount.ts';
 import { pouch, type PouchDocChange } from './pouchdb.ts';
 
 const STORAGE_KEYS = {
@@ -18,6 +19,8 @@ const STORAGE_KEYS = {
   ADJUSTMENTS: 'gst_stock_adjustments',
   VOUCHERS: 'gst_vouchers',
   SETTINGS: 'gst_app_settings',
+  BANK_ACCOUNTS: 'gst_bank_accounts',
+  CASH_BANK_TXNS: 'gst_cash_bank_transactions',
   LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
 };
 
@@ -250,6 +253,49 @@ export const DEFAULT_INVOICES: Invoice[] = [
   },
 ];
 
+export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
+  {
+    id: 'ACC_CASH',
+    accountName: 'Cash in Hand',
+    accountType: 'CASH',
+    openingBalance: 15000,
+    openingBalanceDate: new Date().toISOString().split('T')[0],
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'ACC_BANK_SBI',
+    accountName: 'State Bank of India (Current A/C)',
+    accountType: 'BANK',
+    bankName: 'State Bank of India',
+    accountNumber: '32109876543',
+    ifscCode: 'SBIN0001234',
+    branchName: 'Shivaji Nagar Pune',
+    upiId: 'bharatinfotech@sbi',
+    openingBalance: 65000,
+    openingBalanceDate: new Date().toISOString().split('T')[0],
+    isDefault: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [
+  {
+    id: 'TXN-INIT-001',
+    txnNumber: 'CONTRA-001',
+    date: new Date().toISOString().split('T')[0],
+    type: 'DEPOSIT',
+    fromAccountId: 'ACC_CASH',
+    toAccountId: 'ACC_BANK_SBI',
+    amount: 5000,
+    referenceNo: 'DEP-88219',
+    description: 'Initial Counter Cash Deposited to SBI',
+    createdAt: new Date().toISOString(),
+  },
+];
+
 /**
  * Offline-first Data Access and Multi-Device Synchronization Engine.
  * 
@@ -315,6 +361,8 @@ class StorageService {
           expenses: this.getExpenses(),
           adjustments: this.getStockAdjustments(),
           vouchers: this.getVouchers(),
+          bankAccounts: this.getBankAccounts(),
+          cashBankTxns: this.getCashBankTransactions(),
         })
         .then(() => {
           // Hydrate from PouchDB in case remote CouchDB already had data
@@ -375,6 +423,8 @@ class StorageService {
         case 'expense': this.set(STORAGE_KEYS.EXPENSES, this.getExpenses().filter((e) => e.id !== id)); break;
         case 'voucher': this.set(STORAGE_KEYS.VOUCHERS, this.getVouchers().filter((v) => v.id !== id)); break;
         case 'adjustment': this.set(STORAGE_KEYS.ADJUSTMENTS, this.getStockAdjustments().filter((a) => a.id !== id)); break;
+        case 'bank_account': this.set(STORAGE_KEYS.BANK_ACCOUNTS, this.getBankAccounts().filter((b) => b.id !== id)); break;
+        case 'cash_bank_txn': this.set(STORAGE_KEYS.CASH_BANK_TXNS, this.getCashBankTransactions().filter((t) => t.id !== id)); break;
       }
       this.syncAllPartyBalances();
     } else if (data) {
@@ -426,6 +476,20 @@ class StorageService {
           const idx = list.findIndex((a) => a.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+          break;
+        }
+        case 'bank_account': {
+          const list = this.getBankAccounts();
+          const idx = list.findIndex((b) => b.id === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
+          break;
+        }
+        case 'cash_bank_txn': {
+          const list = this.getCashBankTransactions();
+          const idx = list.findIndex((t) => t.id === id);
+          if (idx >= 0) list[idx] = data; else list.unshift(data);
+          this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
           break;
         }
       }
@@ -487,6 +551,16 @@ class StorageService {
         case 'adjustment': {
           const list = this.getStockAdjustments().filter((a) => a.id !== docId);
           this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+          break;
+        }
+        case 'bank_account': {
+          const list = this.getBankAccounts().filter((b) => b.id !== docId);
+          this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
+          break;
+        }
+        case 'cash_bank_txn': {
+          const list = this.getCashBankTransactions().filter((t) => t.id !== docId);
+          this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
           break;
         }
       }
@@ -589,6 +663,28 @@ class StorageService {
         this.set(STORAGE_KEYS.ADJUSTMENTS, list);
         break;
       }
+      case 'bank_account': {
+        const list = this.getBankAccounts();
+        const idx = list.findIndex((b) => b.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as BankAccount;
+        } else {
+          list.push(cleanEntity as BankAccount);
+        }
+        this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
+        break;
+      }
+      case 'cash_bank_txn': {
+        const list = this.getCashBankTransactions();
+        const idx = list.findIndex((t) => t.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as CashBankTransaction;
+        } else {
+          list.unshift(cleanEntity as CashBankTransaction);
+        }
+        this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
+        break;
+      }
       case 'company': {
         this.set(STORAGE_KEYS.COMPANY, cleanEntity as CompanyProfile);
         break;
@@ -619,6 +715,8 @@ class StorageService {
         remoteExpenses,
         remoteAdjustments,
         remoteVouchers,
+        remoteBankAccounts,
+        remoteCashBankTxns,
       ] = await Promise.all([
         pouch.getAllDocs<SyncedSettings>('settings'),
         pouch.getAllDocs<CompanyProfile>('company'),
@@ -629,6 +727,8 @@ class StorageService {
         pouch.getAllDocs<Expense>('expense'),
         pouch.getAllDocs<StockAdjustment>('adjustment'),
         pouch.getAllDocs<Voucher>('voucher'),
+        pouch.getAllDocs<BankAccount>('bank_account'),
+        pouch.getAllDocs<CashBankTransaction>('cash_bank_txn'),
       ]);
 
       if (remoteSettings.length > 0) {
@@ -648,6 +748,8 @@ class StorageService {
       if (remoteExpenses.length > 0) this.set(STORAGE_KEYS.EXPENSES, remoteExpenses);
       if (remoteAdjustments.length > 0) this.set(STORAGE_KEYS.ADJUSTMENTS, remoteAdjustments);
       if (remoteVouchers.length > 0) this.set(STORAGE_KEYS.VOUCHERS, remoteVouchers);
+      if (remoteBankAccounts.length > 0) this.set(STORAGE_KEYS.BANK_ACCOUNTS, remoteBankAccounts);
+      if (remoteCashBankTxns.length > 0) this.set(STORAGE_KEYS.CASH_BANK_TXNS, remoteCashBankTxns);
 
       this.syncAllPartyBalances();
       this.notifyListeners();
@@ -1161,6 +1263,62 @@ class StorageService {
     this.set(STORAGE_KEYS.EXPENSES, list);
     pouch.deleteDoc('expense', id);
     this.broadcastChange('expense', 'delete', id);
+    this.notifyListeners();
+  }
+
+  // Bank Accounts
+  getBankAccounts(): BankAccount[] {
+    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, DEFAULT_BANK_ACCOUNTS);
+    return list && list.length > 0 ? list : DEFAULT_BANK_ACCOUNTS;
+  }
+
+  saveBankAccount(account: BankAccount): void {
+    const list = this.getBankAccounts();
+    const idx = list.findIndex((b) => b.id === account.id);
+    if (idx >= 0) {
+      list[idx] = account;
+    } else {
+      list.push(account);
+    }
+    this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
+    pouch.putDoc('bank_account', account);
+    this.broadcastChange('bank_account', 'save', account.id, account);
+    this.notifyListeners();
+  }
+
+  deleteBankAccount(id: string): void {
+    if (id === 'ACC_CASH') return; // Cannot delete cash register
+    const list = this.getBankAccounts().filter((b) => b.id !== id);
+    this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
+    pouch.deleteDoc('bank_account', id);
+    this.broadcastChange('bank_account', 'delete', id);
+    this.notifyListeners();
+  }
+
+  // Cash & Bank Transactions (Contra & Direct Transfers)
+  getCashBankTransactions(): CashBankTransaction[] {
+    return this.get<CashBankTransaction[]>(STORAGE_KEYS.CASH_BANK_TXNS, DEFAULT_CASH_BANK_TXNS);
+  }
+
+  saveCashBankTransaction(txn: CashBankTransaction): void {
+    const list = this.getCashBankTransactions();
+    const idx = list.findIndex((t) => t.id === txn.id);
+    if (idx >= 0) {
+      list[idx] = txn;
+    } else {
+      list.unshift(txn);
+    }
+    this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
+    pouch.putDoc('cash_bank_txn', txn);
+    this.broadcastChange('cash_bank_txn', 'save', txn.id, txn);
+    this.notifyListeners();
+  }
+
+  deleteCashBankTransaction(id: string): void {
+    const list = this.getCashBankTransactions().filter((t) => t.id !== id);
+    this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
+    pouch.deleteDoc('cash_bank_txn', id);
+    this.broadcastChange('cash_bank_txn', 'delete', id);
     this.notifyListeners();
   }
 }

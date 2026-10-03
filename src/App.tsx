@@ -34,6 +34,8 @@ import { InventoryView } from './components/Inventory/InventoryView.tsx';
 import { PartiesView } from './components/Parties/PartiesView.tsx';
 import { BusinessReportsView } from './components/Reports/BusinessReportsView.tsx';
 import { DaybookView } from './components/Reports/DaybookView.tsx';
+import { CashBankManagementView } from './components/CashBank/CashBankManagementView.tsx';
+import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
 import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHubView.tsx';
 import { rbac, UserProfile } from './services/rbac.ts';
@@ -63,6 +65,8 @@ export const App: React.FC = () => {
   const [purchases, setPurchases] = useState<PurchaseBill[]>(db.getPurchases());
   const [expenses, setExpenses] = useState<Expense[]>(db.getExpenses());
   const [vouchers, setVouchers] = useState<Voucher[]>(db.getVouchers());
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(db.getBankAccounts());
+  const [cashBankTxns, setCashBankTxns] = useState<CashBankTransaction[]>(db.getCashBankTransactions());
 
   // Modals state
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
@@ -97,6 +101,8 @@ export const App: React.FC = () => {
     setPurchases(db.getPurchases());
     setExpenses(db.getExpenses());
     setVouchers(db.getVouchers());
+    setBankAccounts(db.getBankAccounts());
+    setCashBankTxns(db.getCashBankTransactions());
   };
 
   const activeTabRef = React.useRef(activeTab);
@@ -498,6 +504,30 @@ export const App: React.FC = () => {
     refreshData();
   };
 
+  const handleSaveBankAccount = (account: BankAccount) => {
+    db.saveBankAccount(account);
+    refreshData();
+  };
+
+  const handleDeleteBankAccount = (id: string) => {
+    if (window.confirm('Delete this bank account?')) {
+      db.deleteBankAccount(id);
+      refreshData();
+    }
+  };
+
+  const handleSaveCashBankTxn = (txn: CashBankTransaction) => {
+    db.saveCashBankTransaction(txn);
+    refreshData();
+  };
+
+  const handleDeleteCashBankTxn = (id: string) => {
+    if (window.confirm('Delete this cash/bank transaction?')) {
+      db.deleteCashBankTransaction(id);
+      refreshData();
+    }
+  };
+
   const handleSelectTab = (tab: AppTab) => {
     if (!rbac.canAccessTab(tab, activeUser.role)) {
       setIsRoleSwitchOpen(true);
@@ -549,7 +579,7 @@ export const App: React.FC = () => {
             }}
             onQuickPos={() => setActiveTab('pos')}
             onViewInvoice={setPreviewInvoice}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
           />
         )}
@@ -632,6 +662,23 @@ export const App: React.FC = () => {
 
         {activeTab === 'accounting' && (
           <DaybookView vouchers={vouchers} />
+        )}
+
+        {activeTab === 'cash_bank' && (
+          <CashBankManagementView
+            company={company}
+            accounts={bankAccounts}
+            transactions={cashBankTxns}
+            invoices={invoices}
+            purchases={purchases}
+            expenses={expenses}
+            vouchers={vouchers}
+            onSaveAccount={handleSaveBankAccount}
+            onDeleteAccount={handleDeleteBankAccount}
+            onSaveTransaction={handleSaveCashBankTxn}
+            onDeleteTransaction={handleDeleteCashBankTxn}
+            onNavigateTab={handleSelectTab}
+          />
         )}
 
         {activeTab === 'reports' && (

@@ -298,7 +298,6 @@ class PouchService {
     }
   }
 
-  // --- Fast Batch Migration from localStorage ---
   public async migrateFromLocalStorage(data: {
     company: CompanyProfile;
     parties: Party[];
@@ -308,6 +307,8 @@ class PouchService {
     expenses: Expense[];
     adjustments: StockAdjustment[];
     vouchers: Voucher[];
+    bankAccounts?: any[];
+    cashBankTxns?: any[];
   }): Promise<void> {
     const isMigrated = localStorage.getItem('pouchdb_initial_migrated');
     if (isMigrated) return;
@@ -326,6 +327,12 @@ class PouchService {
       data.expenses.forEach((exp) => docs.push({ ...exp, _id: `expense:${exp.id}`, docType: 'expense', syncedAt: timestamp }));
       data.adjustments.forEach((adj) => docs.push({ ...adj, _id: `adjustment:${adj.id}`, docType: 'adjustment', syncedAt: timestamp }));
       data.vouchers.forEach((v) => docs.push({ ...v, _id: `voucher:${v.id}`, docType: 'voucher', syncedAt: timestamp }));
+      if (data.bankAccounts) {
+        data.bankAccounts.forEach((b) => docs.push({ ...b, _id: `bank_account:${b.id}`, docType: 'bank_account', syncedAt: timestamp }));
+      }
+      if (data.cashBankTxns) {
+        data.cashBankTxns.forEach((t) => docs.push({ ...t, _id: `cash_bank_txn:${t.id}`, docType: 'cash_bank_txn', syncedAt: timestamp }));
+      }
 
       if (docs.length > 0) {
         await this.localDB.bulkDocs(docs);

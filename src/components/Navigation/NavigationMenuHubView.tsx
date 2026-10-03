@@ -311,11 +311,11 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'cash_and_bank',
       title: 'Cash & Bank Accounts',
-      subtitle: 'Cash in hand, UPI QR vp/accounts & bank reconciliations',
+      subtitle: 'Cash in hand, UPI QR accounts & live bank passbook',
       icon: 'account_balance',
       category: 'accounting',
-      badge: { text: 'Double Entry', type: 'neutral' },
-      action: () => onNavigate('accounting'),
+      badge: { text: 'Realtime', type: 'success' },
+      action: () => onNavigate('cash_bank'),
       keywords: ['cash', 'bank', 'upi', 'account', 'ledger'],
     },
     {

@@ -180,6 +180,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </div>
         </div>
+
+        {/* Cash & Bank Quick Strip */}
+        <div
+          onClick={() => onNavigateTab('cash_bank')}
+          className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low/70 hover:bg-surface-container transition-colors cursor-pointer group border border-outline-variant/20"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+              <span className="material-symbols-outlined text-[17px]">account_balance</span>
+            </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-bold text-on-surface truncate">Cash & Bank Balance</span>
+              <span className="text-[11px] text-on-surface-variant font-medium hidden sm:inline">
+                • Cash in hand & bank accounts
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0 text-secondary font-bold text-xs group-hover:underline">
+            <span>Passbook</span>
+            <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+          </div>
+        </div>
       </section>
 
       {/* 3. Fast Quick Action Buttons (Uniform 4-Column Grid) */}

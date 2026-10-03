@@ -115,14 +115,14 @@ class RbacService {
     if (role === 'OWNER') return true;
 
     if (role === 'CASHIER') {
-      // Cashier only does POS counter, simple sales, dashboard, inventory view, and menu hub
-      const allowed = ['dashboard', 'pos', 'sales', 'inventory', 'menu'];
+      // Cashier does POS counter, billing, cash register, dashboard, inventory view, and menu hub
+      const allowed = ['dashboard', 'pos', 'sales', 'cash_bank', 'inventory', 'menu'];
       return allowed.includes(tab);
     }
 
     if (role === 'ACCOUNTANT') {
-      // CA accesses compliance, audit, reports, daybook, sales, purchases, expenses
-      const allowed = ['dashboard', 'reports', 'accounting', 'sales', 'purchases', 'expenses', 'parties', 'inventory'];
+      // CA accesses compliance, audit, reports, cash & bank, daybook, sales, purchases, expenses
+      const allowed = ['dashboard', 'reports', 'accounting', 'cash_bank', 'sales', 'purchases', 'expenses', 'parties', 'inventory', 'menu'];
       return allowed.includes(tab);
     }
 

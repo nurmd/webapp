@@ -8,6 +8,7 @@ export type AppTab =
   | 'sales'
   | 'purchases'
   | 'parties'
+  | 'cash_bank'
   | 'inventory'
   | 'expenses'
   | 'reports'
@@ -49,6 +50,7 @@ export const Drawer: React.FC<DrawerProps> = ({
     { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
     { id: 'purchases', label: 'Purchases & Orders', icon: 'shopping_bag' },
     { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
+    { id: 'cash_bank', label: 'Cash & Bank Accounts', icon: 'account_balance' },
     { id: 'inventory', label: 'Inventory & Stock', icon: 'inventory_2' },
     { id: 'expenses', label: 'Expenses & Overheads', icon: 'receipt_long' },
     { id: 'reports', label: 'Reports & Analytics (GSTR)', icon: 'analytics' },
