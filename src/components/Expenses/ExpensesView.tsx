@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Expense, ExpenseCategory } from '../../models/expense.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface ExpensesViewProps {
   expenses: Expense[];
@@ -29,6 +30,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
+
+  useBackNavigation(() => {
+    setIsModalOpen(false);
+    return true;
+  }, isModalOpen, 20);
 
   // New Expense form state
   const [category, setCategory] = useState<ExpenseCategory>('General Operational');

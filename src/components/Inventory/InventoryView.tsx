@@ -68,7 +68,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     if (adjustmentItem !== null) { setAdjustmentItem(null); return true; }
     if (activeItemDetail !== null) { setActiveItemDetail(null); return true; }
     return false;
-  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null);
+  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null, 20);
 
   // Privacy toggles: Buy price visibility per item
   const [revealedBuyPrices, setRevealedBuyPrices] = useState<Record<string, boolean>>({});

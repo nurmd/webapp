@@ -6,6 +6,7 @@ import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface SalesHubViewProps {
   company: CompanyProfile;
@@ -32,6 +33,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [search, setSearch] = useState('');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+
+  useBackNavigation(() => {
+    setPaymentModalInvoice(null);
+    return true;
+  }, !!paymentModalInvoice, 20);
 
   // Metrics
   const totalSales = invoices.reduce((s, i) => s + i.grandTotal, 0);

@@ -6,6 +6,7 @@ import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
 import { db } from '../../services/db.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface CompanySettingsViewProps {
   company: CompanyProfile;
@@ -48,6 +49,47 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   // App preferences
   const [appLanguage, setAppLanguage] = useState('English (India)');
   const [isAppLockEnabled, setIsAppLockEnabled] = useState(true);
+
+  const isAnySettingsModalOpen =
+    isEditModalOpen ||
+    isQrModalOpen ||
+    isPairQrModalOpen ||
+    isImportProfileModalOpen ||
+    isUpdateModalOpen ||
+    isSyncConfigOpen ||
+    !!activeSubModal;
+
+  useBackNavigation(() => {
+    if (activeSubModal) {
+      setActiveSubModal(null);
+      return true;
+    }
+    if (isEditModalOpen) {
+      setIsEditModalOpen(false);
+      return true;
+    }
+    if (isQrModalOpen) {
+      setIsQrModalOpen(false);
+      return true;
+    }
+    if (isPairQrModalOpen) {
+      setIsPairQrModalOpen(false);
+      return true;
+    }
+    if (isImportProfileModalOpen) {
+      setIsImportProfileModalOpen(false);
+      return true;
+    }
+    if (isUpdateModalOpen) {
+      setIsUpdateModalOpen(false);
+      return true;
+    }
+    if (isSyncConfigOpen) {
+      setIsSyncConfigOpen(false);
+      return true;
+    }
+    return false;
+  }, isAnySettingsModalOpen, 20);
 
   useEffect(() => {
     setProfile({ ...company });

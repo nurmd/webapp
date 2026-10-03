@@ -97,50 +97,51 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  // System Back Navigation for Modals and Tabs
+  // System Back Navigation for Modals and Tabs with explicit priorities
   useBackNavigation(() => {
     setIsDrawerOpen(false);
     return true;
-  }, isDrawerOpen);
+  }, isDrawerOpen, 30);
 
   useBackNavigation(() => {
     setIsStandardInvoiceOpen(false);
     return true;
-  }, isStandardInvoiceOpen);
+  }, isStandardInvoiceOpen, 10);
 
   useBackNavigation(() => {
     setIsTableGridInvoiceOpen(false);
     setEditingInvoice(null);
     return true;
-  }, isTableGridInvoiceOpen);
+  }, isTableGridInvoiceOpen, 10);
 
   useBackNavigation(() => {
     setIsTableGridPurchaseOpen(false);
     setSelectedSupplierForPurchase(null);
     return true;
-  }, isTableGridPurchaseOpen);
+  }, isTableGridPurchaseOpen, 10);
 
   useBackNavigation(() => {
     setPreviewInvoice(null);
     return true;
-  }, !!previewInvoice);
+  }, !!previewInvoice, 25);
 
   useBackNavigation(() => {
     setIsRoleSwitchOpen(false);
     return true;
-  }, isRoleSwitchOpen);
+  }, isRoleSwitchOpen, 25);
 
   useBackNavigation(() => {
     setIsUpdateModalOpen(false);
     return true;
-  }, isUpdateModalOpen);
+  }, isUpdateModalOpen, 25);
 
   useBackNavigation(() => {
     if (activeTab !== 'dashboard') {
       setActiveTab('dashboard');
       return true;
     }
-  }, activeTab !== 'dashboard');
+    return false;
+  }, activeTab !== 'dashboard', 0);
 
   React.useEffect(() => {
     // Listen for PouchDB data changes (local or synced from remote CouchDB)

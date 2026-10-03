@@ -116,7 +116,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     }
     onBack();
     return true;
-  }, true);
+  }, true, 15);
 
   // Payment Form State
   const [paymentType, setPaymentType] = useState<'IN' | 'OUT'>(isCustomer ? 'IN' : 'OUT');

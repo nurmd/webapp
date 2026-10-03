@@ -68,11 +68,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
       setEditingParty(null);
       return true;
     }
-    if (selectedPartyForLedger) {
-      setSelectedPartyForLedger(null);
-      return true;
-    }
-  }, !!selectedPartyForLedger || isModalOpen);
+    return false;
+  }, isModalOpen, 20);
 
   // Partitioned lists
   const customers = parties.filter((p) => p.type === 'CUSTOMER');

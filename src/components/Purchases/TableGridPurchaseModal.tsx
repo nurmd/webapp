@@ -14,6 +14,7 @@ import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface TableGridPurchaseModalProps {
   company: CompanyProfile;
@@ -524,6 +525,49 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const [customBillNo, setCustomBillNo] = useState(billNumber);
   const [isDueDateModalOpen, setIsDueDateModalOpen] = useState(false);
   const [isTaxDetailsOpen, setIsTaxDetailsOpen] = useState(false);
+
+  // Sub-modal back navigation (priority 20 closes inner modals before main purchase bill modal)
+  const isAnySubModalOpen =
+    isItemModalOpen ||
+    isAddPartyModalOpen ||
+    isPartyModalOpen ||
+    isScannerOpen ||
+    isBillNoModalOpen ||
+    isDueDateModalOpen ||
+    isTaxDetailsOpen;
+
+  useBackNavigation(() => {
+    if (isItemModalOpen) {
+      setIsItemModalOpen(false);
+      setEditingRowIndex(null);
+      return true;
+    }
+    if (isAddPartyModalOpen) {
+      setIsAddPartyModalOpen(false);
+      return true;
+    }
+    if (isPartyModalOpen) {
+      setIsPartyModalOpen(false);
+      return true;
+    }
+    if (isScannerOpen) {
+      setIsScannerOpen(false);
+      return true;
+    }
+    if (isBillNoModalOpen) {
+      setIsBillNoModalOpen(false);
+      return true;
+    }
+    if (isDueDateModalOpen) {
+      setIsDueDateModalOpen(false);
+      return true;
+    }
+    if (isTaxDetailsOpen) {
+      setIsTaxDetailsOpen(false);
+      return true;
+    }
+    return false;
+  }, isAnySubModalOpen, 20);
 
   return (
     <div className="fixed inset-0 z-50 bg-surface flex flex-col min-h-screen overflow-x-hidden antialiased">

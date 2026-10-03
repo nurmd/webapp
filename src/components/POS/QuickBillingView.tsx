@@ -9,6 +9,7 @@ import { hardwareScanner, audioService } from '../../services/barcodeService.ts'
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface QuickBillingViewProps {
   company: CompanyProfile;
@@ -29,6 +30,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [isMobileCartDrawerOpen, setIsMobileCartDrawerOpen] = useState(false);
+
+  useBackNavigation(() => {
+    if (isScannerOpen) {
+      setIsScannerOpen(false);
+      return true;
+    }
+    if (isMobileCartDrawerOpen) {
+      setIsMobileCartDrawerOpen(false);
+      return true;
+    }
+    return false;
+  }, isScannerOpen || isMobileCartDrawerOpen, 20);
 
   // Extract unique categories
   const categories = ['ALL', ...Array.from(new Set(items.map((i) => i.category || 'General').filter(Boolean)))];

@@ -156,11 +156,44 @@ class MainActivity : Activity() {
         webView.addJavascriptInterface(AndroidBridge(this, webView, vibrator), "AndroidBridge")
     }
 
+    private var lastBackPressTime: Long = 0
+
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
+        if (!::webView.isInitialized) {
             super.onBackPressed()
+            return
+        }
+
+        webView.evaluateJavascript(
+            "(function() { " +
+            "  try { " +
+            "    if (typeof window.__handleAndroidBack === 'function') { " +
+            "      return window.__handleAndroidBack() === true; " +
+            "    } " +
+            "  } catch (e) {} " +
+            "  return false; " +
+            "})()"
+        ) { result ->
+            val handled = result?.trim()?.replace("\"", "")?.equals("true", ignoreCase = true) == true
+            if (!handled) {
+                val now = System.currentTimeMillis()
+                if (now - lastBackPressTime < 2000) {
+                    finish()
+                } else {
+                    lastBackPressTime = now
+                    vibrator?.let { v ->
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                v.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                v.vibrate(40)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 }
@@ -172,6 +205,15 @@ class AndroidBridge(
 ) {
     private var downloadThread: Thread? = null
     @Volatile private var isDownloading = false
+
+    @JavascriptInterface
+    fun exitApp() {
+        (context as? Activity)?.let { act ->
+            act.runOnUiThread {
+                act.finish()
+            }
+        }
+    }
 
     @JavascriptInterface
     fun showToast(msg: String) {

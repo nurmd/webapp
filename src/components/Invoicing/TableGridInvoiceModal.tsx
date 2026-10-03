@@ -20,6 +20,7 @@ import {
   findConflictingInvoice,
   suggestNextUniqueInvoiceNumber,
 } from '../../core/utils/invoiceNumber.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface TableGridInvoiceModalProps {
   company: CompanyProfile;
@@ -166,6 +167,64 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Dedicated Add/Edit Item Modal State
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+
+  // Sub-modal back navigation (priority 20 closes inner modals before main invoice modal)
+  const isAnySubModalOpen =
+    isItemModalOpen ||
+    isAddPartyModalOpen ||
+    isPartyModalOpen ||
+    isScannerOpen ||
+    !!previewInvoiceData ||
+    !!whatsAppInvoiceData ||
+    isInvoiceNumberModalOpen ||
+    isDueDateModalOpen ||
+    isExtraDiscountModalOpen ||
+    isTaxDetailsOpen;
+
+  useBackNavigation(() => {
+    if (isItemModalOpen) {
+      setIsItemModalOpen(false);
+      setEditingRowIndex(null);
+      return true;
+    }
+    if (isAddPartyModalOpen) {
+      setIsAddPartyModalOpen(false);
+      return true;
+    }
+    if (isPartyModalOpen) {
+      setIsPartyModalOpen(false);
+      return true;
+    }
+    if (isScannerOpen) {
+      setIsScannerOpen(false);
+      return true;
+    }
+    if (previewInvoiceData) {
+      setPreviewInvoiceData(null);
+      return true;
+    }
+    if (whatsAppInvoiceData) {
+      setWhatsAppInvoiceData(null);
+      return true;
+    }
+    if (isInvoiceNumberModalOpen) {
+      setIsInvoiceNumberModalOpen(false);
+      return true;
+    }
+    if (isDueDateModalOpen) {
+      setIsDueDateModalOpen(false);
+      return true;
+    }
+    if (isExtraDiscountModalOpen) {
+      setIsExtraDiscountModalOpen(false);
+      return true;
+    }
+    if (isTaxDetailsOpen) {
+      setIsTaxDetailsOpen(false);
+      return true;
+    }
+    return false;
+  }, isAnySubModalOpen, 20);
 
   const handleOpenAddItem = () => {
     setEditingRowIndex(null);
