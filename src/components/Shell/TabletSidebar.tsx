@@ -84,112 +84,116 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
 
   return (
     <aside
-      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 transition-[width] duration-300 ease-in-out shadow-[1px_0_6px_rgba(0,0,0,0.02)] ${
-        isMinimized ? 'w-[72px]' : 'w-56'
+      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 transition-[width] duration-300 ease-in-out shadow-[1px_0_6px_rgba(0,0,0,0.02)] overflow-x-hidden ${
+        isMinimized ? 'w-[68px]' : 'w-56'
       }`}
     >
       {/* Brand Header */}
-      <div className={`border-b border-black/[0.05] dark:border-white/[0.06] ${isMinimized ? 'p-3 flex flex-col items-center gap-2' : 'p-3.5 flex items-center justify-between'}`}>
-        {isMinimized ? (
-          <>
-            <div
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-sm shadow-xs ring-1 ring-black/5 flex-shrink-0 tracking-tight cursor-pointer hover:scale-105 transition-transform"
-              title={`${company.tradeName || company.businessName} (Vyapar PRO)`}
-              onClick={toggleSidebar}
-            >
-              {brandInitial}
-            </div>
+      <div className="h-14 px-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0 overflow-hidden">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+          {/* Brand Initial Badge */}
+          <button
+            onClick={toggleSidebar}
+            type="button"
+            className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-xs shadow-xs ring-1 ring-black/5 flex-shrink-0 tracking-tight cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+            title={`${company.tradeName || company.businessName} (Vyapar PRO)`}
+          >
+            {brandInitial}
+          </button>
+
+          {/* Business Name & Tag */}
+          <div
+            className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+              isMinimized
+                ? 'opacity-0 max-w-0 -translate-x-3 pointer-events-none'
+                : 'opacity-100 max-w-[120px] translate-x-0'
+            }`}
+          >
+            <span className="font-bold text-xs text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
+              {company.tradeName || company.businessName}
+            </span>
+            <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase tracking-wider mt-0.5 whitespace-nowrap">
+              Vyapar PRO
+            </span>
+          </div>
+        </div>
+
+        {/* Right Header Actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {hasUpdate && onCheckUpdate && !isMinimized && (
             <button
-              onClick={toggleSidebar}
+              onClick={onCheckUpdate}
               type="button"
-              className="w-8 h-7 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 flex items-center justify-center transition-colors cursor-pointer"
-              title="Expand Sidebar (Maximized Theme)"
+              className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center hover:bg-amber-500/25 transition-colors cursor-pointer relative"
+              title={`New update v${latestVersion} available!`}
             >
-              <span className="material-symbols-outlined text-[18px]">keyboard_double_arrow_right</span>
+              <span className="material-symbols-outlined text-[16px]">system_update</span>
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             </button>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-sm shadow-xs ring-1 ring-black/5 flex-shrink-0 tracking-tight">
-                {brandInitial}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-xs text-slate-900 dark:text-white truncate leading-tight tracking-tight">
-                  {company.tradeName || company.businessName}
-                </span>
-                <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase tracking-wider mt-0.5">
-                  Vyapar PRO
-                </span>
-              </div>
-            </div>
+          )}
 
-            <div className="flex items-center gap-1">
-              {/* Update Notification Badge */}
-              {hasUpdate && onCheckUpdate && (
-                <button
-                  onClick={onCheckUpdate}
-                  type="button"
-                  className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center hover:bg-amber-500/25 transition-colors cursor-pointer relative"
-                  title={`New update v${latestVersion} available!`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">system_update</span>
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                </button>
-              )}
-
-              {/* Collapse to Minimized Theme Toggle */}
-              <button
-                onClick={toggleSidebar}
-                type="button"
-                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 flex items-center justify-center transition-colors cursor-pointer"
-                title="Collapse to Minimized Theme (Compact Rail)"
-              >
-                <span className="material-symbols-outlined text-[18px]">keyboard_double_arrow_left</span>
-              </button>
-            </div>
-          </>
-        )}
+          {/* Toggle Button: smoothly rotates 180deg */}
+          <button
+            onClick={toggleSidebar}
+            type="button"
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+            title={isMinimized ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            <span
+              className={`material-symbols-outlined text-[18px] transition-transform duration-300 ease-in-out ${
+                isMinimized ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : 'rotate-0'
+              }`}
+            >
+              keyboard_double_arrow_left
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* Primary Action Button: + New Bill */}
-      <div className={isMinimized ? 'px-2 pt-3 pb-1 flex justify-center' : 'px-3 pt-3 pb-1'}>
-        {isMinimized ? (
-          <button
-            onClick={onNewInvoice}
-            type="button"
-            className="group relative w-11 h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs hover:shadow active:scale-95 transition-all flex items-center justify-center cursor-pointer"
-            title="Create Sale Bill (+)"
+      {/* Primary Action Button: + Create Sale Bill */}
+      <div className="p-2 flex-shrink-0">
+        <button
+          onClick={onNewInvoice}
+          type="button"
+          className={`group relative h-10 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all duration-300 ease-in-out flex items-center cursor-pointer overflow-hidden ${
+            isMinimized ? 'w-11 mx-auto justify-center px-0' : 'w-full px-3 justify-start gap-2'
+          }`}
+          title={isMinimized ? 'Create Sale Bill (+)' : undefined}
+        >
+          <span className="material-symbols-outlined text-[19px] flex-shrink-0 group-hover:rotate-90 transition-transform duration-300">
+            add
+          </span>
+          <span
+            className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+              isMinimized
+                ? 'opacity-0 max-w-0 -translate-x-2'
+                : 'opacity-100 max-w-[130px] translate-x-0'
+            }`}
           >
-            <span className="material-symbols-outlined text-[20px] group-hover:rotate-90 transition-transform duration-300">
-              add
-            </span>
-          </button>
-        ) : (
-          <button
-            onClick={onNewInvoice}
-            type="button"
-            className="group relative w-full h-9 px-3 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[17px] group-hover:rotate-90 transition-transform duration-300">
-              add
-            </span>
-            <span className="truncate">+ Create Sale Bill</span>
-          </button>
-        )}
+            Create Sale Bill
+          </span>
+        </button>
       </div>
 
       {/* Navigation Links */}
-      <nav className={`flex-1 overflow-y-auto ${isMinimized ? 'px-2 py-1 space-y-2' : 'px-2.5 py-1 space-y-2.5'} no-scrollbar`}>
+      <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-2 no-scrollbar">
         {navSections.map((section, idx) => (
           <div key={section.category}>
-            {isMinimized ? (
-              idx > 0 && <div className="my-1.5 mx-auto w-6 h-[1px] bg-slate-200/80 dark:bg-slate-800/80" />
-            ) : (
-              <div className="px-2 pb-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            {/* Category Header or Divider Line */}
+            <div className="px-1.5 pt-1.5 pb-1 relative h-5 flex items-center overflow-hidden">
+              <span
+                className={`text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                  isMinimized ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[150px]'
+                }`}
+              >
                 {section.category}
-              </div>
-            )}
+              </span>
+              <div
+                className={`h-[1px] bg-slate-200/80 dark:bg-slate-800/80 transition-all duration-300 ease-in-out mx-auto ${
+                  isMinimized && idx > 0 ? 'w-6 opacity-100' : 'w-0 opacity-0'
+                }`}
+              />
+            </div>
 
             <div className="space-y-0.5">
               {section.items.map((item) => {
@@ -197,46 +201,16 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                 const userRole = activeUser?.role || 'OWNER';
                 const isAllowed = rbac.canAccessTab(item.id, userRole);
 
-                if (isMinimized) {
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => onSelectTab(item.id)}
-                      disabled={!isAllowed}
-                      type="button"
-                      title={item.label}
-                      className={`relative w-11 h-10 mx-auto rounded-xl flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 ${
-                        isActive
-                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs font-bold'
-                          : isAllowed
-                          ? 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                          : 'opacity-40 cursor-not-allowed text-slate-400'
-                      }`}
-                    >
-                      <span
-                        className="material-symbols-outlined text-[20px]"
-                        style={{
-                          fontVariationSettings: isActive
-                            ? "'FILL' 1, 'wght' 600"
-                            : "'FILL' 0, 'wght' 400",
-                        }}
-                      >
-                        {item.icon}
-                      </span>
-                      {isActive && (
-                        <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-3.5 rounded-r-full bg-emerald-500" />
-                      )}
-                    </button>
-                  );
-                }
-
                 return (
                   <button
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}
                     disabled={!isAllowed}
                     type="button"
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none active:scale-98 ${
+                    title={isMinimized ? item.label : undefined}
+                    className={`relative h-10 rounded-xl flex items-center transition-all duration-300 ease-in-out cursor-pointer select-none active:scale-98 overflow-hidden ${
+                      isMinimized ? 'w-11 mx-auto justify-center px-0' : 'w-full px-2.5 justify-between'
+                    } ${
                       isActive
                         ? 'bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 text-white shadow-xs font-bold'
                         : isAllowed
@@ -244,9 +218,9 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                         : 'opacity-40 cursor-not-allowed text-slate-400'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span
-                        className="material-symbols-outlined text-[19px] flex-shrink-0"
+                        className="material-symbols-outlined text-[20px] flex-shrink-0"
                         style={{
                           fontVariationSettings: isActive
                             ? "'FILL' 1, 'wght' 600"
@@ -255,16 +229,36 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                       >
                         {item.icon}
                       </span>
-                      <span className="truncate">{item.label}</span>
+                      <span
+                        className={`text-xs font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
+                          isMinimized
+                            ? 'opacity-0 max-w-0 -translate-x-2'
+                            : 'opacity-100 max-w-[125px] translate-x-0'
+                        }`}
+                      >
+                        {item.label}
+                      </span>
                     </div>
 
-                    {!isAllowed ? (
-                      <span className="material-symbols-outlined text-[13px] text-slate-400">
-                        lock
-                      </span>
-                    ) : isActive ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
-                    ) : null}
+                    {/* Active Right Dot / Lock */}
+                    <div
+                      className={`flex items-center flex-shrink-0 transition-all duration-300 ease-in-out ${
+                        isMinimized ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[20px]'
+                      }`}
+                    >
+                      {!isAllowed ? (
+                        <span className="material-symbols-outlined text-[13px] text-slate-400">
+                          lock
+                        </span>
+                      ) : isActive ? (
+                        <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+                      ) : null}
+                    </div>
+
+                    {/* Active Left Indicator Bar in Minimized mode */}
+                    {isMinimized && isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 rounded-r-full bg-emerald-400" />
+                    )}
                   </button>
                 );
               })}
@@ -274,55 +268,53 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
       </nav>
 
       {/* User Role & Version Footer */}
-      <div className={`border-t border-black/[0.05] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 ${isMinimized ? 'p-2 flex flex-col items-center gap-1.5' : 'p-2.5'}`}>
-        {isMinimized ? (
-          <>
-            <button
-              onClick={onOpenRoleSwitch}
-              type="button"
-              className="w-9 h-9 rounded-full flex items-center justify-center font-extrabold text-xs text-white shadow-2xs hover:scale-105 transition-transform cursor-pointer"
+      <div className="p-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-1.5">
+          {/* Active User Chip */}
+          <button
+            onClick={onOpenRoleSwitch}
+            type="button"
+            className={`flex items-center gap-2 min-w-0 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 ease-in-out cursor-pointer text-left flex-1 border border-transparent hover:border-black/[0.04] ${
+              isMinimized ? 'justify-center' : ''
+            }`}
+            title={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'OWNER'})`}
+          >
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-[11px] text-white shadow-2xs flex-shrink-0"
               style={{ backgroundColor: activeUser?.avatarColor || '#059669' }}
-              title={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'OWNER'})`}
             >
               {(activeUser?.name || 'A')[0].toUpperCase()}
-            </button>
-            <span className="text-[8px] font-mono text-slate-400 font-medium tracking-tight">
-              v{CURRENT_APP_VERSION}
-            </span>
-          </>
-        ) : (
-          <div className="flex items-center justify-between gap-1.5">
-            {/* Active User Chip */}
-            <button
-              onClick={onOpenRoleSwitch}
-              type="button"
-              className="flex items-center gap-2 min-w-0 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left flex-1 border border-transparent hover:border-black/[0.04]"
-              title="Switch User Role"
+            </div>
+            <div
+              className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+                isMinimized
+                  ? 'opacity-0 max-w-0 pointer-events-none -translate-x-2'
+                  : 'opacity-100 max-w-[110px] translate-x-0'
+              }`}
             >
-              <div
-                className="w-6 h-6 rounded-full flex items-center justify-center font-extrabold text-[10px] text-white shadow-2xs flex-shrink-0"
-                style={{ backgroundColor: activeUser?.avatarColor || '#059669' }}
-              >
-                {(activeUser?.name || 'A')[0].toUpperCase()}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-[11px] text-slate-900 dark:text-white truncate leading-tight">
-                  {activeUser?.name || 'Admin'}
-                </span>
-                <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold truncate capitalize">
-                  {activeUser?.role?.toLowerCase() || 'owner'}
-                </span>
-              </div>
-            </button>
+              <span className="font-bold text-[11px] text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
+                {activeUser?.name || 'Admin'}
+              </span>
+              <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold truncate capitalize whitespace-nowrap">
+                {activeUser?.role?.toLowerCase() || 'owner'}
+              </span>
+            </div>
+          </button>
 
-            {/* App Version Tag */}
-            <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs flex-shrink-0">
-              v{CURRENT_APP_VERSION}
-            </span>
-          </div>
-        )}
+          {/* App Version Tag */}
+          <span
+            className={`text-[9px] font-mono text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs flex-shrink-0 transition-all duration-300 ease-in-out whitespace-nowrap ${
+              isMinimized
+                ? 'opacity-0 max-w-0 px-0 border-0 pointer-events-none'
+                : 'opacity-100 max-w-[60px]'
+            }`}
+          >
+            v{CURRENT_APP_VERSION}
+          </span>
+        </div>
       </div>
     </aside>
   );
 };
+
 
