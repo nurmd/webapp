@@ -27,44 +27,52 @@ export const Header: React.FC<HeaderProps> = ({
   const brandInitial = (company.tradeName || company.businessName || 'V')[0].toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 bg-surface-container-lowest/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-outline-variant/25 shadow-[0_1px_6px_rgba(0,0,0,0.03)] pt-safe transition-colors">
+    <header className="sticky top-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border-b border-black/[0.05] dark:border-white/[0.08] shadow-[0_1px_8px_rgba(0,0,0,0.02)] pt-safe transition-colors">
       <div className="h-14 px-3 sm:px-4 flex items-center justify-between gap-2 max-w-7xl mx-auto">
         {/* Left: Navigation Menu Toggle & Brand Identity */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <button
             onClick={onOpenDrawer}
             aria-label="Open Navigation Drawer"
-            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-all flex-shrink-0 cursor-pointer relative active:scale-95"
+            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-200 bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:hover:bg-slate-700/60 active:scale-90 transition-all flex-shrink-0 cursor-pointer relative border border-black/[0.04] dark:border-white/[0.06]"
             type="button"
           >
-            <span className="material-symbols-outlined text-[22px]">menu</span>
+            <span className="material-symbols-outlined text-[20px]">menu</span>
             {hasUpdate && (
               <span
-                className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-surface animate-pulse"
+                className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse"
                 title="App Update Available"
               />
             )}
           </button>
 
-          {/* Clean Brand Mark & Business Name */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-secondary to-emerald-700 text-on-secondary flex items-center justify-center font-black text-xs shadow-xs flex-shrink-0">
+          {/* Clean Modern Brand Mark & Business Name */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8.5 h-8.5 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-xs shadow-sm ring-1 ring-black/5 flex-shrink-0 tracking-tight">
               {brandInitial}
             </div>
 
             <div className="flex flex-col min-w-0">
-              <span className="font-bold text-xs sm:text-sm text-on-surface truncate tracking-tight leading-tight">
+              <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate tracking-tight leading-tight">
                 {company.tradeName || company.businessName}
               </span>
 
-              <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant font-medium truncate mt-0.5">
+              <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                 <span
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    isGst ? 'bg-secondary' : 'bg-amber-500'
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-tight truncate ${
+                    isGst
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200/60 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800/40'
                   }`}
-                />
-                <span className={`font-semibold truncate ${isGst ? 'text-secondary' : 'text-amber-600 dark:text-amber-400'}`}>
-                  {isGst ? (company.gstin ? `GSTIN: ${company.gstin}` : 'GST Registered') : 'Retail Mode'}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      isGst ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-amber-500'
+                    }`}
+                  />
+                  <span className="truncate">
+                    {isGst ? (company.gstin ? `GSTIN: ${company.gstin}` : 'GST Registered') : 'Retail Mode'}
+                  </span>
                 </span>
               </div>
             </div>
@@ -76,29 +84,29 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onSearchClick}
             type="button"
-            className="hidden md:flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant text-xs cursor-pointer border border-outline-variant/20 transition-all w-64 shadow-2xs"
+            className="hidden md:flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-100/80 hover:bg-slate-100 text-slate-500 hover:text-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800 dark:text-slate-400 text-xs cursor-pointer border border-black/[0.04] dark:border-white/[0.06] transition-all w-64 shadow-2xs"
           >
-            <div className="flex items-center gap-1.5 text-on-surface-variant truncate">
+            <div className="flex items-center gap-1.5 truncate">
               <span className="material-symbols-outlined text-[16px]">search</span>
               <span className="truncate">Search bills, parties, stock...</span>
             </div>
-            <kbd className="font-mono text-[10px] bg-surface-container px-1.5 py-0.5 rounded border border-outline-variant/30 text-outline">
+            <kbd className="font-mono text-[10px] bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-black/[0.06] dark:border-white/[0.08] text-slate-500 dark:text-slate-300">
               ⌘K
             </kbd>
           </button>
         )}
 
         {/* Right: Quick Action Controls & Role Switcher */}
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {/* Mobile Search Button */}
           {onSearchClick && (
             <button
               onClick={onSearchClick}
               aria-label="Search"
-              className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+              className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all cursor-pointer border border-black/[0.03] dark:border-white/[0.05]"
               type="button"
             >
-              <span className="material-symbols-outlined text-[20px]">search</span>
+              <span className="material-symbols-outlined text-[19px]">search</span>
             </button>
           )}
 
@@ -107,18 +115,18 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onBarcodeClick}
               aria-label="POS Counter & Barcode Scanner"
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all cursor-pointer border border-black/[0.03] dark:border-white/[0.05]"
               type="button"
               title="Quick POS Counter"
             >
-              <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+              <span className="material-symbols-outlined text-[19px]">qr_code_scanner</span>
             </button>
           )}
 
           {/* + New Bill Button (Tablet/Desktop) */}
           <button
             onClick={onNewInvoice}
-            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all cursor-pointer"
             type="button"
           >
             <span className="material-symbols-outlined text-[16px]">add</span>
@@ -129,27 +137,27 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onProfileClick}
             aria-label="Switch User Role & Profile"
-            className="flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/25 transition-all cursor-pointer active:scale-95 shadow-2xs"
+            className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-slate-100/70 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-black/[0.05] dark:border-white/[0.08] transition-all cursor-pointer active:scale-95 shadow-2xs"
             type="button"
             title="Switch User Role"
           >
             <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-2xs flex-shrink-0"
-              style={{ backgroundColor: activeUser?.avatarColor || '#006c49' }}
+              className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold shadow-2xs flex-shrink-0"
+              style={{ backgroundColor: activeUser?.avatarColor || '#059669' }}
             >
               {activeUser ? activeUser.name[0].toUpperCase() : 'O'}
             </div>
 
             <div className="flex flex-col text-left hidden sm:flex min-w-0 pr-0.5">
-              <span className="text-[11px] font-bold text-on-surface leading-tight truncate">
+              <span className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight truncate">
                 {activeUser?.name || 'Owner'}
               </span>
-              <span className="text-[9px] font-semibold text-secondary uppercase leading-none">
+              <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase leading-none">
                 {activeUser?.role || 'OWNER'}
               </span>
             </div>
 
-            <span className="material-symbols-outlined text-[13px] text-outline">
+            <span className="material-symbols-outlined text-[13px] text-slate-400 dark:text-slate-500">
               expand_more
             </span>
           </button>

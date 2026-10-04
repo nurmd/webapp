@@ -39,11 +39,25 @@ class MainActivity : Activity() {
 
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
+        // Configure light status bar and navigation bar with crisp dark icons to match white app theme
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            window.statusBarColor = 0xFFFFFFFF.toInt()
+            @Suppress("DEPRECATION")
+            var flags = window.decorView.systemUiVisibility
+            flags = flags or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                window.navigationBarColor = 0xFFFFFFFF.toInt()
+                flags = flags or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            }
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = flags
+        }
+
         webView = WebView(this)
-        webView.setBackgroundColor(0xFF0A0F1D.toInt())
+        webView.setBackgroundColor(0xFFF9F9FF.toInt())
 
         val container = FrameLayout(this)
-        container.setBackgroundColor(0xFF0A0F1D.toInt())
+        container.setBackgroundColor(0xFFFFFFFF.toInt())
         container.fitsSystemWindows = true
         container.addView(webView)
         setContentView(container)
