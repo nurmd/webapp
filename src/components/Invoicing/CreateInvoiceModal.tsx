@@ -125,6 +125,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         discountPercent: l.discountPercent,
+        discountAmount: calcItem.discountAmount,
         taxableAmount: calcItem.taxableAmount,
         gstRate: l.gstRate,
         cgstAmount: calcItem.cgstAmount,

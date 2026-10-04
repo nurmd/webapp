@@ -91,6 +91,10 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
     const cgst = isIntra ? Math.round((taxable * (rate / 2) / 100) * 100) / 100 : 0;
     const sgst = isIntra ? Math.round((taxable * (rate / 2) / 100) * 100) / 100 : 0;
     const igst = !isIntra ? Math.round((taxable * rate / 100) * 100) / 100 : 0;
+    const grossTot = Math.round(it.quantity * it.unitPrice * 100) / 100;
+    const itemDisc = it.discountAmount != null
+      ? Math.round(it.discountAmount * 100) / 100
+      : Math.max(0, Math.round((grossTot - taxable) * 100) / 100);
 
     return {
       SlNo: String(idx + 1),
@@ -102,8 +106,8 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
       FreeQty: 0,
       Unit: it.unit || 'NOS',
       UnitPrice: it.unitPrice,
-      TotAmt: Math.round(it.quantity * it.unitPrice * 100) / 100,
-      Discount: 0,
+      TotAmt: grossTot,
+      Discount: itemDisc,
       PreTaxVal: taxable,
       AssAmt: taxable,
       GstRt: rate,
@@ -164,7 +168,7 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
       CesVal: Math.round(invoice.totalCess * 100) / 100,
       StCesVal: 0,
       Discount: 0,
-      OthChrg: 0,
+      OthChrg: Math.round((invoice.shippingAmount || 0) * 100) / 100,
       RndOffAmt: invoice.roundOff || 0,
       TotInvVal: Math.round(invoice.grandTotal * 100) / 100,
     },

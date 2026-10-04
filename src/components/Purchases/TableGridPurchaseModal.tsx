@@ -218,15 +218,22 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     return [];
   });
 
-  // Calculate invoice
+  // Calculate bill with proper GST on discounted taxable amounts
   const calcInputs = useMemo(() => {
-    return rows.map((r) => ({
-      quantity: Number(r.quantity) || 1,
-      unitPrice: Number(r.unitPrice) || 0,
-      discountPercent: Number(r.discountPercent) || 0,
-      gstRate: isGstActive ? Number(r.gstRate) || 0 : 0,
-    }));
-  }, [rows, isGstActive]);
+    return rows.map((r) => {
+      const itemDisc = Number(r.discountPercent) || 0;
+      const combinedDisc = overallDiscountPercent > 0
+        ? Number((100 * (1 - (1 - itemDisc / 100) * (1 - overallDiscountPercent / 100))).toFixed(4))
+        : itemDisc;
+
+      return {
+        quantity: Number(r.quantity) || 1,
+        unitPrice: Number(r.unitPrice) || 0,
+        discountPercent: combinedDisc,
+        gstRate: isGstActive ? Number(r.gstRate) || 0 : 0,
+      };
+    });
+  }, [rows, isGstActive, overallDiscountPercent]);
 
   const calcSummary = useMemo(() => {
     return calculateInvoice(company.stateCode, supplierStateCode, calcInputs);
@@ -234,12 +241,23 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   const overallDiscountAmount = useMemo(() => {
     if (overallDiscountPercent <= 0) return 0;
-    return Number(((calcSummary.totalTaxableAmount * overallDiscountPercent) / 100).toFixed(2));
-  }, [calcSummary.totalTaxableAmount, overallDiscountPercent]);
+    const rawTaxable = rows.reduce((sum, r) => {
+      const gross = (Number(r.quantity) || 1) * (Number(r.unitPrice) || 0);
+      const itemDisc = (gross * (Number(r.discountPercent) || 0)) / 100;
+      return sum + (gross - itemDisc);
+    }, 0);
+    return Number(((rawTaxable * overallDiscountPercent) / 100).toFixed(2));
+  }, [rows, overallDiscountPercent]);
 
   const finalGrandTotal = useMemo(() => {
-    return Math.max(0, Math.round(calcSummary.grandTotal - overallDiscountAmount + (Number(shippingAmount) || 0)));
-  }, [calcSummary.grandTotal, overallDiscountAmount, shippingAmount]);
+    const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
+    return Math.max(0, Math.round(preRound));
+  }, [calcSummary.netAmount, shippingAmount]);
+
+  const finalRoundOff = useMemo(() => {
+    const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
+    return Number((finalGrandTotal - preRound).toFixed(2));
+  }, [calcSummary.netAmount, shippingAmount, finalGrandTotal]);
 
   // Payment splits state
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
@@ -475,6 +493,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         quantity: r.quantity,
         unitPrice: r.unitPrice,
         discountPercent: r.discountPercent,
+        discountAmount: calcItem?.discountAmount || 0,
         taxableAmount: calcItem?.taxableAmount || r.quantity * r.unitPrice,
         gstRate: isGstActive ? r.gstRate || 0 : 0,
         cgstAmount: isGstActive ? calcItem?.cgstAmount || 0 : 0,
@@ -501,14 +520,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       itcEligibility,
       isRcm: false,
       totalGrossAmount: calcSummary.totalGrossAmount,
-      totalDiscount: calcSummary.totalDiscount + overallDiscountAmount,
-      totalTaxableAmount: Math.max(0, calcSummary.totalTaxableAmount - overallDiscountAmount),
+      totalDiscount: calcSummary.totalDiscount,
+      totalTaxableAmount: calcSummary.totalTaxableAmount,
       totalCgst: isGstActive ? calcSummary.totalCgst : 0,
       totalSgst: isGstActive ? calcSummary.totalSgst : 0,
       totalIgst: isGstActive ? calcSummary.totalIgst : 0,
       totalCess: 0,
       totalTax: isGstActive ? calcSummary.totalTax : 0,
-      roundOff: calcSummary.roundOff,
+      roundOff: finalRoundOff,
       shippingAmount: Number(shippingAmount) || 0,
       grandTotal: finalGrandTotal,
       paidAmount: totalPaid,

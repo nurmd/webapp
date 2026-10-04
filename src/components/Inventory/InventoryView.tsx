@@ -279,8 +279,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   );
   const hasTxnDiscrepancy =
     activeItemDetail !== null &&
+    itemTxnSummary.totalPurchasedQty > 0 &&
     itemTxnSummary.totalTransactions > 0 &&
-    activeItemDetail.currentStock !== netTxnStock;
+    activeItemDetail.currentStock > netTxnStock;
 
   const handleReconcileItemStock = (item: InventoryItem, targetStock: number) => {
     const updated: InventoryItem = {
@@ -330,9 +331,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         }
       }
 
-      if (txnCount === 0) return false;
+      if (txnCount === 0 || totalPurchased === 0) return false;
       const netStock = Math.max(0, totalPurchased + totalAdjusted - totalSold);
-      return item.currentStock !== netStock;
+      return item.currentStock > netStock;
     });
   }, [items, allInvoices, allPurchases, allAdjustments]);
 

@@ -6,6 +6,7 @@ import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
+import { createPaymentReceiptVoucher } from '../../core/accounting/ledger.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface SalesHubViewProps {
@@ -72,6 +73,19 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       paymentStatus: newBal === 0 ? 'PAID' : 'PARTIAL',
       updatedAt: new Date().toISOString(),
     };
+
+    const docId = Date.now().toString().slice(-6);
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: `RCPT-${docId}`,
+      date: new Date().toISOString().split('T')[0],
+      customerName: paymentModalInvoice.partyName,
+      customerId: paymentModalInvoice.partyId || 'ACC_CASH',
+      amount: paymentAmount,
+      paymentMode: paymentModalInvoice.paymentMode === 'CREDIT' ? 'CASH' : (paymentModalInvoice.paymentMode || 'CASH'),
+      referenceNo: paymentModalInvoice.invoiceNumber,
+      narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}`,
+    });
+    db.saveVoucher(voucher);
 
     db.saveInvoice(updated);
     setPaymentModalInvoice(null);

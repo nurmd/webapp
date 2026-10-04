@@ -15,6 +15,7 @@ export interface PurchaseItemEntry {
   quantity: number;
   unitPrice: number;
   discountPercent?: number;
+  discountAmount?: number;
   taxableAmount: number;
   gstRate: number;
   cgstAmount: number;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
@@ -29,7 +29,21 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('ALL');
   const [search, setSearch] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('102024');
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = String(d.getFullYear());
+    return `${mm}${yyyy}`;
+  });
+
+  // Item purchase price lookup for COGS
+  const itemCostMap = useMemo(() => {
+    const map = new Map<string, number>();
+    items.forEach((it) => {
+      map.set(it.id, it.purchasePrice || 0);
+    });
+    return map;
+  }, [items]);
 
   // Aggregates
   const grossSales = invoices.reduce((s, i) => s + i.grandTotal, 0);
@@ -37,6 +51,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const totalOutputGst = invoices.reduce((s, i) => s + i.totalTax, 0);
 
   const grossPurchases = purchases.reduce((s, p) => s + p.grandTotal, 0);
+  const totalPurchasesTaxable = purchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
   const totalItcFromPurchases = purchases.reduce((s, p) => s + p.totalTax, 0);
 
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
@@ -46,8 +61,22 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const netGstPayableInCash = Math.max(0, totalOutputGst - totalAvailableItc);
 
   const totalStockValuation = items.reduce((s, i) => s + (i.currentStock * i.purchasePrice), 0);
-  const netProfit = grossSales - grossPurchases - totalExpenses;
-  const profitMargin = grossSales > 0 ? (netProfit / grossSales) * 100 : 0;
+
+  // Cost of Goods Sold (COGS)
+  const totalCogs = useMemo(() => {
+    return invoices.reduce((sum, inv) => {
+      const invCost = inv.items.reduce((iSum, line) => {
+        const pPrice = (line.itemId ? itemCostMap.get(line.itemId) : 0) || 0;
+        return iSum + (line.quantity * pPrice);
+      }, 0);
+      return sum + invCost;
+    }, 0);
+  }, [invoices, itemCostMap]);
+
+  // Commercial Net Profit: Net Taxable Sales - COGS (or Purchases) - Operating Expenses
+  const effectiveCostOfSales = totalCogs > 0 ? totalCogs : totalPurchasesTaxable;
+  const netProfit = totalSalesTaxable - effectiveCostOfSales - totalExpenses;
+  const profitMargin = totalSalesTaxable > 0 ? (netProfit / totalSalesTaxable) * 100 : 0;
 
   const handleDownloadGstr1 = () => {
     downloadGstr1JsonFile(company, invoices, selectedPeriod);

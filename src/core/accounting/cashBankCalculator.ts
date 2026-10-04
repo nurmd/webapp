@@ -51,73 +51,130 @@ export function computeCashBankSummary(params: {
   let todayInflow = 0;
   let todayOutflow = 0;
 
-  // 2. Process Sales Invoices (Inflow)
+  // 2. Process Sales Invoices (Inflow from upfront payments without vouchers)
+  // Calculate total voucher receipts per party so we only count unvouchered upfront invoice payments
+  const partyVoucherReceipts: Record<string, number> = {};
+  vouchers.forEach((v) => {
+    if (v.voucherType === 'RECEIPT') {
+      v.entries.forEach((e) => {
+        if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
+          const key = e.accountId.toLowerCase();
+          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + v.totalAmount;
+        } else if (e.accountName) {
+          const key = e.accountName.trim().toLowerCase();
+          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + v.totalAmount;
+        }
+      });
+    }
+  });
+
+  // Track remaining voucher credit per party to offset against invoice paidAmount
+  const remainingVoucherCredit = { ...partyVoucherReceipts };
+
   invoices.forEach((inv) => {
     const paid = typeof inv.paidAmount === 'number'
       ? inv.paidAmount
       : (inv.paymentStatus === 'PAID' ? inv.grandTotal : 0);
 
     if (paid > 0 && inv.paymentMode !== 'CREDIT') {
-      const isCash = inv.paymentMode === 'CASH';
-      const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-      const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
-
-      balances[targetAccId] = (balances[targetAccId] || 0) + paid;
-
-      const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
-      if (dateStr === todayStr) {
-        todayInflow += paid;
+      const partyKey = (inv.partyId || inv.partyName || '').trim().toLowerCase();
+      const availCredit = remainingVoucherCredit[partyKey] || 0;
+      // Amount covered by vouchers is handled by section 5 (vouchers), only take unvouchered upfront amount here
+      const coveredByVoucher = Math.min(paid, availCredit);
+      const unvoucheredPaid = paid - coveredByVoucher;
+      if (partyKey && coveredByVoucher > 0) {
+        remainingVoucherCredit[partyKey] -= coveredByVoucher;
       }
 
-      entries.push({
-        id: `LEDGER-SALE-${inv.id}`,
-        date: dateStr,
-        type: 'SALE',
-        category: isCash ? 'CASH' : 'BANK',
-        accountId: targetAccId,
-        accountName: targetAccName,
-        counterpartyOrTitle: inv.partyName || 'Retail Customer',
-        referenceNo: inv.invoiceNumber,
-        mode: inv.paymentMode || (isCash ? 'CASH' : 'UPI'),
-        flow: 'IN',
-        amount: paid,
-        description: `Sale Receipt #${inv.invoiceNumber}`,
+      if (unvoucheredPaid > 0) {
+        const isCash = inv.paymentMode === 'CASH';
+        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+        balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
+
+        const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
+        if (dateStr === todayStr) {
+          todayInflow += unvoucheredPaid;
+        }
+
+        entries.push({
+          id: `LEDGER-SALE-${inv.id}`,
+          date: dateStr,
+          type: 'SALE',
+          category: isCash ? 'CASH' : 'BANK',
+          accountId: targetAccId,
+          accountName: targetAccName,
+          counterpartyOrTitle: inv.partyName || 'Retail Customer',
+          referenceNo: inv.invoiceNumber,
+          mode: inv.paymentMode || (isCash ? 'CASH' : 'UPI'),
+          flow: 'IN',
+          amount: unvoucheredPaid,
+          description: `Sale Receipt #${inv.invoiceNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+        });
+      }
+    }
+  });
+
+  // 3. Process Purchases (Outflow from upfront payments without vouchers)
+  const supplierVoucherPayments: Record<string, number> = {};
+  vouchers.forEach((v) => {
+    if (v.voucherType === 'PAYMENT') {
+      v.entries.forEach((e) => {
+        if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
+          const key = e.accountId.toLowerCase();
+          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + v.totalAmount;
+        } else if (e.accountName) {
+          const key = e.accountName.trim().toLowerCase();
+          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + v.totalAmount;
+        }
       });
     }
   });
 
-  // 3. Process Purchases (Outflow)
+  const remainingVoucherDebit = { ...supplierVoucherPayments };
+
   purchases.forEach((pur) => {
     const paid = typeof pur.paidAmount === 'number'
       ? pur.paidAmount
       : (pur.paymentStatus === 'PAID' ? pur.grandTotal : 0);
 
     if (paid > 0 && pur.paymentMode !== 'CREDIT') {
-      const isCash = pur.paymentMode === 'CASH';
-      const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-      const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
-
-      balances[targetAccId] = (balances[targetAccId] || 0) - paid;
-
-      const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
-      if (dateStr === todayStr) {
-        todayOutflow += paid;
+      const supKey = (pur.supplierId || pur.supplierName || '').trim().toLowerCase();
+      const availDebit = remainingVoucherDebit[supKey] || 0;
+      const coveredByVoucher = Math.min(paid, availDebit);
+      const unvoucheredPaid = paid - coveredByVoucher;
+      if (supKey && coveredByVoucher > 0) {
+        remainingVoucherDebit[supKey] -= coveredByVoucher;
       }
 
-      entries.push({
-        id: `LEDGER-PUR-${pur.id}`,
-        date: dateStr,
-        type: 'PURCHASE',
-        category: isCash ? 'CASH' : 'BANK',
-        accountId: targetAccId,
-        accountName: targetAccName,
-        counterpartyOrTitle: pur.supplierName || 'Vendor Payment',
-        referenceNo: pur.billNumber,
-        mode: pur.paymentMode || (isCash ? 'CASH' : 'NET_BANKING'),
-        flow: 'OUT',
-        amount: paid,
-        description: `Purchase Payment #${pur.billNumber}`,
-      });
+      if (unvoucheredPaid > 0) {
+        const isCash = pur.paymentMode === 'CASH';
+        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+        balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
+
+        const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
+        if (dateStr === todayStr) {
+          todayOutflow += unvoucheredPaid;
+        }
+
+        entries.push({
+          id: `LEDGER-PUR-${pur.id}`,
+          date: dateStr,
+          type: 'PURCHASE',
+          category: isCash ? 'CASH' : 'BANK',
+          accountId: targetAccId,
+          accountName: targetAccName,
+          counterpartyOrTitle: pur.supplierName || 'Vendor Payment',
+          referenceNo: pur.billNumber,
+          mode: pur.paymentMode || (isCash ? 'CASH' : 'NET_BANKING'),
+          flow: 'OUT',
+          amount: unvoucheredPaid,
+          description: `Purchase Payment #${pur.billNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+        });
+      }
     }
   });
 

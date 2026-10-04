@@ -60,8 +60,24 @@ export interface Gstr1JsonPayload {
 }
 
 export function generateGstr1Json(company: CompanyProfile, invoices: Invoice[], returnPeriodMMYYYY: string): Gstr1JsonPayload {
-  const b2bInvoices = invoices.filter((i) => i.invoiceType === 'B2B' && i.partyGstin);
-  const b2csInvoices = invoices.filter((i) => i.invoiceType === 'B2CS' || (!i.partyGstin && i.invoiceType !== 'B2B'));
+  const targetMonth = returnPeriodMMYYYY && returnPeriodMMYYYY.length === 6 ? returnPeriodMMYYYY.substring(0, 2) : '';
+  const targetYear = returnPeriodMMYYYY && returnPeriodMMYYYY.length === 6 ? returnPeriodMMYYYY.substring(2) : '';
+
+  const periodInvoices = invoices.filter((inv) => {
+    if (!targetMonth || !targetYear) return true;
+    const dStr = (inv.date || '').split('T')[0];
+    if (!dStr) return true;
+    const parts = dStr.split('-');
+    if (parts.length >= 2) {
+      const y = parts[0];
+      const m = parts[1].padStart(2, '0');
+      return y === targetYear && m === targetMonth;
+    }
+    return true;
+  });
+
+  const b2bInvoices = periodInvoices.filter((i) => i.invoiceType === 'B2B' && i.partyGstin);
+  const b2csInvoices = periodInvoices.filter((i) => i.invoiceType === 'B2CS' || (!i.partyGstin && i.invoiceType !== 'B2B'));
 
   // Group B2B by Recipient GSTIN
   const b2bGrouped: Record<string, any[]> = {};
@@ -83,9 +99,10 @@ export function generateGstr1Json(company: CompanyProfile, invoices: Invoice[], 
       },
     }));
 
-    // Convert date YYYY-MM-DD to DD-MM-YYYY
-    const [y, m, d] = inv.date.split('-');
-    const formattedDate = `${d}-${m}-${y}`;
+    // Convert date YYYY-MM-DD to DD-MM-YYYY safely
+    const cleanDate = (inv.date || '').split('T')[0];
+    const [y, m, d] = cleanDate.split('-');
+    const formattedDate = (d && m && y) ? `${d.padStart(2, '0')}-${m.padStart(2, '0')}-${y}` : cleanDate;
 
     b2bGrouped[ctin].push({
       inum: inv.invoiceNumber,
@@ -143,7 +160,7 @@ export function generateGstr1Json(company: CompanyProfile, invoices: Invoice[], 
 
   // HSN Summary
   const hsnMap: Record<string, { desc: string; uqc: string; qty: number; val: number; txval: number; iamt: number; camt: number; samt: number; csamt: number }> = {};
-  invoices.forEach((inv) => {
+  periodInvoices.forEach((inv) => {
     inv.items.forEach((item) => {
       const hsn = item.hsnSacCode || '999999';
       if (!hsnMap[hsn]) {
@@ -183,7 +200,7 @@ export function generateGstr1Json(company: CompanyProfile, invoices: Invoice[], 
     csamt: Math.round(hsnMap[hsn].csamt * 100) / 100,
   }));
 
-  const totalGrossTurnover = invoices.reduce((s, i) => s + i.grandTotal, 0);
+  const totalGrossTurnover = periodInvoices.reduce((s, i) => s + i.grandTotal, 0);
 
   return {
     gstin: company.gstin,
