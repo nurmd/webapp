@@ -230,7 +230,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveInvoice = (newInvoice: Invoice) => {
+  const handleSaveInvoice = (newInvoice: Invoice, options?: { openPreview?: boolean }) => {
     // Enforce uniqueness of invoice number under GST compliance
     const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, invoices);
     if (conflict) {
@@ -269,7 +269,9 @@ export const App: React.FC = () => {
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
     setEditingInvoice(null);
-    setPreviewInvoice(newInvoice);
+    if (options?.openPreview !== false) {
+      setPreviewInvoice(newInvoice);
+    }
   };
 
   const handleEditInvoice = (inv: Invoice) => {
@@ -607,7 +609,9 @@ export const App: React.FC = () => {
           <QuickBillingView
             company={company}
             items={activeItems}
-            onCompleteSale={handleSaveInvoice}
+            parties={parties}
+            onCompleteSale={(inv) => handleSaveInvoice(inv, { openPreview: false })}
+            onViewInvoice={setPreviewInvoice}
           />
         )}
 
