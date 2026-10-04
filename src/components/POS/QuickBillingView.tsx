@@ -183,9 +183,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[calc(100vh-64px)] pb-24 lg:pb-0 bg-surface">
+    <div className="flex flex-col md:grid md:grid-cols-12 min-h-[calc(100vh-64px)] pb-24 md:pb-0 bg-surface">
       {/* Catalog & Quick Shelf Section */}
-      <div className="lg:col-span-7 flex flex-col p-3 sm:p-4 border-r border-outline-variant/30 gap-2.5 overflow-y-auto">
+      <div className="md:col-span-7 flex flex-col p-3 sm:p-4 border-r border-outline-variant/30 gap-2.5 overflow-y-auto">
         {/* Operational Mode Mini Ticker (Stitch pos_billing_counter) */}
         <div className="flex items-center justify-between text-on-surface-variant font-label-sm text-[11px] bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 shadow-sm">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -316,8 +316,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         </div>
       </div>
 
-      {/* Desktop Right Pane: Cart & Checkout (Visible on lg+) */}
-      <div className="hidden lg:flex lg:col-span-5 bg-surface-container-low flex-col h-full border-t lg:border-t-0">
+      {/* Desktop/Tablet Right Pane: Cart & Checkout (Visible on md+) */}
+      <div className="hidden md:flex md:col-span-5 bg-surface-container-low flex-col h-full border-t md:border-t-0">
         <div className="p-3.5 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-lowest">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary text-[22px]">shopping_cart</span>
@@ -441,7 +441,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
       {/* Mobile Floating Cart Bar (Sticky when cart has items) */}
       {cart.length > 0 && !isMobileCartDrawerOpen && (
-        <div className="lg:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-3 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
+        <div className="md:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-3 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-bold text-sm shadow-sm">
               {totalCartCount}
@@ -467,7 +467,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
       {/* Mobile Cart & Checkout Drawer Modal */}
       {isMobileCartDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
           <div className="bg-surface-container-lowest rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border-t border-outline-variant/30">
             {/* Drawer Header */}
             <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between">

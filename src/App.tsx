@@ -18,6 +18,7 @@ import {
 import { Header } from './components/Shell/Header.tsx';
 import { Drawer, AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
+import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
 
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
 import { SalesHubView } from './components/Sales/SalesHubView.tsx';
@@ -537,36 +538,54 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased flex flex-col selection:bg-secondary-fixed selection:text-on-secondary-fixed">
-      {/* Top App Header */}
-      <Header
-        company={company}
-        activeUser={activeUser}
-        onOpenDrawer={() => setIsDrawerOpen(true)}
-        onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
-        onSearchClick={() => handleSelectTab('menu')}
-        onBarcodeClick={() => handleSelectTab('pos')}
-        onProfileClick={() => setIsRoleSwitchOpen(true)}
-        hasUpdate={hasUpdate}
-      />
-
-      {/* Slide-out Navigation Drawer */}
-      <Drawer
-        isOpen={isDrawerOpen}
+    <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased flex flex-row selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+      {/* Tablet / Desktop Persistent Sidebar Navigation */}
+      <TabletSidebar
         activeTab={activeTab}
         company={company}
         activeUser={activeUser}
-        onClose={() => setIsDrawerOpen(false)}
         onSelectTab={handleSelectTab}
+        onNewInvoice={() => {
+          setEditingInvoice(null);
+          setIsTableGridInvoiceOpen(true);
+        }}
         onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
         onCheckUpdate={() => handleCheckUpdate(true)}
         hasUpdate={hasUpdate}
         latestVersion={latestRelease?.version}
-        isCheckingUpdate={isCheckingUpdate}
       />
 
-      {/* Main Scrollable View Area with safe-area padding */}
-      <main className="flex-1 w-full pb-24">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Top App Header */}
+        <Header
+          company={company}
+          activeUser={activeUser}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
+          onSearchClick={() => handleSelectTab('menu')}
+          onBarcodeClick={() => handleSelectTab('pos')}
+          onProfileClick={() => setIsRoleSwitchOpen(true)}
+          hasUpdate={hasUpdate}
+        />
+
+        {/* Slide-out Navigation Drawer (Mobile) */}
+        <Drawer
+          isOpen={isDrawerOpen}
+          activeTab={activeTab}
+          company={company}
+          activeUser={activeUser}
+          onClose={() => setIsDrawerOpen(false)}
+          onSelectTab={handleSelectTab}
+          onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
+          onCheckUpdate={() => handleCheckUpdate(true)}
+          hasUpdate={hasUpdate}
+          latestVersion={latestRelease?.version}
+          isCheckingUpdate={isCheckingUpdate}
+        />
+
+        {/* Main Scrollable View Area with safe-area padding */}
+        <main className="flex-1 w-full pb-24 md:pb-8">
         {activeTab === 'dashboard' && (
           <DashboardView
             company={company}
@@ -722,6 +741,7 @@ export const App: React.FC = () => {
           />
         )}
       </main>
+      </div>
 
       {/* Modern Touch Bottom Navigation */}
       <BottomNav

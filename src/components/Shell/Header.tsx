@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenDrawer}
             aria-label="Open Navigation Drawer"
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-all flex-shrink-0 cursor-pointer relative active:scale-95"
+            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-on-surface hover:bg-surface-container active:bg-surface-container-high transition-all flex-shrink-0 cursor-pointer relative active:scale-95"
             type="button"
           >
             <span className="material-symbols-outlined text-[22px]">menu</span>

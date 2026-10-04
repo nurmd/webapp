@@ -37,264 +37,57 @@ export interface SyncedSettings {
   updatedAt: string;
 }
 
-// Initial Seed Data for immediate testing & demonstration
+// Clean Initial Seed Data for Production Use
 const DEFAULT_COMPANY: CompanyProfile = {
   id: 'COMP-001',
-  businessName: 'Bharat Infotech Solutions',
-  tradeName: 'Bharat Infotech',
-  gstin: '27AABCU9603R1ZN', // Maharashtra Valid GSTIN
-  pan: 'AABCU9603R',
+  businessName: 'My Store',
+  tradeName: 'My Store',
+  gstin: '',
+  pan: '',
   stateCode: '27',
-  address: 'Shop No. 12, Tech Park, Shivaji Nagar, Pune',
-  pincode: '411005',
-  phone: '+91 9876543210',
-  email: 'accounts@bharatinfotech.in',
-  website: 'https://bharatinfotech.in',
-  bankName: 'State Bank of India',
-  accountNumber: '32109876543',
-  ifscCode: 'SBIN0001234',
-  branchName: 'Shivaji Nagar Pune',
-  upiId: 'bharatinfotech@sbi',
-  termsAndConditions: '1. Goods once sold will not be taken back.\n2. Interest @ 18% p.a. will be charged after due date.\n3. Subject to Pune jurisdiction.',
-  invoicePrefix: 'INV-2627-',
+  address: '',
+  pincode: '',
+  phone: '',
+  email: '',
+  website: '',
+  bankName: '',
+  accountNumber: '',
+  ifscCode: '',
+  branchName: '',
+  upiId: '',
+  termsAndConditions: '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction.',
+  invoicePrefix: 'INV-',
   isGstEnabled: true,
 };
 
-const DEFAULT_PARTIES: Party[] = [
-  {
-    id: 'PTY-101',
-    name: 'Sharma Electronics & Hardware',
-    type: 'CUSTOMER',
-    phone: '9822012345',
-    email: 'sharma.store@example.com',
-    gstin: '27AAACS1429B1ZV',
-    pan: 'AAACS1429B',
-    stateCode: '27',
-    billingAddress: 'Main Market, Station Road, Thane, Maharashtra',
-    currentBalance: 14500,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'PTY-102',
-    name: 'Gujarat Apex Traders (Interstate)',
-    type: 'CUSTOMER',
-    phone: '9898011223',
-    email: 'apextraders.ahd@example.com',
-    gstin: '24AAACA1111A1ZY',
-    pan: 'AAACA1111A',
-    stateCode: '24', // Gujarat
-    billingAddress: 'GIDC Industrial Estate, Vatva, Ahmedabad, Gujarat',
-    currentBalance: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'PTY-103',
-    name: 'Direct Retail Customer (Cash)',
-    type: 'CUSTOMER',
-    phone: '9999999999',
-    stateCode: '27',
-    billingAddress: 'Local Counter, Pune',
-    currentBalance: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const DEFAULT_PARTIES: Party[] = [];
 
-const DEFAULT_ITEMS: InventoryItem[] = [
-  {
-    id: 'ITM-001',
-    name: 'Thermal Receipt Printer 80mm USB+BT',
-    sku: 'PRN-80-BT',
-    barcode: '8901234567890',
-    hsnSacCode: '844332',
-    category: 'Hardware',
-    unit: 'PCS',
-    salePrice: 3800,
-    purchasePrice: 2800,
-    gstRate: 18,
-    currentStock: 25,
-    minStockAlert: 5,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'ITM-002',
-    name: 'Wireless 2D Barcode Scanner',
-    sku: 'SCN-2D-WIFI',
-    barcode: '8901234567891',
-    hsnSacCode: '847130',
-    category: 'Hardware',
-    unit: 'PCS',
-    salePrice: 1950,
-    purchasePrice: 1350,
-    gstRate: 18,
-    currentStock: 40,
-    minStockAlert: 8,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'ITM-003',
-    name: 'Billing Thermal Paper Roll (79mm x 50m)',
-    sku: 'PPR-TH-80',
-    barcode: '8901234567892',
-    hsnSacCode: '4802',
-    category: 'Consumables',
-    unit: 'BOX',
-    salePrice: 850,
-    purchasePrice: 620,
-    gstRate: 12,
-    currentStock: 120,
-    minStockAlert: 20,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'ITM-004',
-    name: 'Annual Software Maintenance Service',
-    sku: 'SRV-AMC-YR',
-    hsnSacCode: '998313',
-    category: 'Services',
-    unit: 'NOS',
-    salePrice: 5000,
-    purchasePrice: 0,
-    gstRate: 18,
-    currentStock: 999,
-    minStockAlert: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const DEFAULT_ITEMS: InventoryItem[] = [];
 
-export const DEFAULT_INVOICES: Invoice[] = [
-  {
-    id: 'INV-SAMPLE-001',
-    invoiceNumber: 'INV-2024-001',
-    invoiceType: 'B2B',
-    date: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
-    partyId: 'PTY-101',
-    partyName: 'National Hardware & Electronics Ltd',
-    partyGstin: '27AAACS1429B1ZV',
-    partyAddress: 'Plot 42, MIDC Phase II, Hinjewadi, Pune, Maharashtra - 411057',
-    partyStateCode: '27',
-    placeOfSupplyStateCode: '27',
-    isIntraState: true,
-    items: [
-      {
-        itemId: 'ITM-001',
-        name: 'Thermal Receipt Printer 80mm USB+BT',
-        hsnSacCode: '844332',
-        unit: 'PCS',
-        quantity: 2,
-        unitPrice: 3800,
-        discountPercent: 5,
-        taxableAmount: 7220,
-        gstRate: 18,
-        cgstAmount: 649.8,
-        sgstAmount: 649.8,
-        igstAmount: 0,
-        cessAmount: 0,
-        totalAmount: 8519.6,
-      },
-      {
-        itemId: 'ITM-002',
-        name: 'Wireless 2D Barcode Scanner',
-        hsnSacCode: '847130',
-        unit: 'PCS',
-        quantity: 1,
-        unitPrice: 1950,
-        discountPercent: 0,
-        taxableAmount: 1950,
-        gstRate: 18,
-        cgstAmount: 175.5,
-        sgstAmount: 175.5,
-        igstAmount: 0,
-        cessAmount: 0,
-        totalAmount: 2301,
-      },
-      {
-        itemId: 'ITM-003',
-        name: 'Billing Thermal Paper Roll (79mm x 50m)',
-        hsnSacCode: '4802',
-        unit: 'BOX',
-        quantity: 4,
-        unitPrice: 850,
-        discountPercent: 0,
-        taxableAmount: 3400,
-        gstRate: 12,
-        cgstAmount: 204,
-        sgstAmount: 204,
-        igstAmount: 0,
-        cessAmount: 0,
-        totalAmount: 3808,
-      },
-    ],
-    totalGrossAmount: 12950,
-    totalDiscount: 380,
-    totalTaxableAmount: 12570,
-    totalCgst: 1029.3,
-    totalSgst: 1029.3,
-    totalIgst: 0,
-    totalCess: 0,
-    totalTax: 2058.6,
-    roundOff: 0.4,
-    grandTotal: 14629,
-    amountInWords: 'Rupees Fourteen Thousand Six Hundred Twenty Nine Only',
-    paymentMode: 'UPI',
-    paymentStatus: 'PAID',
-    paidAmount: 14629,
-    balanceAmount: 0,
-    notes: 'Goods once sold cannot be returned without original receipt.',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+export const DEFAULT_INVOICES: Invoice[] = [];
 
 export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
   {
     id: 'ACC_CASH',
     accountName: 'Cash in Hand',
     accountType: 'CASH',
-    openingBalance: 15000,
+    openingBalance: 0,
     openingBalanceDate: new Date().toISOString().split('T')[0],
     isDefault: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
-  {
-    id: 'ACC_BANK_SBI',
-    accountName: 'State Bank of India (Current A/C)',
-    accountType: 'BANK',
-    bankName: 'State Bank of India',
-    accountNumber: '32109876543',
-    ifscCode: 'SBIN0001234',
-    branchName: 'Shivaji Nagar Pune',
-    upiId: 'bharatinfotech@sbi',
-    openingBalance: 65000,
-    openingBalanceDate: new Date().toISOString().split('T')[0],
-    isDefault: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
 ];
 
-export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [
-  {
-    id: 'TXN-INIT-001',
-    txnNumber: 'CONTRA-001',
-    date: new Date().toISOString().split('T')[0],
-    type: 'DEPOSIT',
-    fromAccountId: 'ACC_CASH',
-    toAccountId: 'ACC_BANK_SBI',
-    amount: 5000,
-    referenceNo: 'DEP-88219',
-    description: 'Initial Counter Cash Deposited to SBI',
-    createdAt: new Date().toISOString(),
-  },
-];
+export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [];
+
+const DEMO_PARTY_IDS = new Set(['PTY-101', 'PTY-102', 'PTY-103']);
+const DEMO_ITEM_IDS = new Set(['ITM-001', 'ITM-002', 'ITM-003', 'ITM-004']);
+const DEMO_INVOICE_IDS = new Set(['INV-SAMPLE-001']);
+const DEMO_PURCHASE_IDS = new Set(['PUR-001']);
+const DEMO_EXPENSE_IDS = new Set(['EXP-001', 'EXP-002', 'EXP-003', 'EXP-004']);
+const DEMO_BANK_IDS = new Set(['ACC_BANK_SBI']);
+const DEMO_TXN_IDS = new Set(['TXN-INIT-001']);
 
 /**
  * Offline-first Data Access and Multi-Device Synchronization Engine.
@@ -313,6 +106,9 @@ class StorageService {
   private broadcastChannel: BroadcastChannel | null = null;
 
   constructor() {
+    // Purge any legacy sample/demo data to guarantee clean production state
+    this.purgeDemoData();
+
     // Cross-tab / cross-window multi-device real-time sync channel
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
@@ -703,6 +499,69 @@ class StorageService {
     this.notifyListeners();
   }
 
+  private purgeDemoData(): void {
+    try {
+      if (typeof window === 'undefined') return;
+      const PURGE_KEY = 'gst_demo_purged_v1017';
+      if (localStorage.getItem(PURGE_KEY)) return;
+
+      // 1. Company
+      const comp = this.getCompany();
+      if (comp && (comp.businessName === 'Apex Technologies Private Limited' || comp.gstin === '27AABCT3518Q1ZS')) {
+        this.set(STORAGE_KEYS.COMPANY, DEFAULT_COMPANY);
+        pouch.putDoc('company', { ...DEFAULT_COMPANY, id: 'company_profile' });
+      }
+
+      // 2. Parties
+      const parties = this.getParties().filter((p) => !DEMO_PARTY_IDS.has(p.id));
+      this.set(STORAGE_KEYS.PARTIES, parties);
+      DEMO_PARTY_IDS.forEach((id) => pouch.deleteDoc('party', id));
+
+      // 3. Items
+      const items = this.getItems().filter((i) => !DEMO_ITEM_IDS.has(i.id));
+      this.set(STORAGE_KEYS.ITEMS, items);
+      DEMO_ITEM_IDS.forEach((id) => pouch.deleteDoc('item', id));
+
+      // 4. Invoices
+      const invoices = this.getInvoices().filter((i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-'));
+      this.set(STORAGE_KEYS.INVOICES, invoices);
+      DEMO_INVOICE_IDS.forEach((id) => pouch.deleteDoc('invoice', id));
+
+      // 5. Purchases
+      const purchases = this.getPurchases().filter((p) => !DEMO_PURCHASE_IDS.has(p.id));
+      this.set(STORAGE_KEYS.PURCHASES, purchases);
+      DEMO_PURCHASE_IDS.forEach((id) => pouch.deleteDoc('purchase', id));
+
+      // 6. Expenses
+      const expenses = this.getExpenses().filter((e) => !DEMO_EXPENSE_IDS.has(e.id));
+      this.set(STORAGE_KEYS.EXPENSES, expenses);
+      DEMO_EXPENSE_IDS.forEach((id) => pouch.deleteDoc('expense', id));
+
+      // 7. Bank Accounts
+      let bankAccounts = this.getBankAccounts().filter((b) => !DEMO_BANK_IDS.has(b.id));
+      bankAccounts = bankAccounts.map((b) => {
+        if (b.id === 'ACC_CASH' && b.openingBalance === 15000) {
+          return { ...b, openingBalance: 0 };
+        }
+        return b;
+      });
+      if (bankAccounts.length === 0) {
+        bankAccounts = DEFAULT_BANK_ACCOUNTS;
+      }
+      this.set(STORAGE_KEYS.BANK_ACCOUNTS, bankAccounts);
+      DEMO_BANK_IDS.forEach((id) => pouch.deleteDoc('bank_account', id));
+
+      // 8. Cash Bank Txns
+      const txns = this.getCashBankTransactions().filter((t) => !DEMO_TXN_IDS.has(t.id));
+      this.set(STORAGE_KEYS.CASH_BANK_TXNS, txns);
+      DEMO_TXN_IDS.forEach((id) => pouch.deleteDoc('cash_bank_txn', id));
+
+      localStorage.setItem(PURGE_KEY, 'true');
+    } catch (e) {
+      console.warn('Error purging demo data:', e);
+    }
+  }
+
   public async syncAllFromPouch(): Promise<void> {
     try {
       const [
@@ -740,16 +599,47 @@ class StorageService {
         }
       }
 
-      if (remoteCompany.length > 0) this.set(STORAGE_KEYS.COMPANY, remoteCompany[0]);
-      if (remoteInvoices.length > 0) this.set(STORAGE_KEYS.INVOICES, remoteInvoices);
-      if (remotePurchases.length > 0) this.set(STORAGE_KEYS.PURCHASES, remotePurchases);
-      if (remoteParties.length > 0) this.set(STORAGE_KEYS.PARTIES, remoteParties);
-      if (remoteItems.length > 0) this.set(STORAGE_KEYS.ITEMS, remoteItems);
-      if (remoteExpenses.length > 0) this.set(STORAGE_KEYS.EXPENSES, remoteExpenses);
+      if (remoteCompany.length > 0) {
+        const comp = remoteCompany[0];
+        if (comp.businessName !== 'Apex Technologies Private Limited' && comp.gstin !== '27AABCT3518Q1ZS') {
+          this.set(STORAGE_KEYS.COMPANY, comp);
+        }
+      }
+      if (remoteInvoices.length > 0) {
+        const filtered = remoteInvoices.filter((i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-'));
+        this.set(STORAGE_KEYS.INVOICES, filtered);
+      }
+      if (remotePurchases.length > 0) {
+        const filtered = remotePurchases.filter((p) => !DEMO_PURCHASE_IDS.has(p.id));
+        this.set(STORAGE_KEYS.PURCHASES, filtered);
+      }
+      if (remoteParties.length > 0) {
+        const filtered = remoteParties.filter((p) => !DEMO_PARTY_IDS.has(p.id));
+        this.set(STORAGE_KEYS.PARTIES, filtered);
+      }
+      if (remoteItems.length > 0) {
+        const filtered = remoteItems.filter((i) => !DEMO_ITEM_IDS.has(i.id));
+        this.set(STORAGE_KEYS.ITEMS, filtered);
+      }
+      if (remoteExpenses.length > 0) {
+        const filtered = remoteExpenses.filter((e) => !DEMO_EXPENSE_IDS.has(e.id));
+        this.set(STORAGE_KEYS.EXPENSES, filtered);
+      }
       if (remoteAdjustments.length > 0) this.set(STORAGE_KEYS.ADJUSTMENTS, remoteAdjustments);
       if (remoteVouchers.length > 0) this.set(STORAGE_KEYS.VOUCHERS, remoteVouchers);
-      if (remoteBankAccounts.length > 0) this.set(STORAGE_KEYS.BANK_ACCOUNTS, remoteBankAccounts);
-      if (remoteCashBankTxns.length > 0) this.set(STORAGE_KEYS.CASH_BANK_TXNS, remoteCashBankTxns);
+      if (remoteBankAccounts.length > 0) {
+        const filtered = remoteBankAccounts.filter((b) => !DEMO_BANK_IDS.has(b.id)).map((b) => {
+          if (b.id === 'ACC_CASH' && b.openingBalance === 15000) {
+            return { ...b, openingBalance: 0 };
+          }
+          return b;
+        });
+        this.set(STORAGE_KEYS.BANK_ACCOUNTS, filtered.length > 0 ? filtered : DEFAULT_BANK_ACCOUNTS);
+      }
+      if (remoteCashBankTxns.length > 0) {
+        const filtered = remoteCashBankTxns.filter((t) => !DEMO_TXN_IDS.has(t.id));
+        this.set(STORAGE_KEYS.CASH_BANK_TXNS, filtered);
+      }
 
       this.syncAllPartyBalances();
       this.notifyListeners();
@@ -1020,54 +910,7 @@ class StorageService {
 
   // Purchases
   getPurchases(): PurchaseBill[] {
-    return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, [
-      {
-        id: 'PUR-001',
-        billNumber: 'BILL-SUP-8821',
-        date: new Date().toISOString().split('T')[0],
-        supplierId: 'PTY-101',
-        supplierName: 'National Hardware & Electronics Ltd',
-        supplierGstin: '27AAACS1429B1ZV',
-        supplierAddress: 'MIDC Phase II, Pune',
-        supplierStateCode: '27',
-        placeOfSupplyStateCode: '27',
-        isIntraState: true,
-        itcEligibility: 'ELIGIBLE_INPUTS',
-        isRcm: false,
-        items: [
-          {
-            name: 'Thermal Receipt Printer 80mm USB+BT',
-            hsnSacCode: '844332',
-            unit: 'PCS',
-            quantity: 10,
-            unitPrice: 2800,
-            taxableAmount: 28000,
-            gstRate: 18,
-            cgstAmount: 2520,
-            sgstAmount: 2520,
-            igstAmount: 0,
-            cessAmount: 0,
-            totalAmount: 33040,
-          },
-        ],
-        totalGrossAmount: 28000,
-        totalDiscount: 0,
-        totalTaxableAmount: 28000,
-        totalCgst: 2520,
-        totalSgst: 2520,
-        totalIgst: 0,
-        totalCess: 0,
-        totalTax: 5040,
-        roundOff: 0,
-        grandTotal: 33040,
-        paymentMode: 'NET_BANKING',
-        paymentStatus: 'PAID',
-        paidAmount: 33040,
-        balanceAmount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ]);
+    return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, []);
   }
 
   savePurchase(bill: PurchaseBill): void {
@@ -1167,81 +1010,7 @@ class StorageService {
 
   // Expenses
   getExpenses(): Expense[] {
-    return this.get<Expense[]>(STORAGE_KEYS.EXPENSES, [
-      {
-        id: 'EXP-001',
-        category: 'Rent & Utilities',
-        title: 'Office & Warehouse Rent (Oct 2024)',
-        amount: 25000,
-        taxableAmount: 21186.44,
-        gstRate: 18,
-        taxAmount: 3813.56,
-        cgstAmount: 1906.78,
-        sgstAmount: 1906.78,
-        igstAmount: 0,
-        date: '2024-10-01',
-        paymentMode: 'BANK_TRANSFER',
-        vendorName: 'Pinnacle Commercial Spaces',
-        vendorGstin: '27AABCP1234D1ZZ',
-        voucherNumber: 'VR-24-089',
-        itcEligible: true,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'EXP-002',
-        category: 'Electricity & Water',
-        title: 'MSEDCL Commercial Power Bill',
-        amount: 4200,
-        taxableAmount: 4200,
-        gstRate: 0,
-        taxAmount: 0,
-        cgstAmount: 0,
-        sgstAmount: 0,
-        igstAmount: 0,
-        date: '2024-10-05',
-        paymentMode: 'UPI',
-        vendorName: 'MSEDCL Maharashtra',
-        voucherNumber: 'EB-88219',
-        itcEligible: false,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'EXP-003',
-        category: 'Tea, Coffee & Refreshments',
-        title: 'Staff Pantry & Client Hospitality',
-        amount: 1850,
-        taxableAmount: 1761.9,
-        gstRate: 5,
-        taxAmount: 88.1,
-        cgstAmount: 44.05,
-        sgstAmount: 44.05,
-        igstAmount: 0,
-        date: '2024-10-08',
-        paymentMode: 'CASH',
-        vendorName: 'Sai Daily Needs',
-        itcEligible: false,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: 'EXP-004',
-        category: 'Packaging & Courier',
-        title: 'Bluedart Priority Parcel Express',
-        amount: 3450,
-        taxableAmount: 2923.73,
-        gstRate: 18,
-        taxAmount: 526.27,
-        cgstAmount: 263.14,
-        sgstAmount: 263.14,
-        igstAmount: 0,
-        date: '2024-10-12',
-        paymentMode: 'UPI',
-        vendorName: 'Blue Dart Express Ltd',
-        vendorGstin: '27AAACB0012A1ZX',
-        voucherNumber: 'BD-PUN-9921',
-        itcEligible: true,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    return this.get<Expense[]>(STORAGE_KEYS.EXPENSES, []);
   }
 
   saveExpense(expense: Expense): void {

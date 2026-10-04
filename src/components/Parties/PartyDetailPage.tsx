@@ -726,7 +726,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     <div className="min-h-screen bg-surface flex flex-col animate-fade-in pb-8">
       {/* 1. Mobile-Optimized Sticky Top Navigation */}
       <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 px-3 py-2 sm:px-6 sm:py-3 shadow-xs">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* Back button & Party Identity */}
           <div className="flex items-center gap-2 min-w-0">
             <button
@@ -809,8 +809,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Simplified Mobile Content Container */}
-      <main className="max-w-4xl w-full mx-auto p-2.5 sm:p-4 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
+      {/* 2. Simplified Mobile & Tablet Content Container */}
+      <main className="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
         {/* Streamlined Passbook Balance Card */}
         <section className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 border border-outline-variant/20 shadow-xs flex flex-col gap-2.5">
           <div className="flex items-center justify-between">

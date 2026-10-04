@@ -47,14 +47,16 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
 
   const totalStockValuation = items.reduce((s, i) => s + (i.currentStock * i.purchasePrice), 0);
   const netProfit = grossSales - grossPurchases - totalExpenses;
-  const profitMargin = grossSales > 0 ? (netProfit / grossSales) * 100 : 24.6;
+  const profitMargin = grossSales > 0 ? (netProfit / grossSales) * 100 : 0;
 
   const handleDownloadGstr1 = () => {
     downloadGstr1JsonFile(company, invoices, selectedPeriod);
   };
 
+  const totalFlow = grossSales + grossPurchases + totalExpenses;
+
   return (
-    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto px-margin-mobile py-4 gap-space-sm">
+    <div className="flex flex-col w-full pb-24 max-w-7xl mx-auto px-margin-mobile md:px-6 py-4 gap-space-sm">
       {/* 1. Top Financial Snapshot Banner (Stitch business_reports) */}
       <div className="bg-primary-container text-on-primary rounded-2xl p-space-lg shadow-sm relative overflow-hidden">
         {/* Ambient Decorative Curve */}
@@ -70,7 +72,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-1 bg-surface-container-highest/20 text-inverse-on-surface px-3 py-1 rounded-full text-xs font-semibold">
-            <span>This Month (Oct)</span>
+            <span>Current Period</span>
             <span className="material-symbols-outlined text-[14px]">calendar_month</span>
           </div>
         </div>
@@ -82,12 +84,16 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           </div>
           <div className="flex items-baseline gap-space-sm flex-wrap">
             <div className="font-currency-display-mobile text-3xl font-extrabold text-on-primary tracking-tight">
-              {formatINR(netProfit > 0 ? netProfit : 142800)}
+              {formatINR(netProfit)}
             </div>
-            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold">
-              <span className="material-symbols-outlined text-[13px]">trending_up</span>
-              {profitMargin.toFixed(1)}% Margin
-            </span>
+            {grossSales > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold">
+                <span className="material-symbols-outlined text-[13px]">
+                  {profitMargin >= 0 ? 'trending_up' : 'trending_down'}
+                </span>
+                {profitMargin.toFixed(1)}% Margin
+              </span>
+            )}
           </div>
         </div>
 
@@ -99,10 +105,10 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               Gross Revenue
             </span>
             <span className="font-headline-sm text-lg font-bold text-on-primary truncate mt-0.5">
-              {formatINR(grossSales || 580000)}
+              {formatINR(grossSales)}
             </span>
             <span className="text-[11px] text-surface-container-high truncate">
-              {invoices.length || 412} Invoices
+              {invoices.length} Invoices
             </span>
           </div>
 
@@ -112,17 +118,25 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               Expenses &amp; Stock
             </span>
             <span className="font-headline-sm text-lg font-bold text-on-primary truncate mt-0.5">
-              {formatINR(grossPurchases + totalExpenses || 437200)}
+              {formatINR(grossPurchases + totalExpenses)}
             </span>
             <span className="text-[11px] text-surface-container-high truncate">Purchases + Ops</span>
           </div>
         </div>
 
         {/* Visual Progress Ratio Bar */}
-        <div className="mt-space-md w-full bg-surface-container-highest/20 h-1.5 rounded-full overflow-hidden flex">
-          <div className="bg-secondary-fixed h-full" style={{ width: '57%' }}></div>
-          <div className="bg-error-container h-full" style={{ width: '43%' }}></div>
-        </div>
+        {totalFlow > 0 && (
+          <div className="mt-space-md w-full bg-surface-container-highest/20 h-1.5 rounded-full overflow-hidden flex">
+            <div
+              className="bg-secondary-fixed h-full transition-all duration-300"
+              style={{ width: `${Math.round((grossSales / totalFlow) * 100)}%` }}
+            ></div>
+            <div
+              className="bg-error-container h-full transition-all duration-300"
+              style={{ width: `${Math.round(((grossPurchases + totalExpenses) / totalFlow) * 100)}%` }}
+            ></div>
+          </div>
+        )}
       </div>
 
       {/* 2. Category Switcher Tabs */}

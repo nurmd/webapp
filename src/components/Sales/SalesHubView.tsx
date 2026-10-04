@@ -45,8 +45,6 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const totalPending = invoices.reduce((s, i) => s + i.balanceAmount, 0);
   const overdueCount = invoices.filter((i) => i.balanceAmount > 0).length;
   const avgTicket = invoices.length > 0 ? Math.round(totalSales / invoices.length) : 0;
-  const targetSales = 550000;
-  const targetPercent = Math.min(100, Math.round((totalSales / targetSales) * 100));
 
   const filtered = invoices.filter((inv) => {
     const matchesSearch =
@@ -81,7 +79,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto">
+    <div className="flex flex-col w-full pb-24 max-w-7xl mx-auto md:px-6">
       {/* Header Banner */}
       <div className="px-margin-mobile pt-space-xs pb-1">
         <div className="flex items-center justify-between">
@@ -232,9 +230,9 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       </div>
 
       {/* Invoices List Feed (Clean Passbook Row Cards) */}
-      <div className="px-margin-mobile mt-1 space-y-2">
+      <div className="px-margin-mobile md:px-0 mt-1 grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
+          <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No invoices found matching your criteria.
           </div>
         ) : (

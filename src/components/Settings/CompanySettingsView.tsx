@@ -304,7 +304,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const stateName = getStateList().find((s) => s.code === profile.stateCode)?.name || 'Maharashtra';
 
   return (
-    <div className="flex flex-col w-full px-margin-mobile pb-28 pt-2 max-w-3xl mx-auto gap-space-md">
+    <div className="flex flex-col w-full px-margin-mobile md:px-6 pb-28 pt-2 max-w-5xl mx-auto gap-space-md">
       {/* Toast Notice */}
       {savedNotice && (
         <div className="fixed top-20 left-4 right-4 z-50 max-w-md mx-auto bg-secondary text-on-secondary px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-fade-in font-bold text-xs">

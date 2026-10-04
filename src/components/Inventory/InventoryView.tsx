@@ -437,7 +437,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-24 bg-surface min-h-screen">
-      <div className="flex flex-col w-full max-w-4xl mx-auto">
+      <div className="flex flex-col w-full max-w-7xl mx-auto md:px-6">
         {/* Top Stock Value & Financial Valuation Summary (Tactile Fintech Card) */}
         <section className="px-margin-mobile pt-space-sm pb-space-xs">
           <div className="bg-primary-container text-on-primary rounded-xl p-space-md shadow-sm relative overflow-hidden">
@@ -686,9 +686,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Inventory Line Items Feed (Exact simplified Stitch layout) */}
-        <section className="px-margin-mobile flex flex-col gap-space-sm pb-28">
+        <section className="px-margin-mobile md:px-0 grid grid-cols-1 md:grid-cols-2 gap-space-sm pb-28">
           {filtered.length === 0 ? (
-            <div className="w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant">
+            <div className="md:col-span-2 w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant">
               <span className="material-symbols-outlined text-[36px] text-outline mb-2">
                 inventory_2
               </span>

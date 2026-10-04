@@ -72,7 +72,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   const currentMonthName = new Date().toLocaleString('default', { month: 'long' });
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-3 gap-space-sm">
+    <div className="flex flex-col w-full pb-28 max-w-7xl mx-auto px-margin-mobile md:px-6 py-3 gap-space-sm">
       {/* Header Banner */}
       <div className="pt-space-xs pb-1">
         <div className="flex items-center justify-between">
@@ -212,9 +212,9 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
       </div>
 
       {/* 4. Purchase Bills List Stream (Clean Passbook Row Cards) */}
-      <section className="flex flex-col gap-2 mt-1">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
+          <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No purchase records found.
           </div>
         ) : (

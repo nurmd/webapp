@@ -112,7 +112,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   const cashBal = summary.accountBalances['ACC_CASH'] ?? summary.totalCashBalance;
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-4 py-3 gap-3.5 max-w-4xl mx-auto">
+    <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-7xl mx-auto">
       {/* 1. Header Bar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

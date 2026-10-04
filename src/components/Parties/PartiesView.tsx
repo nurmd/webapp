@@ -211,7 +211,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   }
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-4xl mx-auto px-margin-mobile py-2 sm:py-3 gap-2 sm:gap-3">
+    <div className="flex flex-col w-full pb-28 max-w-7xl mx-auto px-margin-mobile md:px-6 py-2 sm:py-3 gap-2 sm:gap-3">
       {/* 1. Unified 1-Glance Financial Balance Summary */}
       <section className="pt-0.5">
         <div className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 shadow-sm border border-outline-variant/20 grid grid-cols-2 divide-x divide-outline-variant/20">
@@ -377,9 +377,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
       </section>
 
       {/* 4. Streamlined Passbook-Style Simplified Parties Feed */}
-      <section className="flex flex-col gap-2">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {filtered.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
+          <div className="md:col-span-2 bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             <span className="material-symbols-outlined text-[32px] text-outline mb-1">
               person_off
             </span>
