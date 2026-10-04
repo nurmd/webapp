@@ -5,7 +5,7 @@ import { Expense } from '../../models/expense.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { Party } from '../../models/party.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { downloadGstr1JsonFile } from '../../core/gst/gstrExport.ts';
 
 interface BusinessReportsViewProps {
@@ -18,6 +18,14 @@ interface BusinessReportsViewProps {
 }
 
 type ReportCategory = 'ALL' | 'GST' | 'FINANCIAL' | 'PARTIES_STOCK';
+export type ProfitPeriod = 'TODAY' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'CUSTOM';
+
+const formatDateLocal = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   company,
@@ -29,12 +37,122 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('ALL');
   const [search, setSearch] = useState('');
+  const [profitPeriod, setProfitPeriod] = useState<ProfitPeriod>('TODAY');
+
+  const todayStr = useMemo(() => formatDateLocal(new Date()), []);
+  const [customStart, setCustomStart] = useState<string>(todayStr);
+  const [customEnd, setCustomEnd] = useState<string>(todayStr);
+
   const [selectedPeriod, setSelectedPeriod] = useState(() => {
     const d = new Date();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const yyyy = String(d.getFullYear());
     return `${mm}${yyyy}`;
   });
+
+  // Dynamic Date Range based on selected ProfitPeriod
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
+
+    if (profitPeriod === 'TODAY') {
+      const today = formatDateLocal(now);
+      return { start: today, end: today, label: `Today (${formatDate(today)})` };
+    }
+
+    if (profitPeriod === 'THIS_MONTH') {
+      const firstDay = new Date(currentYear, currentMonth, 1);
+      const lastDay = new Date(currentYear, currentMonth + 1, 0);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return {
+        start: formatDateLocal(firstDay),
+        end: formatDateLocal(lastDay),
+        label: `This Month (${monthNames[currentMonth]} ${currentYear})`,
+      };
+    }
+
+    if (profitPeriod === 'THIS_QUARTER') {
+      let qNum = 1;
+      let qStartM = 3;
+      let qEndM = 5;
+      let qYear = currentYear;
+
+      if (currentMonth >= 3 && currentMonth <= 5) {
+        qNum = 1;
+        qStartM = 3;
+        qEndM = 5;
+      } else if (currentMonth >= 6 && currentMonth <= 8) {
+        qNum = 2;
+        qStartM = 6;
+        qEndM = 8;
+      } else if (currentMonth >= 9 && currentMonth <= 11) {
+        qNum = 3;
+        qStartM = 9;
+        qEndM = 11;
+      } else {
+        qNum = 4;
+        qStartM = 0;
+        qEndM = 2;
+      }
+      const qFirst = new Date(qYear, qStartM, 1);
+      const qLast = new Date(qYear, qEndM + 1, 0);
+      return {
+        start: formatDateLocal(qFirst),
+        end: formatDateLocal(qLast),
+        label: `This Quarter (Q${qNum}: ${formatDate(qFirst)} - ${formatDate(qLast)})`,
+      };
+    }
+
+    if (profitPeriod === 'THIS_FY') {
+      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const fyEndYear = fyStartYear + 1;
+      const start = `${fyStartYear}-04-01`;
+      const end = `${fyEndYear}-03-31`;
+      return {
+        start,
+        end,
+        label: `This FY (FY ${fyStartYear}-${String(fyEndYear).slice(-2)})`,
+      };
+    }
+
+    if (profitPeriod === 'CUSTOM') {
+      const s = customStart || todayStr;
+      const e = customEnd || todayStr;
+      return {
+        start: s,
+        end: e,
+        label: `Custom (${formatDate(s)} - ${formatDate(e)})`,
+      };
+    }
+
+    return { start: '', end: '', label: 'All Time' };
+  }, [profitPeriod, customStart, customEnd, todayStr]);
+
+  // Filtered transactions for selected period
+  const periodInvoices = useMemo(() => {
+    return invoices.filter((inv) => {
+      const d = (inv.date || '').split('T')[0];
+      if (!d) return false;
+      return d >= dateRange.start && d <= dateRange.end;
+    });
+  }, [invoices, dateRange]);
+
+  const periodPurchases = useMemo(() => {
+    return purchases.filter((pur) => {
+      const d = (pur.date || '').split('T')[0];
+      if (!d) return false;
+      return d >= dateRange.start && d <= dateRange.end;
+    });
+  }, [purchases, dateRange]);
+
+  const periodExpenses = useMemo(() => {
+    return expenses.filter((exp) => {
+      const d = (exp.date || '').split('T')[0];
+      if (!d) return false;
+      return d >= dateRange.start && d <= dateRange.end;
+    });
+  }, [expenses, dateRange]);
 
   // Item purchase price lookup for COGS
   const itemCostMap = useMemo(() => {
@@ -45,33 +163,33 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     return map;
   }, [items]);
 
-  // Aggregates
-  const grossSales = invoices.reduce((s, i) => s + i.grandTotal, 0);
-  const totalSalesTaxable = invoices.reduce((s, i) => s + i.totalTaxableAmount, 0);
-  const totalOutputGst = invoices.reduce((s, i) => s + i.totalTax, 0);
+  // Aggregates for period
+  const grossSales = periodInvoices.reduce((s, i) => s + i.grandTotal, 0);
+  const totalSalesTaxable = periodInvoices.reduce((s, i) => s + i.totalTaxableAmount, 0);
+  const totalOutputGst = periodInvoices.reduce((s, i) => s + i.totalTax, 0);
 
-  const grossPurchases = purchases.reduce((s, p) => s + p.grandTotal, 0);
-  const totalPurchasesTaxable = purchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
-  const totalItcFromPurchases = purchases.reduce((s, p) => s + p.totalTax, 0);
+  const grossPurchases = periodPurchases.reduce((s, p) => s + p.grandTotal, 0);
+  const totalPurchasesTaxable = periodPurchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
+  const totalItcFromPurchases = periodPurchases.reduce((s, p) => s + p.totalTax, 0);
 
-  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
-  const itcFromExpenses = expenses.filter((e) => e.itcEligible).reduce((s, e) => s + e.taxAmount, 0);
+  const totalExpenses = periodExpenses.reduce((s, e) => s + e.amount, 0);
+  const itcFromExpenses = periodExpenses.filter((e) => e.itcEligible).reduce((s, e) => s + e.taxAmount, 0);
 
   const totalAvailableItc = totalItcFromPurchases + itcFromExpenses;
   const netGstPayableInCash = Math.max(0, totalOutputGst - totalAvailableItc);
 
   const totalStockValuation = items.reduce((s, i) => s + (i.currentStock * i.purchasePrice), 0);
 
-  // Cost of Goods Sold (COGS)
+  // Cost of Goods Sold (COGS) for items sold during the period
   const totalCogs = useMemo(() => {
-    return invoices.reduce((sum, inv) => {
+    return periodInvoices.reduce((sum, inv) => {
       const invCost = inv.items.reduce((iSum, line) => {
         const pPrice = (line.itemId ? itemCostMap.get(line.itemId) : 0) || 0;
         return iSum + (line.quantity * pPrice);
       }, 0);
       return sum + invCost;
     }, 0);
-  }, [invoices, itemCostMap]);
+  }, [periodInvoices, itemCostMap]);
 
   // Commercial Net Profit: Net Taxable Sales - COGS (or Purchases) - Operating Expenses
   const effectiveCostOfSales = totalCogs > 0 ? totalCogs : totalPurchasesTaxable;
@@ -91,7 +209,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
         {/* Ambient Decorative Curve */}
         <div className="absolute -right-12 -top-12 w-44 h-44 rounded-full bg-secondary opacity-20 pointer-events-none"></div>
 
-        <div className="flex items-center justify-between mb-space-sm relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-space-sm relative z-10">
           <div className="flex items-center gap-space-xs">
             <span className="material-symbols-outlined text-[20px] text-secondary-fixed">
               auto_graph
@@ -100,16 +218,63 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               Financial Snapshot
             </span>
           </div>
-          <div className="flex items-center gap-1 bg-surface-container-highest/20 text-inverse-on-surface px-3 py-1 rounded-full text-xs font-semibold">
-            <span>Current Period</span>
-            <span className="material-symbols-outlined text-[14px]">calendar_month</span>
+
+          {/* Period Selector Tabs: Today (Default), This Month, Quarter, FY, Custom */}
+          <div className="flex items-center gap-1 bg-surface-container-highest/25 backdrop-blur-xs p-1 rounded-xl flex-wrap">
+            {(
+              [
+                { id: 'TODAY', label: 'Today' },
+                { id: 'THIS_MONTH', label: 'This Month' },
+                { id: 'THIS_QUARTER', label: 'Quarter' },
+                { id: 'THIS_FY', label: 'This FY' },
+                { id: 'CUSTOM', label: 'Custom' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setProfitPeriod(opt.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  profitPeriod === opt.id
+                    ? 'bg-secondary text-on-secondary shadow-xs scale-100'
+                    : 'text-surface-variant hover:text-on-primary hover:bg-white/10'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 
+        {/* Custom Date Range Selector (shown when Custom is active) */}
+        {profitPeriod === 'CUSTOM' && (
+          <div className="flex items-center gap-2 mb-3 bg-surface-container-highest/25 backdrop-blur-xs p-2.5 rounded-xl text-xs flex-wrap relative z-10 animate-fade-in border border-white/10">
+            <span className="text-surface-variant font-medium">From:</span>
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="bg-surface-container-lowest/90 text-on-surface px-2.5 py-1 rounded-lg text-xs border border-outline-variant/30 outline-none focus:border-secondary font-medium"
+            />
+            <span className="text-surface-variant font-medium">To:</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="bg-surface-container-lowest/90 text-on-surface px-2.5 py-1 rounded-lg text-xs border border-outline-variant/30 outline-none focus:border-secondary font-medium"
+            />
+          </div>
+        )}
+
         {/* Main Net Profit */}
         <div className="mb-space-md relative z-10">
-          <div className="text-xs text-surface-container-high font-medium mb-0.5">
-            Net Profit (Estimated)
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <span className="text-xs text-surface-container-high font-medium">
+              Net Profit (Estimated)
+            </span>
+            <span className="text-[11px] text-surface-variant/90 font-medium">
+              {dateRange.label}
+            </span>
           </div>
           <div className="flex items-baseline gap-space-sm flex-wrap">
             <div className="font-currency-display-mobile text-3xl font-extrabold text-on-primary tracking-tight">
@@ -327,10 +492,15 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
       {/* 5. SECTION: Profit & Loss Statement */}
       {(activeCategory === 'ALL' || activeCategory === 'FINANCIAL') && (
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-3">
-          <h3 className="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[18px] text-secondary">analytics</span>
-            <span>Trading &amp; Profit &amp; Loss Statement</span>
-          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <h3 className="font-headline-sm text-sm font-bold text-on-surface flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[18px] text-secondary">analytics</span>
+              <span>Trading &amp; Profit &amp; Loss Statement</span>
+            </h3>
+            <span className="text-[11px] text-on-surface-variant font-semibold bg-surface-container-low px-2.5 py-0.5 rounded-full border border-outline-variant/30 w-fit">
+              {dateRange.label}
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             {/* Income */}
@@ -339,8 +509,8 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
                 INCOME / REVENUE
               </div>
               <div className="flex justify-between">
-                <span>Gross Sales:</span>
-                <span className="font-bold">{formatINR(grossSales)}</span>
+                <span>Taxable Sales:</span>
+                <span className="font-bold">{formatINR(totalSalesTaxable)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Closing Stock Value:</span>
@@ -348,7 +518,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               </div>
               <div className="flex justify-between border-t border-outline-variant/20 pt-1 text-secondary font-bold">
                 <span>Total Income:</span>
-                <span>{formatINR(grossSales + totalStockValuation)}</span>
+                <span>{formatINR(totalSalesTaxable + totalStockValuation)}</span>
               </div>
             </div>
 
@@ -358,8 +528,8 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
                 COSTS &amp; OVERHEADS
               </div>
               <div className="flex justify-between">
-                <span>Inward Purchases:</span>
-                <span className="font-bold">{formatINR(grossPurchases)}</span>
+                <span>Cost of Sales (COGS):</span>
+                <span className="font-bold">{formatINR(effectiveCostOfSales)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Operational Expenses:</span>
@@ -367,9 +537,17 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               </div>
               <div className="flex justify-between border-t border-outline-variant/20 pt-1 text-error font-bold">
                 <span>Total Costs:</span>
-                <span>{formatINR(grossPurchases + totalExpenses)}</span>
+                <span>{formatINR(effectiveCostOfSales + totalExpenses)}</span>
               </div>
             </div>
+          </div>
+
+          {/* Net Profit Summary Bar */}
+          <div className="p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-outline-variant/20">
+            <span className="font-bold text-xs text-on-surface">Net Operating Profit:</span>
+            <span className={`font-black text-sm ${netProfit >= 0 ? 'text-secondary' : 'text-error'}`}>
+              {formatINR(netProfit)} ({profitMargin.toFixed(1)}%)
+            </span>
           </div>
         </section>
       )}
