@@ -49,6 +49,17 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   // App preferences
   const [appLanguage, setAppLanguage] = useState('English (India)');
   const [isAppLockEnabled, setIsAppLockEnabled] = useState(true);
+  // Device-local preference: Never synced across devices
+  const [showBuyPricesGlobally, setShowBuyPricesGlobally] = useState<boolean>(() => {
+    return db.getBuyPriceVisibility();
+  });
+
+  const handleToggleBuyPriceVisibility = (enabled: boolean) => {
+    setShowBuyPricesGlobally(enabled);
+    db.setBuyPriceVisibility(enabled);
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2000);
+  };
 
   const isAnySettingsModalOpen =
     isEditModalOpen ||
@@ -226,7 +237,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         isGstEnabled: isGstActive,
         appLanguage,
         isAppLockEnabled,
-        // Explicitly exclude any printer / printing settings
+        // Explicitly exclude any printer / printing / device-local privacy settings
       };
       return btoa(unescape(encodeURIComponent(JSON.stringify(fullSettings))));
     } catch {
@@ -269,7 +280,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       if (parsed.appLanguage) setAppLanguage(parsed.appLanguage);
       if (parsed.isAppLockEnabled !== undefined) setIsAppLockEnabled(parsed.isAppLockEnabled);
 
-      // Save all settings excluding printing
+      // Save all settings excluding printing and local privacy preferences
       db.syncAllSettingsAcrossDevices({
         company: incomingCompany,
         isGstEnabled: incomingCompany.isGstEnabled ?? true,
@@ -988,7 +999,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       <section className="flex flex-col gap-2">
         <div className="px-1">
           <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Device & Language
+            Device, Privacy & Preferences
           </h3>
         </div>
 
@@ -1020,6 +1031,38 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Buy Price Global Show / Hidden Privacy Toggle */}
+          <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px]">
+                  {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 pr-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-label-md text-sm font-bold text-on-surface">Show Buy / Purchase Prices</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
+                </div>
+                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                  {showBuyPricesGlobally
+                    ? 'Visible: Show purchase rates and valuation on this device'
+                    : 'Hidden (***): Mask purchase rates to protect costs on this device'}
+                </div>
+              </div>
+            </div>
+
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input
+                type="checkbox"
+                checked={showBuyPricesGlobally}
+                onChange={(e) => handleToggleBuyPriceVisibility(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+            </label>
           </div>
 
           {/* Biometric / PIN Lock Toggle */}

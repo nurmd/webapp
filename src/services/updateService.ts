@@ -32,8 +32,8 @@ export interface OtaDownloadOptions {
   onError?: (errorMessage: string, canRetry: boolean) => void;
 }
 
-export const CURRENT_APP_VERSION = '1.0.25';
-export const CURRENT_VERSION_CODE = 10025;
+export const CURRENT_APP_VERSION = '1.0.26';
+export const CURRENT_VERSION_CODE = 10026;
 export const DEFAULT_GITHUB_REPO = 'nurmd/webapp';
 
 class UpdateService {

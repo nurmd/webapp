@@ -686,7 +686,7 @@ class StorageService {
     };
   }
 
-  // Synced Settings (All settings except device-local printing settings)
+  // Synced Settings (All settings except device-local printing & privacy settings)
   getSettings(): SyncedSettings {
     const defaultSettings: SyncedSettings = {
       id: 'app_settings',
@@ -702,10 +702,28 @@ class StorageService {
     return this.get<SyncedSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
   }
 
+  // Device-local Buy Price Privacy Setting (Never synced to remote devices)
+  getBuyPriceVisibility(): boolean {
+    if (typeof window === 'undefined') return true;
+    try {
+      return localStorage.getItem('gst_hide_buy_prices') !== 'true';
+    } catch {
+      return true;
+    }
+  }
+
+  setBuyPriceVisibility(visible: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('gst_hide_buy_prices', (!visible).toString());
+      window.dispatchEvent(new Event('gst_buy_price_visibility_change'));
+    } catch {}
+  }
+
   saveSettings(settings: Partial<SyncedSettings>): void {
     const current = this.getSettings();
-    // Explicitly exclude and strip any printing settings so they remain device-local
-    const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = settings as any;
+    // Explicitly exclude and strip any printing settings & device-local privacy settings so they remain device-local
+    const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, showBuyPricesGlobally, ...syncable } = settings as any;
     const merged: SyncedSettings = {
       ...current,
       ...syncable,
@@ -916,6 +934,8 @@ class StorageService {
   savePurchase(bill: PurchaseBill): void {
     const list = this.getPurchases();
     const idx = list.findIndex((b) => b.id === bill.id);
+    const prevBill = idx >= 0 ? list[idx] : null;
+
     if (idx >= 0) {
       list[idx] = bill;
     } else {
@@ -925,15 +945,53 @@ class StorageService {
     pouch.putDoc('purchase', bill);
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
-    // Increase stock levels for purchased items
+    // Increase stock levels and update latest purchase price for purchased items
     const items = this.getItems();
-    for (const line of bill.items) {
-      if (line.itemId) {
-        const match = items.find((itm) => itm.id === line.itemId);
+
+    // If editing existing bill, revert previous quantities first
+    if (prevBill) {
+      for (const oldLine of prevBill.items) {
+        const match = oldLine.itemId
+          ? items.find((itm) => itm.id === oldLine.itemId)
+          : items.find((itm) => itm.name.trim().toLowerCase() === oldLine.name.trim().toLowerCase());
         if (match) {
-          match.currentStock += line.quantity;
-          this.saveItem(match);
+          match.currentStock = Math.max(0, match.currentStock - oldLine.quantity);
         }
+      }
+    }
+
+    for (const line of bill.items) {
+      const match = line.itemId
+        ? items.find((itm) => itm.id === line.itemId)
+        : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
+
+      if (match) {
+        match.currentStock += line.quantity;
+        // Update purchase price from bill so the latest purchase price is reflected in items & stock
+        if (typeof line.unitPrice === 'number' && line.unitPrice > 0) {
+          match.purchasePrice = line.unitPrice;
+        }
+        match.updatedAt = new Date().toISOString();
+        this.saveItem(match);
+      } else if (line.name && line.name.trim()) {
+        // If purchased item is not yet in catalog, automatically register it with the bill's purchase price
+        const newItem: InventoryItem = {
+          id: line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: line.name.trim(),
+          hsnSacCode: line.hsnSacCode || '844332',
+          category: 'General',
+          unit: line.unit || 'PCS',
+          salePrice: Number((line.unitPrice * 1.2).toFixed(2)),
+          purchasePrice: line.unitPrice || 0,
+          gstRate: line.gstRate || 0,
+          currentStock: line.quantity,
+          minStockAlert: 5,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        items.push(newItem);
+        this.saveItem(newItem);
       }
     }
 
@@ -949,6 +1007,22 @@ class StorageService {
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.deleteDoc('purchase', id);
     this.broadcastChange('purchase', 'delete', id);
+
+    // Revert stock upon bill deletion
+    if (bill) {
+      const items = this.getItems();
+      for (const line of bill.items) {
+        const match = line.itemId
+          ? items.find((itm) => itm.id === line.itemId)
+          : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
+        if (match) {
+          match.currentStock = Math.max(0, match.currentStock - line.quantity);
+          match.updatedAt = new Date().toISOString();
+          this.saveItem(match);
+        }
+      }
+    }
+
     if (bill?.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
     }

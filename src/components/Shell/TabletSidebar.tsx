@@ -89,13 +89,13 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 px-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      <div className={`h-14 px-3 flex items-center border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0 ${isMinimized ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center gap-2.5 min-w-0 ${isMinimized ? 'justify-center' : 'flex-1'}`}>
           {/* Brand Initial Badge */}
           <button
             onClick={toggleSidebar}
             type="button"
-            className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-xs shadow-xs ring-1 ring-black/5 flex-shrink-0 tracking-tight cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 text-white flex items-center justify-center font-black text-xs shadow-xs ring-1 ring-black/5 flex-shrink-0 tracking-tight cursor-pointer hover:scale-105 active:scale-95 transition-transform"
             title={`${company.tradeName || company.businessName} (Vyapar PRO)`}
           >
             {brandInitial}
@@ -114,36 +114,18 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
           )}
         </div>
 
-        {/* Right Header Actions */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {hasUpdate && onCheckUpdate && !isMinimized && (
-            <button
-              onClick={onCheckUpdate}
-              type="button"
-              className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center hover:bg-amber-500/25 transition-colors cursor-pointer relative"
-              title={`New update v${latestVersion} available!`}
-            >
-              <span className="material-symbols-outlined text-[16px]">system_update</span>
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            </button>
-          )}
-
-          {/* Toggle Button */}
+        {/* Update Notification Badge in Header (when expanded) */}
+        {hasUpdate && onCheckUpdate && !isMinimized && (
           <button
-            onClick={toggleSidebar}
+            onClick={onCheckUpdate}
             type="button"
-            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
-            title={isMinimized ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center hover:bg-amber-500/25 transition-colors cursor-pointer relative flex-shrink-0"
+            title={`New update v${latestVersion} available!`}
           >
-            <span
-              className={`material-symbols-outlined text-[18px] transition-transform duration-150 ease-out ${
-                isMinimized ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : 'rotate-0'
-              }`}
-            >
-              keyboard_double_arrow_left
-            </span>
+            <span className="material-symbols-outlined text-[16px]">system_update</span>
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           </button>
-        </div>
+        )}
       </div>
 
       {/* Primary Action Button: + Create Sale Bill */}
@@ -248,18 +230,18 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
         ))}
       </nav>
 
-      {/* User Role & Version Footer */}
-      <div className="p-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0">
-        <div className="flex items-center justify-between gap-1.5">
-          {/* Active User Chip */}
-          <button
-            onClick={onOpenRoleSwitch}
-            type="button"
-            className={`flex items-center gap-2 min-w-0 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left flex-1 border border-transparent hover:border-black/[0.04] ${
-              isMinimized ? 'justify-center' : ''
-            }`}
-            title={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'OWNER'})`}
-          >
+      {/* User Role & Bottom Expand/Collapse Footer */}
+      <div className="p-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0 flex flex-col gap-1.5">
+        {/* User Role Switcher */}
+        <button
+          onClick={onOpenRoleSwitch}
+          type="button"
+          className={`flex items-center gap-2 min-w-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left border border-transparent hover:border-black/[0.04] ${
+            isMinimized ? 'justify-center w-full' : 'w-full justify-between'
+          }`}
+          title={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'OWNER'})`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center font-extrabold text-[11px] text-white shadow-2xs flex-shrink-0"
               style={{ backgroundColor: activeUser?.avatarColor || '#059669' }}
@@ -276,15 +258,35 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                 </span>
               </div>
             )}
-          </button>
+          </div>
 
-          {/* App Version Tag */}
           {!isMinimized && (
-            <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs flex-shrink-0 whitespace-nowrap animate-fade-in">
+            <span className="text-[9px] font-mono text-slate-400 font-medium px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs">
               v{CURRENT_APP_VERSION}
             </span>
           )}
-        </div>
+        </button>
+
+        {/* Sidebar Expand / Collapse Toggle Button at Bottom */}
+        <button
+          onClick={toggleSidebar}
+          type="button"
+          className={`h-8 rounded-xl flex items-center gap-2 px-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 transition-colors cursor-pointer ${
+            isMinimized ? 'w-11 mx-auto justify-center' : 'w-full justify-between'
+          }`}
+          title={isMinimized ? 'Expand Sidebar' : 'Collapse Sidebar'}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-[19px] flex-shrink-0 text-emerald-600 dark:text-emerald-400">
+              {isMinimized ? 'keyboard_double_arrow_right' : 'keyboard_double_arrow_left'}
+            </span>
+            {!isMinimized && (
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 whitespace-nowrap truncate animate-fade-in">
+                Collapse Sidebar
+              </span>
+            )}
+          </div>
+        </button>
       </div>
     </aside>
   );

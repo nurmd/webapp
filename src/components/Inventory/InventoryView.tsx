@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { InventoryItem, StockAdjustment, UnitOfMeasurement, isItemDisabled, isItemActive } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -70,17 +70,57 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     return false;
   }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null, 20);
 
-  // Privacy toggles: Buy price visibility per item
+  // Privacy toggles: Buy price visibility per item & global setting
+  const [showBuyPricesGlobally, setShowBuyPricesGlobally] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('gst_hide_buy_prices') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
   const [revealedBuyPrices, setRevealedBuyPrices] = useState<Record<string, boolean>>({});
+
+  const isBuyPriceVisible = (itemId: string): boolean => {
+    if (itemId in revealedBuyPrices) {
+      return revealedBuyPrices[itemId];
+    }
+    return showBuyPricesGlobally;
+  };
 
   const toggleBuyPrice = (itemId: string, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
     }
+    const current = isBuyPriceVisible(itemId);
     setRevealedBuyPrices((prev) => ({
       ...prev,
-      [itemId]: !prev[itemId],
+      [itemId]: !current,
     }));
+  };
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        setShowBuyPricesGlobally(db.getBuyPriceVisibility());
+      } catch {}
+    };
+
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('gst_buy_price_visibility_change', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('gst_buy_price_visibility_change', handleSync);
+    };
+  }, []);
+
+  const toggleGlobalBuyPrice = () => {
+    setShowBuyPricesGlobally((prev) => {
+      const next = !prev;
+      db.setBuyPriceVisibility(next);
+      setRevealedBuyPrices({});
+      return next;
+    });
   };
 
   const disabledItemsCount = useMemo(() => items.filter(isItemDisabled).length, [items]);
@@ -499,6 +539,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
             <button
+              aria-label={showBuyPricesGlobally ? 'Hide Buy Prices' : 'Show Buy Prices'}
+              title={showBuyPricesGlobally ? 'Hide Buy Prices (Privacy Mode)' : 'Show Buy Prices'}
+              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
+                !showBuyPricesGlobally ? 'text-outline border border-outline/30' : 'text-primary'
+              }`}
+              type="button"
+              onClick={toggleGlobalBuyPrice}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
+              </span>
+            </button>
+            <button
               aria-label="Filter & Sort Options"
               className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
                 activeFilterCount > 0 ? 'border-2 border-secondary text-secondary bg-secondary/5 font-bold' : ''
@@ -779,14 +832,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         type="button"
                         onClick={(e) => toggleBuyPrice(item.id, e)}
                         className="inline-flex items-center justify-end gap-1 cursor-pointer hover:opacity-80 active:scale-95 transition-all text-right ml-auto bg-transparent border-0 p-0"
-                        title={revealedBuyPrices[item.id] ? 'Click to hide purchase price' : 'Click to view purchase price'}
+                        title={isBuyPriceVisible(item.id) ? 'Click to hide purchase price' : 'Click to view purchase price'}
                       >
                         <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
                         <span className="font-tabular-data text-xs font-semibold text-on-surface-variant font-mono tracking-wider">
-                          {revealedBuyPrices[item.id] ? formatINR(item.purchasePrice) : '***'}
+                          {isBuyPriceVisible(item.id) ? formatINR(item.purchasePrice) : '***'}
                         </span>
                         <span className="material-symbols-outlined text-[14px] text-outline ml-0.5">
-                          {revealedBuyPrices[item.id] ? 'visibility' : 'visibility_off'}
+                          {isBuyPriceVisible(item.id) ? 'visibility' : 'visibility_off'}
                         </span>
                       </button>
                     </div>
@@ -885,21 +938,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   type="button"
                   onClick={() => toggleBuyPrice(activeItemDetail.id)}
                   className="font-bold text-on-surface text-sm flex items-center gap-1 cursor-pointer hover:text-secondary transition-colors"
+                  title={isBuyPriceVisible(activeItemDetail.id) ? 'Click to hide purchase price' : 'Click to view purchase price'}
                 >
                   <span className="font-mono">
-                    {revealedBuyPrices[activeItemDetail.id]
+                    {isBuyPriceVisible(activeItemDetail.id)
                       ? formatINR(activeItemDetail.purchasePrice)
                       : '***'}
                   </span>
                   <span className="material-symbols-outlined text-[13px] text-outline">
-                    {revealedBuyPrices[activeItemDetail.id] ? 'visibility' : 'visibility_off'}
+                    {isBuyPriceVisible(activeItemDetail.id) ? 'visibility' : 'visibility_off'}
                   </span>
                 </button>
               </div>
               <div>
                 <span className="text-[10px] text-outline font-semibold uppercase block">Stock Value</span>
                 <span className="font-bold text-on-surface text-sm">
-                  {formatINR(activeItemDetail.currentStock * activeItemDetail.purchasePrice)}
+                  {isBuyPriceVisible(activeItemDetail.id)
+                    ? formatINR(activeItemDetail.currentStock * activeItemDetail.purchasePrice)
+                    : '***'}
                 </span>
               </div>
             </div>
