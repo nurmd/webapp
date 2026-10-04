@@ -160,9 +160,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const passbook: PassbookEntry[] = useMemo(() => {
     const rawEntries: Omit<PassbookEntry, 'runningBalance'>[] = [];
 
-    // Sales Invoices
+    // Sales Invoices (Debit the full billed amount)
     partyInvoices.forEach((inv) => {
-      const balance = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
       rawEntries.push({
         id: `sale-${inv.id}`,
         rawId: inv.id,
@@ -172,19 +171,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         description: inv.items && inv.items.length > 0
           ? `${inv.items.length} items (${inv.items.map((i) => i.name).slice(0, 2).join(', ')})`
           : `Sale #${inv.invoiceNumber}`,
-        debit: balance,
+        debit: inv.grandTotal,
         credit: 0,
         billAmount: inv.grandTotal,
         status: inv.paymentStatus,
         paymentMode: inv.paymentMode,
         rawInvoice: inv,
       });
-      // NOTE: Payment in is handled within the sales invoice; no extra pay-inv transaction is generated.
     });
 
-    // Purchase Bills
+    // Purchase Bills (Credit the full billed amount)
     partyPurchases.forEach((pur) => {
-      const balance = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
       rawEntries.push({
         id: `pur-${pur.id}`,
         rawId: pur.id,
@@ -195,16 +192,18 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           ? `${pur.items.length} items (${pur.items.map((i) => i.name).slice(0, 2).join(', ')})`
           : `Purchase Bill #${pur.billNumber}`,
         debit: 0,
-        credit: balance,
+        credit: pur.grandTotal,
         billAmount: pur.grandTotal,
         status: pur.paymentStatus,
         paymentMode: pur.paymentMode,
         rawPurchase: pur,
       });
-      // NOTE: Payment out is handled within the purchase bill; no extra pay-pur transaction is generated.
     });
 
     // Accounting Vouchers (Receipts / Payments)
+    let totalVoucherReceipts = 0;
+    let totalVoucherPayments = 0;
+
     vouchers.forEach((v) => {
       const isPartyVoucher = v.entries.some(
         (e) => e.accountId === party.id || e.accountName.toLowerCase() === party.name.toLowerCase()
@@ -216,6 +215,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         );
         if (!isDupe) {
           if (v.voucherType === 'RECEIPT') {
+            totalVoucherReceipts += v.totalAmount;
             rawEntries.push({
               id: `vchr-${v.id}`,
               rawId: v.id,
@@ -229,6 +229,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               rawVoucher: v,
             });
           } else if (v.voucherType === 'PAYMENT') {
+            totalVoucherPayments += v.totalAmount;
             rawEntries.push({
               id: `vchr-${v.id}`,
               rawId: v.id,
@@ -245,6 +246,65 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         }
       }
     });
+
+    // Account for upfront payments made directly on invoices/bills without separate vouchers
+    if (isCustomer) {
+      const totalPaidOnInvoices = partyInvoices.reduce((s, inv) => s + (inv.paidAmount || 0), 0);
+      let unvoucheredPaid = Math.max(0, totalPaidOnInvoices - totalVoucherReceipts);
+
+      if (unvoucheredPaid > 0) {
+        const sortedInvs = [...partyInvoices]
+          .filter((inv) => (inv.paidAmount || 0) > 0)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        for (const inv of sortedInvs) {
+          if (unvoucheredPaid <= 0) break;
+          const amt = Math.min(unvoucheredPaid, inv.paidAmount || 0);
+          rawEntries.push({
+            id: `pay-inv-${inv.id}`,
+            rawId: inv.id,
+            date: inv.date,
+            docNumber: `PAY-${inv.invoiceNumber}`,
+            type: 'PAYMENT_IN',
+            description: `Payment (${inv.paymentMode || 'Cash'} on #${inv.invoiceNumber})`,
+            debit: 0,
+            credit: amt,
+            status: 'PAID',
+            paymentMode: inv.paymentMode,
+            rawInvoice: inv,
+          });
+          unvoucheredPaid -= amt;
+        }
+      }
+    } else {
+      const totalPaidOnPurchases = partyPurchases.reduce((s, pur) => s + (pur.paidAmount || 0), 0);
+      let unvoucheredPaid = Math.max(0, totalPaidOnPurchases - totalVoucherPayments);
+
+      if (unvoucheredPaid > 0) {
+        const sortedPurs = [...partyPurchases]
+          .filter((pur) => (pur.paidAmount || 0) > 0)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        for (const pur of sortedPurs) {
+          if (unvoucheredPaid <= 0) break;
+          const amt = Math.min(unvoucheredPaid, pur.paidAmount || 0);
+          rawEntries.push({
+            id: `pay-pur-${pur.id}`,
+            rawId: pur.id,
+            date: pur.date,
+            docNumber: `PAY-${pur.billNumber}`,
+            type: 'PAYMENT_OUT',
+            description: `Payment (${pur.paymentMode || 'Cash'} on #${pur.billNumber})`,
+            debit: amt,
+            credit: 0,
+            status: 'PAID',
+            paymentMode: pur.paymentMode,
+            rawPurchase: pur,
+          });
+          unvoucheredPaid -= amt;
+        }
+      }
+    }
 
     // Only genuine, explicit opening balance (no fake synthesized opening balances)
     const hasExplicitOpening = typeof party.openingBalance === 'number' && party.openingBalance > 0;
@@ -277,7 +337,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       } else {
         running += entry.credit - entry.debit;
       }
-      return { ...entry, runningBalance: running };
+      return { ...entry, runningBalance: Math.round(running * 100) / 100 };
     });
   }, [party, partyInvoices, partyPurchases, vouchers, isCustomer]);
 

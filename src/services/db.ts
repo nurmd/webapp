@@ -811,6 +811,20 @@ class StorageService {
         const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
         balance += unpaid;
       });
+
+      // Check for unallocated/advance receipt vouchers
+      const vouchers = this.getVouchers();
+      const partyReceipts = vouchers.filter(
+        (v) =>
+          v.voucherType === 'RECEIPT' &&
+          v.entries.some((e) => e.accountId === party.id || e.accountName.toLowerCase() === partyNameNorm)
+      );
+      const totalReceipts = partyReceipts.reduce((sum, v) => sum + v.totalAmount, 0);
+      const totalInvoicePaid = partyInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+      if (totalReceipts > totalInvoicePaid) {
+        // Customer paid more than total settled on invoices (advance from customer)
+        balance -= (totalReceipts - totalInvoicePaid);
+      }
     } else {
       // Purchases: we owe vendor remaining unpaid balance (negative = payable)
       const purchases = this.getPurchases();
@@ -821,6 +835,20 @@ class StorageService {
         const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
         balance -= unpaid;
       });
+
+      // Check for unallocated/advance payment out vouchers
+      const vouchers = this.getVouchers();
+      const partyPayments = vouchers.filter(
+        (v) =>
+          v.voucherType === 'PAYMENT' &&
+          v.entries.some((e) => e.accountId === party.id || e.accountName.toLowerCase() === partyNameNorm)
+      );
+      const totalPayments = partyPayments.reduce((sum, v) => sum + v.totalAmount, 0);
+      const totalPurchasePaid = partyPurchases.reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
+      if (totalPayments > totalPurchasePaid) {
+        // We paid vendor more than total billed on purchases (advance to vendor)
+        balance += (totalPayments - totalPurchasePaid);
+      }
     }
 
     const netBalance = Math.round(balance * 100) / 100;
@@ -889,6 +917,8 @@ class StorageService {
     }
 
     const idx = list.findIndex((inv) => inv.id === invoice.id);
+    const prevInvoice = idx >= 0 ? list[idx] : null;
+
     if (idx >= 0) {
       list[idx] = invoice;
     } else {
@@ -900,10 +930,26 @@ class StorageService {
 
     // Update stock levels
     const items = this.getItems();
+
+    // If editing existing invoice, revert previous quantities first
+    if (prevInvoice) {
+      for (const oldLine of prevInvoice.items) {
+        const match = oldLine.itemId
+          ? items.find((itm) => itm.id === oldLine.itemId)
+          : items.find((itm) => itm.name.trim().toLowerCase() === oldLine.name.trim().toLowerCase());
+        if (match) {
+          match.currentStock += oldLine.quantity;
+        }
+      }
+    }
+
     for (const line of invoice.items) {
-      const match = items.find((itm) => itm.id === line.itemId);
-      if (match && match.currentStock > 0) {
+      const match = line.itemId
+        ? items.find((itm) => itm.id === line.itemId)
+        : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
+      if (match) {
         match.currentStock = Math.max(0, match.currentStock - line.quantity);
+        match.updatedAt = new Date().toISOString();
         this.saveItem(match);
       }
     }
@@ -920,6 +966,22 @@ class StorageService {
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.deleteDoc('invoice', id);
     this.broadcastChange('invoice', 'delete', id);
+
+    // Restore stock upon invoice deletion
+    if (inv) {
+      const items = this.getItems();
+      for (const line of inv.items) {
+        const match = line.itemId
+          ? items.find((itm) => itm.id === line.itemId)
+          : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
+        if (match) {
+          match.currentStock += line.quantity;
+          match.updatedAt = new Date().toISOString();
+          this.saveItem(match);
+        }
+      }
+    }
+
     if (inv?.partyId) {
       this.recalculatePartyBalance(inv.partyId);
     }
