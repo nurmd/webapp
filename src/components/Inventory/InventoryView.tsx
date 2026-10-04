@@ -58,7 +58,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [activeItemDetail, setActiveItemDetail] = useState<InventoryItem | null>(null);
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
-  const [adjQty, setAdjQty] = useState<number>(1);
+  const [adjQty, setAdjQty] = useState<number | ''>(1);
   const [adjReason, setAdjReason] = useState('New inventory arrival');
 
   // Back Navigation for modals
@@ -456,15 +456,16 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleApplyAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adjustmentItem || adjQty <= 0) return;
+    const qty = typeof adjQty === 'number' ? adjQty : parseFloat(adjQty);
+    if (!adjustmentItem || isNaN(qty) || qty <= 0) return;
 
     const adj: StockAdjustment = {
       id: 'ADJ-' + Date.now(),
       itemId: adjustmentItem.id,
       itemName: adjustmentItem.name,
       type: adjType,
-      quantity: adjQty,
-      reason: adjReason,
+      quantity: qty,
+      reason: adjReason.trim() || (adjType === 'STOCK_IN' ? 'Stock In Addition' : 'Stock Out Reduction'),
       date: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
     };
@@ -1283,6 +1284,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       step="0.01"
                       required
                       value={salePrice || ''}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
                       className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-sm font-bold focus:outline-none focus:border-secondary"
                     />
@@ -1295,6 +1297,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       type="number"
                       step="0.01"
                       value={purchasePrice || ''}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
                       className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-sm focus:outline-none focus:border-secondary"
                     />
@@ -1339,6 +1342,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <input
                         type="number"
                         value={currentStock || ''}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
                         className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary"
                       />
@@ -1370,6 +1374,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <input
                         type="number"
                         value={minStockAlert || ''}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
                         className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                       />
@@ -1472,17 +1477,66 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                  Quantity ({adjustmentItem.unit})
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={adjQty}
-                  onChange={(e) => setAdjQty(parseFloat(e.target.value) || 1)}
-                  className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-base font-bold focus:outline-none focus:border-secondary"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-label-sm text-xs font-semibold text-on-surface">
+                    Quantity ({adjustmentItem.unit})
+                  </label>
+                  {adjQty !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => setAdjQty('')}
+                      className="text-[11px] text-secondary hover:underline font-semibold cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="any"
+                    required
+                    placeholder="Enter quantity"
+                    value={adjQty}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setAdjQty('');
+                      } else {
+                        const parsed = parseFloat(val);
+                        setAdjQty(isNaN(parsed) ? '' : parsed);
+                      }
+                    }}
+                    className="w-full h-11 px-3 pr-8 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-base font-bold focus:outline-none focus:border-secondary"
+                  />
+                  {adjQty !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => setAdjQty('')}
+                      className="absolute right-2 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+                      title="Clear quantity"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Add Chips */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[10px] text-outline font-semibold">Quick add:</span>
+                  {[1, 5, 10, 25, 50].map((step) => (
+                    <button
+                      key={step}
+                      type="button"
+                      onClick={() => setAdjQty((prev) => (Number(prev) || 0) + step)}
+                      className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface text-xs font-semibold hover:bg-secondary/15 hover:text-secondary active:scale-95 transition-all cursor-pointer"
+                    >
+                      +{step}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -1492,6 +1546,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <input
                   type="text"
                   value={adjReason}
+                  placeholder="e.g. New inventory arrival, physical audit correction"
                   onChange={(e) => setAdjReason(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                 />
@@ -1507,7 +1562,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-full bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm cursor-pointer active:scale-95"
+                  disabled={adjQty === '' || Number(adjQty) <= 0}
+                  className={`px-5 py-2 rounded-full font-label-md text-xs font-bold shadow-sm transition-all ${
+                    adjQty === '' || Number(adjQty) <= 0
+                      ? 'bg-surface-container text-outline cursor-not-allowed opacity-60'
+                      : 'bg-secondary text-on-secondary cursor-pointer active:scale-95'
+                  }`}
                 >
                   Apply Stock
                 </button>
