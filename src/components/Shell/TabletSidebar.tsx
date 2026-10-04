@@ -84,13 +84,13 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
 
   return (
     <aside
-      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 transition-[width] duration-300 ease-in-out shadow-[1px_0_6px_rgba(0,0,0,0.02)] overflow-x-hidden ${
+      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 shadow-[1px_0_6px_rgba(0,0,0,0.02)] overflow-x-hidden ${
         isMinimized ? 'w-[68px]' : 'w-56'
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 px-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0 overflow-hidden">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+      <div className="h-14 px-3 flex items-center justify-between border-b border-black/[0.06] dark:border-white/[0.06] flex-shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {/* Brand Initial Badge */}
           <button
             onClick={toggleSidebar}
@@ -102,20 +102,16 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
           </button>
 
           {/* Business Name & Tag */}
-          <div
-            className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-              isMinimized
-                ? 'opacity-0 max-w-0 -translate-x-3 pointer-events-none'
-                : 'opacity-100 max-w-[120px] translate-x-0'
-            }`}
-          >
-            <span className="font-bold text-xs text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
-              {company.tradeName || company.businessName}
-            </span>
-            <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase tracking-wider mt-0.5 whitespace-nowrap">
-              Vyapar PRO
-            </span>
-          </div>
+          {!isMinimized && (
+            <div className="flex flex-col min-w-0 animate-fade-in">
+              <span className="font-bold text-xs text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
+                {company.tradeName || company.businessName}
+              </span>
+              <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-extrabold uppercase tracking-wider mt-0.5 whitespace-nowrap">
+                Vyapar PRO
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right Header Actions */}
@@ -132,7 +128,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
             </button>
           )}
 
-          {/* Toggle Button: smoothly rotates 180deg */}
+          {/* Toggle Button */}
           <button
             onClick={toggleSidebar}
             type="button"
@@ -140,7 +136,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
             title={isMinimized ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             <span
-              className={`material-symbols-outlined text-[18px] transition-transform duration-300 ease-in-out ${
+              className={`material-symbols-outlined text-[18px] transition-transform duration-150 ease-out ${
                 isMinimized ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : 'rotate-0'
               }`}
             >
@@ -155,23 +151,19 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
         <button
           onClick={onNewInvoice}
           type="button"
-          className={`group relative h-10 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all duration-300 ease-in-out flex items-center cursor-pointer overflow-hidden ${
+          className={`group relative h-10 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all flex items-center cursor-pointer ${
             isMinimized ? 'w-11 mx-auto justify-center px-0' : 'w-full px-3 justify-start gap-2'
           }`}
           title={isMinimized ? 'Create Sale Bill (+)' : undefined}
         >
-          <span className="material-symbols-outlined text-[19px] flex-shrink-0 group-hover:rotate-90 transition-transform duration-300">
+          <span className="material-symbols-outlined text-[19px] flex-shrink-0 group-hover:rotate-90 transition-transform duration-200">
             add
           </span>
-          <span
-            className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
-              isMinimized
-                ? 'opacity-0 max-w-0 -translate-x-2'
-                : 'opacity-100 max-w-[130px] translate-x-0'
-            }`}
-          >
-            Create Sale Bill
-          </span>
+          {!isMinimized && (
+            <span className="whitespace-nowrap truncate animate-fade-in">
+              Create Sale Bill
+            </span>
+          )}
         </button>
       </div>
 
@@ -180,19 +172,14 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
         {navSections.map((section, idx) => (
           <div key={section.category}>
             {/* Category Header or Divider Line */}
-            <div className="px-1.5 pt-1.5 pb-1 relative h-5 flex items-center overflow-hidden">
-              <span
-                className={`text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
-                  isMinimized ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[150px]'
-                }`}
-              >
-                {section.category}
-              </span>
-              <div
-                className={`h-[1px] bg-slate-200/80 dark:bg-slate-800/80 transition-all duration-300 ease-in-out mx-auto ${
-                  isMinimized && idx > 0 ? 'w-6 opacity-100' : 'w-0 opacity-0'
-                }`}
-              />
+            <div className="px-1.5 pt-1.5 pb-1 relative h-5 flex items-center">
+              {!isMinimized ? (
+                <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap animate-fade-in">
+                  {section.category}
+                </span>
+              ) : idx > 0 ? (
+                <div className="h-[1px] w-6 bg-slate-200/80 dark:bg-slate-800/80 mx-auto" />
+              ) : null}
             </div>
 
             <div className="space-y-0.5">
@@ -208,7 +195,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                     disabled={!isAllowed}
                     type="button"
                     title={isMinimized ? item.label : undefined}
-                    className={`relative h-10 rounded-xl flex items-center transition-all duration-300 ease-in-out cursor-pointer select-none active:scale-98 overflow-hidden ${
+                    className={`relative h-10 rounded-xl flex items-center cursor-pointer select-none active:scale-98 transition-colors ${
                       isMinimized ? 'w-11 mx-auto justify-center px-0' : 'w-full px-2.5 justify-between'
                     } ${
                       isActive
@@ -229,31 +216,25 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
                       >
                         {item.icon}
                       </span>
-                      <span
-                        className={`text-xs font-semibold whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${
-                          isMinimized
-                            ? 'opacity-0 max-w-0 -translate-x-2'
-                            : 'opacity-100 max-w-[125px] translate-x-0'
-                        }`}
-                      >
-                        {item.label}
-                      </span>
+                      {!isMinimized && (
+                        <span className="text-xs font-semibold whitespace-nowrap truncate animate-fade-in">
+                          {item.label}
+                        </span>
+                      )}
                     </div>
 
                     {/* Active Right Dot / Lock */}
-                    <div
-                      className={`flex items-center flex-shrink-0 transition-all duration-300 ease-in-out ${
-                        isMinimized ? 'opacity-0 max-w-0' : 'opacity-100 max-w-[20px]'
-                      }`}
-                    >
-                      {!isAllowed ? (
-                        <span className="material-symbols-outlined text-[13px] text-slate-400">
-                          lock
-                        </span>
-                      ) : isActive ? (
-                        <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
-                      ) : null}
-                    </div>
+                    {!isMinimized && (
+                      <div className="flex items-center flex-shrink-0">
+                        {!isAllowed ? (
+                          <span className="material-symbols-outlined text-[13px] text-slate-400">
+                            lock
+                          </span>
+                        ) : isActive ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white flex-shrink-0" />
+                        ) : null}
+                      </div>
+                    )}
 
                     {/* Active Left Indicator Bar in Minimized mode */}
                     {isMinimized && isActive && (
@@ -268,13 +249,13 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
       </nav>
 
       {/* User Role & Version Footer */}
-      <div className="p-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0 overflow-hidden">
+      <div className="p-2 border-t border-black/[0.06] dark:border-white/[0.06] bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0">
         <div className="flex items-center justify-between gap-1.5">
           {/* Active User Chip */}
           <button
             onClick={onOpenRoleSwitch}
             type="button"
-            className={`flex items-center gap-2 min-w-0 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 ease-in-out cursor-pointer text-left flex-1 border border-transparent hover:border-black/[0.04] ${
+            className={`flex items-center gap-2 min-w-0 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left flex-1 border border-transparent hover:border-black/[0.04] ${
               isMinimized ? 'justify-center' : ''
             }`}
             title={`Active: ${activeUser?.name || 'Admin'} (${activeUser?.role || 'OWNER'})`}
@@ -285,32 +266,24 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
             >
               {(activeUser?.name || 'A')[0].toUpperCase()}
             </div>
-            <div
-              className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-                isMinimized
-                  ? 'opacity-0 max-w-0 pointer-events-none -translate-x-2'
-                  : 'opacity-100 max-w-[110px] translate-x-0'
-              }`}
-            >
-              <span className="font-bold text-[11px] text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
-                {activeUser?.name || 'Admin'}
-              </span>
-              <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold truncate capitalize whitespace-nowrap">
-                {activeUser?.role?.toLowerCase() || 'owner'}
-              </span>
-            </div>
+            {!isMinimized && (
+              <div className="flex flex-col min-w-0 animate-fade-in">
+                <span className="font-bold text-[11px] text-slate-900 dark:text-white truncate leading-tight whitespace-nowrap">
+                  {activeUser?.name || 'Admin'}
+                </span>
+                <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold truncate capitalize whitespace-nowrap">
+                  {activeUser?.role?.toLowerCase() || 'owner'}
+                </span>
+              </div>
+            )}
           </button>
 
           {/* App Version Tag */}
-          <span
-            className={`text-[9px] font-mono text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs flex-shrink-0 transition-all duration-300 ease-in-out whitespace-nowrap ${
-              isMinimized
-                ? 'opacity-0 max-w-0 px-0 border-0 pointer-events-none'
-                : 'opacity-100 max-w-[60px]'
-            }`}
-          >
-            v{CURRENT_APP_VERSION}
-          </span>
+          {!isMinimized && (
+            <span className="text-[9px] font-mono text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-black/[0.05] dark:border-white/[0.06] shadow-2xs flex-shrink-0 whitespace-nowrap animate-fade-in">
+              v{CURRENT_APP_VERSION}
+            </span>
+          )}
         </div>
       </div>
     </aside>
