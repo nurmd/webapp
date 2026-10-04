@@ -178,7 +178,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     if (found) {
       addToCart(found);
       audioService.playScanSuccess();
-      setScanMessage({ text: `Added: ${found.name} (₹${found.salePrice})` });
+      setScanMessage({ text: `Added: ${found.name}` });
       setTimeout(() => setScanMessage(null), 2500);
     } else {
       audioService.playScanError();
@@ -198,7 +198,6 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   // POS Keyboard Shortcuts Handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in regular text inputs other than global shortcuts
       const target = e.target as HTMLElement;
       const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
 
@@ -244,8 +243,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         !search ||
         i.name.toLowerCase().includes(q) ||
         (i.barcode && i.barcode.includes(search)) ||
-        (i.sku && i.sku.toLowerCase().includes(q)) ||
-        (i.hsnSacCode && i.hsnSacCode.includes(search));
+        (i.sku && i.sku.toLowerCase().includes(q));
 
       let matchesCategory = true;
       if (selectedCategory === 'FAST MOVERS') {
@@ -298,12 +296,6 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     );
   };
 
-  const updateCartLineDiscount = (itemId: string, discountPercent: number) => {
-    setCart(
-      cart.map((c) => (c.item.id === itemId ? { ...c, discountPercent } : c))
-    );
-  };
-
   const removeFromCart = (itemId: string) => {
     setCart(cart.filter((c) => c.item.id !== itemId));
   };
@@ -336,7 +328,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     }
   }, [calcSummary.totalTaxableAmount, cartDiscountType, cartDiscountValue]);
 
-  // Final Payable Grand Total (including additional charges and overall discount)
+  // Final Payable Grand Total
   const finalPayableTotal = useMemo(() => {
     const raw = Math.max(
       0,
@@ -413,7 +405,6 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     setAdditionalCharges(bill.additionalCharges);
     setPaymentMode(bill.paymentMode);
 
-    // Remove from held list
     setHeldBills(heldBills.filter((b) => b.id !== bill.id));
     audioService.playScanSuccess();
     setScanMessage({ text: `Resumed ${bill.label}` });
@@ -556,395 +547,382 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   }, [company.invoicePrefix, completedSale]);
 
   return (
-    <div className="flex flex-col md:grid md:grid-cols-12 min-h-[calc(100vh-64px)] pb-24 md:pb-0 bg-surface">
+    <div className="flex flex-col md:grid md:grid-cols-12 h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-surface pb-20 md:pb-0 select-none">
       {/* ======================================================== */}
       {/* Left Catalog Pane (md:col-span-7)                       */}
       {/* ======================================================== */}
-      <div className="md:col-span-7 flex flex-col p-3 sm:p-4 border-r border-outline-variant/30 gap-2.5 overflow-y-auto">
-        {/* Top Operational Status Ribbon */}
-        <div className="flex items-center justify-between text-on-surface-variant font-label-sm text-[11px] bg-surface-container-lowest p-2.5 rounded-2xl border border-outline-variant/20 shadow-xs flex-wrap gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="inline-flex items-center gap-1.5 bg-secondary-container/60 text-on-secondary-container px-2.5 py-1 rounded-full font-bold text-xs">
-              <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-              Counter #01
-            </span>
-            <span className="text-outline font-mono font-semibold">
-              Bill #{previewInvoiceNumber}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Parked Bills Button */}
-            <button
-              type="button"
-              onClick={() => setIsHoldModalOpen(true)}
-              className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
-                heldBills.length > 0
-                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-xs animate-pulse-gentle'
-                  : 'bg-surface-container text-outline hover:text-on-surface'
-              }`}
-              title="Parked / Held Bills (F7)"
-            >
-              <span className="material-symbols-outlined text-[16px]">pause_circle</span>
-              <span>Held Bills ({heldBills.length})</span>
-            </button>
-
-            {/* Keyboard Shortcuts Button */}
-            <button
-              type="button"
-              onClick={() => setIsShortcutsModalOpen(true)}
-              className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
-              title="Keyboard Shortcuts (?)"
-            >
-              <span className="material-symbols-outlined text-[16px]">help</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Customer / Party Selection Card */}
-        <div className="bg-surface-container-lowest p-3 rounded-2xl border border-outline-variant/25 shadow-xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div
-              className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0 ${
-                customer.party
-                  ? 'bg-secondary/10 text-secondary'
-                  : 'bg-surface-container text-outline'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">
-                {customer.party ? 'person' : 'storefront'}
+      <div className="md:col-span-7 flex flex-col h-full border-r border-outline-variant/25 overflow-hidden bg-surface">
+        {/* Top Controls Area (Fixed, not scrolling) */}
+        <div className="flex-shrink-0 p-3 pb-2 space-y-2.5 bg-surface border-b border-outline-variant/15">
+          {/* Status Ribbon & Quick Tools */}
+          <div className="flex items-center justify-between text-xs text-on-surface-variant">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="inline-flex items-center gap-1.5 bg-secondary-container/60 text-on-secondary-container px-2.5 py-0.5 rounded-full font-bold text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                POS Counter #01
+              </span>
+              <span className="text-outline font-mono text-[11px] font-semibold">
+                Bill #{previewInvoiceNumber}
               </span>
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs sm:text-sm font-bold text-on-surface truncate">
-                  {customer.party ? customer.party.name : 'Walk-in Retail Customer'}
-                </span>
-                {customer.isB2b ? (
-                  <span className="text-[10px] bg-primary/10 text-primary font-mono px-1.5 py-0.2 rounded font-bold">
-                    B2B GSTIN
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-surface-container text-outline px-1.5 py-0.2 rounded font-semibold">
-                    B2C
-                  </span>
-                )}
-              </div>
-              <div className="text-[11px] text-outline mt-0.5 truncate flex items-center gap-2">
-                <span>{customer.phone || 'No phone entered'}</span>
-                {customer.party && (
-                  <>
-                    <span>•</span>
-                    <span
-                      className={`font-semibold ${
-                        (customer.party.currentBalance || 0) > 0
-                          ? 'text-amber-600'
-                          : 'text-secondary'
-                      }`}
-                    >
-                      Bal: {formatINR(customer.party.currentBalance || 0)}
-                    </span>
-                  </>
-                )}
-              </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsHoldModalOpen(true)}
+                className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+                  heldBills.length > 0
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-xs animate-pulse-gentle'
+                    : 'bg-surface-container text-outline hover:text-on-surface'
+                }`}
+                title="Parked / Held Bills (F7)"
+              >
+                <span className="material-symbols-outlined text-[15px]">pause_circle</span>
+                <span>Held ({heldBills.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsShortcutsModalOpen(true)}
+                className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+                title="Keyboard Shortcuts (?)"
+              >
+                <span className="material-symbols-outlined text-[15px]">help</span>
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {customer.party && (
-              <button
-                type="button"
-                onClick={() => handleSelectCustomer(null)}
-                className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high text-outline flex items-center justify-center cursor-pointer"
-                title="Reset to Walk-in Customer"
-              >
-                <span className="material-symbols-outlined text-[15px]">close</span>
-              </button>
-            )}
+          {/* Clean Search & Barcode Bar */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 px-3 py-2 shadow-xs focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all">
+              <span className="material-symbols-outlined text-outline text-[18px] mr-2">
+                barcode_scanner
+              </span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Scan barcode or search item... (F2 or /)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-transparent text-xs sm:text-sm text-on-surface placeholder:text-outline outline-none"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="text-outline hover:text-on-surface ml-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Camera Scanner Button */}
             <button
               type="button"
-              onClick={() => setIsCustomerModalOpen(true)}
-              className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-bold border border-outline-variant/30 flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+              onClick={() => setIsScannerOpen(true)}
+              className="h-9 px-3 bg-primary text-on-primary rounded-xl flex items-center gap-1 font-semibold text-xs shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              title="Camera Scanner"
             >
-              <span className="material-symbols-outlined text-[15px]">person_search</span>
-              <span>{customer.party ? 'Change' : 'Select Customer'}</span>
+              <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+              <span className="hidden sm:inline">Scan</span>
             </button>
-          </div>
-        </div>
 
-        {/* Scan & Quick SKU Search Bar */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 flex items-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30 px-3.5 py-2.5 shadow-xs focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all">
-            <span className="material-symbols-outlined text-outline text-[20px] mr-2">
-              barcode_scanner
-            </span>
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Scan Barcode or Search Item / SKU / HSN (F2 or /)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent text-xs sm:text-sm text-on-surface placeholder:text-outline outline-none"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="text-outline hover:text-on-surface ml-1 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
-          </div>
-
-          {/* Camera Scanner Button */}
-          <button
-            type="button"
-            onClick={() => setIsScannerOpen(true)}
-            className="h-10 px-3.5 bg-primary text-on-primary rounded-2xl flex items-center gap-1.5 font-label-md text-xs font-semibold shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
-            title="Scan barcode with device camera"
-          >
-            <span className="material-symbols-outlined text-[18px]">photo_camera</span>
-            <span className="hidden sm:inline">Camera</span>
-          </button>
-
-          {/* Add Custom Non-Catalog Item Button */}
-          <button
-            type="button"
-            onClick={() => setIsCustomItemModalOpen(true)}
-            className="h-10 px-3 bg-surface-container-lowest text-on-surface border border-outline-variant/30 hover:border-secondary rounded-2xl flex items-center gap-1 text-xs font-bold shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
-            title="Add Custom / Service Line Item (F8)"
-          >
-            <span className="material-symbols-outlined text-[18px] text-secondary">add_box</span>
-            <span className="hidden sm:inline">+ Custom</span>
-          </button>
-        </div>
-
-        {/* Scan Notification Alert Banner */}
-        {scanMessage && (
-          <div
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md animate-fade-in ${
-              scanMessage.isError
-                ? 'bg-error text-on-error'
-                : 'bg-secondary text-on-secondary'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">
-              {scanMessage.isError ? 'error' : 'check_circle'}
-            </span>
-            <span>{scanMessage.text}</span>
-          </div>
-        )}
-
-        {/* Category Pills Carousel & View Mode Toggle */}
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 flex-1">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-full font-label-md text-xs font-semibold shadow-xs transition-all flex-shrink-0 cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-secondary text-on-secondary font-bold'
-                    : 'bg-surface-container-lowest text-on-surface border border-outline-variant/30 hover:bg-surface-container-low'
-                }`}
-              >
-                {cat === 'ALL' ? 'All Items' : cat}
-              </button>
-            ))}
-          </div>
-
-          {/* View Toggle */}
-          <div className="flex items-center bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-0.5 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setCatalogViewMode('GRID')}
-              className={`p-1.5 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                catalogViewMode === 'GRID'
-                  ? 'bg-secondary text-on-secondary'
-                  : 'text-outline hover:text-on-surface'
-              }`}
-              title="Grid View"
-            >
-              <span className="material-symbols-outlined text-[16px]">grid_view</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCatalogViewMode('LIST')}
-              className={`p-1.5 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
-                catalogViewMode === 'LIST'
-                  ? 'bg-secondary text-on-secondary'
-                  : 'text-outline hover:text-on-surface'
-              }`}
-              title="Dense List View"
-            >
-              <span className="material-symbols-outlined text-[16px]">view_list</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Items Section Header */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-secondary text-[18px]">
-              inventory_2
-            </span>
-            <h2 className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">
-              Catalog Items ({filteredItems.length})
-            </h2>
-          </div>
-          <span className="text-[11px] text-outline">Tap item to punch into cart</span>
-        </div>
-
-        {/* Catalog Items Display (Grid or Dense List) */}
-        {filteredItems.length === 0 ? (
-          <div className="h-48 flex flex-col items-center justify-center text-outline gap-2 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/40">
-            <span className="material-symbols-outlined text-4xl text-outline-variant">search_off</span>
-            <p className="text-xs font-semibold">No items match your filter.</p>
+            {/* Add Custom Non-Catalog Item Button */}
             <button
               type="button"
               onClick={() => setIsCustomItemModalOpen(true)}
-              className="text-xs text-secondary font-bold hover:underline cursor-pointer"
+              className="h-9 px-3 bg-surface-container-lowest text-on-surface border border-outline-variant/30 hover:border-secondary rounded-xl flex items-center gap-1 text-xs font-bold shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              title="Add Custom Line Item (F8)"
             >
-              + Add Custom Item to Cart
+              <span className="material-symbols-outlined text-[16px] text-secondary">add_box</span>
+              <span>+ Custom</span>
             </button>
           </div>
-        ) : catalogViewMode === 'GRID' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pb-6">
-            {filteredItems.map((item) => {
-              const inCartQty = cart.find((c) => c.item.id === item.id)?.qty || 0;
-              const isLowStock = (item.currentStock || 0) <= (item.minStockAlert || 0);
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className={`bg-surface-container-lowest rounded-2xl p-3 shadow-xs border transition-all cursor-pointer flex flex-col justify-between select-none relative group ${
-                    inCartQty > 0
-                      ? 'border-secondary ring-1 ring-secondary/50 bg-secondary-container/5'
-                      : 'border-outline-variant/30 hover:border-secondary hover:shadow-sm'
+          {/* Scan Alert Notification */}
+          {scanMessage && (
+            <div
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm animate-fade-in ${
+                scanMessage.isError
+                  ? 'bg-error text-on-error'
+                  : 'bg-secondary text-on-secondary'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">
+                {scanMessage.isError ? 'error' : 'check_circle'}
+              </span>
+              <span>{scanMessage.text}</span>
+            </div>
+          )}
+
+          {/* Category Carousel & View Mode Toggle */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 flex-1">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-all flex-shrink-0 cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-secondary text-on-secondary font-bold'
+                      : 'bg-surface-container-lowest text-on-surface border border-outline-variant/25 hover:bg-surface-container-low'
                   }`}
                 >
-                  {/* Top line with Stock Badge and GST Slab */}
-                  <div className="flex items-center justify-between gap-1 mb-2">
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                        isLowStock
-                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                          : 'bg-surface-container text-outline'
-                      }`}
-                    >
-                      Stock: {item.currentStock}
-                    </span>
+                  {cat === 'ALL' ? 'All' : cat}
+                </button>
+              ))}
+            </div>
 
-                    <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
-                      {item.gstRate}% GST
-                    </span>
-                  </div>
-
-                  {/* Item Details */}
-                  <div className="min-w-0">
-                    <p className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface truncate group-hover:text-secondary transition-colors">
-                      {item.name}
-                    </p>
-                    <p className="text-[11px] text-outline truncate mt-0.5">
-                      {item.hsnSacCode ? `HSN ${item.hsnSacCode}` : item.category || 'General'}
-                    </p>
-                  </div>
-
-                  {/* Price and Add Action */}
-                  <div className="mt-3 pt-2 border-t border-outline-variant/20 flex items-center justify-between">
-                    <div className="flex items-baseline gap-0.5">
-                      <span className="font-headline-sm text-xs sm:text-sm font-black text-on-surface font-tabular-data">
-                        {formatINR(item.salePrice)}
-                      </span>
-                      <span className="text-[10px] text-outline">/{item.unit.toLowerCase()}</span>
-                    </div>
-
-                    {inCartQty > 0 ? (
-                      <span className="h-6 px-2 bg-secondary text-on-secondary rounded-lg font-bold text-xs flex items-center gap-1 shadow-xs">
-                        <span>{inCartQty} in cart</span>
-                      </span>
-                    ) : (
-                      <span className="w-7 h-7 bg-surface-container group-hover:bg-secondary group-hover:text-on-secondary rounded-xl text-outline flex items-center justify-center transition-colors">
-                        <span className="material-symbols-outlined text-[16px]">add</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            <div className="flex items-center bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-0.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setCatalogViewMode('GRID')}
+                className={`p-1 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
+                  catalogViewMode === 'GRID'
+                    ? 'bg-secondary text-on-secondary'
+                    : 'text-outline hover:text-on-surface'
+                }`}
+                title="Grid Cards"
+              >
+                <span className="material-symbols-outlined text-[16px]">grid_view</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCatalogViewMode('LIST')}
+                className={`p-1 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
+                  catalogViewMode === 'LIST'
+                    ? 'bg-secondary text-on-secondary'
+                    : 'text-outline hover:text-on-surface'
+                }`}
+                title="Dense List"
+              >
+                <span className="material-symbols-outlined text-[16px]">view_list</span>
+              </button>
+            </div>
           </div>
-        ) : (
-          /* Dense List View */
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 shadow-xs pb-6">
-            {filteredItems.map((item) => {
-              const inCartQty = cart.find((c) => c.item.id === item.id)?.qty || 0;
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className={`p-2.5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors cursor-pointer select-none ${
-                    inCartQty > 0 ? 'bg-secondary-container/10' : ''
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-on-surface truncate">
-                        {item.name}
+        </div>
+
+        {/* Catalog Items Container (Scrollable only here) */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-3">
+          {filteredItems.length === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center text-outline gap-2 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/40">
+              <span className="material-symbols-outlined text-4xl text-outline-variant">search_off</span>
+              <p className="text-xs font-semibold text-on-surface">No matching items found.</p>
+              <button
+                type="button"
+                onClick={() => setIsCustomItemModalOpen(true)}
+                className="text-xs text-secondary font-bold hover:underline cursor-pointer"
+              >
+                + Add Custom Item to Bill
+              </button>
+            </div>
+          ) : catalogViewMode === 'GRID' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pb-4">
+              {filteredItems.map((item) => {
+                const inCartQty = cart.find((c) => c.item.id === item.id)?.qty || 0;
+                const isLowStock = (item.currentStock || 0) <= (item.minStockAlert || 0);
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => addToCart(item)}
+                    className={`bg-surface-container-lowest rounded-xl p-3 shadow-xs border transition-all cursor-pointer flex flex-col justify-between select-none relative group ${
+                      inCartQty > 0
+                        ? 'border-secondary ring-1 ring-secondary/50 bg-secondary-container/5'
+                        : 'border-outline-variant/25 hover:border-secondary hover:shadow-sm'
+                    }`}
+                  >
+                    {/* Top line with Stock Badge and GST Rate */}
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                          isLowStock
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                            : 'bg-surface-container text-outline'
+                        }`}
+                      >
+                        Stock: {item.currentStock}
                       </span>
+
                       <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
                         {item.gstRate}%
                       </span>
                     </div>
-                    <div className="text-[11px] text-outline mt-0.5 flex items-center gap-2">
-                      <span>HSN: {item.hsnSacCode || '-'}</span>
-                      <span>•</span>
-                      <span>Stock: {item.currentStock} {item.unit}</span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-on-surface font-tabular-data">
-                        {formatINR(item.salePrice)}
+                    {/* Item Details (Clean, NO HSN) */}
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-on-surface truncate group-hover:text-secondary transition-colors">
+                        {item.name}
+                      </p>
+                      <p className="text-[11px] text-outline truncate mt-0.5">
+                        {item.category || 'General'}
+                      </p>
+                    </div>
+
+                    {/* Price and Add Action */}
+                    <div className="mt-2.5 pt-2 border-t border-outline-variant/15 flex items-center justify-between">
+                      <div className="flex items-baseline gap-0.5">
+                        <span className="text-xs sm:text-sm font-black text-on-surface font-tabular-data">
+                          {formatINR(item.salePrice)}
+                        </span>
+                        <span className="text-[10px] text-outline">/{item.unit.toLowerCase()}</span>
                       </div>
-                      <div className="text-[10px] text-outline">/{item.unit.toLowerCase()}</div>
+
+                      {inCartQty > 0 ? (
+                        <span className="h-6 px-2 bg-secondary text-on-secondary rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs">
+                          <span>{inCartQty}</span>
+                        </span>
+                      ) : (
+                        <span className="w-6 h-6 bg-surface-container group-hover:bg-secondary group-hover:text-on-secondary rounded-lg text-outline flex items-center justify-center transition-colors">
+                          <span className="material-symbols-outlined text-[15px]">add</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Dense List View (Clean, NO HSN) */
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/25 overflow-hidden divide-y divide-outline-variant/15 shadow-xs mb-4">
+              {filteredItems.map((item) => {
+                const inCartQty = cart.find((c) => c.item.id === item.id)?.qty || 0;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => addToCart(item)}
+                    className={`p-2.5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors cursor-pointer select-none ${
+                      inCartQty > 0 ? 'bg-secondary-container/10' : ''
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-on-surface truncate">
+                          {item.name}
+                        </span>
+                        <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
+                          {item.gstRate}%
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-outline mt-0.5 flex items-center gap-2">
+                        <span>{item.category || 'General'}</span>
+                        <span>•</span>
+                        <span>Stock: {item.currentStock} {item.unit}</span>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer ${
-                        inCartQty > 0
-                          ? 'bg-secondary text-on-secondary'
-                          : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[15px]">
-                        {inCartQty > 0 ? 'check' : 'add'}
-                      </span>
-                      <span>{inCartQty > 0 ? inCartQty : 'Add'}</span>
-                    </button>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-on-surface font-tabular-data">
+                          {formatINR(item.salePrice)}
+                        </div>
+                        <div className="text-[10px] text-outline">/{item.unit.toLowerCase()}</div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer ${
+                          inCartQty > 0
+                            ? 'bg-secondary text-on-secondary'
+                            : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {inCartQty > 0 ? 'check' : 'add'}
+                        </span>
+                        <span>{inCartQty > 0 ? inCartQty : 'Add'}</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ======================================================== */}
       {/* Right Desktop/Tablet Cart & Checkout Pane (md:col-span-5) */}
       {/* ======================================================== */}
-      <div className="hidden md:flex md:col-span-5 bg-surface-container-low flex-col h-full border-t md:border-t-0 overflow-hidden">
-        {/* Cart Header */}
-        <div className="p-3.5 border-b border-outline-variant/30 flex items-center justify-between bg-surface-container-lowest shadow-xs">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary text-[22px]">shopping_cart</span>
-            <span className="font-label-md text-sm font-bold text-on-surface">
-              Active Bill ({totalCartCount} Items)
-            </span>
+      <div className="hidden md:flex md:col-span-5 bg-surface-container-low flex-col h-full overflow-hidden border-t md:border-t-0">
+        {/* Cart Top Section: Customer Selection Bar (Moved to Cart Side) */}
+        <div className="flex-shrink-0 p-2.5 bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <div
+              onClick={() => setIsCustomerModalOpen(true)}
+              className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:opacity-85 transition-opacity"
+            >
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold flex-shrink-0 ${
+                  customer.party
+                    ? 'bg-secondary/10 text-secondary'
+                    : 'bg-surface-container text-outline'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {customer.party ? 'person' : 'storefront'}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-on-surface truncate">
+                    {customer.party ? customer.party.name : 'Walk-in Retail Customer'}
+                  </span>
+                  <span
+                    className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                      customer.isB2b
+                        ? 'bg-primary/10 text-primary font-mono'
+                        : 'bg-surface-container text-outline'
+                    }`}
+                  >
+                    {customer.isB2b ? 'B2B' : 'B2C'}
+                  </span>
+                </div>
+                <div className="text-[10px] text-outline truncate flex items-center gap-1.5 mt-0.5">
+                  <span>{customer.phone || 'Tap to select customer'}</span>
+                  {customer.party && (customer.party.currentBalance || 0) !== 0 && (
+                    <span
+                      className={`font-semibold ${
+                        customer.party.currentBalance > 0 ? 'text-amber-600' : 'text-secondary'
+                      }`}
+                    >
+                      • Bal: {formatINR(customer.party.currentBalance)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {customer.party && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectCustomer(null)}
+                  className="w-6 h-6 rounded-md hover:bg-surface-container text-outline flex items-center justify-center cursor-pointer"
+                  title="Reset to Walk-in"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="px-2 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-[11px] font-bold border border-outline-variant/30 flex items-center gap-0.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[13px]">person_search</span>
+                <span>{customer.party ? 'Change' : 'Select'}</span>
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Cart Sub-Header (Items Count, Hold, Clear) */}
+        <div className="flex-shrink-0 px-3 py-2 bg-surface-container-lowest/80 border-b border-outline-variant/20 flex items-center justify-between text-xs">
+          <span className="font-bold text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-secondary text-[17px]">shopping_cart</span>
+            <span>Current Bill ({totalCartCount})</span>
+          </span>
 
           <div className="flex items-center gap-2">
             {cart.length > 0 && (
@@ -952,20 +930,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 <button
                   type="button"
                   onClick={handleHoldBill}
-                  className="px-2.5 py-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                  title="Park this customer's bill (F4)"
+                  className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Hold Bill (F4)"
                 >
-                  <span className="material-symbols-outlined text-[14px]">pause</span>
-                  <span>Hold (F4)</span>
+                  <span className="material-symbols-outlined text-[13px]">pause</span>
+                  <span>Hold</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('Clear all items from current cart?')) {
-                      setCart([]);
-                    }
+                    if (window.confirm('Clear all items from bill?')) setCart([]);
                   }}
-                  className="text-xs text-error font-medium hover:underline cursor-pointer"
+                  className="text-[11px] text-error hover:underline cursor-pointer"
                 >
                   Clear
                 </button>
@@ -974,32 +950,32 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           </div>
         </div>
 
-        {/* Itemized Cart List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {/* Item Table in Cart - THIS IS THE ONLY SCROLLABLE AREA IN THE CART */}
+        <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-2">
           {cart.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-outline gap-2">
-              <div className="w-14 h-14 rounded-full bg-surface-container flex items-center justify-center text-outline-variant">
-                <span className="material-symbols-outlined text-3xl">point_of_sale</span>
+            <div className="h-full flex flex-col items-center justify-center text-outline gap-2 py-12">
+              <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-outline-variant">
+                <span className="material-symbols-outlined text-2xl">point_of_sale</span>
               </div>
-              <p className="text-xs font-semibold text-on-surface">POS Cart is Empty</p>
+              <p className="text-xs font-semibold text-on-surface">Cart is Empty</p>
               <p className="text-[11px] text-outline text-center max-w-xs">
-                Scan barcode guns or tap catalog items on the shelf to ring up the sale.
+                Tap items from catalog or scan barcodes to begin sale.
               </p>
             </div>
           ) : (
-            cart.map(({ item, qty, unitPrice, discountPercent }) => (
+            cart.map(({ item, qty, unitPrice }) => (
               <div
                 key={item.id}
-                className="bg-surface-container-lowest p-3 rounded-2xl border border-outline-variant/20 shadow-xs flex flex-col gap-2 hover:border-secondary/30 transition-all"
+                className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 shadow-xs flex flex-col gap-1.5 hover:border-secondary/30 transition-all"
               >
-                {/* Line 1: Item Name, Rate, Delete */}
+                {/* Line 1: Clean Name, Unit/GST, Delete */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="font-label-md text-xs font-bold text-on-surface truncate block">
+                    <span className="text-xs font-bold text-on-surface truncate block">
                       {item.name}
                     </span>
                     <span className="text-[10px] text-outline">
-                      HSN {item.hsnSacCode || '-'} • {item.gstRate}% GST
+                      {item.unit} • {item.gstRate}% GST
                     </span>
                   </div>
 
@@ -1009,18 +985,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     className="text-outline hover:text-error cursor-pointer p-0.5"
                     title="Remove item"
                   >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
                   </button>
                 </div>
 
-                {/* Line 2: Quantity Controls, Unit Price Input, and Subtotal */}
+                {/* Line 2: Quantity Stepper, Editable Rate, and Line Total */}
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/10">
-                  {/* Quantity Stepper & Inline Edit */}
-                  <div className="flex items-center gap-1 bg-surface-container-low rounded-xl p-0.5 border border-outline-variant/30">
+                  {/* Stepper with Direct Input */}
+                  <div className="flex items-center gap-1 bg-surface-container-low rounded-lg p-0.5 border border-outline-variant/25">
                     <button
                       type="button"
                       onClick={() => updateCartQty(item.id, qty - 1)}
-                      className="w-6 h-6 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       -
                     </button>
@@ -1032,20 +1008,20 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         const val = parseInt(e.target.value) || 1;
                         updateCartQty(item.id, Math.max(1, val));
                       }}
-                      className="w-10 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
+                      className="w-8 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
                     />
                     <button
                       type="button"
                       onClick={() => updateCartQty(item.id, qty + 1)}
-                      className="w-6 h-6 rounded-lg bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       +
                     </button>
                   </div>
 
-                  {/* Unit Price Rate Input */}
+                  {/* Inline Rate Input */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-outline">Rate ₹</span>
+                    <span className="text-[10px] text-outline">₹</span>
                     <input
                       type="number"
                       step="0.01"
@@ -1055,11 +1031,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         const val = parseFloat(e.target.value) || 0;
                         updateCartPrice(item.id, val);
                       }}
-                      className="w-16 bg-surface-container-low border border-outline-variant/30 rounded-lg px-1.5 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
+                      className="w-14 bg-surface-container-low border border-outline-variant/25 rounded-md px-1 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
                     />
                   </div>
 
-                  {/* Line Total */}
+                  {/* Subtotal */}
                   <div className="text-right">
                     <div className="text-xs font-bold text-on-surface font-tabular-data">
                       {formatINR(qty * unitPrice)}
@@ -1071,34 +1047,34 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           )}
         </div>
 
-        {/* Cart Summary & Checkout Dock */}
+        {/* Fixed Summary & Checkout Dock (Never scrolls away) */}
         {cart.length > 0 && (
-          <div className="p-3.5 bg-surface-container-lowest border-t border-outline-variant/30 space-y-2.5 shadow-xl">
-            {/* Bill Level Adjustments (Discount & Additional Charges) */}
+          <div className="flex-shrink-0 p-3 bg-surface-container-lowest border-t border-outline-variant/25 space-y-2 shadow-xl">
+            {/* Bill Adjustments: Discount & Extra Charges */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-1.5 bg-surface-container-low px-2 py-1.5 rounded-xl border border-outline-variant/20">
-                <span className="text-[11px] text-outline font-semibold">Bill Disc</span>
+              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/20">
+                <span className="text-[10px] text-outline font-semibold">Disc</span>
                 <input
                   type="number"
                   min="0"
                   placeholder="0"
                   value={cartDiscountValue || ''}
                   onChange={(e) => setCartDiscountValue(parseFloat(e.target.value) || 0)}
-                  className="w-12 bg-transparent text-xs font-bold outline-none font-tabular-data text-on-surface"
+                  className="w-10 bg-transparent text-xs font-bold outline-none font-tabular-data text-on-surface"
                 />
                 <button
                   type="button"
                   onClick={() =>
                     setCartDiscountType(cartDiscountType === 'FLAT' ? 'PERCENT' : 'FLAT')
                   }
-                  className="text-[10px] font-bold text-secondary px-1 py-0.2 rounded bg-surface-container-lowest border border-outline-variant/30 cursor-pointer"
+                  className="text-[9px] font-bold text-secondary px-1 py-0.2 rounded bg-surface-container-lowest border border-outline-variant/30 cursor-pointer"
                 >
                   {cartDiscountType === 'FLAT' ? '₹' : '%'}
                 </button>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-surface-container-low px-2 py-1.5 rounded-xl border border-outline-variant/20">
-                <span className="text-[11px] text-outline font-semibold">Extra/Ship ₹</span>
+              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/20">
+                <span className="text-[10px] text-outline font-semibold">Extra ₹</span>
                 <input
                   type="number"
                   min="0"
@@ -1110,66 +1086,60 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               </div>
             </div>
 
-            {/* Tax & Grand Total Breakdown */}
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between text-outline">
-                <span>Taxable Value</span>
+            {/* Totals Summary */}
+            <div className="space-y-0.5 text-xs">
+              <div className="flex justify-between text-outline text-[11px]">
+                <span>Taxable</span>
                 <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
               </div>
-              <div className="flex justify-between text-outline items-center">
+              <div className="flex justify-between text-outline text-[11px] items-center">
                 <button
                   type="button"
                   onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
                   className="flex items-center gap-0.5 text-secondary font-semibold hover:underline cursor-pointer"
                 >
-                  <span>Total GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
-                  <span className="material-symbols-outlined text-[14px]">
+                  <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
+                  <span className="material-symbols-outlined text-[13px]">
                     {showTaxBreakdown ? 'expand_less' : 'expand_more'}
                   </span>
                 </button>
                 <span className="font-tabular-data">{formatINR(calcSummary.totalTax)}</span>
               </div>
 
-              {/* Detailed GST Slabs when expanded */}
+              {/* Collapsible Tax Detail */}
               {showTaxBreakdown && (
-                <div className="p-2 bg-surface-container-low rounded-xl border border-outline-variant/20 space-y-1 text-[11px] text-on-surface-variant">
+                <div className="p-1.5 bg-surface-container-low rounded-lg border border-outline-variant/20 space-y-0.5 text-[10px] text-on-surface-variant">
                   {isIntraState ? (
                     <>
                       <div className="flex justify-between">
-                        <span>Output CGST</span>
-                        <span>{formatINR(calcSummary.totalCgst)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Output SGST</span>
-                        <span>{formatINR(calcSummary.totalSgst)}</span>
+                        <span>CGST: {formatINR(calcSummary.totalCgst)}</span>
+                        <span>SGST: {formatINR(calcSummary.totalSgst)}</span>
                       </div>
                     </>
                   ) : (
                     <div className="flex justify-between">
-                      <span>Output IGST (Inter-State)</span>
-                      <span>{formatINR(calcSummary.totalIgst)}</span>
+                      <span>IGST: {formatINR(calcSummary.totalIgst)}</span>
                     </div>
                   )}
                   {calcSummary.roundOff !== 0 && (
                     <div className="flex justify-between text-outline">
-                      <span>Round Off</span>
-                      <span>{calcSummary.roundOff > 0 ? `+₹${calcSummary.roundOff}` : `₹${calcSummary.roundOff}`}</span>
+                      <span>Round Off: {calcSummary.roundOff > 0 ? `+₹${calcSummary.roundOff}` : `₹${calcSummary.roundOff}`}</span>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Grand Total */}
-              <div className="flex justify-between font-black text-base text-on-surface pt-1.5 border-t border-outline-variant/20 items-baseline">
-                <span>Grand Total</span>
-                <span className="text-secondary text-xl font-tabular-data">
+              <div className="flex justify-between font-black text-on-surface pt-1 border-t border-outline-variant/20 items-baseline">
+                <span className="text-xs">Grand Total</span>
+                <span className="text-secondary text-lg font-tabular-data">
                   {formatINR(finalPayableTotal)}
                 </span>
               </div>
             </div>
 
             {/* Payment Mode Selector Tabs */}
-            <div className="grid grid-cols-5 gap-1 pt-1">
+            <div className="grid grid-cols-5 gap-1 pt-0.5">
               {(['CASH', 'UPI', 'CARD', 'CREDIT', 'SPLIT'] as const).map((mode) => (
                 <button
                   key={mode}
@@ -1179,7 +1149,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     if (mode === 'UPI') setIsUpiModalOpen(true);
                     if (mode === 'SPLIT') setIsSplitModalOpen(true);
                   }}
-                  className={`py-1.5 rounded-xl text-[11px] font-bold cursor-pointer transition-colors ${
+                  className={`py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
                     paymentMode === mode
                       ? 'bg-secondary text-on-secondary shadow-xs'
                       : 'bg-surface-container-low border border-outline-variant/25 text-on-surface hover:bg-surface-container'
@@ -1190,49 +1160,46 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               ))}
             </div>
 
-            {/* Cash Tendered Calculator (Visible when CASH is selected) */}
+            {/* Cash Tendered Calculator (Clean, visible only on CASH) */}
             {paymentMode === 'CASH' && (
-              <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/20 space-y-1.5">
+              <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/20 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-outline font-semibold">Cash Tendered:</span>
+                  <span className="text-[10px] text-outline font-semibold">Cash Given:</span>
                   <input
                     type="number"
                     placeholder={`e.g. ${finalPayableTotal}`}
                     value={cashTendered}
                     onChange={(e) => setCashTendered(e.target.value)}
-                    className="w-24 bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2 py-1 text-xs font-black text-on-surface outline-none focus:border-secondary font-tabular-data text-right"
+                    className="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-md px-1.5 py-0.5 text-xs font-black text-on-surface outline-none focus:border-secondary font-tabular-data text-right"
                   />
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCashTendered(finalPayableTotal.toString())}
+                      className="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded text-[9px] font-bold text-secondary cursor-pointer"
+                    >
+                      Exact
+                    </button>
+                    {[100, 500, 2000].map((preset) => {
+                      if (preset < finalPayableTotal) return null;
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setCashTendered(preset.toString())}
+                          className="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded text-[9px] font-bold text-outline cursor-pointer"
+                        >
+                          ₹{preset}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Quick Tender Preset Chips */}
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setCashTendered(finalPayableTotal.toString())}
-                    className="px-2 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-[10px] font-bold text-secondary cursor-pointer hover:bg-surface-container"
-                  >
-                    Exact
-                  </button>
-                  {[50, 100, 200, 500, 2000].map((preset) => {
-                    if (preset < finalPayableTotal) return null;
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setCashTendered(preset.toString())}
-                        className="px-2 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-[10px] font-bold text-outline hover:text-on-surface cursor-pointer"
-                      >
-                        ₹{preset}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Change Due Return Alert */}
                 {cashChangeDue > 0 && (
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-outline-variant/15 font-bold text-emerald-600 dark:text-emerald-400">
                     <span>Return Change:</span>
-                    <span className="font-tabular-data text-sm font-black">
+                    <span className="font-tabular-data font-black">
                       {formatINR(cashChangeDue)}
                     </span>
                   </div>
@@ -1240,13 +1207,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               </div>
             )}
 
-            {/* Charge Button */}
+            {/* Checkout Action Button */}
             <button
               type="button"
               onClick={() => handleCheckout()}
-              className="w-full py-3 bg-secondary text-on-secondary rounded-2xl font-black text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 bg-secondary text-on-secondary rounded-xl font-bold text-xs sm:text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px]">payments</span>
+              <span className="material-symbols-outlined text-[18px]">payments</span>
               <span>Charge {formatINR(finalPayableTotal)} & Print (F9)</span>
             </button>
           </div>
@@ -1257,14 +1224,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {/* Mobile Floating Sticky Cart Bar                          */}
       {/* ======================================================== */}
       {cart.length > 0 && !isMobileCartDrawerOpen && (
-        <div className="md:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-3 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-sm shadow-xs">
+        <div className="md:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-2.5 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-xs shadow-xs">
               {totalCartCount}
             </div>
             <div>
-              <div className="font-label-md text-xs text-surface-variant">POS Total</div>
-              <div className="font-currency-display-mobile text-base font-bold text-surface">
+              <div className="text-[10px] text-surface-variant font-medium">Bill Total</div>
+              <div className="text-sm font-bold text-surface">
                 {formatINR(finalPayableTotal)}
               </div>
             </div>
@@ -1273,10 +1240,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           <button
             type="button"
             onClick={() => setIsMobileCartDrawerOpen(true)}
-            className="px-4 py-2 bg-secondary text-on-secondary rounded-xl font-label-md text-xs font-bold shadow-md active:scale-95 transition-transform flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-1.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md active:scale-95 transition-transform flex items-center gap-1 cursor-pointer"
           >
-            <span>View Bill</span>
-            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            <span>View Cart ({totalCartCount})</span>
+            <span className="material-symbols-outlined text-[15px]">arrow_forward</span>
           </button>
         </div>
       )}
@@ -1287,42 +1254,62 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {isMobileCartDrawerOpen && (
         <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
           <div className="bg-surface-container-lowest rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border-t border-outline-variant/30">
-            {/* Header */}
-            <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-[22px]">
-                  shopping_cart
-                </span>
-                <span className="font-headline-sm text-base font-bold text-on-surface">
-                  Current Bill ({totalCartCount} Items)
-                </span>
+            {/* Mobile Drawer Header with Customer Selection */}
+            <div className="p-3 border-b border-outline-variant/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-secondary text-[20px]">
+                    shopping_cart
+                  </span>
+                  <span className="text-sm font-bold text-on-surface">
+                    Current Bill ({totalCartCount} Items)
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleHoldBill}
+                    className="px-2 py-0.5 text-xs text-amber-700 bg-amber-500/10 rounded-lg font-bold"
+                  >
+                    Hold
+                  </button>
+                  <button
+                    onClick={() => setIsMobileCartDrawerOpen(false)}
+                    className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-outline cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleHoldBill}
-                  className="px-2.5 py-1 text-xs text-amber-700 bg-amber-500/10 rounded-lg font-bold"
-                >
-                  Hold Bill
-                </button>
-                <button
-                  onClick={() => setIsMobileCartDrawerOpen(false)}
-                  className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+
+              {/* Customer Row on Mobile Cart */}
+              <div
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="p-2 bg-surface-container-low rounded-xl border border-outline-variant/20 flex items-center justify-between cursor-pointer"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="material-symbols-outlined text-secondary text-[16px]">
+                    {customer.party ? 'person' : 'storefront'}
+                  </span>
+                  <span className="text-xs font-bold text-on-surface truncate">
+                    {customer.party ? customer.party.name : 'Walk-in Retail Customer'}
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-secondary">
+                  {customer.party ? 'Change' : 'Select'}
+                </span>
               </div>
             </div>
 
-            {/* Cart Items List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+            {/* Cart Items List (Clean, NO HSN) */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {cart.map(({ item, qty, unitPrice }) => (
                 <div
                   key={item.id}
-                  className="bg-surface-container-low/70 p-3 rounded-2xl border border-outline-variant/20 flex items-center justify-between gap-2"
+                  className="bg-surface-container-low/70 p-2.5 rounded-xl border border-outline-variant/20 flex items-center justify-between gap-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="font-label-md text-xs font-bold text-on-surface truncate">
+                    <div className="text-xs font-bold text-on-surface truncate">
                       {item.name}
                     </div>
                     <div className="text-[11px] text-outline mt-0.5">
@@ -1330,17 +1317,17 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => updateCartQty(item.id, qty - 1)}
-                      className="w-7 h-7 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       -
                     </button>
-                    <span className="w-6 text-center text-xs font-bold">{qty}</span>
+                    <span className="w-5 text-center text-xs font-bold">{qty}</span>
                     <button
                       onClick={() => updateCartQty(item.id, qty + 1)}
-                      className="w-7 h-7 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       +
                     </button>
@@ -1348,7 +1335,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       onClick={() => removeFromCart(item.id)}
                       className="text-outline hover:text-error ml-1 cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      <span className="material-symbols-outlined text-[15px]">delete</span>
                     </button>
                   </div>
                 </div>
@@ -1356,19 +1343,19 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             </div>
 
             {/* Summary & Checkout Footer */}
-            <div className="p-4 bg-surface-container-low/50 border-t border-outline-variant/20 space-y-3">
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between text-outline">
+            <div className="p-3 bg-surface-container-low/50 border-t border-outline-variant/20 space-y-2.5">
+              <div className="space-y-0.5 text-xs">
+                <div className="flex justify-between text-outline text-[11px]">
                   <span>Taxable Subtotal</span>
                   <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
                 </div>
-                <div className="flex justify-between text-outline">
+                <div className="flex justify-between text-outline text-[11px]">
                   <span>GST Total</span>
                   <span>{formatINR(calcSummary.totalTax)}</span>
                 </div>
-                <div className="flex justify-between font-black text-base text-on-surface pt-1 border-t border-outline-variant/20">
-                  <span>Grand Total</span>
-                  <span className="text-secondary text-lg">{formatINR(finalPayableTotal)}</span>
+                <div className="flex justify-between font-black text-on-surface pt-1 border-t border-outline-variant/20">
+                  <span className="text-xs">Grand Total</span>
+                  <span className="text-secondary text-base">{formatINR(finalPayableTotal)}</span>
                 </div>
               </div>
 
@@ -1383,7 +1370,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       if (mode === 'UPI') setIsUpiModalOpen(true);
                       if (mode === 'SPLIT') setIsSplitModalOpen(true);
                     }}
-                    className={`py-1.5 rounded-xl text-[10px] font-bold cursor-pointer transition-colors ${
+                    className={`py-1 rounded-lg text-[9px] font-bold cursor-pointer transition-colors ${
                       paymentMode === mode
                         ? 'bg-secondary text-on-secondary shadow-xs'
                         : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface'
@@ -1398,9 +1385,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleCheckout()}
-                className="w-full py-3 bg-secondary text-on-secondary rounded-2xl font-black text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 bg-secondary text-on-secondary rounded-xl font-bold text-xs sm:text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[20px]">print</span>
+                <span className="material-symbols-outlined text-[18px]">print</span>
                 <span>Charge {formatINR(finalPayableTotal)} & Print</span>
               </button>
             </div>
@@ -1431,7 +1418,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           onAddCustomItem={(item, initialQty) => {
             addToCart(item, initialQty);
             audioService.playScanSuccess();
-            setScanMessage({ text: `Added Custom: ${item.name}` });
+            setScanMessage({ text: `Added: ${item.name}` });
             setTimeout(() => setScanMessage(null), 2500);
           }}
         />
