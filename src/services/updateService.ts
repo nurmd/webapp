@@ -32,8 +32,13 @@ export interface OtaDownloadOptions {
   onError?: (errorMessage: string, canRetry: boolean) => void;
 }
 
-export const CURRENT_APP_VERSION = '1.0.27';
-export const CURRENT_VERSION_CODE = 10027;
+import packageJson from '../../package.json';
+
+export const CURRENT_APP_VERSION = packageJson.version || '1.0.29';
+export const CURRENT_VERSION_CODE = (() => {
+  const parts = CURRENT_APP_VERSION.split('.').map((p) => parseInt(p, 10) || 0);
+  return (parts[0] || 1) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
+})();
 export const DEFAULT_GITHUB_REPO = 'nurmd/webapp';
 
 class UpdateService {
