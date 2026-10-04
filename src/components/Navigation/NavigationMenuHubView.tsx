@@ -367,6 +367,16 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       keywords: ['profit', 'loss', 'p&l', 'margin', 'financials'],
     },
     {
+      id: 'bill_wise_profit',
+      title: 'Bill-Wise Profit Report',
+      subtitle: 'Invoice-level revenue, COGS, gross profit & profit margin',
+      icon: 'receipt_long',
+      category: 'reports',
+      badge: { text: 'New', type: 'primary' },
+      action: () => onNavigate('reports'),
+      keywords: ['bill profit', 'invoice profit', 'margin per bill', 'cogs', 'profitability'],
+    },
+    {
       id: 'daybook_balance_sheet',
       title: 'Balance Sheet & Trial Balance',
       subtitle: 'Assets, liabilities, equity & trial balance verification',

@@ -17,7 +17,7 @@ interface BusinessReportsViewProps {
   parties: Party[];
 }
 
-type ReportCategory = 'ALL' | 'GST' | 'FINANCIAL' | 'PARTIES_STOCK';
+type ReportCategory = 'ALL' | 'GST' | 'FINANCIAL' | 'BILL_WISE' | 'PARTIES_STOCK';
 export type ProfitPeriod = 'TODAY' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'CUSTOM';
 
 const formatDateLocal = (d: Date): string => {
@@ -26,6 +26,59 @@ const formatDateLocal = (d: Date): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
+
+function exportBillWiseProfitCsv(
+  billRows: Array<{
+    invoiceNumber: string;
+    date: string;
+    partyName: string;
+    totalTaxable: number;
+    totalTax: number;
+    grandTotal: number;
+    cogs: number;
+    profit: number;
+    margin: number;
+  }>,
+  dateLabel: string
+) {
+  const headers = [
+    'Invoice Number',
+    'Date',
+    'Customer Name',
+    'Taxable Amount (Rs)',
+    'Tax Amount (Rs)',
+    'Grand Total (Rs)',
+    'Purchase Cost COGS (Rs)',
+    'Profit Amount (Rs)',
+    'Profit Margin (%)',
+  ];
+  const csvRows = [headers.join(',')];
+
+  billRows.forEach((r) => {
+    const row = [
+      `"${r.invoiceNumber.replace(/"/g, '""')}"`,
+      `"${r.date}"`,
+      `"${r.partyName.replace(/"/g, '""')}"`,
+      r.totalTaxable.toFixed(2),
+      r.totalTax.toFixed(2),
+      r.grandTotal.toFixed(2),
+      r.cogs.toFixed(2),
+      r.profit.toFixed(2),
+      r.margin.toFixed(2) + '%',
+    ];
+    csvRows.push(row.join(','));
+  });
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Bill_Wise_Profit_${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   company,
@@ -202,6 +255,93 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
 
   const totalFlow = grossSales + grossPurchases + totalExpenses;
 
+  // Bill-wise Profit Breakdown & Analytics
+  const [billSearch, setBillSearch] = useState('');
+  const [billSortBy, setBillSortBy] = useState<
+    'DATE_DESC' | 'DATE_ASC' | 'PROFIT_DESC' | 'PROFIT_ASC' | 'MARGIN_DESC'
+  >('DATE_DESC');
+  const [expandedBillId, setExpandedBillId] = useState<string | null>(null);
+
+  const billWiseProfitData = useMemo(() => {
+    return periodInvoices.map((inv) => {
+      const taxable = inv.totalTaxableAmount;
+      const cogs = inv.items.reduce((sum, line) => {
+        const pPrice = (line.itemId ? itemCostMap.get(line.itemId) : 0) || 0;
+        return sum + line.quantity * pPrice;
+      }, 0);
+      const profit = taxable - cogs;
+      const margin = taxable > 0 ? (profit / taxable) * 100 : 0;
+
+      const itemBreakdowns = inv.items.map((line) => {
+        const itemTaxable = line.taxableAmount || line.quantity * line.unitPrice;
+        const itemPPrice = (line.itemId ? itemCostMap.get(line.itemId) : 0) || 0;
+        const itemCogs = line.quantity * itemPPrice;
+        const itemProfit = itemTaxable - itemCogs;
+        const itemMargin = itemTaxable > 0 ? (itemProfit / itemTaxable) * 100 : 0;
+        return {
+          name: line.name,
+          quantity: line.quantity,
+          unit: line.unit || 'PCS',
+          salePrice: line.unitPrice,
+          purchasePrice: itemPPrice,
+          taxable: itemTaxable,
+          cogs: itemCogs,
+          profit: itemProfit,
+          margin: itemMargin,
+        };
+      });
+
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date,
+        partyName: inv.partyName || 'Cash Customer',
+        totalTaxable: taxable,
+        totalTax: inv.totalTax,
+        grandTotal: inv.grandTotal,
+        cogs,
+        profit,
+        margin,
+        itemBreakdowns,
+        paymentStatus: inv.paymentStatus,
+      };
+    });
+  }, [periodInvoices, itemCostMap]);
+
+  const filteredBillWiseData = useMemo(() => {
+    let list = billWiseProfitData;
+    if (billSearch.trim()) {
+      const q = billSearch.trim().toLowerCase();
+      list = list.filter(
+        (b) =>
+          b.invoiceNumber.toLowerCase().includes(q) ||
+          b.partyName.toLowerCase().includes(q)
+      );
+    }
+    return [...list].sort((a, b) => {
+      if (billSortBy === 'DATE_DESC') return new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (billSortBy === 'DATE_ASC') return new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (billSortBy === 'PROFIT_DESC') return b.profit - a.profit;
+      if (billSortBy === 'PROFIT_ASC') return a.profit - b.profit;
+      if (billSortBy === 'MARGIN_DESC') return b.margin - a.margin;
+      return 0;
+    });
+  }, [billWiseProfitData, billSearch, billSortBy]);
+
+  const totalBillWiseProfit = useMemo(() => {
+    return filteredBillWiseData.reduce((s, b) => s + b.profit, 0);
+  }, [filteredBillWiseData]);
+
+  const totalBillWiseTaxable = useMemo(() => {
+    return filteredBillWiseData.reduce((s, b) => s + b.totalTaxable, 0);
+  }, [filteredBillWiseData]);
+
+  const totalBillWiseCogs = useMemo(() => {
+    return filteredBillWiseData.reduce((s, b) => s + b.cogs, 0);
+  }, [filteredBillWiseData]);
+
+  const averageBillMargin = totalBillWiseTaxable > 0 ? (totalBillWiseProfit / totalBillWiseTaxable) * 100 : 0;
+
   return (
     <div className="flex flex-col w-full pb-24 max-w-7xl mx-auto px-margin-mobile md:px-6 py-4 gap-space-sm">
       {/* 1. Top Financial Snapshot Banner (Stitch business_reports) */}
@@ -372,6 +512,19 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
         >
           <span className="material-symbols-outlined text-[16px]">account_balance</span>
           <span>Financials (P&amp;L)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveCategory('BILL_WISE')}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-sm ${
+            activeCategory === 'BILL_WISE'
+              ? 'bg-secondary text-on-secondary'
+              : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+          }`}
+          type="button"
+        >
+          <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+          <span>Bill-Wise Profit</span>
         </button>
 
         <button
@@ -548,6 +701,240 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             <span className={`font-black text-sm ${netProfit >= 0 ? 'text-secondary' : 'text-error'}`}>
               {formatINR(netProfit)} ({profitMargin.toFixed(1)}%)
             </span>
+          </div>
+        </section>
+      )}
+
+      {/* 6. SECTION: Bill-Wise Profit Report */}
+      {(activeCategory === 'ALL' || activeCategory === 'FINANCIAL' || activeCategory === 'BILL_WISE') && (
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-secondary">
+                receipt_long
+              </span>
+              <div>
+                <h3 className="font-headline-sm text-sm font-bold text-on-surface">
+                  Bill-Wise Profit Report
+                </h3>
+                <div className="text-[11px] text-on-surface-variant">
+                  Invoice-level revenue, COGS, gross profit &amp; margin breakdown
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-on-surface-variant font-semibold bg-surface-container-low px-2.5 py-0.5 rounded-full border border-outline-variant/30">
+                {dateRange.label}
+              </span>
+              {filteredBillWiseData.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => exportBillWiseProfitCsv(filteredBillWiseData, dateRange.label)}
+                  className="px-2.5 py-1 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-secondary text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Export to CSV"
+                >
+                  <span className="material-symbols-outlined text-[15px]">download</span>
+                  <span>CSV</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Metrics KPI Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col">
+              <span className="text-on-surface-variant font-medium">Billed Sales (Taxable)</span>
+              <span className="font-bold text-on-surface text-sm mt-0.5">
+                {formatINR(totalBillWiseTaxable)}
+              </span>
+              <span className="text-[10px] text-secondary font-semibold">{filteredBillWiseData.length} Bills</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col">
+              <span className="text-on-surface-variant font-medium">Purchase Cost (COGS)</span>
+              <span className="font-bold text-on-surface text-sm mt-0.5">
+                {formatINR(totalBillWiseCogs)}
+              </span>
+              <span className="text-[10px] text-on-surface-variant">Cost of goods sold</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col">
+              <span className="text-on-surface-variant font-medium">Gross Profit</span>
+              <span className={`font-bold text-sm mt-0.5 ${totalBillWiseProfit >= 0 ? 'text-secondary' : 'text-error'}`}>
+                {formatINR(totalBillWiseProfit)}
+              </span>
+              <span className="text-[10px] font-semibold text-secondary">
+                {averageBillMargin.toFixed(1)}% Avg Margin
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-container-low flex flex-col">
+              <span className="text-on-surface-variant font-medium">Avg Profit per Bill</span>
+              <span className="font-bold text-on-surface text-sm mt-0.5">
+                {formatINR(filteredBillWiseData.length > 0 ? totalBillWiseProfit / filteredBillWiseData.length : 0)}
+              </span>
+              <span className="text-[10px] text-on-surface-variant">Per invoice average</span>
+            </div>
+          </div>
+
+          {/* Search & Sort Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+            <div className="relative flex-1 max-w-sm">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Search bill no or customer..."
+                value={billSearch}
+                onChange={(e) => setBillSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-outline-variant/40 bg-surface text-on-surface text-xs outline-none focus:border-secondary"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 self-end sm:self-auto text-xs">
+              <span className="text-on-surface-variant font-medium text-[11px]">Sort:</span>
+              <select
+                value={billSortBy}
+                onChange={(e) => setBillSortBy(e.target.value as any)}
+                className="bg-surface border border-outline-variant/40 rounded-xl px-2.5 py-1.5 text-xs text-on-surface outline-none focus:border-secondary"
+              >
+                <option value="DATE_DESC">Date (Newest)</option>
+                <option value="DATE_ASC">Date (Oldest)</option>
+                <option value="PROFIT_DESC">Highest Profit</option>
+                <option value="PROFIT_ASC">Lowest Profit</option>
+                <option value="MARGIN_DESC">Highest Margin %</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bill List Table */}
+          <div className="overflow-x-auto rounded-xl border border-outline-variant/20">
+            {filteredBillWiseData.length === 0 ? (
+              <div className="p-8 text-center text-on-surface-variant text-xs">
+                No sales invoices found for {dateRange.label}.
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-outline-variant/30 bg-surface-container-low text-on-surface-variant font-semibold">
+                    <th className="py-2.5 px-3">Invoice #</th>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Customer</th>
+                    <th className="py-2.5 px-3 text-right">Sale Amount</th>
+                    <th className="py-2.5 px-3 text-right">Cost (COGS)</th>
+                    <th className="py-2.5 px-3 text-right">Profit (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Margin (%)</th>
+                    <th className="py-2.5 px-3 text-center">Items</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/15">
+                  {filteredBillWiseData.map((bill) => {
+                    const isExpanded = expandedBillId === bill.id;
+                    const isProfitable = bill.profit >= 0;
+                    return (
+                      <React.Fragment key={bill.id}>
+                        <tr
+                          onClick={() => setExpandedBillId(isExpanded ? null : bill.id)}
+                          className="hover:bg-surface-container-high/40 transition-colors cursor-pointer"
+                        >
+                          <td className="py-2.5 px-3 font-bold text-on-surface flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[14px] text-outline">
+                              {isExpanded ? 'expand_less' : 'expand_more'}
+                            </span>
+                            <span>{bill.invoiceNumber}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-on-surface-variant whitespace-nowrap">
+                            {formatDate(bill.date)}
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-on-surface truncate max-w-[140px]">
+                            {bill.partyName}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-medium">
+                            {formatINR(bill.totalTaxable)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-on-surface-variant">
+                            {formatINR(bill.cogs)}
+                          </td>
+                          <td className={`py-2.5 px-3 text-right font-bold ${isProfitable ? 'text-secondary' : 'text-error'}`}>
+                            {isProfitable ? '+' : ''}{formatINR(bill.profit)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <span
+                              className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                                isProfitable
+                                  ? 'bg-secondary/15 text-secondary'
+                                  : 'bg-error/15 text-error'
+                              }`}
+                            >
+                              {bill.margin.toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-on-surface-variant">
+                            <span className="px-2 py-0.5 rounded-full bg-surface-container text-[11px]">
+                              {bill.itemBreakdowns.length}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Expandable Line-Item Breakdown */}
+                        {isExpanded && (
+                          <tr className="bg-surface-container-low/60">
+                            <td colSpan={8} className="p-3">
+                              <div className="bg-surface-container-lowest rounded-xl p-3 border border-outline-variant/30 space-y-2">
+                                <div className="text-[11px] font-bold text-on-surface flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px] text-secondary">
+                                    inventory_2
+                                  </span>
+                                  <span>Product-Level Profit Breakdown for #{bill.invoiceNumber}</span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-left text-[11px]">
+                                    <thead>
+                                      <tr className="border-b border-outline-variant/20 text-on-surface-variant font-semibold">
+                                        <th className="py-1 px-2">Item Name</th>
+                                        <th className="py-1 px-2 text-center">Qty</th>
+                                        <th className="py-1 px-2 text-right">Sale Price</th>
+                                        <th className="py-1 px-2 text-right">Buy Price</th>
+                                        <th className="py-1 px-2 text-right">Taxable Sale</th>
+                                        <th className="py-1 px-2 text-right">Cost (COGS)</th>
+                                        <th className="py-1 px-2 text-right">Profit</th>
+                                        <th className="py-1 px-2 text-right">Margin</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-outline-variant/10">
+                                      {bill.itemBreakdowns.map((it, iIdx) => (
+                                        <tr key={iIdx}>
+                                          <td className="py-1 px-2 font-medium">{it.name}</td>
+                                          <td className="py-1 px-2 text-center">{it.quantity} {it.unit}</td>
+                                          <td className="py-1 px-2 text-right">{formatINR(it.salePrice)}</td>
+                                          <td className="py-1 px-2 text-right">{it.purchasePrice > 0 ? formatINR(it.purchasePrice) : '₹0'}</td>
+                                          <td className="py-1 px-2 text-right font-medium">{formatINR(it.taxable)}</td>
+                                          <td className="py-1 px-2 text-right text-on-surface-variant">{formatINR(it.cogs)}</td>
+                                          <td className={`py-1 px-2 text-right font-bold ${it.profit >= 0 ? 'text-secondary' : 'text-error'}`}>
+                                            {it.profit >= 0 ? '+' : ''}{formatINR(it.profit)}
+                                          </td>
+                                          <td className="py-1 px-2 text-right">
+                                            <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${it.profit >= 0 ? 'text-secondary' : 'text-error'}`}>
+                                              {it.margin.toFixed(1)}%
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
       )}
