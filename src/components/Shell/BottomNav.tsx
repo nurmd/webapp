@@ -80,8 +80,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <span className="material-symbols-outlined text-[26px] group-hover:rotate-90 transition-transform duration-300">
               add
             </span>
-            {/* Top specular reflection */}
-            <div className="absolute inset-x-2 top-1 h-[1px] bg-white/40 rounded-full pointer-events-none" />
           </button>
           <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 mt-1 leading-none tracking-tight">
             + Bill

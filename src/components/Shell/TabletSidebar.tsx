@@ -175,7 +175,6 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
               add
             </span>
             <span className="truncate">+ Create Sale Bill</span>
-            <div className="absolute inset-x-2 top-1 h-[1px] bg-white/30 rounded-full pointer-events-none" />
           </button>
         )}
       </div>
