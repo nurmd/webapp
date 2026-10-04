@@ -17,6 +17,7 @@
   body {
     overscroll-behavior: none;
     min-height: 100vh;
+    -webkit-overflow-scrolling: touch;
   }
 
   .pb-safe {
@@ -26,6 +27,17 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+}
+
+/* GPU layer acceleration for smooth 60/120fps scrolling on tablets & mobile */
+.transform-gpu {
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.contain-paint {
+  contain: paint;
 }
 
 /* Material Symbols Outlined Font Support */

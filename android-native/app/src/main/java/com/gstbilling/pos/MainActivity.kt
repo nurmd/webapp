@@ -53,7 +53,14 @@ class MainActivity : Activity() {
             window.decorView.systemUiVisibility = flags
         }
 
+        // Explicitly enforce hardware acceleration on window
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            android.view.WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        )
+
         webView = WebView(this)
+        webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
         webView.setBackgroundColor(0xFFF9F9FF.toInt())
 
         val container = FrameLayout(this)

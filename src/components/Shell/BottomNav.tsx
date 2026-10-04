@@ -62,7 +62,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   };
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl border-t border-black/[0.05] dark:border-white/[0.08] pb-safe shadow-[0_-4px_24px_rgba(0,0,0,0.03)] transition-colors">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t border-black/[0.06] dark:border-white/[0.08] pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.03)] transition-colors transform-gpu">
       <div className="h-16 px-2 sm:px-4 flex items-center justify-between max-w-lg mx-auto relative">
         {/* Left Tabs: Home & Parties */}
         <div className="flex items-center flex-1 h-full">

@@ -84,14 +84,14 @@ export const Drawer: React.FC<DrawerProps> = ({
       {/* Backdrop with soft blur */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-50 bg-slate-950/50 transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       />
 
       {/* Slide-out Drawer Panel */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-[310px] max-w-[85vw] z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-r border-black/[0.05] dark:border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out flex flex-col pt-safe pb-safe ${
+        className={`fixed top-0 left-0 bottom-0 w-[310px] max-w-[85vw] z-50 bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out flex flex-col pt-safe pb-safe transform-gpu contain-paint ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
