@@ -975,8 +975,10 @@ class StorageService {
         this.saveItem(match);
       } else if (line.name && line.name.trim()) {
         // If purchased item is not yet in catalog, automatically register it with the bill's purchase price
+        const newId = line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        line.itemId = newId;
         const newItem: InventoryItem = {
-          id: line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          id: newId,
           name: line.name.trim(),
           hsnSacCode: line.hsnSacCode || '844332',
           category: 'General',

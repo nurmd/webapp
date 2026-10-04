@@ -122,6 +122,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   });
 
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Bill metadata (Sequential & Unique)
   const [billNumber, setBillNumber] = useState<string>(() => {
@@ -442,6 +443,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   // Save bill
   const handleSaveBill = () => {
+    if (isSubmitting) return;
     if (rows.length === 0) {
       alert('Please add at least one line item.');
       return;
@@ -517,6 +519,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
+    setIsSubmitting(true);
     onSave(newBill);
   };
 
@@ -1219,11 +1222,16 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             </button>
             <button
               type="button"
+              disabled={isSubmitting}
               onClick={handleSaveBill}
-              className="h-10 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm shadow-orange-600/30 active:scale-95 transition-all cursor-pointer"
+              className={`h-10 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm shadow-orange-600/30 transition-all ${
+                isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-95 cursor-pointer'
+              }`}
             >
-              <span className="material-symbols-outlined text-[18px]">save</span>
-              <span>Save Purchase Bill</span>
+              <span className="material-symbols-outlined text-[18px]">
+                {isSubmitting ? 'hourglass_top' : 'save'}
+              </span>
+              <span>{isSubmitting ? 'Saving Bill...' : 'Save Purchase Bill'}</span>
             </button>
           </div>
         </div>

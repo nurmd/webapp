@@ -273,6 +273,123 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     };
   }, [itemTransactions]);
 
+  const netTxnStock = Math.max(
+    0,
+    itemTxnSummary.totalPurchasedQty + itemTxnSummary.totalAdjustedQty - itemTxnSummary.totalSoldQty
+  );
+  const hasTxnDiscrepancy =
+    activeItemDetail !== null &&
+    itemTxnSummary.totalTransactions > 0 &&
+    activeItemDetail.currentStock !== netTxnStock;
+
+  const handleReconcileItemStock = (item: InventoryItem, targetStock: number) => {
+    const updated: InventoryItem = {
+      ...item,
+      currentStock: targetStock,
+      updatedAt: new Date().toISOString(),
+    };
+    db.saveItem(updated);
+    setActiveItemDetail(updated);
+    onSaveItem(updated);
+  };
+
+  // Find all items with stock discrepancies where transactions exist
+  const itemsWithDiscrepancy = useMemo(() => {
+    return items.filter((item) => {
+      let totalSold = 0;
+      let totalPurchased = 0;
+      let totalAdjusted = 0;
+      let txnCount = 0;
+      const normName = item.name.trim().toLowerCase();
+
+      for (const inv of allInvoices) {
+        if (!inv.items) continue;
+        for (const it of inv.items) {
+          if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
+            totalSold += it.quantity;
+            txnCount++;
+          }
+        }
+      }
+
+      for (const bill of allPurchases) {
+        if (!bill.items) continue;
+        for (const it of bill.items) {
+          if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
+            totalPurchased += it.quantity;
+            txnCount++;
+          }
+        }
+      }
+
+      for (const adj of allAdjustments) {
+        if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
+          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity;
+          else totalAdjusted -= adj.quantity;
+          txnCount++;
+        }
+      }
+
+      if (txnCount === 0) return false;
+      const netStock = Math.max(0, totalPurchased + totalAdjusted - totalSold);
+      return item.currentStock !== netStock;
+    });
+  }, [items, allInvoices, allPurchases, allAdjustments]);
+
+  const handleReconcileAllDiscrepancies = () => {
+    if (itemsWithDiscrepancy.length === 0) return;
+    if (
+      !window.confirm(
+        `Reconcile stock for ${itemsWithDiscrepancy.length} item(s) to match exact transaction history totals?\n\nThis will correct doubled stock back to accurate purchase/sales levels.`
+      )
+    ) {
+      return;
+    }
+
+    let count = 0;
+    for (const item of itemsWithDiscrepancy) {
+      let totalSold = 0;
+      let totalPurchased = 0;
+      let totalAdjusted = 0;
+      const normName = item.name.trim().toLowerCase();
+
+      for (const inv of allInvoices) {
+        if (!inv.items) continue;
+        for (const it of inv.items) {
+          if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
+            totalSold += it.quantity;
+          }
+        }
+      }
+      for (const bill of allPurchases) {
+        if (!bill.items) continue;
+        for (const it of bill.items) {
+          if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
+            totalPurchased += it.quantity;
+          }
+        }
+      }
+      for (const adj of allAdjustments) {
+        if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
+          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity;
+          else totalAdjusted -= adj.quantity;
+        }
+      }
+
+      const netStock = Math.max(0, totalPurchased + totalAdjusted - totalSold);
+      const updated: InventoryItem = {
+        ...item,
+        currentStock: netStock,
+        updatedAt: new Date().toISOString(),
+      };
+      db.saveItem(updated);
+      onSaveItem(updated);
+      count++;
+    }
+
+    alert(`Successfully reconciled ${count} item(s) to match transaction records!`);
+  };
+
   // Form State (Product vs Service, Basic, Pricing, Stock)
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [name, setName] = useState('');
@@ -284,7 +401,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [salePrice, setSalePrice] = useState<number>(0);
   const [purchasePrice, setPurchasePrice] = useState<number>(0);
   const [gstRate, setGstRate] = useState<number>(18);
-  const [currentStock, setCurrentStock] = useState<number>(10);
+  const [currentStock, setCurrentStock] = useState<number>(0);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
   const [isDisabledState, setIsDisabledState] = useState(false);
 
@@ -401,7 +518,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setSalePrice(0);
     setPurchasePrice(0);
     setGstRate(18);
-    setCurrentStock(10);
+    setCurrentStock(0);
     setMinStockAlert(5);
     setIsDisabledState(false);
     setIsModalOpen(true);
@@ -667,6 +784,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           )}
         </section>
 
+        {/* Stock Discrepancy Reconciliation Banner */}
+        {itemsWithDiscrepancy.length > 0 && (
+          <div className="px-margin-mobile pt-1 pb-1">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-fade-in shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">published_with_changes</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="font-bold text-amber-900 dark:text-amber-200 block truncate">
+                    {itemsWithDiscrepancy.length} item{itemsWithDiscrepancy.length > 1 ? 's have' : ' has'} stock discrepancy
+                  </span>
+                  <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate">
+                    Catalog stock differs from transaction history (e.g. double counted new items)
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleReconcileAllDiscrepancies}
+                className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs flex-shrink-0 transition-all"
+              >
+                <span className="material-symbols-outlined text-[15px]">done_all</span>
+                <span>Sync All ({itemsWithDiscrepancy.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Horizontal Scrollable Category Pills */}
         <section className="pt-space-xs pb-space-xs">
           <div className="flex items-center gap-space-xs overflow-x-auto px-margin-mobile no-scrollbar py-0.5">
@@ -924,6 +1070,42 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-[11px] text-outline flex-shrink-0">
                 <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">verified_user</span>
                 <span>Referenced in historical bills. Cannot be deleted to preserve accounting records.</span>
+              </div>
+            )}
+
+            {/* Stock Discrepancy Alert & 1-Tap Reconciliation */}
+            {hasTxnDiscrepancy && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2.5 text-xs flex-shrink-0 animate-fade-in">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">published_with_changes</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-amber-900 dark:text-amber-200 truncate">
+                        Stock Discrepancy
+                      </span>
+                      {activeItemDetail.currentStock === netTxnStock * 2 && (
+                        <span className="text-[10px] bg-amber-500/25 text-amber-700 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded">
+                          Double Counted (2x)
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate">
+                      Catalog: <strong className="text-on-surface">{activeItemDetail.currentStock}</strong> • Transactions: <strong className="text-on-surface">{netTxnStock} {activeItemDetail.unit}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleReconcileItemStock(activeItemDetail, netTxnStock)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 shadow-xs flex-shrink-0 transition-all"
+                  title="Correct stock to match transaction total"
+                >
+                  <span className="material-symbols-outlined text-[15px]">done_all</span>
+                  <span>Sync to {netTxnStock}</span>
+                </button>
               </div>
             )}
 

@@ -195,6 +195,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const sale = parseFloat(newItemSalePrice) || 0;
     const purchase = parseFloat(newItemPurchasePrice) || (mode === 'purchase' ? sale : 0);
 
+    const createdStock = mode === 'purchase' ? 0 : (parseFloat(newItemStock) || 0);
+
     const createdItem: InventoryItem = {
       id: 'ITM-' + Date.now(),
       name: newItemName.trim(),
@@ -203,7 +205,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       unit: newItemUnit,
       hsnSacCode: newItemHsn.trim() || defaultHsn,
       gstRate: isGstActive ? (Number(newItemGstRate) || 0) : 0,
-      currentStock: parseFloat(newItemStock) || 0,
+      currentStock: createdStock,
       minStockAlert: 5,
       category: newItemCategory.trim() || 'General',
       isActive: true,
@@ -948,20 +950,29 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
-                    Opening Stock (Qty)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newItemStock}
-                    onChange={(e) => setNewItemStock(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
-                  />
-                </div>
+                {isPurchase ? (
+                  <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-700 dark:text-orange-300 flex flex-col justify-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider block">Opening Stock: 0</span>
+                    <span className="text-[10px] text-on-surface-variant leading-tight mt-0.5">
+                      Stock will be added automatically from this purchase bill.
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                      Opening Stock (Qty)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newItemStock}
+                      onChange={(e) => setNewItemStock(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Category */}
