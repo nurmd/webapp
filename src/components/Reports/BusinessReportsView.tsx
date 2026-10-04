@@ -18,7 +18,7 @@ interface BusinessReportsViewProps {
 }
 
 type ReportCategory = 'ALL' | 'GST' | 'FINANCIAL' | 'BILL_WISE' | 'PARTIES_STOCK';
-export type ProfitPeriod = 'TODAY' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'CUSTOM';
+export type ProfitPeriod = 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'CUSTOM';
 
 const formatDateLocal = (d: Date): string => {
   const y = d.getFullYear();
@@ -112,6 +112,13 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     if (profitPeriod === 'TODAY') {
       const today = formatDateLocal(now);
       return { start: today, end: today, label: `Today (${formatDate(today)})` };
+    }
+
+    if (profitPeriod === 'YESTERDAY') {
+      const yDate = new Date(now);
+      yDate.setDate(now.getDate() - 1);
+      const yesterday = formatDateLocal(yDate);
+      return { start: yesterday, end: yesterday, label: `Yesterday (${formatDate(yesterday)})` };
     }
 
     if (profitPeriod === 'THIS_MONTH') {
@@ -359,30 +366,26 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             </span>
           </div>
 
-          {/* Period Selector Tabs: Today (Default), This Month, Quarter, FY, Custom */}
-          <div className="flex items-center gap-1 bg-surface-container-highest/25 backdrop-blur-xs p-1 rounded-xl flex-wrap">
-            {(
-              [
-                { id: 'TODAY', label: 'Today' },
-                { id: 'THIS_MONTH', label: 'This Month' },
-                { id: 'THIS_QUARTER', label: 'Quarter' },
-                { id: 'THIS_FY', label: 'This FY' },
-                { id: 'CUSTOM', label: 'Custom' },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setProfitPeriod(opt.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  profitPeriod === opt.id
-                    ? 'bg-secondary text-on-secondary shadow-xs scale-100'
-                    : 'text-surface-variant hover:text-on-primary hover:bg-white/10'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          {/* Compact Period Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-surface-container-highest/30 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/15 shadow-xs">
+            <span className="material-symbols-outlined text-[17px] text-secondary-fixed">
+              calendar_month
+            </span>
+            <select
+              value={profitPeriod}
+              onChange={(e) => setProfitPeriod(e.target.value as ProfitPeriod)}
+              className="bg-transparent text-xs font-bold text-on-primary outline-none cursor-pointer pr-1 appearance-none [&>option]:bg-surface-container-lowest [&>option]:text-on-surface"
+            >
+              <option value="TODAY">Today</option>
+              <option value="YESTERDAY">Yesterday</option>
+              <option value="THIS_MONTH">This Month</option>
+              <option value="THIS_QUARTER">Quarter</option>
+              <option value="THIS_FY">This FY</option>
+              <option value="CUSTOM">Custom Date...</option>
+            </select>
+            <span className="material-symbols-outlined text-[16px] text-surface-variant pointer-events-none -ml-1">
+              arrow_drop_down
+            </span>
           </div>
         </div>
 
