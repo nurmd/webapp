@@ -91,8 +91,8 @@ export const Drawer: React.FC<DrawerProps> = ({
 
       {/* Slide-out Drawer Panel */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-[310px] max-w-[85vw] z-50 bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out flex flex-col pt-safe pb-safe transform-gpu contain-paint ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed top-0 left-0 bottom-0 w-[310px] max-w-[85vw] z-50 bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] transition-transform duration-300 ease-out flex flex-col pt-safe pb-safe ${
+          isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none'
         }`}
       >
         {/* Drawer Header: Brand Identity & Close Button */}

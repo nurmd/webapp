@@ -84,7 +84,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
 
   return (
     <aside
-      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 transition-[width] duration-300 ease-in-out shadow-[1px_0_6px_rgba(0,0,0,0.02)] transform-gpu contain-paint ${
+      className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 transition-[width] duration-300 ease-in-out shadow-[1px_0_6px_rgba(0,0,0,0.02)] ${
         isMinimized ? 'w-[72px]' : 'w-56'
       }`}
     >
