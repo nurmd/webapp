@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import {
@@ -21,12 +21,26 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   company,
   onClose,
 }) => {
-  const [width, setWidth] = useState<32 | 48>(32);
-  const [kickDrawer, setKickDrawer] = useState(true);
-  const [includeQr, setIncludeQr] = useState(true);
+  const [width, setWidth] = useState<32 | 48>(
+    () => (Number(localStorage.getItem('printer_paper_width')) as 32 | 48) || 32
+  );
+  const [kickDrawer, setKickDrawer] = useState(() => {
+    const val = localStorage.getItem('printer_kick_drawer');
+    return val !== null ? val === 'true' : true;
+  });
+  const [includeQr, setIncludeQr] = useState(() => {
+    const val = localStorage.getItem('printer_include_qr');
+    return val !== null ? val === 'true' : true;
+  });
   const [isPrinting, setIsPrinting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('printer_paper_width', width.toString());
+    localStorage.setItem('printer_kick_drawer', kickDrawer.toString());
+    localStorage.setItem('printer_include_qr', includeQr.toString());
+  }, [width, kickDrawer, includeQr]);
 
   const receiptData: ThermalReceiptData = {
     companyName: company.tradeName || company.businessName,
