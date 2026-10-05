@@ -54,6 +54,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   onRefresh,
 }) => {
   const company = db.getCompany();
+  const isGstActive = company.isGstEnabled !== false;
   const allVouchers = vouchers || db.getVouchers();
   const allStates = getStateList();
 
@@ -317,9 +318,13 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <input
             type="text"
             placeholder={
-              activeSegment === 'CUSTOMERS'
-                ? 'Search customer by name, phone, GSTIN...'
-                : 'Search supplier by name, phone, GSTIN...'
+              isGstActive
+                ? (activeSegment === 'CUSTOMERS'
+                    ? 'Search customer by name, phone, GSTIN...'
+                    : 'Search supplier by name, phone, GSTIN...')
+                : (activeSegment === 'CUSTOMERS'
+                    ? 'Search customer by name, phone...'
+                    : 'Search supplier by name, phone...')
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -419,7 +424,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       <span className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
                         {party.name}
                       </span>
-                      {party.gstin && (
+                      {isGstActive && party.gstin && (
                         <span
                           className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0"
                           title={`GSTIN: ${party.gstin}`}

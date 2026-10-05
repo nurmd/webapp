@@ -20,6 +20,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
   onSelectParty,
   onClose,
 }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
   const [search, setSearch] = useState('');
   const [isAddingNew, setIsAddingNew] = useState(false);
 
@@ -160,24 +161,26 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-outline">
-                  GSTIN (For B2B Invoice, Optional)
-                </label>
-                {gstinError && <span className="text-[11px] text-error font-medium">{gstinError}</span>}
+            {isGstActive && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-outline">
+                    GSTIN (For B2B Invoice, Optional)
+                  </label>
+                  {gstinError && <span className="text-[11px] text-error font-medium">{gstinError}</span>}
+                </div>
+                <input
+                  type="text"
+                  maxLength={15}
+                  placeholder="15-digit GSTIN (e.g. 27ABCDE1234F1Z5)"
+                  value={newGstin}
+                  onChange={(e) => handleGstinChange(e.target.value)}
+                  className={`w-full bg-surface-container-low border rounded-xl px-3 py-2 text-sm font-mono uppercase text-on-surface outline-none ${
+                    gstinError ? 'border-error' : 'border-outline-variant/30 focus:border-secondary'
+                  }`}
+                />
               </div>
-              <input
-                type="text"
-                maxLength={15}
-                placeholder="15-digit GSTIN (e.g. 27ABCDE1234F1Z5)"
-                value={newGstin}
-                onChange={(e) => handleGstinChange(e.target.value)}
-                className={`w-full bg-surface-container-low border rounded-xl px-3 py-2 text-sm font-mono uppercase text-on-surface outline-none ${
-                  gstinError ? 'border-error' : 'border-outline-variant/30 focus:border-secondary'
-                }`}
-              />
-            </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-outline mb-1">
@@ -216,7 +219,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                 <span className="material-symbols-outlined text-outline text-[18px] mr-2">search</span>
                 <input
                   type="text"
-                  placeholder="Search by Customer Name, Phone, or GSTIN..."
+                  placeholder={isGstActive ? "Search by Customer Name, Phone, or GSTIN..." : "Search by Customer Name or Phone..."}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full bg-transparent text-xs text-on-surface placeholder:text-outline outline-none"
@@ -297,7 +300,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                           <span className="text-xs font-bold text-on-surface truncate">
                             {party.name}
                           </span>
-                          {party.gstin && (
+                          {party.gstin && isGstActive && (
                             <span className="text-[10px] bg-primary/10 text-primary font-mono px-1 rounded font-semibold">
                               B2B
                             </span>
@@ -307,7 +310,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                           <span>{party.phone || 'No phone'}</span>
                           <span>•</span>
                           <span>State: {party.stateCode}</span>
-                          {party.gstin && (
+                          {party.gstin && isGstActive && (
                             <>
                               <span>•</span>
                               <span className="font-mono">{party.gstin}</span>

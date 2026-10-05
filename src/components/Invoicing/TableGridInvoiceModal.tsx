@@ -671,11 +671,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               <h1 className="font-bold text-sm sm:text-base text-on-surface truncate">
                 {initialInvoice ? `Edit Invoice #${invoiceNumber}` : `New Invoice`}
               </h1>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
-                {isGstActive
-                  ? (calcSummary.isIntraState ? 'Intra-State GST' : 'Inter-State IGST')
-                  : 'Retail Mode (Non-GST)'}
-              </span>
+              {isGstActive && (
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
+                  {calcSummary.isIntraState ? 'Intra-State GST' : 'Inter-State IGST'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -817,14 +817,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               </button>
 
               {/* Mode & PoS */}
-              {isGstActive ? (
+              {isGstActive && (
                 <div className="h-7 px-2 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1 border border-secondary/20">
                   <span>GST</span>
                   <span className="text-[10px] font-mono opacity-80">({posStateCode})</span>
-                </div>
-              ) : (
-                <div className="h-7 px-2 rounded-lg bg-surface-container text-on-surface-variant font-medium text-[11px] flex items-center border border-outline-variant/20">
-                  Non-GST
                 </div>
               )}
             </div>
@@ -1092,9 +1088,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
                   Invoice Summary
                 </span>
-                <span className="text-[11px] font-bold text-secondary">
-                  {isGstActive ? 'GST Compliant' : 'Non-GST'}
-                </span>
+                {isGstActive && (
+                  <span className="text-[11px] font-bold text-secondary">
+                    GST Compliant
+                  </span>
+                )}
               </div>
 
               {/* Subtotal */}

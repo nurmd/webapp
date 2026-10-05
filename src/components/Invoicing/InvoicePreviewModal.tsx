@@ -286,7 +286,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               }`}
             >
               <FileText size={14} />
-              <span>{isGst ? 'A4 Tax Invoice' : 'A4 Bill of Supply'}</span>
+              <span>{isGst ? 'A4 Tax Invoice' : 'A4 Retail Invoice'}</span>
             </button>
 
             <button
@@ -499,13 +499,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                 <div className="text-center flex-1 mx-2">
                   <h1 className="text-lg sm:text-xl font-black tracking-wider uppercase text-slate-950">
-                    {isGst ? 'TAX INVOICE' : 'BILL OF SUPPLY'}
+                    {isGst ? 'TAX INVOICE' : 'RETAIL INVOICE'}
                   </h1>
-                  <p className="text-[10px] text-slate-600 font-medium">
-                    {isGst
-                      ? '(Issued under Section 31 of CGST Act, 2017 read with Rule 46 of CGST Rules, 2017)'
-                      : '(Issued under Section 31(3)(c) for Non-GST / Composition Supply)'}
-                  </p>
+                  {isGst && (
+                    <p className="text-[10px] text-slate-600 font-medium">
+                      (Issued under Section 31 of CGST Act, 2017 read with Rule 46 of CGST Rules, 2017)
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right">

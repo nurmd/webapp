@@ -359,16 +359,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             <p className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
               {profile.tradeName || 'Wholesale & Retail Groceries'}
             </p>
-            {/* Verification Pill */}
-            {isGstActive ? (
+            {isGstActive && (
               <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-[11px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
                 <span>GST Portal Verified</span>
-              </div>
-            ) : (
-              <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 font-label-sm text-[11px] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span>Non-GST Store (Exempt)</span>
               </div>
             )}
           </div>
@@ -376,27 +370,31 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
 
         {/* Essential Metadata Grid */}
         <div className="bg-surface-container-low/70 rounded-xl p-3.5 flex flex-col gap-2 text-xs">
-          <div
-            onClick={() => document.getElementById('gst-tax-config')?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex items-center justify-between text-on-surface hover:bg-surface-container-high/50 p-1 -m-1 rounded-lg transition-colors cursor-pointer"
-            title="Click to configure GST & Legal Tax settings"
-          >
-            <span className="text-on-surface-variant font-medium flex items-center gap-1">
-              <span>GSTIN</span>
-              <span className="material-symbols-outlined text-[13px] text-secondary">tune</span>
-            </span>
-            <span className={`font-tabular-data tracking-wider font-bold ${isGstActive ? 'text-on-surface' : 'text-on-surface-variant italic'}`}>
-              {isGstActive ? (profile.gstin || '27AAAAA0000A1Z5') : 'Not Applicable (Disabled)'}
-            </span>
-          </div>
+          {isGstActive && (
+            <>
+              <div
+                onClick={() => document.getElementById('gst-tax-config')?.scrollIntoView({ behavior: 'smooth' })}
+                className="flex items-center justify-between text-on-surface hover:bg-surface-container-high/50 p-1 -m-1 rounded-lg transition-colors cursor-pointer"
+                title="Click to configure GST & Legal Tax settings"
+              >
+                <span className="text-on-surface-variant font-medium flex items-center gap-1">
+                  <span>GSTIN</span>
+                  <span className="material-symbols-outlined text-[13px] text-secondary">tune</span>
+                </span>
+                <span className="font-tabular-data tracking-wider font-bold text-on-surface">
+                  {profile.gstin || '27AAAAA0000A1Z5'}
+                </span>
+              </div>
 
-          <div className="flex items-center justify-between text-on-surface">
-            <span className="text-on-surface-variant font-medium">Taxpayer Status</span>
-            <span className={`font-bold flex items-center gap-1 ${isGstActive ? 'text-secondary' : 'text-amber-600 dark:text-amber-400'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isGstActive ? 'bg-secondary' : 'bg-amber-500'}`} />
-              {isGstActive ? 'Active • Regular' : 'Non-GST / Unregistered'}
-            </span>
-          </div>
+              <div className="flex items-center justify-between text-on-surface">
+                <span className="text-on-surface-variant font-medium">Taxpayer Status</span>
+                <span className="font-bold flex items-center gap-1 text-secondary">
+                  <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+                  Active • Regular
+                </span>
+              </div>
+            </>
+          )}
 
           <div className="flex items-center justify-between text-on-surface">
             <span className="text-on-surface-variant font-medium">Contact Phone</span>
@@ -631,8 +629,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               GST &amp; Legal Tax Configuration
             </h3>
           </div>
-          <span className={`font-label-sm text-[11px] font-bold ${isGstActive ? 'text-secondary' : 'text-amber-500'}`}>
-            {isGstActive ? 'GST Mode: Regular' : 'GST Mode: Disabled (Non-GST)'}
+          <span className={`font-label-sm text-[11px] font-bold ${isGstActive ? 'text-secondary' : 'text-on-surface-variant'}`}>
+            {isGstActive ? 'GST Mode: Regular' : 'GST Mode: Disabled'}
           </span>
         </div>
 
@@ -652,15 +650,15 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   isGstActive
                     ? 'bg-secondary-container text-on-secondary-container'
-                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                    : 'bg-surface-container-high text-on-surface-variant'
                 }`}>
-                  {isGstActive ? 'Active' : 'Disabled (Non-GST)'}
+                  {isGstActive ? 'Active' : 'Disabled'}
                 </span>
               </div>
               <p className="font-body-sm text-xs text-on-surface-variant mt-0.5 leading-relaxed">
                 {isGstActive
                   ? 'Tax rates (CGST/SGST/IGST), GSTIN validation, HSN/SAC codes & E-Way bills active.'
-                  : 'Tax calculations disabled. Generate simple non-tax bills / Bills of Supply without GST.'}
+                  : 'Tax calculations and tax tags hidden across the app. Generate clean direct bills.'}
               </p>
             </div>
           </div>
@@ -720,7 +718,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 maxLength={15}
                 disabled={!isGstActive}
                 value={isGstActive ? profile.gstin : ''}
-                placeholder={isGstActive ? '27AABCU9603R1ZN' : 'Disabled (Non-GST Business)'}
+                placeholder={isGstActive ? '27AABCU9603R1ZN' : 'Disabled'}
                 onChange={(e) => handleGstinChange(e.target.value)}
                 className={`w-full bg-surface-container-low px-3 py-2.5 rounded-xl border border-outline-variant/30 text-xs font-mono font-bold uppercase outline-none focus:border-secondary ${
                   !isGstActive ? 'opacity-50 cursor-not-allowed bg-surface-container' : ''
@@ -864,7 +862,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
                 {isGstActive
                   ? 'Threshold ₹50,000 • Official NIC Portal JSON v1.1'
-                  : 'NIC JSON generation paused (Non-GST mode)'}
+                  : 'NIC JSON generation paused (Disabled)'}
               </div>
             </div>
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
@@ -1156,7 +1154,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                   <span className="text-[11px] text-on-surface-variant truncate block mt-0.5">
                     {isGstActive
                       ? `GSTIN: ${profile.gstin || 'Not configured'} • State: ${stateName} (${profile.stateCode})`
-                      : 'GST Mode: Disabled (Non-GST Billing)'}
+                      : 'GST Mode: Disabled'}
                   </span>
                 </div>
                 <button

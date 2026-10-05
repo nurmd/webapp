@@ -38,21 +38,23 @@ export const Navbar: React.FC<NavbarProps> = ({ company, onNewInvoice, onQuickPo
             <h1 style={{ fontSize: '1.125rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
               {company.businessName}
             </h1>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              fontSize: '0.75rem',
-              backgroundColor: company.isGstEnabled === false ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-              color: company.isGstEnabled === false ? '#fbbf24' : '#34d399',
-              padding: '0.15rem 0.5rem',
-              borderRadius: '9999px',
-              fontWeight: 700,
-              border: company.isGstEnabled === false ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)',
-            }}>
-              <CheckCircle2 size={12} />
-              {company.isGstEnabled === false ? 'Non-GST Mode' : `GSTIN Active: ${company.gstin}`}
-            </span>
+            {company.isGstEnabled !== false && (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.75rem',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '9999px',
+                fontWeight: 700,
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+              }}>
+                <CheckCircle2 size={12} />
+                {`GSTIN Active: ${company.gstin}`}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
             {company.address} • Ph: {company.phone}

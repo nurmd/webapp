@@ -3,6 +3,7 @@ import { Party, BalanceType } from '../../models/party.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { db } from '../../services/db.ts';
 
 export interface AddEditPartyModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   initialType = 'CUSTOMER',
   parties = [],
 }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
   const allStates = getStateList();
 
   const [name, setName] = useState('');
@@ -279,29 +281,31 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
           </div>
 
           {/* GSTIN & State Code */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-on-surface-variant">GSTIN (Optional)</label>
-                {gstin && (
-                  <span
-                    className={`text-[10px] font-bold ${
-                      isValidGstin(gstin) ? 'text-secondary' : 'text-outline'
-                    }`}
-                  >
-                    {isValidGstin(gstin) ? '✓ Valid Format' : '15 characters expected'}
-                  </span>
-                )}
+          <div className={isGstActive ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5" : ""}>
+            {isGstActive && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-on-surface-variant">GSTIN (Optional)</label>
+                  {gstin && (
+                    <span
+                      className={`text-[10px] font-bold ${
+                        isValidGstin(gstin) ? 'text-secondary' : 'text-outline'
+                      }`}
+                    >
+                      {isValidGstin(gstin) ? '✓ Valid Format' : '15 characters expected'}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  maxLength={15}
+                  placeholder="15-digit GSTIN"
+                  value={gstin}
+                  onChange={(e) => handleGstinInputChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                />
               </div>
-              <input
-                type="text"
-                maxLength={15}
-                placeholder="15-digit GSTIN"
-                value={gstin}
-                onChange={(e) => handleGstinInputChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-secondary/40"
-              />
-            </div>
+            )}
 
             <div>
               <label className="block font-bold text-on-surface-variant mb-1">State / POS</label>

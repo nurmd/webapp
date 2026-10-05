@@ -39,6 +39,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   onCompleteSale,
   onViewInvoice,
 }) => {
+  const isGstActive = company.isGstEnabled !== false;
+
   // Cart state
   const [cart, setCart] = useState<PosCartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -309,11 +311,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     return cart.map((c) => ({
       quantity: c.qty,
       unitPrice: c.unitPrice,
-      gstRate: c.item.gstRate,
+      gstRate: isGstActive ? c.item.gstRate : 0,
       discountPercent: c.discountPercent || 0,
       discountAmount: c.discountAmount || 0,
     }));
-  }, [cart]);
+  }, [cart, isGstActive]);
 
   const calcSummary = useMemo(() => {
     return calculateInvoice(supplierStateCode, recipientStateCode, calcInputs);
@@ -467,7 +469,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     });
 
     const isCreditSale = chosenMode === 'CREDIT';
-    const isB2bInvoice = !!customer.gstin;
+    const isB2bInvoice = isGstActive && !!customer.gstin;
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
@@ -476,6 +478,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         db.getInvoices()
       ),
       invoiceType: isB2bInvoice ? 'B2B' : 'B2CS',
+      isGstInvoice: isGstActive,
       date: new Date().toISOString().split('T')[0],
       partyId: customer.party?.id,
       partyName: customer.party
@@ -483,7 +486,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         : customer.phone
         ? `Retail (${customer.phone})`
         : 'Walk-in Retail Customer',
-      partyGstin: customer.gstin,
+      partyGstin: isGstActive ? customer.gstin : undefined,
       partyAddress: customer.party?.billingAddress || 'Local Retail Counter',
       partyStateCode: customer.stateCode,
       placeOfSupplyStateCode: customer.stateCode,
@@ -492,11 +495,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       totalGrossAmount: calcSummary.totalGrossAmount,
       totalDiscount: calcSummary.totalDiscount + overallDiscountAmt,
       totalTaxableAmount: calcSummary.totalTaxableAmount,
-      totalCgst: calcSummary.totalCgst,
-      totalSgst: calcSummary.totalSgst,
-      totalIgst: calcSummary.totalIgst,
-      totalCess: calcSummary.totalCess,
-      totalTax: calcSummary.totalTax,
+      totalCgst: isGstActive ? calcSummary.totalCgst : 0,
+      totalSgst: isGstActive ? calcSummary.totalSgst : 0,
+      totalIgst: isGstActive ? calcSummary.totalIgst : 0,
+      totalCess: 0,
+      totalTax: isGstActive ? calcSummary.totalTax : 0,
       roundOff: calcSummary.roundOff,
       shippingAmount: additionalCharges > 0 ? additionalCharges : undefined,
       grandTotal: finalPayableTotal,
@@ -745,9 +748,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         Stock: {item.currentStock}
                       </span>
 
-                      <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
-                        {item.gstRate}%
-                      </span>
+                      {isGstActive && item.gstRate > 0 && (
+                        <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
+                          {item.gstRate}%
+                        </span>
+                      )}
                     </div>
 
                     {/* Item Details (Clean, NO HSN) */}
@@ -801,9 +806,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         <span className="text-xs font-bold text-on-surface truncate">
                           {item.name}
                         </span>
-                        <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
-                          {item.gstRate}%
-                        </span>
+                        {isGstActive && item.gstRate > 0 && (
+                          <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
+                            {item.gstRate}%
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-outline mt-0.5 flex items-center gap-2">
                         <span>{item.category || 'General'}</span>
@@ -975,7 +982,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       {item.name}
                     </span>
                     <span className="text-[10px] text-outline">
-                      {item.unit} • {item.gstRate}% GST
+                      {item.unit}{isGstActive && item.gstRate > 0 ? ` • ${item.gstRate}% GST` : ''}
                     </span>
                   </div>
 
@@ -1088,45 +1095,49 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
             {/* Totals Summary */}
             <div className="space-y-0.5 text-xs">
-              <div className="flex justify-between text-outline text-[11px]">
-                <span>Taxable</span>
-                <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
-              </div>
-              <div className="flex justify-between text-outline text-[11px] items-center">
-                <button
-                  type="button"
-                  onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
-                  className="flex items-center gap-0.5 text-secondary font-semibold hover:underline cursor-pointer"
-                >
-                  <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
-                  <span className="material-symbols-outlined text-[13px]">
-                    {showTaxBreakdown ? 'expand_less' : 'expand_more'}
-                  </span>
-                </button>
-                <span className="font-tabular-data">{formatINR(calcSummary.totalTax)}</span>
-              </div>
+              {isGstActive && (
+                <>
+                  <div className="flex justify-between text-outline text-[11px]">
+                    <span>Taxable</span>
+                    <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-outline text-[11px] items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+                      className="flex items-center gap-0.5 text-secondary font-semibold hover:underline cursor-pointer"
+                    >
+                      <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
+                      <span className="material-symbols-outlined text-[13px]">
+                        {showTaxBreakdown ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+                    <span className="font-tabular-data">{formatINR(calcSummary.totalTax)}</span>
+                  </div>
 
-              {/* Collapsible Tax Detail */}
-              {showTaxBreakdown && (
-                <div className="p-1.5 bg-surface-container-low rounded-lg border border-outline-variant/20 space-y-0.5 text-[10px] text-on-surface-variant">
-                  {isIntraState ? (
-                    <>
-                      <div className="flex justify-between">
-                        <span>CGST: {formatINR(calcSummary.totalCgst)}</span>
-                        <span>SGST: {formatINR(calcSummary.totalSgst)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-between">
-                      <span>IGST: {formatINR(calcSummary.totalIgst)}</span>
+                  {/* Collapsible Tax Detail */}
+                  {showTaxBreakdown && (
+                    <div className="p-1.5 bg-surface-container-low rounded-lg border border-outline-variant/20 space-y-0.5 text-[10px] text-on-surface-variant">
+                      {isIntraState ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span>CGST: {formatINR(calcSummary.totalCgst)}</span>
+                            <span>SGST: {formatINR(calcSummary.totalSgst)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between">
+                          <span>IGST: {formatINR(calcSummary.totalIgst)}</span>
+                        </div>
+                      )}
+                      {calcSummary.roundOff !== 0 && (
+                        <div className="flex justify-between text-outline">
+                          <span>Round Off: {calcSummary.roundOff > 0 ? `+₹${calcSummary.roundOff}` : `₹${calcSummary.roundOff}`}</span>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {calcSummary.roundOff !== 0 && (
-                    <div className="flex justify-between text-outline">
-                      <span>Round Off: {calcSummary.roundOff > 0 ? `+₹${calcSummary.roundOff}` : `₹${calcSummary.roundOff}`}</span>
-                    </div>
-                  )}
-                </div>
+                </>
               )}
 
               {/* Grand Total */}
@@ -1345,14 +1356,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             {/* Summary & Checkout Footer */}
             <div className="p-3 bg-surface-container-low/50 border-t border-outline-variant/20 space-y-2.5">
               <div className="space-y-0.5 text-xs">
-                <div className="flex justify-between text-outline text-[11px]">
-                  <span>Taxable Subtotal</span>
-                  <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
-                </div>
-                <div className="flex justify-between text-outline text-[11px]">
-                  <span>GST Total</span>
-                  <span>{formatINR(calcSummary.totalTax)}</span>
-                </div>
+                {isGstActive && (
+                  <>
+                    <div className="flex justify-between text-outline text-[11px]">
+                      <span>Taxable Subtotal</span>
+                      <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
+                    </div>
+                    <div className="flex justify-between text-outline text-[11px]">
+                      <span>GST Total</span>
+                      <span>{formatINR(calcSummary.totalTax)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between font-black text-on-surface pt-1 border-t border-outline-variant/20">
                   <span className="text-xs">Grand Total</span>
                   <span className="text-secondary text-base">{formatINR(finalPayableTotal)}</span>

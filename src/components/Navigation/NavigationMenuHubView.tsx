@@ -82,6 +82,8 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     return unsub;
   }, []);
 
+  const isGstActive = company.isGstEnabled !== false;
+
   // Compute live business metrics
   const customers = useMemo(() => parties.filter((p) => p.type === 'CUSTOMER'), [parties]);
   const suppliers = useMemo(() => parties.filter((p) => p.type === 'SUPPLIER'), [parties]);
@@ -129,14 +131,16 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'sale_invoices',
       title: 'Sale Invoices',
-      subtitle: 'Create GST/Non-GST tax bills & e-way receipts',
+      subtitle: isGstActive ? 'Create GST tax bills & e-way receipts' : 'Create customer bills & retail receipts',
       icon: 'receipt_long',
       category: 'sales',
       badge: unpaidInvoicesCount > 0
         ? { text: `${unpaidInvoicesCount} Pending`, type: 'error' }
         : { text: `${invoices.length} Bills`, type: 'neutral' },
       action: () => onNavigate('sales'),
-      keywords: ['sales', 'bill', 'invoice', 'gst', 'tax', 'cash', 'credit', 'sales ledger', 'ledger'],
+      keywords: isGstActive
+        ? ['sales', 'bill', 'invoice', 'gst', 'tax', 'cash', 'credit', 'sales ledger', 'ledger']
+        : ['sales', 'bill', 'invoice', 'cash', 'credit', 'sales ledger', 'ledger'],
     },
     {
       id: 'quick_pos',
@@ -190,14 +194,16 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'purchase_bills',
       title: 'Purchase Bills',
-      subtitle: 'Inward inventory, supplier bills & ITC tax credits',
+      subtitle: isGstActive ? 'Inward inventory, supplier bills & ITC tax credits' : 'Inward inventory & supplier bills',
       icon: 'shopping_bag',
       category: 'purchases',
       badge: unpaidPurchasesTotal > 0
         ? { text: `${formatInr(unpaidPurchasesTotal)} due`, type: 'warning' }
         : { text: `${purchases.length} Inward`, type: 'neutral' },
       action: () => onNavigate('purchases'),
-      keywords: ['purchase', 'vendor bill', 'inward', 'itc', 'procurement', 'purchase ledger', 'ledger'],
+      keywords: isGstActive
+        ? ['purchase', 'vendor bill', 'inward', 'itc', 'procurement', 'purchase ledger', 'ledger']
+        : ['purchase', 'vendor bill', 'inward', 'procurement', 'purchase ledger', 'ledger'],
     },
     {
       id: 'purchase_orders',
@@ -347,7 +353,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     },
 
     // Reports & GST Filing
-    {
+    ...(company.isGstEnabled !== false ? ([{
       id: 'gstr_filing',
       title: 'GSTR-1 & GSTR-3B Reports',
       subtitle: 'Auto-generated GST tax summaries for direct portal upload',
@@ -356,7 +362,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       badge: { text: 'CA Ready', type: 'success' },
       action: () => onNavigate('reports'),
       keywords: ['gst', 'gstr1', 'gstr3b', 'tax report', 'ca', 'portal'],
-    },
+    }] as MenuItem[]) : []),
     {
       id: 'profit_loss',
       title: 'Profit & Loss Statement',
@@ -571,14 +577,12 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold flex items-center gap-1 ${
-                    company.isGstEnabled === false
-                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                      : 'bg-secondary-container text-on-secondary-container'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${company.isGstEnabled === false ? 'bg-amber-500' : 'bg-secondary'}`}></span>
-                    {company.isGstEnabled === false ? 'Non-GST Store' : 'GSTIN Active'}
-                  </span>
+                  {company.isGstEnabled !== false && (
+                    <span className="px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold flex items-center gap-1 bg-secondary-container text-on-secondary-container">
+                      <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                      GSTIN Active
+                    </span>
+                  )}
                   <span className="font-body-sm text-xs text-on-surface-variant truncate">
                     {company.tradeName || 'Wholesale & Retail'}
                   </span>
@@ -598,14 +602,25 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
 
           {/* Key Quick Metadata Strip */}
           <div className="mt-3.5 pt-2 border-t border-outline-variant/20 grid grid-cols-3 gap-2 relative z-10">
-            <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
-              <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">
-                {company.isGstEnabled === false ? 'Tax Mode' : 'GST Reg.'}
-              </span>
-              <span className="font-tabular-data text-xs text-on-surface truncate font-semibold">
-                {company.isGstEnabled === false ? 'Non-GST' : (company.gstin || '27AAAAA0000A1Z5')}
-              </span>
-            </div>
+            {company.isGstEnabled !== false ? (
+              <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
+                <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">
+                  GST Reg.
+                </span>
+                <span className="font-tabular-data text-xs text-on-surface truncate font-semibold">
+                  {company.gstin || '27AAAAA0000A1Z5'}
+                </span>
+              </div>
+            ) : (
+              <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
+                <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">
+                  State
+                </span>
+                <span className="font-tabular-data text-xs text-on-surface truncate font-semibold">
+                  Code {company.stateCode || '27'}
+                </span>
+              </div>
+            )}
             <div className="p-2 rounded-xl bg-surface-container-low flex flex-col min-w-0">
               <span className="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">
                 Fiscal Year
@@ -768,7 +783,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
             className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-secondary text-on-secondary font-label-md text-sm font-bold shadow-[0_4px_16px_rgba(0,108,73,0.25)] active:scale-98 transition-transform cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">add_circle</span>
-            Create New GST Invoice
+            {company.isGstEnabled !== false ? 'Create New GST Invoice' : 'Create New Invoice'}
           </button>
 
           <button

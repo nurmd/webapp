@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Party } from '../../models/party.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { db } from '../../services/db.ts';
 
 interface SelectPartyModalProps {
   parties: Party[];
@@ -15,6 +16,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   onClose,
   onAddNewParty,
 }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'CUSTOMER' | 'SUPPLIER'>('ALL');
   const [filterBalanceOnly, setFilterBalanceOnly] = useState(false);
@@ -51,7 +53,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                 Select Customer / Party
               </h3>
               <p className="text-[11px] text-on-surface-variant">
-                Autofill billing details, address &amp; GSTIN
+                {isGstActive ? 'Autofill billing details, address & GSTIN' : 'Autofill billing details & address'}
               </p>
             </div>
           </div>
@@ -110,7 +112,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
             </span>
             <input
               type="search"
-              placeholder="Search by name, phone, GSTIN, city..."
+              placeholder={isGstActive ? "Search by name, phone, GSTIN, city..." : "Search by name, phone, city..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-transparent py-2 text-on-surface font-body-md text-xs placeholder:text-outline focus:outline-none"
@@ -170,7 +172,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                         <span className="font-headline-sm text-xs font-bold text-on-surface truncate group-hover:text-secondary">
                           {party.name}
                         </span>
-                        {party.gstin && (
+                        {party.gstin && isGstActive && (
                           <span
                             className="material-symbols-outlined text-[14px] text-secondary flex-shrink-0"
                             style={{ fontVariationSettings: "'FILL' 1" }}

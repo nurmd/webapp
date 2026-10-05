@@ -13,6 +13,8 @@ import {
   Wallet,
 } from 'lucide-react';
 
+import { db } from '../services/db.ts';
+
 export type NavTab =
   | 'dashboard'
   | 'pos'
@@ -32,16 +34,17 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
   const menuItems: Array<{ id: NavTab; label: string; icon: React.ReactNode }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { id: 'pos', label: 'POS Quick Bill', icon: <ShoppingCart size={18} /> },
     { id: 'sales', label: 'Sales Hub', icon: <Receipt size={18} /> },
-    { id: 'purchases', label: 'Purchases & ITC', icon: <ShoppingBag size={18} /> },
+    { id: 'purchases', label: isGstActive ? 'Purchases & ITC' : 'Purchases', icon: <ShoppingBag size={18} /> },
     { id: 'expenses', label: 'Expenses & Overhead', icon: <Wallet size={18} /> },
     { id: 'inventory', label: 'Stock & Items', icon: <Package size={18} /> },
     { id: 'parties', label: 'Parties Ledger', icon: <Users size={18} /> },
     { id: 'accounting', label: 'Daybook & Accounts', icon: <BookOpen size={18} /> },
-    { id: 'reports', label: 'GST & Financials', icon: <FileSpreadsheet size={18} /> },
+    { id: 'reports', label: isGstActive ? 'GST & Financials' : 'Reports & Financials', icon: <FileSpreadsheet size={18} /> },
     { id: 'stitch', label: 'Stitch UI Screens', icon: <Layers size={18} /> },
     { id: 'settings', label: 'Business Profile', icon: <Settings size={18} /> },
   ];

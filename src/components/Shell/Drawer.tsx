@@ -69,7 +69,7 @@ export const Drawer: React.FC<DrawerProps> = ({
       items: [
         { id: 'cash_bank', label: 'Cash & Bank Accounts', icon: 'account_balance' },
         { id: 'expenses', label: 'Expenses & Overheads', icon: 'receipt_long' },
-        { id: 'reports', label: 'Reports & GSTR', icon: 'analytics' },
+        { id: 'reports', label: company.isGstEnabled !== false ? 'Reports & GSTR' : 'Reports & Analytics', icon: 'analytics' },
         { id: 'accounting', label: 'Daybook Journal', icon: 'menu_book' },
         { id: 'menu', label: 'Navigation Menu Hub', icon: 'grid_view' },
         { id: 'settings', label: 'Company Settings', icon: 'settings' },

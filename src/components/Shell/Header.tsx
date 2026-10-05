@@ -58,22 +58,14 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
 
               <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-tight truncate ${
-                    isGst
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40'
-                      : 'bg-amber-50 text-amber-700 border border-amber-200/60 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800/40'
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      isGst ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-amber-500'
-                    }`}
-                  />
-                  <span className="truncate">
-                    {isGst ? (company.gstin ? `GSTIN: ${company.gstin}` : 'GST Registered') : 'Retail Mode'}
+                {isGst && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-tight truncate bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800/40">
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-emerald-600 dark:bg-emerald-400" />
+                    <span className="truncate">
+                      {company.gstin ? `GSTIN: ${company.gstin}` : 'GST Registered'}
+                    </span>
                   </span>
-                </span>
+                )}
               </div>
             </div>
           </div>

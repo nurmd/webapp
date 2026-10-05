@@ -662,7 +662,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                         GSTIN: {selectedSupplier.gstin}
                       </span>
                     ) : (
-                      <span className="text-outline">Unregistered Vendor</span>
+                      <span className="text-outline">{isGstActive ? 'Unregistered Vendor' : 'Vendor'}</span>
                     )}
                     {supplierStateCode && <span>· State: {supplierStateCode}</span>}
                   </div>
@@ -733,18 +733,20 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
               </button>
 
               {/* ITC Eligibility Selector */}
-              <div className="h-7 px-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 border border-orange-500/20">
-                <span className="material-symbols-outlined text-[14px]">verified</span>
-                <span>
-                  {itcEligibility === 'ELIGIBLE_INPUTS'
-                    ? 'ITC: Inputs'
-                    : itcEligibility === 'ELIGIBLE_CAPITAL_GOODS'
-                    ? 'ITC: Capital'
-                    : itcEligibility === 'ELIGIBLE_SERVICES'
-                    ? 'ITC: Services'
-                    : 'No ITC'}
-                </span>
-              </div>
+              {isGstActive && (
+                <div className="h-7 px-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 border border-orange-500/20">
+                  <span className="material-symbols-outlined text-[14px]">verified</span>
+                  <span>
+                    {itcEligibility === 'ELIGIBLE_INPUTS'
+                      ? 'ITC: Inputs'
+                      : itcEligibility === 'ELIGIBLE_CAPITAL_GOODS'
+                      ? 'ITC: Capital'
+                      : itcEligibility === 'ELIGIBLE_SERVICES'
+                      ? 'ITC: Services'
+                      : 'No ITC'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -979,9 +981,11 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
                   Purchase Bill Summary
                 </span>
-                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                  {isGstActive ? 'GST Compliant' : 'Non-GST'}
-                </span>
+                {isGstActive && (
+                  <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
+                    GST Compliant
+                  </span>
+                )}
               </div>
 
               {/* Subtotal */}

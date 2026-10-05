@@ -14,7 +14,7 @@ export interface SimplifiedPurchaseModalProps {
 
 export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = ({
   bill,
-  company: _company,
+  company,
   onClose,
   onEditPurchase,
   onDeletePurchase,
@@ -29,6 +29,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
 
   const isPaid = bill.paymentStatus === 'PAID';
   const isPartial = bill.paymentStatus === 'PARTIAL';
+  const isGstActive = company.isGstEnabled !== false;
 
   const handleDelete = () => {
     if (!onDeletePurchase) return;
@@ -80,14 +81,16 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         </div>
 
         {/* Compact Supplier Details */}
-        <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
-          <span>
-            GSTIN: <strong className="font-mono text-on-surface">{bill.supplierGstin || 'Unregistered'}</strong>
-          </span>
-          <span>
-            ITC: <strong className="text-on-surface">{bill.itcEligibility === 'INELIGIBLE_17_5' ? 'Blocked' : 'Eligible'}</strong>
-          </span>
-        </div>
+        {isGstActive && (
+          <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
+            <span>
+              GSTIN: <strong className="font-mono text-on-surface">{bill.supplierGstin || 'Unregistered'}</strong>
+            </span>
+            <span>
+              ITC: <strong className="text-on-surface">{bill.itcEligibility === 'INELIGIBLE_17_5' ? 'Blocked' : 'Eligible'}</strong>
+            </span>
+          </div>
+        )}
 
         {/* Purchased Items Table View */}
         <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
@@ -111,11 +114,13 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
                           {item.name}
                         </div>
                         <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                          {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                          {item.hsnSacCode && <span>•</span>}
-                          <span className="text-orange-600 dark:text-orange-400 font-semibold">
-                            GST {item.gstRate || 0}%
-                          </span>
+                          {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
+                          {isGstActive && item.hsnSacCode && <span>•</span>}
+                          {isGstActive && (
+                            <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                              GST {item.gstRate || 0}%
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
@@ -147,16 +152,20 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
 
         {/* Financial Breakdown */}
         <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-          <div className="flex justify-between text-on-surface-variant text-[11px]">
-            <span>Taxable Amount</span>
-            <span className="font-bold text-on-surface">{formatINR(bill.totalTaxableAmount)}</span>
-          </div>
-          <div className="flex justify-between text-on-surface-variant text-[11px]">
-            <span>Total Tax (GST / ITC)</span>
-            <span className="font-bold text-orange-600 dark:text-orange-400">
-              {formatINR(bill.totalTax)}
-            </span>
-          </div>
+          {isGstActive && (
+            <>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Taxable Amount</span>
+                <span className="font-bold text-on-surface">{formatINR(bill.totalTaxableAmount)}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Total Tax (GST / ITC)</span>
+                <span className="font-bold text-orange-600 dark:text-orange-400">
+                  {formatINR(bill.totalTax)}
+                </span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
             <span>Total Bill Value</span>
             <span className="font-black text-on-surface font-currency-display-mobile">

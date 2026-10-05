@@ -3,6 +3,8 @@ import { Expense, ExpenseCategory } from '../../models/expense.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
+import { db } from '../../services/db.ts';
+
 interface ExpensesViewProps {
   expenses: Expense[];
   onSaveExpense: (expense: Expense) => void;
@@ -27,6 +29,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   onSaveExpense,
   onDeleteExpense,
 }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -73,7 +76,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       return;
     }
 
-    const taxable = gstRate > 0 ? (amount * 100) / (100 + gstRate) : amount;
+    const effectiveGstRate = isGstActive ? gstRate : 0;
+    const taxable = effectiveGstRate > 0 ? (amount * 100) / (100 + effectiveGstRate) : amount;
     const tax = amount - taxable;
     const halfTax = tax / 2;
 
@@ -83,7 +87,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       title: title.trim(),
       amount,
       taxableAmount: Math.round(taxable * 100) / 100,
-      gstRate,
+      gstRate: effectiveGstRate,
       taxAmount: Math.round(tax * 100) / 100,
       cgstAmount: Math.round(halfTax * 100) / 100,
       sgstAmount: Math.round(halfTax * 100) / 100,
@@ -91,9 +95,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       date: new Date().toISOString().split('T')[0],
       paymentMode,
       vendorName: vendorName.trim() || undefined,
-      vendorGstin: vendorGstin.trim().toUpperCase() || undefined,
+      vendorGstin: isGstActive ? (vendorGstin.trim().toUpperCase() || undefined) : undefined,
       voucherNumber: voucherNumber.trim() || undefined,
-      itcEligible,
+      itcEligible: isGstActive ? itcEligible : false,
       notes: notes.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
@@ -111,7 +115,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   return (
     <div className="flex flex-col w-full pb-24 max-w-4xl mx-auto px-margin-mobile py-4 gap-space-sm">
       {/* Top Banner: Metrics Bento */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-xs">
+      <div className={`grid grid-cols-1 ${isGstActive ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-space-xs`}>
         <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm border border-outline-variant/20 flex items-center justify-between">
           <div>
             <span className="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider block">
@@ -129,22 +133,24 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm border border-outline-variant/20 flex items-center justify-between">
-          <div>
-            <span className="font-label-sm text-[11px] text-secondary uppercase tracking-wider block font-semibold">
-              Eligible ITC (GSTR-3B)
-            </span>
-            <span className="font-currency-display text-[22px] font-extrabold text-secondary block mt-0.5">
-              {formatINR(totalItcClaimable)}
-            </span>
-            <span className="text-[11px] text-secondary font-medium">
-              Tax credit claimable
-            </span>
+        {isGstActive && (
+          <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm border border-outline-variant/20 flex items-center justify-between">
+            <div>
+              <span className="font-label-sm text-[11px] text-secondary uppercase tracking-wider block font-semibold">
+                Eligible ITC (GSTR-3B)
+              </span>
+              <span className="font-currency-display text-[22px] font-extrabold text-secondary block mt-0.5">
+                {formatINR(totalItcClaimable)}
+              </span>
+              <span className="text-[11px] text-secondary font-medium">
+                Tax credit claimable
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-secondary-container/40 text-on-secondary-container flex items-center justify-center">
+              <span className="material-symbols-outlined text-[22px]">verified</span>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-secondary-container/40 text-on-secondary-container flex items-center justify-center">
-            <span className="material-symbols-outlined text-[22px]">verified</span>
-          </div>
-        </div>
+        )}
 
         <div className="bg-surface-container-lowest p-space-sm rounded-xl shadow-sm border border-outline-variant/20 flex items-center justify-between">
           <div>
@@ -239,7 +245,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-low font-semibold text-on-surface-variant">
                     {exp.category}
                   </span>
-                  {exp.itcEligible && (
+                  {isGstActive && exp.itcEligible && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-semibold">
                       ITC: {formatINR(exp.taxAmount)}
                     </span>
@@ -259,9 +265,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   <span className="font-currency-display text-base font-bold text-on-surface block">
                     {formatINR(exp.amount)}
                   </span>
-                  <span className="text-[10px] text-on-surface-variant block">
-                    {exp.gstRate > 0 ? `${exp.gstRate}% GST incl.` : 'No GST'}
-                  </span>
+                  {isGstActive && (
+                    <span className="text-[10px] text-on-surface-variant block">
+                      {exp.gstRate > 0 ? `${exp.gstRate}% GST incl.` : 'No GST'}
+                    </span>
+                  )}
                 </div>
 
                 <button
@@ -328,7 +336,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={isGstActive ? "grid grid-cols-2 gap-3" : ""}>
                 <div>
                   <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
                     Total Amount (₹) *
@@ -344,22 +352,24 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                    GST Tax Rate (%)
-                  </label>
-                  <select
-                    value={gstRate}
-                    onChange={(e) => setGstRate(parseFloat(e.target.value))}
-                    className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
-                  >
-                    <option value={0}>0% (Exempt / Nil)</option>
-                    <option value={5}>5% GST</option>
-                    <option value={12}>12% GST</option>
-                    <option value={18}>18% GST</option>
-                    <option value={28}>28% GST</option>
-                  </select>
-                </div>
+                {isGstActive && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
+                      GST Tax Rate (%)
+                    </label>
+                    <select
+                      value={gstRate}
+                      onChange={(e) => setGstRate(parseFloat(e.target.value))}
+                      className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
+                    >
+                      <option value={0}>0% (Exempt / Nil)</option>
+                      <option value={5}>5% GST</option>
+                      <option value={12}>12% GST</option>
+                      <option value={18}>18% GST</option>
+                      <option value={28}>28% GST</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -395,9 +405,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
               <div>
                 <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1">
-                  Vendor Name & GSTIN (Optional)
+                  {isGstActive ? "Vendor Name & GSTIN (Optional)" : "Vendor Name (Optional)"}
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={isGstActive ? "grid grid-cols-2 gap-2" : ""}>
                   <input
                     type="text"
                     placeholder="Vendor Name"
@@ -405,28 +415,32 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                     onChange={(e) => setVendorName(e.target.value)}
                     className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none"
                   />
-                  <input
-                    type="text"
-                    placeholder="Vendor GSTIN (15 digits)"
-                    value={vendorGstin}
-                    onChange={(e) => setVendorGstin(e.target.value)}
-                    className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono"
-                  />
+                  {isGstActive && (
+                    <input
+                      type="text"
+                      placeholder="Vendor GSTIN (15 digits)"
+                      value={vendorGstin}
+                      onChange={(e) => setVendorGstin(e.target.value)}
+                      className="w-full bg-surface border border-outline-variant/40 rounded-xl p-2.5 text-sm text-on-surface focus:border-secondary outline-none font-mono"
+                    />
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 p-2 bg-surface-container-low rounded-xl">
-                <input
-                  type="checkbox"
-                  id="itcEligible"
-                  checked={itcEligible}
-                  onChange={(e) => setItcEligible(e.target.checked)}
-                  className="w-4 h-4 rounded text-secondary accent-secondary"
-                />
-                <label htmlFor="itcEligible" className="text-xs text-on-surface font-medium cursor-pointer">
-                  Eligible for Input Tax Credit (ITC claimable in GSTR-3B)
-                </label>
-              </div>
+              {isGstActive && (
+                <div className="flex items-center gap-2 p-2 bg-surface-container-low rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="itcEligible"
+                    checked={itcEligible}
+                    onChange={(e) => setItcEligible(e.target.checked)}
+                    className="w-4 h-4 rounded text-secondary accent-secondary"
+                  />
+                  <label htmlFor="itcEligible" className="text-xs text-on-surface font-medium cursor-pointer">
+                    Eligible for Input Tax Credit (ITC claimable in GSTR-3B)
+                  </label>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-outline-variant/20">
                 <button

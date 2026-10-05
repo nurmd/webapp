@@ -253,7 +253,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             </span>
             <input
               className="w-full h-7 pl-7 pr-6 bg-surface-container-lowest text-on-surface text-xs rounded-lg shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
-              placeholder="Search customer, bill, GSTIN..."
+              placeholder={company.isGstEnabled !== false ? "Search customer, bill, GSTIN..." : "Search customer, bill..."}
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

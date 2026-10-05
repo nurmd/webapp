@@ -967,12 +967,14 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           {showPartyDetails && (
             <div className="pt-2.5 border-t border-outline-variant/20 text-xs text-on-surface space-y-1.5 animate-in fade-in">
               <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <span className="text-outline block">GSTIN</span>
-                  <span className="font-mono font-bold text-on-surface truncate block">
-                    {party.gstin || 'Unregistered'}
-                  </span>
-                </div>
+                {company.isGstEnabled !== false && (
+                  <div>
+                    <span className="text-outline block">GSTIN</span>
+                    <span className="font-mono font-bold text-on-surface truncate block">
+                      {party.gstin || 'Unregistered'}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <span className="text-outline block">PAN</span>
                   <span className="font-mono font-bold text-on-surface truncate block">

@@ -58,6 +58,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   }, [datePreset, customStart, customEnd]);
 
   // 1. Date Filter
+  const isGstActive = company.isGstEnabled !== false;
   const dateFilteredPurchases = useMemo(() => {
     if (!dateRange.start && !dateRange.end) return purchases;
     return purchases.filter((p) => isDateInRange(p.date, dateRange.start, dateRange.end));
@@ -369,7 +370,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                     <span>{formatDate(bill.date)}</span>
                     <span>•</span>
                     <span className="truncate">{bill.items?.length || 0} {bill.items?.length === 1 ? 'item' : 'items'}</span>
-                    {bill.totalTax > 0 && (
+                    {isGstActive && bill.totalTax > 0 && (
                       <>
                         <span>•</span>
                         <span className="font-semibold text-orange-600 dark:text-orange-400">+{formatINR(bill.totalTax)} ITC</span>

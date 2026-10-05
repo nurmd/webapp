@@ -44,6 +44,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onSaveAdjustment,
   onScanBarcodeClick,
 }) => {
+  const isGstActive = db.getCompany().isGstEnabled !== false;
+
   // Filter & Sort State (Name, Available Stock, Category, Created Date, Disabled Items)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
@@ -641,7 +643,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </span>
               <input
                 className="w-full h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
-                placeholder="Search items, SKU, or HSN code..."
+                placeholder={isGstActive ? "Search items, SKU, or HSN code..." : "Search items or SKU..."}
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1035,7 +1037,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
-                  {activeItemDetail.category} • HSN: {activeItemDetail.hsnSacCode}
+                  {activeItemDetail.category}
+                  {isGstActive && activeItemDetail.hsnSacCode ? ` • HSN: ${activeItemDetail.hsnSacCode}` : ''}
                   {activeItemDetail.sku ? ` • SKU: ${activeItemDetail.sku}` : ''}
                 </p>
               </div>
@@ -1397,7 +1400,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className={isGstActive ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
                   <div>
                     <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
                       Category
@@ -1410,18 +1413,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                     />
                   </div>
-                  <div>
-                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                      HSN / SAC Code
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 100630"
-                      value={hsn}
-                      onChange={(e) => setHsn(e.target.value)}
-                      className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
-                    />
-                  </div>
+                  {isGstActive && (
+                    <div>
+                      <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                        HSN / SAC Code
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 100630"
+                        value={hsn}
+                        onChange={(e) => setHsn(e.target.value)}
+                        className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1454,7 +1459,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               {/* Section 2: Pricing & GST Tax Rates */}
               <div className="bg-surface-container-low/50 rounded-xl p-3.5 border border-outline-variant/20 flex flex-col gap-2.5">
                 <span className="font-label-md text-xs font-bold text-on-surface uppercase tracking-wider">
-                  Pricing &amp; Tax Slabs
+                  {isGstActive ? 'Pricing & Tax Slabs' : 'Pricing'}
                 </span>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1487,27 +1492,29 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
-                    GST Tax Rate Slab
-                  </label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[0, 5, 12, 18, 28].map((rate) => (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => setGstRate(rate)}
-                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          gstRate === rate
-                            ? 'bg-secondary text-on-secondary shadow-sm'
-                            : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container'
-                        }`}
-                      >
-                        {rate}%
-                      </button>
-                    ))}
+                {isGstActive && (
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
+                      GST Tax Rate Slab
+                    </label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[0, 5, 12, 18, 28].map((rate) => (
+                        <button
+                          key={rate}
+                          type="button"
+                          onClick={() => setGstRate(rate)}
+                          className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            gstRate === rate
+                              ? 'bg-secondary text-on-secondary shadow-sm'
+                              : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container'
+                          }`}
+                        >
+                          {rate}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Section 3: Stock & Inventory Tracking */}

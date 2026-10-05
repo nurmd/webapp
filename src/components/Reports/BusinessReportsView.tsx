@@ -88,6 +88,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   items,
   parties,
 }) => {
+  const isGstActive = company.isGstEnabled !== false;
   const [activeCategory, setActiveCategory] = useState<ReportCategory>('ALL');
   const [search, setSearch] = useState('');
   const [profitPeriod, setProfitPeriod] = useState<ProfitPeriod>('TODAY');
@@ -488,21 +489,23 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           type="button"
         >
           <span className="material-symbols-outlined text-[16px]">apps</span>
-          <span>All (13)</span>
+          <span>All</span>
         </button>
 
-        <button
-          onClick={() => setActiveCategory('GST')}
-          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-sm ${
-            activeCategory === 'GST'
-              ? 'bg-secondary text-on-secondary'
-              : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-          }`}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-[16px]">verified_user</span>
-          <span>GST &amp; Tax</span>
-        </button>
+        {isGstActive && (
+          <button
+            onClick={() => setActiveCategory('GST')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-sm ${
+              activeCategory === 'GST'
+                ? 'bg-secondary text-on-secondary'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+            }`}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[16px]">verified_user</span>
+            <span>GST &amp; Tax</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveCategory('FINANCIAL')}
@@ -545,7 +548,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
       </div>
 
       {/* 3. SECTION: GSTR-1 Official Section with 1-Click JSON Download */}
-      {(activeCategory === 'ALL' || activeCategory === 'GST') && (
+      {isGstActive && (activeCategory === 'ALL' || activeCategory === 'GST') && (
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
@@ -609,7 +612,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
       )}
 
       {/* 4. SECTION: GSTR-3B Tax Computation */}
-      {(activeCategory === 'ALL' || activeCategory === 'GST') && (
+      {isGstActive && (activeCategory === 'ALL' || activeCategory === 'GST') && (
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-md bg-primary-fixed text-on-primary-fixed font-bold text-xs">
@@ -665,7 +668,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
                 INCOME / REVENUE
               </div>
               <div className="flex justify-between">
-                <span>Taxable Sales:</span>
+                <span>{isGstActive ? 'Taxable Sales:' : 'Total Sales:'}</span>
                 <span className="font-bold">{formatINR(totalSalesTaxable)}</span>
               </div>
               <div className="flex justify-between">
@@ -747,7 +750,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           {/* Quick Metrics KPI Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
             <div className="p-3 rounded-xl bg-surface-container-low flex flex-col">
-              <span className="text-on-surface-variant font-medium">Billed Sales (Taxable)</span>
+              <span className="text-on-surface-variant font-medium">{isGstActive ? 'Billed Sales (Taxable)' : 'Billed Sales'}</span>
               <span className="font-bold text-on-surface text-sm mt-0.5">
                 {formatINR(totalBillWiseTaxable)}
               </span>
@@ -900,7 +903,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
                                         <th className="py-1 px-2 text-center">Qty</th>
                                         <th className="py-1 px-2 text-right">Sale Price</th>
                                         <th className="py-1 px-2 text-right">Buy Price</th>
-                                        <th className="py-1 px-2 text-right">Taxable Sale</th>
+                                        <th className="py-1 px-2 text-right">{isGstActive ? 'Taxable Sale' : 'Sale Amount'}</th>
                                         <th className="py-1 px-2 text-right">Cost (COGS)</th>
                                         <th className="py-1 px-2 text-right">Profit</th>
                                         <th className="py-1 px-2 text-right">Margin</th>

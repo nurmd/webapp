@@ -34,6 +34,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
   const isPaid = invoice.paymentStatus === 'PAID';
   const isPartial = invoice.paymentStatus === 'PARTIAL';
+  const isGstActive = company.isGstEnabled !== false && invoice.isGstInvoice !== false;
 
   const handleWhatsApp = () => {
     const url = getWhatsAppShareUrl(invoice, company);
@@ -90,14 +91,16 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         </div>
 
         {/* Compact Customer Details */}
-        <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
-          <span>
-            GSTIN: <strong className="font-mono text-on-surface">{invoice.partyGstin || 'Unregistered'}</strong>
-          </span>
-          <span>
-            POS: <strong className="text-on-surface">State {invoice.placeOfSupplyStateCode || company.stateCode}</strong>
-          </span>
-        </div>
+        {isGstActive && (
+          <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
+            <span>
+              GSTIN: <strong className="font-mono text-on-surface">{invoice.partyGstin || 'Unregistered'}</strong>
+            </span>
+            <span>
+              POS: <strong className="text-on-surface">State {invoice.placeOfSupplyStateCode || company.stateCode}</strong>
+            </span>
+          </div>
+        )}
 
         {/* Purchased Items Table View */}
         <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
@@ -121,9 +124,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
                           {item.name}
                         </div>
                         <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                          {item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                          {item.hsnSacCode && <span>•</span>}
-                          <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>
+                          {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
+                          {isGstActive && item.hsnSacCode && <span>•</span>}
+                          {isGstActive && <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>}
                         </div>
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
@@ -155,14 +158,18 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
         {/* Financial Breakdown */}
         <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-          <div className="flex justify-between text-on-surface-variant text-[11px]">
-            <span>Taxable Amount</span>
-            <span className="font-bold text-on-surface">{formatINR(invoice.totalTaxableAmount)}</span>
-          </div>
-          <div className="flex justify-between text-on-surface-variant text-[11px]">
-            <span>Total Tax (GST)</span>
-            <span className="font-bold text-secondary">{formatINR(invoice.totalTax)}</span>
-          </div>
+          {isGstActive && (
+            <>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Taxable Amount</span>
+                <span className="font-bold text-on-surface">{formatINR(invoice.totalTaxableAmount)}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Total Tax (GST)</span>
+                <span className="font-bold text-secondary">{formatINR(invoice.totalTax)}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
             <span>Total Invoice Value</span>
             <span className="font-black text-on-surface font-currency-display-mobile">
@@ -234,26 +241,30 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           )}
 
           {/* E-Way JSON export */}
-          <button
-            type="button"
-            onClick={() => downloadEWayBillJson(company, invoice)}
-            className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-            title="Download E-Way Bill JSON"
-          >
-            <span className="material-symbols-outlined text-[16px]">local_shipping</span>
-            <span>E-Way</span>
-          </button>
+          {isGstActive && (
+            <button
+              type="button"
+              onClick={() => downloadEWayBillJson(company, invoice)}
+              className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+              title="Download E-Way Bill JSON"
+            >
+              <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+              <span>E-Way</span>
+            </button>
+          )}
 
           {/* E-Invoice JSON export */}
-          <button
-            type="button"
-            onClick={() => downloadEInvoiceJson(company, invoice)}
-            className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-            title="Download E-Invoice JSON"
-          >
-            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-            <span>E-Inv</span>
-          </button>
+          {isGstActive && (
+            <button
+              type="button"
+              onClick={() => downloadEInvoiceJson(company, invoice)}
+              className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+              title="Download E-Invoice JSON"
+            >
+              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+              <span>E-Inv</span>
+            </button>
+          )}
 
           {/* Delete Invoice Button */}
           {onDeleteInvoice && (
