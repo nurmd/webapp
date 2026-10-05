@@ -16,11 +16,21 @@ cd "$APP_DIR"
 echo "[1/6] Building production web assets with Vite..."
 npm run build
 
-# 2. Copy Web Assets to Android assets directory
-echo "[2/6] Staging web assets into Android container..."
+# 2. Copy Web Assets to Android assets directory (strictly separating PWA and Android)
+echo "[2/6] Staging web assets into Android container (excluding PWA-only artifacts)..."
 mkdir -p "$NATIVE_DIR/app/src/main/assets"
 rm -rf "$NATIVE_DIR/app/src/main/assets/"*
 cp -r dist/* "$NATIVE_DIR/app/src/main/assets/"
+
+# Remove PWA-specific files not needed by Android native container to prevent APK size inflation:
+rm -rf "$NATIVE_DIR/app/src/main/assets/deploy"
+rm -f "$NATIVE_DIR/app/src/main/assets/sw.js"
+rm -f "$NATIVE_DIR/app/src/main/assets/manifest.json"
+rm -f "$NATIVE_DIR/app/src/main/assets/apple-touch-icon.png"
+rm -f "$NATIVE_DIR/app/src/main/assets/icon-"*.png
+rm -f "$NATIVE_DIR/app/src/main/assets/"*.tar.gz
+rm -f "$NATIVE_DIR/app/src/main/assets/"*.sha256
+rm -f "$NATIVE_DIR/app/src/main/assets/"*.map
 
 # 3. Clean & Prepare Build Directories
 echo "[3/6] Compiling Android resources with aapt2..."

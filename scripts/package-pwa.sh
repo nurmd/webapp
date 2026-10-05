@@ -43,6 +43,7 @@ mkdir -p "$APP_DIR/dist-pwa"
 ARCHIVE_PATH="$APP_DIR/dist-pwa/vyapar-pwa.tar.gz"
 
 tar -czf "$ARCHIVE_PATH" -C "$APP_DIR/dist" .
+rm -rf "$APP_DIR/dist/deploy"
 
 # 4. Generate Checksum
 SHA256=$(sha256sum "$ARCHIVE_PATH" | awk '{print $1}')
