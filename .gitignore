@@ -20,4 +20,6 @@ ios/
 src-tauri/target/
 
 # PWA Dist
-dist-pwa/
+dist-pwa/*
+!dist-pwa/vyapar-pwa.tar.gz
+!dist-pwa/vyapar-pwa.tar.gz.sha256

@@ -35,7 +35,10 @@ for file in "${REQUIRED_FILES[@]}"; do
 done
 
 # 3. Create deployment archive
-echo "[3/4] Creating compressed tarball for Debian server..."
+echo "[3/4] Copying deploy scripts and creating compressed tarball..."
+mkdir -p "$APP_DIR/dist/deploy"
+cp -r "$APP_DIR/deploy/"* "$APP_DIR/dist/deploy/"
+
 mkdir -p "$APP_DIR/dist-pwa"
 ARCHIVE_PATH="$APP_DIR/dist-pwa/vyapar-pwa.tar.gz"
 
