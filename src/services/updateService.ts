@@ -240,6 +240,9 @@ class UpdateService {
           (a: any) => a.name && a.name.endsWith('.sha256')
         );
 
+        const defaultRawApkUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`;
+        const defaultRawShaUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`;
+
         const releaseInfo: AppReleaseInfo = {
           version: cleanVersion,
           versionCode: this.calculateVersionCode(cleanVersion),
@@ -250,10 +253,10 @@ class UpdateService {
             'Full PWA offline support with instant background synchronization',
             'Thermal receipt printing (58mm/80mm) and Dynamic UPI QR codes',
           ],
-          apkUrl: apkAsset?.browser_download_url || `https://github.com/${repo}/releases/latest`,
-          apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '20.2 MB'),
+          apkUrl: apkAsset?.browser_download_url || defaultRawApkUrl,
+          apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '1.1 MB'),
           sha256: parsedSha256,
-          sha256Url: shaAsset?.browser_download_url,
+          sha256Url: shaAsset?.browser_download_url || defaultRawShaUrl,
           htmlUrl: data.html_url,
           isPwa,
           pwaTarballUrl: pwaAsset?.browser_download_url,
@@ -302,8 +305,9 @@ class UpdateService {
             'Installable Offline-First PWA for Debian Linux Server',
             'Automatic GitHub deployment pipeline with Service Worker hot-reload'
           ],
-          apkUrl: `https://github.com/${repo}/releases`,
-          apkSize: isPwa ? 'Web PWA' : '20.2 MB',
+          apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
+          apkSize: isPwa ? 'Web PWA' : '1.1 MB',
+          sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
           htmlUrl: `https://github.com/${repo}`,
           isPwa,
           commitMessage: commitMsg,

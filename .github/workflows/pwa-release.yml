@@ -58,6 +58,8 @@ jobs:
           files: |
             dist-pwa/vyapar-pwa.tar.gz
             dist-pwa/vyapar-pwa.tar.gz.sha256
+            dist-android/GSTBilling-Vyapar.apk
+            dist-android/GSTBilling-Vyapar.apk.sha256
             public/version.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
