@@ -1,0 +1,23 @@
+# /etc/caddy/Caddyfile
+# Vyapar Books PRO - Production Caddyfile for Debian Linux with Automatic Let's Encrypt HTTPS
+
+billing.yourdomain.com {
+    root * /var/www/vyapar
+    encode gzip zstd
+    file_server
+
+    # PWA Service Worker & Manifest caching policy
+    @pwaFiles {
+        path /sw.js /manifest.json
+    }
+    header @pwaFiles Cache-Control "no-cache, no-store, must-revalidate"
+
+    # Static hashed assets
+    @staticHashed {
+        path /assets/*
+    }
+    header @staticHashed Cache-Control "public, max-age=31536000, immutable"
+
+    # SPA routing fallback
+    try_files {path} /index.html
+}

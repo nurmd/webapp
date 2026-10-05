@@ -1,16 +1,81 @@
 {
-  "short_name": "GSTBilling",
-  "name": "GST Billing & Accounting",
+  "name": "Vyapar Books PRO - GST Billing & Accounting",
+  "short_name": "Vyapar Books",
+  "description": "High-speed offline-first GST Billing, POS Counter & Double-Entry Accounting System",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#006c49",
+  "background_color": "#f9f9ff",
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "./favicon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "sizes": "192x192 512x512"
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ],
-  "start_url": "/",
-  "background_color": "#0f172a",
-  "theme_color": "#2563eb",
-  "display": "standalone",
-  "orientation": "any"
+  "shortcuts": [
+    {
+      "name": "POS Counter Billing",
+      "short_name": "POS Billing",
+      "description": "Open high-speed counter sale screen",
+      "url": "./index.html#pos",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sales Invoices",
+      "short_name": "Sales",
+      "description": "View and create GST sales invoices",
+      "url": "./index.html#sales",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daybook Ledger",
+      "short_name": "Daybook",
+      "description": "View daily double-entry transactions",
+      "url": "./index.html#daybook",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Inventory & Stock",
+      "short_name": "Inventory",
+      "description": "Check current stock and adjust items",
+      "url": "./index.html#inventory",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

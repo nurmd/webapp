@@ -1,0 +1,11 @@
+services:
+  vyapar-pwa:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: vyapar-pwa
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production

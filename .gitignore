@@ -18,3 +18,6 @@ ios/
 
 # Tauri
 src-tauri/target/
+
+# PWA Dist
+dist-pwa/
