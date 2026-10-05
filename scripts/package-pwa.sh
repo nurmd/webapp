@@ -10,6 +10,7 @@ cd "$APP_DIR"
 
 # 1. Compile production assets with Vite
 echo "[1/4] Compiling production web bundle with Vite..."
+bash "$APP_DIR/scripts/generate-version.sh"
 npm run build
 
 # 2. Verify PWA critical assets
@@ -18,6 +19,7 @@ REQUIRED_FILES=(
   "dist/index.html"
   "dist/sw.js"
   "dist/manifest.json"
+  "dist/version.json"
   "dist/favicon.svg"
   "dist/icon-192.png"
   "dist/icon-512.png"

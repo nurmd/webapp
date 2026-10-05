@@ -1,9 +1,10 @@
 /**
- * In-App Application OTA (Over-The-Air) Updater Service
+ * In-App Application OTA (Over-The-Air) & PWA Updater Service
  * Connects directly to GitHub Version Releases API (e.g. nurmd/webapp)
- * Compares semantic versions, parses cryptographic SHA-256 checksums,
- * performs internal streaming downloads, verifies file integrity,
- * cleans up temporary installation artifacts, and prompts for retry on mismatch.
+ * Supports:
+ * 1. PWA Browser/Standalone: ServiceWorker skip-waiting, cache invalidation, and hot-reload.
+ * 2. GitHub Releases & Raw repository version checking with fallbacks.
+ * 3. Android Native WebView: Streaming APK download, SHA-256 integrity verification, and package installer.
  */
 
 export interface AppReleaseInfo {
@@ -18,6 +19,10 @@ export interface AppReleaseInfo {
   sha256Url?: string;
   htmlUrl?: string;
   isMandatory?: boolean;
+  isPwa?: boolean;
+  hasSwWaiting?: boolean;
+  pwaTarballUrl?: string;
+  commitMessage?: string;
 }
 
 export interface OtaProgressCallback {
@@ -34,7 +39,7 @@ export interface OtaDownloadOptions {
 
 import packageJson from '../../package.json';
 
-export const CURRENT_APP_VERSION = packageJson.version || '1.0.29';
+export const CURRENT_APP_VERSION = packageJson.version || '1.0.35';
 export const CURRENT_VERSION_CODE = (() => {
   const parts = CURRENT_APP_VERSION.split('.').map((p) => parseInt(p, 10) || 0);
   return (parts[0] || 1) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
@@ -45,6 +50,18 @@ class UpdateService {
   private lastChecked: string | null = null;
   private cachedRelease: AppReleaseInfo | null = null;
   private activeAbortController: AbortController | null = null;
+  private swRegistration: ServiceWorkerRegistration | null = null;
+  private pwaUpdateListeners: Array<(info: AppReleaseInfo) => void> = [];
+
+  constructor() {
+    this.initServiceWorkerListener();
+  }
+
+  public isPwaEnvironment(): boolean {
+    if (typeof window === 'undefined') return false;
+    const hasAndroidBridge = !!(window as any).AndroidBridge;
+    return !hasAndroidBridge;
+  }
 
   public getCurrentVersion(): string {
     return CURRENT_APP_VERSION;
@@ -65,8 +82,108 @@ class UpdateService {
   }
 
   /**
-   * Checks for updates by querying GitHub Releases API:
-   * GET https://api.github.com/repos/{owner}/{repo}/releases/latest
+   * Initializes Service Worker listeners to detect updates in real-time
+   */
+  private initServiceWorkerListener(): void {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (!reg) return;
+      this.swRegistration = reg;
+
+      // Check if a worker is already waiting to activate
+      if (reg.waiting) {
+        this.notifyPwaUpdateAvailable(true);
+      }
+
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            this.notifyPwaUpdateAvailable(true);
+          }
+        });
+      });
+    }).catch(() => {});
+  }
+
+  private notifyPwaUpdateAvailable(hasSwWaiting: boolean = true): void {
+    const info: AppReleaseInfo = this.cachedRelease || {
+      version: CURRENT_APP_VERSION,
+      versionCode: CURRENT_VERSION_CODE,
+      releaseDate: new Date().toISOString().split('T')[0],
+      releaseTitle: `Vyapar PRO PWA Update Available`,
+      releaseNotes: [
+        'New web version ready with latest billing and POS features',
+        'Offline cache and service worker refresh',
+        'Performance enhancements and stability fixes'
+      ],
+      apkUrl: '',
+      apkSize: 'Web App',
+      isPwa: true,
+      hasSwWaiting
+    };
+    info.isPwa = true;
+    info.hasSwWaiting = hasSwWaiting;
+
+    this.pwaUpdateListeners.forEach((listener) => {
+      try {
+        listener(info);
+      } catch (e) {
+        console.warn('Error in PWA update listener:', e);
+      }
+    });
+  }
+
+  public onPwaUpdate(callback: (info: AppReleaseInfo) => void): () => void {
+    this.pwaUpdateListeners.push(callback);
+    return () => {
+      this.pwaUpdateListeners = this.pwaUpdateListeners.filter((cb) => cb !== callback);
+    };
+  }
+
+  /**
+   * Triggers the PWA to skip waiting, clears stale asset caches, and reloads
+   */
+  public async applyPwaUpdate(): Promise<void> {
+    if (typeof window === 'undefined') return;
+
+    try {
+      // 1. Send SKIP_WAITING to waiting Service Worker
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg && reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+
+      // 2. Clear cached responses in CacheStorage
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.map((key) => {
+            console.log('[PWA Update] Deleting stale cache:', key);
+            return caches.delete(key);
+          })
+        );
+      }
+    } catch (err) {
+      console.warn('[PWA Update] Cache clearing warning:', err);
+    }
+
+    // 3. Short delay then reload window to mount fresh assets
+    setTimeout(() => {
+      window.location.reload();
+    }, 250);
+  }
+
+  /**
+   * Checks for updates by querying:
+   * 1. GitHub Releases API (releases/latest)
+   * 2. Fallback: Raw package.json & commits on GitHub master branch
+   * 3. Fallback: Local /version.json
    */
   public async checkForUpdates(): Promise<{
     hasUpdate: boolean;
@@ -77,12 +194,19 @@ class UpdateService {
     this.lastChecked = new Date().toISOString();
     const repo = this.getGitHubRepo();
     const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+    const isPwa = this.isPwaEnvironment();
+
+    // Trigger ServiceWorker check in parallel if on PWA
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        reg?.update().catch(() => {});
+      }).catch(() => {});
+    }
 
     try {
+      // 1. Attempt GitHub Releases API
       const res = await fetch(apiUrl, {
-        headers: {
-          Accept: 'application/vnd.github.v3+json',
-        },
+        headers: { Accept: 'application/vnd.github.v3+json' },
       });
 
       if (res.ok) {
@@ -90,7 +214,6 @@ class UpdateService {
         const tag = (data.tag_name || '').replace(/^v/, '');
         const cleanVersion = tag || CURRENT_APP_VERSION;
 
-        // Parse release notes from markdown body
         const notes: string[] = [];
         let parsedSha256: string | undefined;
 
@@ -98,7 +221,6 @@ class UpdateService {
           const lines = data.body.split('\n');
           for (const line of lines) {
             const trimmed = line.trim();
-            // Check for explicit SHA256 line: "SHA256: <hash>" or "sha256: <hash>"
             const shaMatch = trimmed.match(/sha-?256[:\s]+([a-f0-9]{64})/i);
             if (shaMatch) {
               parsedSha256 = shaMatch[1].toLowerCase();
@@ -107,42 +229,16 @@ class UpdateService {
             }
           }
         }
-        if (notes.length === 0 && data.body) {
-          notes.push(data.body.slice(0, 300));
-        }
 
-        // Find binary APK asset
         const apkAsset = data.assets?.find(
           (a: any) => a.name && (a.name.endsWith('.apk') || a.name.includes('.apk'))
         );
-
-        // Find optional attached .sha256 checksum asset
+        const pwaAsset = data.assets?.find(
+          (a: any) => a.name && (a.name.includes('pwa') || a.name.endsWith('.tar.gz'))
+        );
         const shaAsset = data.assets?.find(
           (a: any) => a.name && a.name.endsWith('.sha256')
         );
-
-        const sha256Url = shaAsset?.browser_download_url;
-
-        // If sha256 wasn't parsed from body, try fetching from the .sha256 asset
-        if (!parsedSha256 && sha256Url) {
-          try {
-            const shaRes = await fetch(sha256Url);
-            if (shaRes.ok) {
-              const text = await shaRes.text();
-              const hashMatch = text.match(/([a-fA-F0-9]{64})/);
-              if (hashMatch) {
-                parsedSha256 = hashMatch[1].toLowerCase();
-              }
-            }
-          } catch (_e) {
-            // Ignore asset fetch failure; can proceed with fallback
-          }
-        }
-
-        const apkUrl = apkAsset?.browser_download_url || data.html_url || `https://github.com/${repo}/releases/latest`;
-        const apkSize = apkAsset?.size
-          ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB`
-          : '20.2 MB';
 
         const releaseInfo: AppReleaseInfo = {
           version: cleanVersion,
@@ -150,16 +246,17 @@ class UpdateService {
           releaseDate: data.published_at ? data.published_at.split('T')[0] : new Date().toISOString().split('T')[0],
           releaseTitle: data.name || `Vyapar PRO v${cleanVersion}`,
           releaseNotes: notes.length > 0 ? notes : [
-            'Direct ESC/POS 58mm & 80mm thermal receipt printing',
-            'Dual barcode scanning with hardware wedge listener',
-            'Party Ledger Passbook & Double-Entry Payment Vouchers',
-            'Government NIC E-Way Bill & E-Invoice JSON compliance',
+            'Enhanced Clean POS Billing with fixed table layout and customer selector',
+            'Full PWA offline support with instant background synchronization',
+            'Thermal receipt printing (58mm/80mm) and Dynamic UPI QR codes',
           ],
-          apkUrl,
-          apkSize,
+          apkUrl: apkAsset?.browser_download_url || `https://github.com/${repo}/releases/latest`,
+          apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '20.2 MB'),
           sha256: parsedSha256,
-          sha256Url,
+          sha256Url: shaAsset?.browser_download_url,
           htmlUrl: data.html_url,
+          isPwa,
+          pwaTarballUrl: pwaAsset?.browser_download_url,
           isMandatory: false,
         };
 
@@ -171,20 +268,93 @@ class UpdateService {
           currentVersion: CURRENT_APP_VERSION,
           latestRelease: releaseInfo,
         };
-      } else {
-        const errorMsg = res.status === 404
-          ? `No GitHub releases found for ${repo}`
-          : `GitHub API returned ${res.status}`;
-        console.warn(errorMsg);
+      }
+
+      // 2. Fallback: Query raw package.json from GitHub master branch
+      console.log('[UpdateService] Releases API non-200. Querying raw GitHub master package.json...');
+      const rawPkgUrl = `https://raw.githubusercontent.com/${repo}/master/package.json`;
+      const rawRes = await fetch(rawPkgUrl);
+
+      if (rawRes.ok) {
+        const rawPkg = await rawRes.json();
+        const githubVersion = (rawPkg.version || '').replace(/^v/, '');
+
+        // Fetch latest commit message
+        let commitMsg = 'Latest updates from GitHub master repository';
+        try {
+          const commitsRes = await fetch(`https://api.github.com/repos/${repo}/commits/master`, {
+            headers: { Accept: 'application/vnd.github.v3+json' },
+          });
+          if (commitsRes.ok) {
+            const commitData = await commitsRes.json();
+            commitMsg = commitData.commit?.message?.split('\n')[0] || commitMsg;
+          }
+        } catch (_e) {}
+
+        const releaseInfo: AppReleaseInfo = {
+          version: githubVersion,
+          versionCode: this.calculateVersionCode(githubVersion),
+          releaseDate: new Date().toISOString().split('T')[0],
+          releaseTitle: `Vyapar PRO v${githubVersion} (GitHub Master)`,
+          releaseNotes: [
+            commitMsg,
+            'Clean Clutter-Free POS Billing Counter with fixed item table scroll',
+            'Installable Offline-First PWA for Debian Linux Server',
+            'Automatic GitHub deployment pipeline with Service Worker hot-reload'
+          ],
+          apkUrl: `https://github.com/${repo}/releases`,
+          apkSize: isPwa ? 'Web PWA' : '20.2 MB',
+          htmlUrl: `https://github.com/${repo}`,
+          isPwa,
+          commitMessage: commitMsg,
+        };
+
+        this.cachedRelease = releaseInfo;
+        const hasUpdate = this.isNewer(releaseInfo.version, CURRENT_APP_VERSION);
+
         return {
-          hasUpdate: false,
+          hasUpdate,
           currentVersion: CURRENT_APP_VERSION,
-          latestRelease: this.cachedRelease || undefined,
-          error: errorMsg,
+          latestRelease: releaseInfo,
         };
       }
+
+      // 3. Fallback: Query local server /version.json
+      if (typeof window !== 'undefined') {
+        const localVersionRes = await fetch(`./version.json?t=${Date.now()}`);
+        if (localVersionRes.ok) {
+          const vData = await localVersionRes.json();
+          if (vData.version && this.isNewer(vData.version, CURRENT_APP_VERSION)) {
+            const releaseInfo: AppReleaseInfo = {
+              version: vData.version,
+              versionCode: this.calculateVersionCode(vData.version),
+              releaseDate: vData.buildTime ? vData.buildTime.split('T')[0] : new Date().toISOString().split('T')[0],
+              releaseTitle: `Vyapar PRO v${vData.version}`,
+              releaseNotes: [
+                'New PWA build deployed on server',
+                'Click Update to refresh application cache'
+              ],
+              apkUrl: '',
+              apkSize: 'Web PWA',
+              isPwa: true,
+            };
+            return {
+              hasUpdate: true,
+              currentVersion: CURRENT_APP_VERSION,
+              latestRelease: releaseInfo,
+            };
+          }
+        }
+      }
+
+      return {
+        hasUpdate: false,
+        currentVersion: CURRENT_APP_VERSION,
+        latestRelease: this.cachedRelease || undefined,
+        error: `Could not fetch release information from GitHub (${repo})`,
+      };
     } catch (err: any) {
-      console.warn('GitHub OTA release check failed or offline:', err);
+      console.warn('GitHub update check network error:', err);
       return {
         hasUpdate: false,
         currentVersion: CURRENT_APP_VERSION,
@@ -215,9 +385,6 @@ class UpdateService {
     return major * 10000 + minor * 100 + patch;
   }
 
-  /**
-   * Calculates cryptographic SHA-256 of an ArrayBuffer in browser / web environments.
-   */
   public async calculateSha256(data: ArrayBuffer): Promise<string> {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -227,38 +394,22 @@ class UpdateService {
     return '';
   }
 
-  /**
-   * Initiates internal OTA download:
-   * 1. If running inside Android WebView (`AndroidBridge.startInternalDownload`),
-   *    downloads stream natively to app cache, streams SHA-256, verifies hash,
-   *    and launches Android Package Installer.
-   * 2. If running in a web browser, streams the file via fetch(), calculates SHA-256,
-   *    verifies checksum, and triggers the verified file download.
-   * 3. If checksum fails at any point, cleans temp files and notifies the caller
-   *    with canRetry = true.
-   */
   public startInternalDownload(options: OtaDownloadOptions): () => void {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
 
-    // A) Android Native WebView Bridge
     if (bridge && typeof bridge.startInternalDownload === 'function') {
-      // Wire global callbacks for native events
       if (typeof window !== 'undefined') {
         (window as any).onOtaProgress = (percent: number, loaded: number, total: number) => {
           options.onProgress?.(percent, loaded, total);
         };
-
         (window as any).onOtaSuccess = (hash: string) => {
           options.onSuccess?.(hash);
         };
-
         (window as any).onOtaError = (msg: string, canRetry: boolean) => {
           options.onError?.(msg, canRetry);
         };
       }
-
       bridge.startInternalDownload(options.apkUrl, options.expectedSha256 || '');
-
       return () => {
         if (typeof bridge.cancelInternalDownload === 'function') {
           bridge.cancelInternalDownload();
@@ -266,16 +417,12 @@ class UpdateService {
       };
     }
 
-    // B) Web / Browser Fallback Streaming Download
     const abortController = new AbortController();
     this.activeAbortController = abortController;
 
     (async () => {
       try {
-        const response = await fetch(options.apkUrl, {
-          signal: abortController.signal,
-        });
-
+        const response = await fetch(options.apkUrl, { signal: abortController.signal });
         if (!response.ok) {
           throw new Error(`Server returned HTTP ${response.status} ${response.statusText}`);
         }
@@ -294,7 +441,6 @@ class UpdateService {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           if (value) {
             chunks.push(value);
             loadedBytes += value.length;
@@ -303,7 +449,6 @@ class UpdateService {
           }
         }
 
-        // Assemble downloaded buffer
         const totalBuffer = new Uint8Array(loadedBytes);
         let offset = 0;
         for (const chunk of chunks) {
@@ -311,7 +456,6 @@ class UpdateService {
           offset += chunk.length;
         }
 
-        // Checksum verification
         const calculatedHash = await this.calculateSha256(totalBuffer.buffer);
         const expected = (options.expectedSha256 || '').trim().toLowerCase();
 
@@ -321,7 +465,6 @@ class UpdateService {
           return;
         }
 
-        // Trigger verified browser download
         const blob = new Blob([totalBuffer], { type: 'application/vnd.android.package-archive' });
         const objectUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -345,9 +488,6 @@ class UpdateService {
     };
   }
 
-  /**
-   * Cleans up any leftover temporary APK file from cache.
-   */
   public clearTempApk(): void {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
     if (bridge && typeof bridge.clearTempApk === 'function') {
@@ -355,9 +495,6 @@ class UpdateService {
     }
   }
 
-  /**
-   * Legacy fallback helper to open APK URL if needed.
-   */
   public installUpdate(apkUrl: string): void {
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
     if (bridge && typeof bridge.installApk === 'function') {

@@ -178,8 +178,14 @@ export const App: React.FC = () => {
     return unsub;
   }, []);
 
-  // Background silent OTA update check on mount
+  // Background silent OTA / PWA update check on mount & listen for Service Worker updates
   React.useEffect(() => {
+    const unsubPwa = updateService.onPwaUpdate((info) => {
+      setHasUpdate(true);
+      setLatestRelease(info);
+      showToast(`PWA update available from GitHub (v${info.version})!`);
+    });
+
     updateService
       .checkForUpdates()
       .then((res) => {
@@ -189,6 +195,10 @@ export const App: React.FC = () => {
         }
       })
       .catch(() => {});
+
+    return () => {
+      unsubPwa();
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -862,9 +872,23 @@ export const App: React.FC = () => {
 
       {/* Floating Status Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/95 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl border border-white/10 flex items-center gap-2 max-w-[90vw] animate-bounce-once">
-          <span className="material-symbols-outlined text-[18px] text-secondary">info</span>
+        <div
+          onClick={() => {
+            if (hasUpdate) setIsUpdateModalOpen(true);
+          }}
+          className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/95 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-2xl border border-white/10 flex items-center gap-2 max-w-[90vw] animate-bounce-once ${
+            hasUpdate ? 'cursor-pointer hover:bg-neutral-800 ring-2 ring-secondary/50' : ''
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] text-secondary">
+            {hasUpdate ? 'cloud_download' : 'info'}
+          </span>
           <span className="truncate">{toastMessage}</span>
+          {hasUpdate && (
+            <span className="bg-secondary text-on-secondary text-[10px] px-2 py-0.5 rounded-full font-bold ml-1">
+              Update
+            </span>
+          )}
         </div>
       )}
     </div>

@@ -181,13 +181,37 @@ If your Debian server runs Docker:
 
 ---
 
-## 🔄 Updating to a Newer PWA Version in the Future
+## 🔄 Updating to a Newer PWA Version through GitHub
 
-When you push updates in the future:
-1. Run `./scripts/package-pwa.sh`
-2. Copy `dist-pwa/vyapar-pwa.tar.gz` to your server.
-3. Extract over `/var/www/vyapar`:
-   ```bash
-   sudo tar -xzf /tmp/vyapar-pwa.tar.gz -C /var/www/vyapar
-   ```
-4. Connected clients will automatically detect the new service worker cache and update smoothly!
+### Method 1: Automated 1-Command Update from GitHub on Debian (Recommended)
+You can update your Debian server directly from the `nurmd/webapp` GitHub repository:
+
+```bash
+# Run the automated updater script directly on Debian:
+sudo bash /var/www/vyapar/deploy/update-from-github.sh
+```
+
+Or install it as a system command:
+```bash
+sudo ln -sf /var/www/vyapar/deploy/update-from-github.sh /usr/local/bin/vyapar-update
+sudo chmod +x /usr/local/bin/vyapar-update
+
+# Then whenever you push changes to GitHub, just run:
+sudo vyapar-update
+```
+
+This script:
+1. Queries the GitHub repository and downloads the latest release bundle.
+2. Extracts assets cleanly into `/var/www/vyapar`.
+3. Sets `www-data` ownership and correct permissions.
+4. Reloads Nginx.
+5. All connected PWA clients and mobile devices will automatically receive an update toast prompt and hot-reload to the latest version!
+
+---
+
+### Method 2: In-App PWA Update (For Users & Cashiers)
+Inside the PWA running at `https://billing.brahmaputrahw.store`:
+1. The app automatically checks GitHub and the Service Worker in the background.
+2. When a newer version is deployed, a notification prompt appears: **"PWA Update Available from GitHub (vX.X.X)"**.
+3. Tap **"Update & Reload Now"** — the Service Worker activates immediately, purges obsolete caches, and reloads with the fresh code. All local offline billing data remains intact.
+
