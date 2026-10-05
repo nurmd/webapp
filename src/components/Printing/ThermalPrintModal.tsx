@@ -68,6 +68,18 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const previewText = formatThermalReceiptText(receiptData, width);
 
   const handleBluetoothPrint = async () => {
+    // Check if running inside Android wrapper
+    const androidBridge = (window as any).AndroidBridge;
+    if (androidBridge && typeof androidBridge.checkBluetoothStatus === 'function') {
+      const btStatus = androidBridge.checkBluetoothStatus();
+      if (btStatus === 'DISABLED') {
+        androidBridge.enableBluetooth();
+        setStatusMessage('Please enable Bluetooth and try again.');
+        setIsError(true);
+        return;
+      }
+    }
+
     setIsPrinting(true);
     setStatusMessage('Scanning for nearby Bluetooth thermal printers...');
     setIsError(false);

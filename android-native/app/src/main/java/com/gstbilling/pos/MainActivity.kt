@@ -244,6 +244,30 @@ class AndroidBridge(
     }
 
     @JavascriptInterface
+    fun checkBluetoothStatus(): String {
+        val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+        if (bluetoothAdapter == null) {
+            return "UNSUPPORTED"
+        }
+        return if (bluetoothAdapter.isEnabled) "ENABLED" else "DISABLED"
+    }
+
+    @JavascriptInterface
+    fun enableBluetooth() {
+        val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+        if (bluetoothAdapter?.isEnabled == false) {
+            (context as? Activity)?.runOnUiThread {
+                try {
+                    val enableBtIntent = Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    context.startActivity(enableBtIntent)
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Could not open Bluetooth settings", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun vibrate(durationMs: Long) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
