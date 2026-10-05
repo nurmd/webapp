@@ -236,7 +236,14 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const sgstAmount = isIntraState ? gstAmount / 2 : 0;
     const igstAmount = isIntraState ? 0 : gstAmount;
 
-    const totalAmount = taxableAmount + gstAmount;
+    let totalAmount = taxableAmount + gstAmount;
+
+    // If user explicitly typed a total that matches within a small rounding difference (<= 0.02),
+    // honor the user's exact entered total so it never falls back or gets rejected
+    const parsedTotal = parseFloat(totalInput);
+    if (!isNaN(parsedTotal) && parsedTotal > 0 && Math.abs(totalAmount - parsedTotal) <= 0.02) {
+      totalAmount = parsedTotal;
+    }
 
     return {
       gross,
@@ -248,11 +255,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       igstAmount,
       totalAmount,
     };
-  }, [quantity, unitPrice, discountPercent, gstRate, isIntraState, isGstActive]);
+  }, [quantity, unitPrice, discountPercent, gstRate, isIntraState, isGstActive, totalInput]);
 
   // Keep totalInput synchronized with calculated total unless user is actively editing it
   useEffect(() => {
     if (!isEditingTotal) {
+      const parsed = parseFloat(totalInput);
+      if (!isNaN(parsed) && Math.abs(calculation.totalAmount - parsed) <= 0.02) {
+        return;
+      }
       if (calculation.totalAmount > 0) {
         setTotalInput(calculation.totalAmount.toFixed(2));
       } else {
@@ -318,7 +329,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
     const divisor = qty * (discMultiplier > 0 ? discMultiplier : 1) * taxMultiplier;
     if (divisor > 0) {
-      const calculatedPrice = Math.round((newTotal / divisor) * 100) / 100;
+      // Precision up to 4 decimal places (fractional paisa) to accurately preserve wholesale and GST rates (e.g. 21.165)
+      const rawPrice = newTotal / divisor;
+      const calculatedPrice = Math.round(rawPrice * 10000) / 10000;
       setUnitPrice(calculatedPrice);
     }
   };
@@ -615,7 +628,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   required
                   value={unitPrice || ''}
                   onChange={(e) => setUnitPrice(Math.max(0, Number(e.target.value)))}
@@ -637,7 +650,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={mrp !== undefined ? mrp : ''}
                   onChange={(e) => setMrp(e.target.value === '' ? undefined : Number(e.target.value))}
                   placeholder="0.00"
@@ -722,12 +735,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   id="modal-item-total"
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={totalInput}
                   onFocus={() => setIsEditingTotal(true)}
                   onBlur={() => {
                     setIsEditingTotal(false);
-                    if (calculation.totalAmount > 0) {
+                    const entered = parseFloat(totalInput);
+                    if (!isNaN(entered) && Math.abs(calculation.totalAmount - entered) <= 0.02) {
+                      setTotalInput(entered.toFixed(2));
+                    } else if (calculation.totalAmount > 0) {
                       setTotalInput(calculation.totalAmount.toFixed(2));
                     }
                   }}

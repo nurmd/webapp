@@ -1024,14 +1024,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     <span className="text-[10px] text-outline">₹</span>
                     <input
                       type="number"
-                      step="0.01"
+                      step="any"
                       min="0"
                       value={unitPrice}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
                         updateCartPrice(item.id, val);
                       }}
-                      className="w-14 bg-surface-container-low border border-outline-variant/25 rounded-md px-1 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
+                      className="w-16 bg-surface-container-low border border-outline-variant/25 rounded-md px-1 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
                     />
                   </div>
 
