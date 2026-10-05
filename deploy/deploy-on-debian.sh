@@ -93,6 +93,18 @@ server {
     location / {
         try_files $uri $uri/ /index.html;
     }
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/vyapar;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
 }
 EOF
 fi
