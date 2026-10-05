@@ -136,46 +136,83 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-28 max-w-7xl mx-auto px-margin-mobile md:px-6 py-3 gap-space-sm">
-      {/* Ultra-Compact Top Header & Controls Strip */}
-      <div className="pt-1.5 pb-1 flex flex-col gap-1.5">
-        {/* Row 1: Title + Inline Metrics Badges + Add Purchase Button */}
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 shrink-0">
+      {/* Header, Metrics & Controls Strip */}
+      <div className="pt-1.5 pb-1 flex flex-col gap-2">
+        {/* Row 1: Title + Date Range Selector Pill */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span className="text-sm font-bold text-on-surface">Purchases</span>
+            <span className="text-sm font-bold text-on-surface">Purchase Ledger</span>
           </div>
 
-          {/* Sleek Inline Financial Badges */}
-          <div className="flex items-center gap-1 sm:gap-2 text-[11px] font-bold overflow-x-auto no-scrollbar">
-            <span className="text-on-surface whitespace-nowrap bg-surface-container-lowest px-2 py-0.5 rounded-lg border border-outline-variant/20 shadow-xs">
-              <span className="text-outline uppercase text-[9px] mr-1">Total</span>
-              {formatINR(totalPurchases)}
-            </span>
-            <span className="text-error whitespace-nowrap bg-error/10 px-2 py-0.5 rounded-lg border border-error/20">
-              <span className="uppercase text-[9px] mr-1">Due</span>
-              {formatINR(totalToPay)}
-            </span>
-            <span className="text-orange-600 dark:text-orange-400 whitespace-nowrap bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-500/20 hidden sm:inline-block">
-              <span className="uppercase text-[9px] mr-1">ITC</span>
-              {formatINR(totalItcClaimable)}
-            </span>
-          </div>
-
-          {/* Action Button */}
+          {/* Date Range Selector Pill */}
           <button
-            onClick={() => {
-              setEditingBill(null);
-              setIsModalOpen(true);
-            }}
-            className="h-7 px-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
             type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className={`h-7 flex items-center gap-1 px-2.5 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
+              datePreset !== 'ALL_TIME'
+                ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+            }`}
+            title="Filter by date range"
           >
-            <span className="material-symbols-outlined text-[15px]">add</span>
-            <span>Bill</span>
+            <span className="material-symbols-outlined text-[13px] text-orange-600 dark:text-orange-400">calendar_month</span>
+            <span className="truncate max-w-[100px] sm:max-w-[150px]">{dateRange.label}</span>
+            {datePreset !== 'ALL_TIME' ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDatePreset('ALL_TIME');
+                  setCustomStart('');
+                  setCustomEnd('');
+                }}
+                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
+                title="Reset to All Time"
+              >
+                close
+              </span>
+            ) : (
+              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+            )}
           </button>
         </div>
 
-        {/* Row 2: Search + Date Range Pill + Sort Selector */}
+        {/* Row 2: 2-Card Summary Grid for Total & Due */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Purchase Total Card */}
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-outline text-[11px] font-bold">
+              <span className="uppercase tracking-wider">Purchase Total</span>
+              <span className="text-[10px] bg-surface-container-low px-1.5 py-0.2 rounded font-semibold text-on-surface-variant">
+                {dateFilteredPurchases.length} {dateFilteredPurchases.length === 1 ? 'bill' : 'bills'}
+              </span>
+            </div>
+            <div className="mt-1 text-base sm:text-lg font-black text-on-surface tabular-nums tracking-tight">
+              {formatINR(totalPurchases)}
+            </div>
+          </div>
+
+          {/* Total to Pay Card */}
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between text-error text-[11px] font-bold">
+              <span className="uppercase tracking-wider">Total to Pay</span>
+              {unpaidPurchases.length > 0 ? (
+                <span className="text-[10px] bg-error/10 px-1.5 py-0.2 rounded font-bold text-error">
+                  {unpaidPurchases.length} due
+                </span>
+              ) : (
+                <span className="text-[10px] bg-secondary/10 px-1.5 py-0.2 rounded font-bold text-secondary">
+                  Settled
+                </span>
+              )}
+            </div>
+            <div className={`mt-1 text-base sm:text-lg font-black tabular-nums tracking-tight ${totalToPay > 0 ? 'text-error' : 'text-on-surface'}`}>
+              {formatINR(totalToPay)}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 3: Search + Sort Selector */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-[120px]">
             <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-on-surface-variant text-[16px]">
@@ -198,37 +235,6 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               </button>
             )}
           </div>
-
-          {/* Date Range Selector Pill */}
-          <button
-            type="button"
-            onClick={() => setIsDateModalOpen(true)}
-            className={`h-7 flex items-center gap-1 px-2 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
-              datePreset !== 'ALL_TIME'
-                ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
-                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
-            }`}
-            title="Filter by date range"
-          >
-            <span className="material-symbols-outlined text-[13px] text-orange-600 dark:text-orange-400">calendar_month</span>
-            <span className="truncate max-w-[80px] sm:max-w-[130px]">{dateRange.label}</span>
-            {datePreset !== 'ALL_TIME' ? (
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDatePreset('ALL_TIME');
-                  setCustomStart('');
-                  setCustomEnd('');
-                }}
-                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
-                title="Reset to All Time"
-              >
-                close
-              </span>
-            ) : (
-              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
-            )}
-          </button>
 
           {/* Sort Selector Dropdown Button */}
           <div className="relative shrink-0">
@@ -278,7 +284,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           </div>
         </div>
 
-        {/* Row 3: Status Filter Pills (Compact inline bar) */}
+        {/* Row 4: Status Filter Pills */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           <button
             onClick={() => setFilterStatus('ALL')}
@@ -323,8 +329,8 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         </div>
       </div>
 
-      {/* 4. Purchase Bills List Stream (Clean Passbook Row Cards) */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-1">
+      {/* 4. Purchase Bills List Stream (Slim Passbook Cards) */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
         {sortedPurchases.length === 0 ? (
           <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No purchase records found.
@@ -334,93 +340,66 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             const isUnpaid = bill.paymentStatus === 'UNPAID';
             const isPartial = bill.paymentStatus === 'PARTIAL';
             const isPaid = bill.paymentStatus === 'PAID';
-            const itemDesc = bill.items && bill.items.length > 0
-              ? bill.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')
-              : null;
             const dueAmt = bill.balanceAmount || (isUnpaid ? bill.grandTotal : 0);
 
             return (
               <div
                 key={bill.id}
                 onClick={() => setSelectedBillForPreview(bill)}
-                className="bg-surface-container-lowest rounded-2xl p-3 sm:p-3.5 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-orange-500/40 active:scale-[0.99] transition-all cursor-pointer"
+                className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-orange-500/40 active:scale-[0.99] transition-all cursor-pointer"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      {(bill.supplierName || 'S').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                        {bill.supplierName}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5">
-                        <span className="font-semibold text-orange-600 dark:text-orange-400">{bill.billNumber}</span>
-                        <span>•</span>
-                        <span>{formatDate(bill.date)}</span>
-                        {bill.supplierGstin && (
-                          <>
-                            <span>•</span>
-                            <span className="font-mono text-[10px] text-outline truncate max-w-[80px] sm:max-w-none">
-                              {bill.supplierGstin}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end flex-shrink-0 text-right pl-2">
-                    <span className="font-extrabold text-xs sm:text-base text-on-surface whitespace-nowrap tabular-nums">
-                      {formatINR(bill.grandTotal)}
+                {/* Line 1: Supplier Name & Bill # (left) | Grand Total (right) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                      {bill.supplierName}
                     </span>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-0.5 whitespace-nowrap flex items-center gap-0.5 ${
-                        isPaid
-                          ? 'bg-secondary/15 text-secondary'
-                          : isPartial
-                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                          : 'bg-error/15 text-error'
-                      }`}
-                    >
-                      {isPaid ? (
-                        <>
-                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                          <span>Settled</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="material-symbols-outlined text-[12px]">schedule</span>
-                          <span>Due {formatINR(dueAmt)}</span>
-                        </>
-                      )}
+                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded">
+                      #{bill.billNumber}
                     </span>
                   </div>
+                  <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
+                    {formatINR(bill.grandTotal)}
+                  </span>
                 </div>
 
-                {/* Subtitle items line & ITC chip */}
-                <div className="flex items-center justify-between text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/15 gap-2">
-                  <span className="truncate text-on-surface-variant font-medium">
-                    {itemDesc || `${bill.items?.length || 0} items`}
-                  </span>
+                {/* Line 2: Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
+                  <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
+                    <span>{formatDate(bill.date)}</span>
+                    <span>•</span>
+                    <span className="truncate">{bill.items?.length || 0} {bill.items?.length === 1 ? 'item' : 'items'}</span>
+                    {bill.totalTax > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="font-semibold text-orange-600 dark:text-orange-400">+{formatINR(bill.totalTax)} ITC</span>
+                      </>
+                    )}
+                  </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="font-bold text-[9px] text-orange-600 dark:text-orange-400">
-                      +{formatINR(bill.totalTax)} ITC
-                    </span>
-
-                    {(isUnpaid || isPartial) && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuickPay(bill);
-                        }}
-                        className="px-2 py-0.5 rounded-lg bg-error/15 hover:bg-error/25 text-error font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
-                      >
-                        <span className="material-symbols-outlined text-[12px]">payments</span>
-                        <span>Pay</span>
-                      </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(isUnpaid || isPartial) ? (
+                      <>
+                        <span className="text-[11px] font-bold text-error whitespace-nowrap tabular-nums">
+                          Due {formatINR(dueAmt)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQuickPay(bill);
+                          }}
+                          className="h-6 px-2 rounded-md bg-error/15 hover:bg-error/25 text-error font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
+                        >
+                          <span className="material-symbols-outlined text-[12px]">payments</span>
+                          <span>Pay</span>
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] font-bold text-secondary flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                        <span>Settled</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -429,6 +408,22 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           })
         )}
       </section>
+
+      {/* Floating Action Button for New Purchase */}
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+        <button
+          onClick={() => {
+            setEditingBill(null);
+            setIsModalOpen(true);
+          }}
+          className="h-11 px-4 rounded-full bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"
+          type="button"
+          title="Create New Purchase Bill"
+        >
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          <span>+ Purchase</span>
+        </button>
+      </div>
 
       {/* Table Grid Purchase Workstation Modal */}
       {(isModalOpen || editingBill) && (
