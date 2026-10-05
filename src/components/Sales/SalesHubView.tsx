@@ -169,80 +169,51 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-24 max-w-7xl mx-auto md:px-6">
-      {/* Header Banner */}
-      <div className="px-margin-mobile pt-space-xs pb-1">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-secondary animate-pulse" />
-            <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Sales Ledger
+      {/* Ultra-Compact Top Header & Controls Strip */}
+      <div className="px-margin-mobile pt-1.5 pb-1 flex flex-col gap-1.5">
+        {/* Row 1: Title + Inline Metrics Badges + Add Bill Button */}
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+            <span className="text-sm font-bold text-on-surface">Sales</span>
+          </div>
+
+          {/* Sleek Inline Financial Badges */}
+          <div className="flex items-center gap-1 sm:gap-2 text-[11px] font-bold overflow-x-auto no-scrollbar">
+            <span className="text-on-surface whitespace-nowrap bg-surface-container-lowest px-2 py-0.5 rounded-lg border border-outline-variant/20 shadow-xs">
+              <span className="text-outline uppercase text-[9px] mr-1">Total</span>
+              {formatINR(totalSales)}
+            </span>
+            <span className="text-error whitespace-nowrap bg-error/10 px-2 py-0.5 rounded-lg border border-error/20">
+              <span className="uppercase text-[9px] mr-1">Due</span>
+              {formatINR(totalPending)}
+            </span>
+            <span className="text-secondary whitespace-nowrap bg-secondary/10 px-2 py-0.5 rounded-lg border border-secondary/20 hidden sm:inline-block">
+              <span className="uppercase text-[9px] mr-1">Paid</span>
+              {formatINR(totalPaid)}
             </span>
           </div>
+
+          {/* Action Button */}
           <button
+            onClick={onOpenTableGridInvoice}
+            className="h-7 px-2.5 bg-secondary text-on-secondary rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
             type="button"
-            onClick={() => setIsDateModalOpen(true)}
-            className="flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container active:scale-95 px-3 py-1.5 rounded-full shadow-xs text-xs font-semibold cursor-pointer border border-outline-variant/30 transition-all group"
           >
-            <span className="material-symbols-outlined text-[15px] text-secondary group-hover:scale-110 transition-transform">
-              calendar_month
-            </span>
-            <span className="text-on-surface font-bold text-xs truncate max-w-[130px] sm:max-w-[200px]">
-              {dateRange.label}
-            </span>
-            <span className="material-symbols-outlined text-[14px] text-outline">
-              arrow_drop_down
-            </span>
+            <span className="material-symbols-outlined text-[15px]">add</span>
+            <span>Bill</span>
           </button>
         </div>
 
-        {/* Compact 3-Column Financial Summary Strip */}
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate">
-              Total Sales
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-on-surface mt-0.5 truncate">
-              {formatINR(totalSales)}
-            </span>
-            <span className="text-[10px] text-on-surface-variant truncate">
-              {dateFilteredInvoices.length} Bills
-            </span>
-          </div>
-
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-error uppercase tracking-wider truncate">
-              To Collect
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-error mt-0.5 truncate">
-              {formatINR(totalPending)}
-            </span>
-            <span className="text-[10px] text-error font-medium truncate">
-              {overdueCount} Overdue
-            </span>
-          </div>
-
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-secondary uppercase tracking-wider truncate">
-              Received
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-secondary mt-0.5 truncate">
-              {formatINR(totalPaid)}
-            </span>
-            <span className="text-[10px] text-secondary font-medium truncate">
-              {dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length} Settled
-            </span>
-          </div>
-        </div>
-
-        {/* Search & Action Row */}
-        <div className="flex items-center gap-2 mt-2.5">
-          <div className="relative flex-1">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">
+        {/* Row 2: Search + Date Range Pill + Sort Selector */}
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1 min-w-[120px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-on-surface-variant text-[16px]">
               search
             </span>
             <input
-              className="w-full h-10 pl-9 pr-8 bg-surface-container-lowest text-on-surface text-xs rounded-xl shadow-xs border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
-              placeholder="Search by customer, bill no, GSTIN..."
+              className="w-full h-7 pl-7 pr-6 bg-surface-container-lowest text-on-surface text-xs rounded-lg shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
+              placeholder="Search customer, bill, GSTIN..."
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -250,98 +221,61 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-2.5 text-outline hover:text-on-surface"
+                className="absolute right-1.5 top-1.5 text-outline hover:text-on-surface"
                 type="button"
               >
-                <span className="material-symbols-outlined text-[16px]">close</span>
+                <span className="material-symbols-outlined text-[13px]">close</span>
               </button>
             )}
           </div>
 
+          {/* Date Range Selector Pill */}
           <button
-            onClick={onOpenTableGridInvoice}
-            className="h-10 px-3.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all flex-shrink-0 cursor-pointer"
             type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className={`h-7 flex items-center gap-1 px-2 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
+              datePreset !== 'ALL_TIME'
+                ? 'bg-secondary/15 text-secondary border-secondary/30'
+                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+            }`}
+            title="Filter by date range"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            <span>Sale Bill</span>
+            <span className="material-symbols-outlined text-[13px]">calendar_month</span>
+            <span className="truncate max-w-[80px] sm:max-w-[130px]">{dateRange.label}</span>
+            {datePreset !== 'ALL_TIME' ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDatePreset('ALL_TIME');
+                  setCustomStart('');
+                  setCustomEnd('');
+                }}
+                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
+                title="Reset to All Time"
+              >
+                close
+              </span>
+            ) : (
+              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+            )}
           </button>
-        </div>
 
-        {/* Filter Segmented Pills & Sort Control Row */}
-        <div className="flex items-center justify-between gap-2 py-1 mt-1.5 flex-wrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            <button
-              onClick={() => setActiveTab('ALL')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                activeTab === 'ALL'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span>All</span>
-              <span className="text-[10px] opacity-80">({dateFilteredInvoices.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('UNPAID')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                activeTab === 'UNPAID'
-                  ? 'bg-error text-on-error shadow-xs'
-                  : 'bg-surface-container-lowest text-error border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-error" />
-              <span>Due</span>
-              <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('PAID')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                activeTab === 'PAID'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-              <span>Paid</span>
-              <span className="text-[10px] opacity-80">({dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('ESTIMATES')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'ESTIMATES'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              Estimates
-            </button>
-          </div>
-
-          {/* Sort Selector Dropdown */}
+          {/* Sort Selector Dropdown Button */}
           <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer transition-all whitespace-nowrap shadow-xs"
+              className="h-7 flex items-center gap-0.5 px-2 rounded-lg text-[11px] font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs"
+              title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
             >
-              <span className="material-symbols-outlined text-[15px] text-secondary">sort</span>
-              <span className="hidden sm:inline">Sort:</span>
-              <span className="text-on-surface font-extrabold">{LEDGER_SORT_LABELS[sortBy].replace(' (Default)', '')}</span>
-              <span className="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[14px] text-secondary">sort</span>
+              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
             </button>
 
             {isSortDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-52 bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/30 py-1.5 overflow-hidden animate-fade-in">
+                <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-1 overflow-hidden animate-fade-in">
                   <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
                     Sort Sales Ledger
                   </div>
@@ -355,13 +289,13 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                           setSortBy(key);
                           setIsSortDropdownOpen(false);
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
                           isSelected ? 'text-secondary font-bold bg-secondary/5' : 'text-on-surface'
                         }`}
                       >
                         <span>{LEDGER_SORT_LABELS[key]}</span>
                         {isSelected && (
-                          <span className="material-symbols-outlined text-[16px] text-secondary">
+                          <span className="material-symbols-outlined text-[15px] text-secondary">
                             check
                           </span>
                         )}
@@ -374,28 +308,61 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           </div>
         </div>
 
-        {/* Active Filter Indicators (Reset Pill) */}
-        {datePreset !== 'ALL_TIME' && (
-          <div className="flex items-center gap-2 mt-1 pt-1 border-t border-outline-variant/10 text-xs">
-            <span className="text-[11px] text-on-surface-variant font-medium">Filtered by date:</span>
-            <span className="inline-flex items-center gap-1 bg-secondary/10 text-secondary text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-secondary/20">
-              <span className="material-symbols-outlined text-[12px]">calendar_today</span>
-              <span>{dateRange.label}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setDatePreset('ALL_TIME');
-                  setCustomStart('');
-                  setCustomEnd('');
-                }}
-                className="hover:text-error ml-1 cursor-pointer"
-                title="Reset to All Time"
-              >
-                <span className="material-symbols-outlined text-[12px]">close</span>
-              </button>
-            </span>
-          </div>
-        )}
+        {/* Row 3: Status Filter Pills (Compact inline bar) */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+          <button
+            onClick={() => setActiveTab('ALL')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              activeTab === 'ALL'
+                ? 'bg-secondary text-on-secondary shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span>All</span>
+            <span className="text-[10px] opacity-80">({dateFilteredInvoices.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('UNPAID')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              activeTab === 'UNPAID'
+                ? 'bg-error text-on-error shadow-xs'
+                : 'bg-surface-container-lowest text-error border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-error" />
+            <span>Due</span>
+            <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('PAID')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              activeTab === 'PAID'
+                ? 'bg-secondary text-on-secondary shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+            <span>Paid</span>
+            <span className="text-[10px] opacity-80">({dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ESTIMATES')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'ESTIMATES'
+                ? 'bg-secondary text-on-secondary shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            Estimates
+          </button>
+        </div>
       </div>
 
       {/* Invoices List Feed (Clean Passbook Row Cards) */}

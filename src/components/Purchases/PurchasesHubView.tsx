@@ -136,77 +136,53 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
   return (
     <div className="flex flex-col w-full pb-28 max-w-7xl mx-auto px-margin-mobile md:px-6 py-3 gap-space-sm">
-      {/* Header Banner */}
-      <div className="pt-space-xs pb-1">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse" />
-            <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Purchase Ledger
+      {/* Ultra-Compact Top Header & Controls Strip */}
+      <div className="pt-1.5 pb-1 flex flex-col gap-1.5">
+        {/* Row 1: Title + Inline Metrics Badges + Add Purchase Button */}
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <span className="text-sm font-bold text-on-surface">Purchases</span>
+          </div>
+
+          {/* Sleek Inline Financial Badges */}
+          <div className="flex items-center gap-1 sm:gap-2 text-[11px] font-bold overflow-x-auto no-scrollbar">
+            <span className="text-on-surface whitespace-nowrap bg-surface-container-lowest px-2 py-0.5 rounded-lg border border-outline-variant/20 shadow-xs">
+              <span className="text-outline uppercase text-[9px] mr-1">Total</span>
+              {formatINR(totalPurchases)}
+            </span>
+            <span className="text-error whitespace-nowrap bg-error/10 px-2 py-0.5 rounded-lg border border-error/20">
+              <span className="uppercase text-[9px] mr-1">Due</span>
+              {formatINR(totalToPay)}
+            </span>
+            <span className="text-orange-600 dark:text-orange-400 whitespace-nowrap bg-orange-500/10 px-2 py-0.5 rounded-lg border border-orange-500/20 hidden sm:inline-block">
+              <span className="uppercase text-[9px] mr-1">ITC</span>
+              {formatINR(totalItcClaimable)}
             </span>
           </div>
+
+          {/* Action Button */}
           <button
+            onClick={() => {
+              setEditingBill(null);
+              setIsModalOpen(true);
+            }}
+            className="h-7 px-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all shrink-0 cursor-pointer"
             type="button"
-            onClick={() => setIsDateModalOpen(true)}
-            className="flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container active:scale-95 px-3 py-1.5 rounded-full shadow-xs text-xs font-semibold cursor-pointer border border-outline-variant/30 transition-all"
           >
-            <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">
-              calendar_month
-            </span>
-            <span className="text-on-surface font-bold text-xs">{dateRange.label}</span>
-            <span className="material-symbols-outlined text-[16px] text-outline">
-              arrow_drop_down
-            </span>
+            <span className="material-symbols-outlined text-[15px]">add</span>
+            <span>Bill</span>
           </button>
         </div>
 
-        {/* Compact 3-Column Financial Summary Strip */}
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate">
-              Purchases
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-on-surface mt-0.5 truncate">
-              {formatINR(totalPurchases)}
-            </span>
-            <span className="text-[10px] text-on-surface-variant truncate">
-              {dateFilteredPurchases.length} Bills
-            </span>
-          </div>
-
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-error uppercase tracking-wider truncate">
-              To Pay
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-error mt-0.5 truncate">
-              {formatINR(totalToPay)}
-            </span>
-            <span className="text-[10px] text-error font-medium truncate">
-              {unpaidPurchases.length} Pending
-            </span>
-          </div>
-
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 border border-outline-variant/25 shadow-xs flex flex-col">
-            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider truncate">
-              ITC Credit
-            </span>
-            <span className="font-extrabold text-xs sm:text-sm text-orange-600 dark:text-orange-400 mt-0.5 truncate">
-              {formatINR(totalItcClaimable)}
-            </span>
-            <span className="text-[10px] text-orange-600/80 dark:text-orange-400/80 font-medium truncate">
-              Eligible
-            </span>
-          </div>
-        </div>
-
-        {/* Search & Action Row */}
-        <div className="flex items-center gap-2 mt-2.5">
-          <div className="relative flex-1">
-            <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-[18px]">
+        {/* Row 2: Search + Date Range Pill + Sort Selector */}
+        <div className="flex items-center gap-1.5">
+          <div className="relative flex-1 min-w-[120px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-on-surface-variant text-[16px]">
               search
             </span>
             <input
-              className="w-full h-10 pl-9 pr-8 bg-surface-container-lowest text-on-surface text-xs rounded-xl shadow-xs border border-outline-variant/30 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
+              className="w-full h-7 pl-7 pr-6 bg-surface-container-lowest text-on-surface text-xs rounded-lg shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
               placeholder="Search bill, supplier..."
               type="text"
               value={search}
@@ -215,89 +191,61 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-2.5 text-outline hover:text-on-surface"
+                className="absolute right-1.5 top-1.5 text-outline hover:text-on-surface"
                 type="button"
               >
-                <span className="material-symbols-outlined text-[16px]">close</span>
+                <span className="material-symbols-outlined text-[13px]">close</span>
               </button>
             )}
           </div>
 
+          {/* Date Range Selector Pill */}
           <button
-            onClick={() => {
-              setEditingBill(null);
-              setIsModalOpen(true);
-            }}
-            className="h-10 px-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-xs active:scale-95 transition-all flex-shrink-0 cursor-pointer"
             type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className={`h-7 flex items-center gap-1 px-2 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
+              datePreset !== 'ALL_TIME'
+                ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+            }`}
+            title="Filter by date range"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            <span>Purchase</span>
+            <span className="material-symbols-outlined text-[13px] text-orange-600 dark:text-orange-400">calendar_month</span>
+            <span className="truncate max-w-[80px] sm:max-w-[130px]">{dateRange.label}</span>
+            {datePreset !== 'ALL_TIME' ? (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDatePreset('ALL_TIME');
+                  setCustomStart('');
+                  setCustomEnd('');
+                }}
+                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
+                title="Reset to All Time"
+              >
+                close
+              </span>
+            ) : (
+              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+            )}
           </button>
-        </div>
 
-        {/* Filter Segmented Pills & Sort Control Row */}
-        <div className="flex items-center justify-between gap-2 py-1 mt-1.5 flex-wrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            <button
-              onClick={() => setFilterStatus('ALL')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                filterStatus === 'ALL'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span>All</span>
-              <span className="text-[10px] opacity-80">({dateFilteredPurchases.length})</span>
-            </button>
-
-            <button
-              onClick={() => setFilterStatus('UNPAID')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                filterStatus === 'UNPAID'
-                  ? 'bg-error text-on-error shadow-xs'
-                  : 'bg-surface-container-lowest text-error border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-error" />
-              <span>Due</span>
-              <span className="text-[10px] opacity-90 font-bold">({unpaidPurchases.length})</span>
-            </button>
-
-            <button
-              onClick={() => setFilterStatus('PAID')}
-              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                filterStatus === 'PAID'
-                  ? 'bg-orange-600 text-white shadow-xs'
-                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-              }`}
-              type="button"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-              <span>Settled</span>
-              <span className="text-[10px] opacity-80">({dateFilteredPurchases.filter((p) => p.paymentStatus === 'PAID').length})</span>
-            </button>
-          </div>
-
-          {/* Sort Selector Dropdown */}
+          {/* Sort Selector Dropdown Button */}
           <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer transition-all whitespace-nowrap shadow-xs"
+              className="h-7 flex items-center gap-0.5 px-2 rounded-lg text-[11px] font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs"
+              title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
             >
-              <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">sort</span>
-              <span className="hidden sm:inline">Sort:</span>
-              <span className="text-on-surface font-extrabold">{LEDGER_SORT_LABELS[sortBy].replace(' (Default)', '')}</span>
-              <span className="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[14px] text-orange-600 dark:text-orange-400">sort</span>
+              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
             </button>
 
             {isSortDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-52 bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/30 py-1.5 overflow-hidden animate-fade-in">
+                <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-1 overflow-hidden animate-fade-in">
                   <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
                     Sort Purchase Ledger
                   </div>
@@ -311,13 +259,13 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                           setSortBy(key);
                           setIsSortDropdownOpen(false);
                         }}
-                        className={`w-full px-3 py-2 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
                           isSelected ? 'text-orange-600 dark:text-orange-400 font-bold bg-orange-500/5' : 'text-on-surface'
                         }`}
                       >
                         <span>{LEDGER_SORT_LABELS[key]}</span>
                         {isSelected && (
-                          <span className="material-symbols-outlined text-[16px] text-orange-600 dark:text-orange-400">
+                          <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">
                             check
                           </span>
                         )}
@@ -330,28 +278,49 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           </div>
         </div>
 
-        {/* Active Filter Indicators (Reset Pill) */}
-        {datePreset !== 'ALL_TIME' && (
-          <div className="flex items-center gap-2 mt-1 pt-1 border-t border-outline-variant/10 text-xs">
-            <span className="text-[11px] text-on-surface-variant font-medium">Filtered by date:</span>
-            <span className="inline-flex items-center gap-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-orange-500/20">
-              <span className="material-symbols-outlined text-[12px]">calendar_today</span>
-              <span>{dateRange.label}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setDatePreset('ALL_TIME');
-                  setCustomStart('');
-                  setCustomEnd('');
-                }}
-                className="hover:text-error ml-1 cursor-pointer"
-                title="Reset to All Time"
-              >
-                <span className="material-symbols-outlined text-[12px]">close</span>
-              </button>
-            </span>
-          </div>
-        )}
+        {/* Row 3: Status Filter Pills (Compact inline bar) */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+          <button
+            onClick={() => setFilterStatus('ALL')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              filterStatus === 'ALL'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span>All</span>
+            <span className="text-[10px] opacity-80">({dateFilteredPurchases.length})</span>
+          </button>
+
+          <button
+            onClick={() => setFilterStatus('UNPAID')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              filterStatus === 'UNPAID'
+                ? 'bg-error text-on-error shadow-xs'
+                : 'bg-surface-container-lowest text-error border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-error" />
+            <span>Due</span>
+            <span className="text-[10px] opacity-90 font-bold">({unpaidPurchases.length})</span>
+          </button>
+
+          <button
+            onClick={() => setFilterStatus('PAID')}
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+              filterStatus === 'PAID'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+            }`}
+            type="button"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+            <span>Settled</span>
+            <span className="text-[10px] opacity-80">({dateFilteredPurchases.filter((p) => p.paymentStatus === 'PAID').length})</span>
+          </button>
+        </div>
       </div>
 
       {/* 4. Purchase Bills List Stream (Clean Passbook Row Cards) */}
