@@ -73,6 +73,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 }) => {
   const [txnFilter, setTxnFilter] = useState<'ALL' | 'BILLS' | 'PAYMENTS'>('ALL');
   const [dateFilter, setDateFilter] = useState<'ALL' | 'THIS_MONTH' | 'LAST_30_DAYS'>('ALL');
+  const [txnSortOrder, setTxnSortOrder] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
   const [searchTxn, setSearchTxn] = useState('');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [showPartyDetails, setShowPartyDetails] = useState(false);
@@ -357,13 +358,13 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const isReceivable = liveNetBalance > 0;
   const isPayable = liveNetBalance < 0;
 
-  // Filtered passbook list
+  // Filtered passbook list - defaults to NEWEST first
   const filteredPassbook = useMemo(() => {
     const now = new Date();
     const currentMonthPrefix = now.toISOString().slice(0, 7);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    return passbook.filter((entry) => {
+    const matches = passbook.filter((entry) => {
       if (txnFilter === 'BILLS' && entry.type !== 'SALE' && entry.type !== 'PURCHASE') return false;
       if (txnFilter === 'PAYMENTS' && entry.type !== 'PAYMENT_IN' && entry.type !== 'PAYMENT_OUT') return false;
 
@@ -375,18 +376,23 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
       if (searchTxn.trim()) {
         const q = searchTxn.toLowerCase();
-        const matches =
+        const m =
           entry.docNumber.toLowerCase().includes(q) ||
           entry.description.toLowerCase().includes(q) ||
           (entry.paymentMode && entry.paymentMode.toLowerCase().includes(q)) ||
           entry.debit.toString().includes(q) ||
           entry.credit.toString().includes(q);
-        if (!matches) return false;
+        if (!m) return false;
       }
 
       return true;
     });
-  }, [passbook, txnFilter, dateFilter, searchTxn]);
+
+    if (txnSortOrder === 'NEWEST') {
+      return [...matches].reverse();
+    }
+    return matches;
+  }, [passbook, txnFilter, dateFilter, searchTxn, txnSortOrder]);
 
   const handlePrintStatement = () => {
     const printable = filteredPassbook.map((e) => ({
@@ -1234,8 +1240,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               </span>
             </div>
 
-            {/* Segmented Filter Pills */}
-            <div className="flex items-center gap-1">
+            {/* Segmented Filter Pills & Sort Toggle */}
+            <div className="flex items-center gap-1.5">
               <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
                 {(['ALL', 'BILLS', 'PAYMENTS'] as const).map((tab) => (
                   <button
@@ -1252,6 +1258,18 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                   </button>
                 ))}
               </div>
+
+              <button
+                type="button"
+                onClick={() => setTxnSortOrder(txnSortOrder === 'NEWEST' ? 'OLDEST' : 'NEWEST')}
+                className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[11px] font-bold text-on-surface-variant hover:text-on-surface bg-surface-container hover:bg-surface-container-high cursor-pointer transition-colors"
+                title={txnSortOrder === 'NEWEST' ? 'Sorted: Newest First (Click for Oldest)' : 'Sorted: Oldest First (Click for Newest)'}
+              >
+                <span className="material-symbols-outlined text-[13px] text-primary">
+                  {txnSortOrder === 'NEWEST' ? 'south' : 'north'}
+                </span>
+                <span>{txnSortOrder === 'NEWEST' ? 'Newest' : 'Oldest'}</span>
+              </button>
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -8,6 +8,14 @@ import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { createPaymentReceiptVoucher } from '../../core/accounting/ledger.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import {
+  DatePreset,
+  getDateFilterBounds,
+  isDateInRange,
+  LedgerSortOption,
+  LEDGER_SORT_LABELS,
+} from '../../core/utils/dateFilters.ts';
+import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 
 interface SalesHubViewProps {
   company: CompanyProfile;
@@ -35,30 +43,97 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
 
+  // Sorting state - Defaults to NEWEST first as requested
+  const [sortBy, setSortBy] = useState<LedgerSortOption>('NEWEST');
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
+  // Date Range Filter state - Interactive selectable date picker
+  const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+
   useBackNavigation(() => {
+    if (isDateModalOpen) {
+      setIsDateModalOpen(false);
+      return true;
+    }
+    if (isSortDropdownOpen) {
+      setIsSortDropdownOpen(false);
+      return true;
+    }
     setPaymentModalInvoice(null);
     return true;
-  }, !!paymentModalInvoice, 20);
+  }, isDateModalOpen || isSortDropdownOpen || !!paymentModalInvoice, 20);
 
-  // Metrics
-  const totalSales = invoices.reduce((s, i) => s + i.grandTotal, 0);
-  const totalPaid = invoices.reduce((s, i) => s + i.paidAmount, 0);
-  const totalPending = invoices.reduce((s, i) => s + i.balanceAmount, 0);
-  const overdueCount = invoices.filter((i) => i.balanceAmount > 0).length;
-  const avgTicket = invoices.length > 0 ? Math.round(totalSales / invoices.length) : 0;
+  // Active Date Bounds
+  const dateRange = useMemo(() => {
+    return getDateFilterBounds(datePreset, customStart, customEnd);
+  }, [datePreset, customStart, customEnd]);
 
-  const filtered = invoices.filter((inv) => {
-    const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.partyName.toLowerCase().includes(search.toLowerCase()) ||
-      (inv.partyGstin && inv.partyGstin.toLowerCase().includes(search.toLowerCase()));
+  // 1. Date Filter
+  const dateFilteredInvoices = useMemo(() => {
+    if (!dateRange.start && !dateRange.end) return invoices;
+    return invoices.filter((inv) => isDateInRange(inv.date, dateRange.start, dateRange.end));
+  }, [invoices, dateRange]);
 
-    if (activeTab === 'UNPAID') return matchesSearch && inv.balanceAmount > 0;
-    if (activeTab === 'PAID') return matchesSearch && inv.paymentStatus === 'PAID';
-    if (activeTab === 'ESTIMATES') return matchesSearch && inv.invoiceType === 'ESTIMATE';
-    if (activeTab === 'CHALLANS') return matchesSearch && inv.invoiceType === 'DELIVERY_CHALLAN';
-    return matchesSearch;
-  });
+  // Metrics dynamically calculated on active date period
+  const totalSales = dateFilteredInvoices.reduce((s, i) => s + i.grandTotal, 0);
+  const totalPaid = dateFilteredInvoices.reduce((s, i) => s + i.paidAmount, 0);
+  const totalPending = dateFilteredInvoices.reduce((s, i) => s + i.balanceAmount, 0);
+  const overdueCount = dateFilteredInvoices.filter((i) => i.balanceAmount > 0).length;
+  const avgTicket = dateFilteredInvoices.length > 0 ? Math.round(totalSales / dateFilteredInvoices.length) : 0;
+
+  // 2. Search & Tab Filter
+  const statusFiltered = useMemo(() => {
+    return dateFilteredInvoices.filter((inv) => {
+      const q = search.trim().toLowerCase();
+      const matchesSearch = !q ||
+        inv.invoiceNumber.toLowerCase().includes(q) ||
+        inv.partyName.toLowerCase().includes(q) ||
+        (inv.partyGstin && inv.partyGstin.toLowerCase().includes(q));
+
+      if (!matchesSearch) return false;
+
+      if (activeTab === 'UNPAID') return inv.balanceAmount > 0;
+      if (activeTab === 'PAID') return inv.paymentStatus === 'PAID';
+      if (activeTab === 'ESTIMATES') return inv.invoiceType === 'ESTIMATE';
+      if (activeTab === 'CHALLANS') return inv.invoiceType === 'DELIVERY_CHALLAN';
+      return true;
+    });
+  }, [dateFilteredInvoices, search, activeTab]);
+
+  // 3. Sort - Defaults to NEWEST first
+  const sortedInvoices = useMemo(() => {
+    return [...statusFiltered].sort((a, b) => {
+      switch (sortBy) {
+        case 'NEWEST': {
+          const tA = new Date(a.date).getTime() || 0;
+          const tB = new Date(b.date).getTime() || 0;
+          if (tB !== tA) return tB - tA;
+          return (b.id || '').localeCompare(a.id || '');
+        }
+        case 'OLDEST': {
+          const tA = new Date(a.date).getTime() || 0;
+          const tB = new Date(b.date).getTime() || 0;
+          if (tA !== tB) return tA - tB;
+          return (a.id || '').localeCompare(b.id || '');
+        }
+        case 'AMOUNT_HIGH':
+          return b.grandTotal - a.grandTotal;
+        case 'AMOUNT_LOW':
+          return a.grandTotal - b.grandTotal;
+        case 'NAME_AZ':
+          return (a.partyName || '').localeCompare(b.partyName || '');
+        case 'NAME_ZA':
+          return (b.partyName || '').localeCompare(a.partyName || '');
+        case 'DOC_NUM':
+          return (b.invoiceNumber || '').localeCompare(a.invoiceNumber || '', undefined, { numeric: true });
+        default:
+          return 0;
+      }
+    });
+  }, [statusFiltered, sortBy]);
 
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,14 +178,21 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               Sales Ledger
             </span>
           </div>
-          <div className="flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-full shadow-xs text-xs font-semibold">
-            <span className="material-symbols-outlined text-[14px] text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
-              calendar_today
+          <button
+            type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className="flex items-center gap-1.5 bg-surface-container-low hover:bg-surface-container active:scale-95 px-3 py-1.5 rounded-full shadow-xs text-xs font-semibold cursor-pointer border border-outline-variant/30 transition-all group"
+          >
+            <span className="material-symbols-outlined text-[15px] text-secondary group-hover:scale-110 transition-transform">
+              calendar_month
             </span>
-            <span className="text-on-surface font-medium text-[11px]">
-              {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}
+            <span className="text-on-surface font-bold text-xs truncate max-w-[130px] sm:max-w-[200px]">
+              {dateRange.label}
             </span>
-          </div>
+            <span className="material-symbols-outlined text-[14px] text-outline">
+              arrow_drop_down
+            </span>
+          </button>
         </div>
 
         {/* Compact 3-Column Financial Summary Strip */}
@@ -123,7 +205,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               {formatINR(totalSales)}
             </span>
             <span className="text-[10px] text-on-surface-variant truncate">
-              {invoices.length} Bills
+              {dateFilteredInvoices.length} Bills
             </span>
           </div>
 
@@ -147,7 +229,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               {formatINR(totalPaid)}
             </span>
             <span className="text-[10px] text-secondary font-medium truncate">
-              {invoices.filter((i) => i.paymentStatus === 'PAID').length} Settled
+              {dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length} Settled
             </span>
           </div>
         </div>
@@ -186,71 +268,144 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           </button>
         </div>
 
-        {/* Filter Segmented Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 mt-1.5">
-          <button
-            onClick={() => setActiveTab('ALL')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-              activeTab === 'ALL'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-            }`}
-            type="button"
-          >
-            <span>All</span>
-            <span className="text-[10px] opacity-80">({invoices.length})</span>
-          </button>
+        {/* Filter Segmented Pills & Sort Control Row */}
+        <div className="flex items-center justify-between gap-2 py-1 mt-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <button
+              onClick={() => setActiveTab('ALL')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                activeTab === 'ALL'
+                  ? 'bg-secondary text-on-secondary shadow-xs'
+                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+              }`}
+              type="button"
+            >
+              <span>All</span>
+              <span className="text-[10px] opacity-80">({dateFilteredInvoices.length})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('UNPAID')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-              activeTab === 'UNPAID'
-                ? 'bg-error text-on-error shadow-xs'
-                : 'bg-surface-container-lowest text-error border border-outline-variant/30'
-            }`}
-            type="button"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-error" />
-            <span>Due</span>
-            <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('UNPAID')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                activeTab === 'UNPAID'
+                  ? 'bg-error text-on-error shadow-xs'
+                  : 'bg-surface-container-lowest text-error border border-outline-variant/30'
+              }`}
+              type="button"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-error" />
+              <span>Due</span>
+              <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('PAID')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-              activeTab === 'PAID'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-            }`}
-            type="button"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-            <span>Paid</span>
-            <span className="text-[10px] opacity-80">({invoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('PAID')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+                activeTab === 'PAID'
+                  ? 'bg-secondary text-on-secondary shadow-xs'
+                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+              }`}
+              type="button"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              <span>Paid</span>
+              <span className="text-[10px] opacity-80">({dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('ESTIMATES')}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'ESTIMATES'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
-            }`}
-            type="button"
-          >
-            Estimates
-          </button>
+            <button
+              onClick={() => setActiveTab('ESTIMATES')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                activeTab === 'ESTIMATES'
+                  ? 'bg-secondary text-on-secondary shadow-xs'
+                  : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
+              }`}
+              type="button"
+            >
+              Estimates
+            </button>
+          </div>
+
+          {/* Sort Selector Dropdown */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer transition-all whitespace-nowrap shadow-xs"
+            >
+              <span className="material-symbols-outlined text-[15px] text-secondary">sort</span>
+              <span className="hidden sm:inline">Sort:</span>
+              <span className="text-on-surface font-extrabold">{LEDGER_SORT_LABELS[sortBy].replace(' (Default)', '')}</span>
+              <span className="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+            </button>
+
+            {isSortDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-52 bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/30 py-1.5 overflow-hidden animate-fade-in">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
+                    Sort Sales Ledger
+                  </div>
+                  {(Object.keys(LEDGER_SORT_LABELS) as LedgerSortOption[]).map((key) => {
+                    const isSelected = sortBy === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setSortBy(key);
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
+                          isSelected ? 'text-secondary font-bold bg-secondary/5' : 'text-on-surface'
+                        }`}
+                      >
+                        <span>{LEDGER_SORT_LABELS[key]}</span>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-[16px] text-secondary">
+                            check
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Active Filter Indicators (Reset Pill) */}
+        {datePreset !== 'ALL_TIME' && (
+          <div className="flex items-center gap-2 mt-1 pt-1 border-t border-outline-variant/10 text-xs">
+            <span className="text-[11px] text-on-surface-variant font-medium">Filtered by date:</span>
+            <span className="inline-flex items-center gap-1 bg-secondary/10 text-secondary text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-secondary/20">
+              <span className="material-symbols-outlined text-[12px]">calendar_today</span>
+              <span>{dateRange.label}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDatePreset('ALL_TIME');
+                  setCustomStart('');
+                  setCustomEnd('');
+                }}
+                className="hover:text-error ml-1 cursor-pointer"
+                title="Reset to All Time"
+              >
+                <span className="material-symbols-outlined text-[12px]">close</span>
+              </button>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Invoices List Feed (Clean Passbook Row Cards) */}
       <div className="px-margin-mobile md:px-0 mt-1 grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {filtered.length === 0 ? (
+        {sortedInvoices.length === 0 ? (
           <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             No invoices found matching your criteria.
           </div>
         ) : (
-          filtered.map((inv) => {
+          sortedInvoices.map((inv) => {
             const isPaid = inv.paymentStatus === 'PAID';
             const isPartial = inv.paymentStatus === 'PARTIAL';
             const itemDesc = inv.items && inv.items.length > 0
@@ -408,6 +563,21 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Date Filter Modal */}
+      <DateFilterModal
+        isOpen={isDateModalOpen}
+        activePreset={datePreset}
+        customStartDate={customStart}
+        customEndDate={customEnd}
+        onClose={() => setIsDateModalOpen(false)}
+        onSelectRange={(preset, start, end) => {
+          setDatePreset(preset);
+          setCustomStart(start || '');
+          setCustomEnd(end || '');
+        }}
+        accentColor="secondary"
+      />
     </div>
   );
 };
