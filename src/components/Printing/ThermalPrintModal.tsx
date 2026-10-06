@@ -67,9 +67,12 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
 
   const previewText = formatThermalReceiptText(receiptData, width);
 
-  const handleBluetoothPrint = async () => {
-    // Check if running inside Android wrapper
+  const [printersList, setPrintersList] = useState<{name: string, address: string}[]>([]);
+
+  const handleBluetoothPrint = async (macAddress?: string) => {
     const androidBridge = (window as any).AndroidBridge;
+    
+    // Check if running inside Android wrapper
     if (androidBridge && typeof androidBridge.checkBluetoothStatus === 'function') {
       const btStatus = androidBridge.checkBluetoothStatus();
       if (btStatus === 'DISABLED') {
@@ -78,8 +81,59 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
         setIsError(true);
         return;
       }
+      
+      // Native Android Printing Logic
+      if (!macAddress) {
+        try {
+          const printersJson = androidBridge.getPairedPrinters();
+          const printers = JSON.parse(printersJson);
+          if (printers.length === 0) {
+            setStatusMessage('No paired Bluetooth printers found. Pair one in OS settings.');
+            setIsError(true);
+            return;
+          }
+          if (printers.length === 1) {
+            // Auto connect if only 1 printer
+            macAddress = printers[0].address;
+          } else {
+            // Show picker UI
+            setPrintersList(printers);
+            return;
+          }
+        } catch (e) {
+          setStatusMessage('Failed to read paired printers.');
+          setIsError(true);
+          return;
+        }
+      }
+
+      setIsPrinting(true);
+      setStatusMessage(`Sending print job to printer...`);
+      setIsError(false);
+      
+      try {
+        const binary = buildThermalReceiptBinary(receiptData, { width, kickDrawer, printQr: includeQr });
+        const base64Data = btoa(String.fromCharCode.apply(null, binary as unknown as number[]));
+        
+        const res = androidBridge.printToBluetoothDevice(macAddress, base64Data);
+        if (res === 'SUCCESS') {
+          setStatusMessage('Receipt printed successfully!');
+          setTimeout(() => onClose(), 1500);
+        } else {
+          setIsError(true);
+          setStatusMessage(res || 'Failed to print.');
+        }
+      } catch (err: any) {
+        setIsError(true);
+        setStatusMessage(err.message || 'Bluetooth printing error.');
+      } finally {
+        setIsPrinting(false);
+        setPrintersList([]);
+      }
+      return;
     }
 
+    // Web Bluetooth API Fallback (for Chrome/Edge)
     setIsPrinting(true);
     setStatusMessage('Scanning for nearby Bluetooth thermal printers...');
     setIsError(false);
@@ -219,17 +273,46 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
             </div>
           )}
 
-          {/* Thermal Slip Preview */}
+          {/* Thermal Slip Preview or Printer Picker */}
           <div>
             <div className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center justify-between">
-              <span>Receipt Preview</span>
-              <span className="text-[10px] font-mono text-secondary">
-                {width === 32 ? '32 Columns' : '48 Columns'}
-              </span>
+              <span>{printersList.length > 0 ? 'Select Printer' : 'Receipt Preview'}</span>
+              {!printersList.length && (
+                <span className="text-[10px] font-mono text-secondary">
+                  {width === 32 ? '32 Columns' : '48 Columns'}
+                </span>
+              )}
             </div>
-            <div className="bg-[#fcfbf9] p-4 rounded-xl border border-outline-variant/30 font-mono text-[11px] leading-tight text-neutral-900 shadow-inner overflow-x-auto whitespace-pre">
-              {previewText}
-            </div>
+            
+            {printersList.length > 0 ? (
+              <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/30 flex flex-col gap-2 max-h-[300px] overflow-y-auto">
+                {printersList.map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleBluetoothPrint(p.address)}
+                    className="text-left px-4 py-3 rounded-lg bg-surface hover:bg-surface-container-high transition-colors flex items-center justify-between border border-outline-variant/20 shadow-sm"
+                  >
+                    <div>
+                      <div className="font-bold text-sm text-on-surface">{p.name}</div>
+                      <div className="text-[10px] text-on-surface-variant font-mono">{p.address}</div>
+                    </div>
+                    <span className="material-symbols-outlined text-secondary">print</span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setPrintersList([])}
+                  className="mt-2 text-xs font-bold text-on-surface-variant text-center py-2"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#fcfbf9] p-4 rounded-xl border border-outline-variant/30 font-mono text-[11px] leading-tight text-neutral-900 shadow-inner overflow-x-auto whitespace-pre">
+                {previewText}
+              </div>
+            )}
           </div>
         </div>
 
@@ -259,7 +342,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           <button
             type="button"
             disabled={isPrinting}
-            onClick={handleBluetoothPrint}
+            onClick={() => handleBluetoothPrint()}
             className="w-full sm:w-auto px-5 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">bluetooth</span>

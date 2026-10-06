@@ -71,6 +71,18 @@ class MainActivity : Activity() {
 
         setupWebView()
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
+        
+        // Request Bluetooth permissions for Android 12+
+        if (Build.VERSION.SDK_INT >= 31) {
+            val permissions = arrayOf<String>(
+                "android.permission.BLUETOOTH_CONNECT",
+                "android.permission.BLUETOOTH_SCAN"
+            )
+            val toRequest = permissions.filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+            if (toRequest.isNotEmpty()) {
+                requestPermissions(toRequest.toTypedArray(), 101)
+            }
+        }
     }
 
     override fun onResume() {
@@ -264,6 +276,62 @@ class AndroidBridge(
                     Toast.makeText(context, "Could not open Bluetooth settings", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    @JavascriptInterface
+    fun getPairedPrinters(): String {
+        try {
+            val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+                return "[]"
+            }
+            val pairedDevices = bluetoothAdapter.bondedDevices
+            val printers = mutableListOf<String>()
+            if (pairedDevices != null) {
+                for (device in pairedDevices) {
+                    val name = device.name ?: "Unknown"
+                    val address = device.address
+                    printers.add("{\"name\":\"${name.replace("\"", "\\\"")}\", \"address\":\"$address\"}")
+                }
+            }
+            return "[${printers.joinToString(",")}]"
+        } catch (e: Exception) {
+            return "[]"
+        }
+    }
+
+    @JavascriptInterface
+    fun printToBluetoothDevice(macAddress: String, base64Data: String): String {
+        try {
+            val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+            if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+                return "Bluetooth is disabled"
+            }
+            val device = bluetoothAdapter.getRemoteDevice(macAddress)
+            val uuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB") // SPP UUID
+            val socket = device.createRfcommSocketToServiceRecord(uuid)
+            
+            try {
+                bluetoothAdapter.cancelDiscovery()
+            } catch (e: Exception) {}
+            
+            socket.connect()
+            val outputStream = socket.outputStream
+            val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+            
+            val chunkSize = 512
+            for (i in decodedBytes.indices step chunkSize) {
+                val end = kotlin.math.min(decodedBytes.size, i + chunkSize)
+                outputStream.write(decodedBytes, i, end - i)
+                outputStream.flush()
+                Thread.sleep(10)
+            }
+            
+            socket.close()
+            return "SUCCESS"
+        } catch (e: Exception) {
+            return "Error: ${e.message}"
         }
     }
 
