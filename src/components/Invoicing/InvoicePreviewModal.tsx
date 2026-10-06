@@ -287,95 +287,53 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-1 sm:p-4 print-modal-overlay animate-fade-in">
-      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-5xl max-h-[96vh] flex flex-col shadow-2xl overflow-hidden print-modal-container">
-        {/* Modal Controls Toolbar (Hidden during print) */}
-        <div className="no-print px-3 sm:px-4 py-2 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/85 flex-wrap gap-2">
-          {/* Format Switcher & Copy Badge Selector */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              onClick={() => setViewMode('A4')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-label-sm text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'A4'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <FileText size={14} />
-              <span>{isGst ? 'A4 Tax Invoice' : 'A4 Retail Invoice'}</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode('THERMAL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-label-sm text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'THERMAL'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <Receipt size={14} />
-              <span>Thermal POS</span>
-            </button>
-
-            {viewMode === 'A4' && (
-              <div className="flex items-center gap-1 bg-surface-container rounded-xl p-0.5 border border-outline-variant/30 text-[11px] font-bold">
-                <button
-                  onClick={() => setCopyType('ORIGINAL FOR RECIPIENT')}
-                  className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                    copyType === 'ORIGINAL FOR RECIPIENT'
-                      ? 'bg-secondary text-on-secondary shadow-xs'
-                      : 'text-on-surface-variant'
-                  }`}
-                >
-                  Original
-                </button>
-                <button
-                  onClick={() => setCopyType('DUPLICATE FOR TRANSPORTER')}
-                  className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                    copyType === 'DUPLICATE FOR TRANSPORTER'
-                      ? 'bg-secondary text-on-secondary shadow-xs'
-                      : 'text-on-surface-variant'
-                  }`}
-                >
-                  Duplicate
-                </button>
-                <button
-                  onClick={() => setCopyType('TRIPLICATE FOR SUPPLIER')}
-                  className={`px-2 py-1 rounded-lg transition-colors cursor-pointer ${
-                    copyType === 'TRIPLICATE FOR SUPPLIER'
-                      ? 'bg-secondary text-on-secondary shadow-xs'
-                      : 'text-on-surface-variant'
-                  }`}
-                >
-                  Triplicate
-                </button>
-              </div>
-            )}
-
-            {viewMode === 'THERMAL' && (
-              <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30 ml-1">
-                <button
-                  onClick={() => setThermalWidth(32)}
-                  className={`px-2 py-0.5 text-[11px] rounded font-bold cursor-pointer ${
-                    thermalWidth === 32
-                      ? 'bg-secondary text-on-secondary'
-                      : 'text-on-surface-variant'
-                  }`}
-                >
-                  58mm
-                </button>
-                <button
-                  onClick={() => setThermalWidth(48)}
-                  className={`px-2 py-0.5 text-[11px] rounded font-bold cursor-pointer ${
-                    thermalWidth === 48
-                      ? 'bg-secondary text-on-secondary'
-                      : 'text-on-surface-variant'
-                  }`}
-                >
-                  80mm
-                </button>
-              </div>
-            )}
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-2 print-modal-overlay animate-fade-in">
+      <div className="bg-surface-container-lowest text-on-surface rounded-none sm:rounded-2xl border-0 sm:border sm:border-outline-variant/30 w-full max-w-5xl h-full sm:h-auto sm:max-h-[96vh] flex flex-col shadow-2xl overflow-hidden print-modal-container">
+        {/* Modal Controls Toolbar (Compact & Minimal Padding) */}
+        <div className="no-print px-2 sm:px-3 py-1 sm:py-1.5 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/95 gap-1 shrink-0">
+          {/* Format Selector: Unified Compact Segmented Pill */}
+          <div className="flex items-center gap-1">
+            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30 text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setViewMode('A4')}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                  viewMode === 'A4'
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                A4 Laser
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('THERMAL');
+                  setThermalWidth(48);
+                }}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                  viewMode === 'THERMAL' && thermalWidth === 48
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                3" Thermal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('THERMAL');
+                  setThermalWidth(32);
+                }}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                  viewMode === 'THERMAL' && thermalWidth === 32
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                2" Thermal
+              </button>
+            </div>
 
             {/* Quick Toggle Default Print Format */}
             {(() => {
@@ -394,17 +352,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSetDefault}
-                  title={isCurrentDefault ? 'Current default format for all invoices' : 'Set as default format for all invoices'}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer border ${
+                  title={isCurrentDefault ? 'Current default print format' : 'Set as default print format'}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
                     isCurrentDefault
-                      ? 'bg-secondary/15 text-secondary border-secondary/40 shadow-xs'
-                      : 'bg-surface-container text-on-surface-variant hover:text-on-surface border-outline-variant/30 hover:bg-surface-container-high'
+                      ? 'bg-secondary/15 text-secondary border-secondary/40'
+                      : 'bg-surface-container text-on-surface-variant hover:text-on-surface border-outline-variant/30'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">
-                    {isCurrentDefault ? 'check_circle' : 'bookmark_add'}
+                  <span className="material-symbols-outlined text-[13px]">
+                    {isCurrentDefault ? 'star' : 'star_border'}
                   </span>
-                  <span>{isCurrentDefault ? 'Default' : 'Set Default'}</span>
+                  <span className="hidden md:inline">{isCurrentDefault ? 'Default' : 'Set Default'}</span>
                 </button>
               );
             })()}
@@ -414,9 +372,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           <button
             onClick={onClose}
             aria-label="Close Preview"
-            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer ml-auto active:scale-95"
+            className="w-7 h-7 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer active:scale-95 ml-auto shrink-0"
           >
-            <X size={18} />
+            <X size={15} />
           </button>
         </div>
 
@@ -428,54 +386,53 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         )}
 
         {/* Printable Invoice Container (Scrollable on small mobile screens) */}
-        <div className={`overflow-auto p-2 sm:p-5 flex ${viewMode === 'THERMAL' ? 'justify-center overflow-x-hidden' : 'justify-start sm:justify-center'} bg-slate-200/50 flex-1`}>
+        <div className={`overflow-auto py-1 sm:py-2 px-1 flex ${viewMode === 'THERMAL' ? 'justify-center overflow-x-hidden' : 'justify-start sm:justify-center'} bg-slate-200/40 flex-1`}>
           {viewMode === 'THERMAL' ? (
             /* Standard POS Thermal Slip Preview */
             <div
-              className={`printable-invoice bg-white text-slate-900 rounded-sm shadow-xl border border-slate-300/80 mx-auto overflow-hidden ${
-                thermalWidth === 32 ? 'max-w-[290px] sm:max-w-[310px]' : 'max-w-[330px] sm:max-w-[360px]'
+              className={`printable-invoice bg-white text-slate-900 rounded-sm shadow-md border border-slate-300 mx-auto overflow-hidden ${
+                thermalWidth === 32 ? 'max-w-[280px] sm:max-w-[300px]' : 'max-w-[320px] sm:max-w-[340px]'
               } w-full font-mono text-xs`}
               style={{
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
               }}
             >
               {/* Paper Top Dashed Edge */}
-              <div className="h-1.5 border-b border-dashed border-slate-300 bg-slate-50" />
+              <div className="h-1 border-b border-dashed border-slate-300 bg-slate-50" />
 
-              <div className="p-3.5 sm:p-4 space-y-2.5">
+              <div className="p-2 sm:p-2.5 space-y-1">
                 {/* Store Header */}
                 <div className="text-center space-y-0.5">
-                  <h2 className="font-black text-sm sm:text-base uppercase tracking-tight text-slate-950 leading-tight">
+                  <h2 className="font-black text-xs sm:text-sm uppercase tracking-tight text-slate-950 leading-tight">
                     {company.tradeName || company.businessName}
                   </h2>
                   {company.address && (
-                    <p className="text-[10px] sm:text-[11px] text-slate-700 leading-snug">
-                      {company.address}
-                      {company.pincode ? ` - ${company.pincode}` : ''}
+                    <p className="text-[10px] text-slate-600 leading-tight">
+                      {company.address}{company.pincode ? ` - ${company.pincode}` : ''}
                     </p>
                   )}
                   {isGst && company.gstin && (
-                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-800 tracking-wider">
+                    <p className="text-[10px] font-bold text-slate-800">
                       GSTIN: {company.gstin}
                     </p>
                   )}
                   {company.phone && (
-                    <p className="text-[10px] sm:text-[11px] text-slate-700">
+                    <p className="text-[10px] text-slate-600">
                       Ph: {company.phone}
                     </p>
                   )}
-                  <div className="pt-1">
-                    <span className="inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-900 border border-slate-300 rounded">
+                  <div className="pt-0.5">
+                    <span className="inline-block px-1.5 py-0.2 text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-900 border border-slate-300 rounded">
                       {isGst ? 'TAX INVOICE' : 'RETAIL INVOICE'}
                     </span>
                   </div>
                 </div>
 
                 {/* Dashed Divider */}
-                <div className="border-b border-dashed border-slate-400" />
+                <div className="border-b border-dashed border-slate-400 my-1" />
 
                 {/* Metadata Row */}
-                <div className="text-[11px] space-y-0.5 leading-tight">
+                <div className="text-[10px] space-y-0.5 leading-tight">
                   <div className="flex justify-between items-center">
                     <span><strong className="text-slate-800">Bill:</strong> {invoice.invoiceNumber}</span>
                     <span className="text-slate-700">{formatDate(invoice.date)}</span>
@@ -488,38 +445,38 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
 
                 {/* Dashed Divider */}
-                <div className="border-b border-dashed border-slate-400" />
+                <div className="border-b border-dashed border-slate-400 my-1" />
 
                 {/* Item Table */}
-                <table className="w-full text-[10px] sm:text-[11px] border-collapse">
+                <table className="w-full text-[10px] border-collapse">
                   <thead>
-                    <tr className="border-b border-dashed border-slate-400 text-slate-800 font-bold uppercase">
-                      <th className="text-left pb-1 font-bold">Item</th>
-                      <th className="text-center pb-1 w-10 font-bold">Qty</th>
-                      <th className="text-right pb-1 w-12 font-bold">Rate</th>
-                      <th className="text-right pb-1 w-14 font-bold">Total</th>
+                    <tr className="border-b border-dashed border-slate-400 text-slate-800 font-bold uppercase text-[9px]">
+                      <th className="text-left pb-0.5 font-bold">Item</th>
+                      <th className="text-center pb-0.5 w-8 font-bold">Qty</th>
+                      <th className="text-right pb-0.5 w-10 font-bold">Rate</th>
+                      <th className="text-right pb-0.5 w-12 font-bold">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dotted divide-slate-200">
                     {itemsList.map((item, idx) => (
                       <tr key={item.id || idx} className="align-top">
-                        <td className="py-1 text-left pr-1">
+                        <td className="py-0.5 text-left pr-1">
                           <div className="font-semibold text-slate-900 leading-tight break-words">
                             {item.name}
                           </div>
                           {item.discountPercent > 0 && (
-                            <span className="text-[9px] text-emerald-700 block">
+                            <span className="text-[8px] text-emerald-700 block">
                               Disc {item.discountPercent}%
                             </span>
                           )}
                         </td>
-                        <td className="py-1 text-center font-medium text-slate-800">
+                        <td className="py-0.5 text-center font-medium text-slate-800">
                           {item.quantity}
                         </td>
-                        <td className="py-1 text-right font-medium text-slate-800">
+                        <td className="py-0.5 text-right font-medium text-slate-800">
                           {item.unitPrice.toFixed(0)}
                         </td>
-                        <td className="py-1 text-right font-bold text-slate-950">
+                        <td className="py-0.5 text-right font-bold text-slate-950">
                           {item.totalAmount.toFixed(2)}
                         </td>
                       </tr>
@@ -528,10 +485,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </table>
 
                 {/* Dashed Divider */}
-                <div className="border-b border-dashed border-slate-400" />
+                <div className="border-b border-dashed border-slate-400 my-1" />
 
                 {/* Totals & Tax Calculation Breakdown */}
-                <div className="text-[11px] space-y-1">
+                <div className="text-[10px] space-y-0.5">
                   <div className="flex justify-between">
                     <span className="text-slate-600">{isGst ? 'Subtotal (Taxable):' : 'Subtotal:'}</span>
                     <span className="font-medium text-slate-900">₹{totalTaxable.toFixed(2)}</span>
@@ -580,15 +537,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   )}
 
                   {/* Grand Total Highlight */}
-                  <div className="pt-1.5 border-t-2 border-slate-900 border-b-2 py-1 flex justify-between items-center font-black text-xs sm:text-sm text-slate-950">
+                  <div className="pt-1 border-t border-b border-slate-900 my-0.5 py-0.5 flex justify-between items-center font-black text-xs text-slate-950">
                     <span className="uppercase tracking-wide">GRAND TOTAL:</span>
-                    <span className="text-sm sm:text-base">₹{resolvedGrandTotal.toFixed(2)}</span>
+                    <span className="text-xs sm:text-sm">₹{resolvedGrandTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
                 {/* Payment Status / Balance Due */}
                 {invoice.balanceAmount > 0 && (
-                  <div className="flex justify-between items-center text-[11px] text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded">
+                  <div className="flex justify-between items-center text-[10px] text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded">
                     <span>Balance Due:</span>
                     <span>₹{invoice.balanceAmount.toFixed(2)}</span>
                   </div>
@@ -596,29 +553,26 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                 {/* Dynamic UPI QR Code */}
                 {upiQrUrl && (
-                  <div className="pt-1 text-center flex flex-col items-center">
-                    <div className="p-1.5 bg-white border border-slate-300 rounded inline-block shadow-2xs">
-                      <img src={upiQrUrl} alt="UPI QR" className="w-24 h-24 block" />
+                  <div className="pt-0.5 text-center flex flex-col items-center">
+                    <div className="p-1 bg-white border border-slate-300 rounded inline-block shadow-2xs">
+                      <img src={upiQrUrl} alt="UPI QR" className="w-16 h-16 sm:w-20 sm:h-20 block" />
                     </div>
                     {company.upiId && (
-                      <p className="text-[10px] text-slate-700 font-bold mt-1">
-                        Pay via UPI: <span className="font-mono">{company.upiId}</span>
+                      <p className="text-[9px] text-slate-700 font-bold mt-0.5">
+                        UPI: <span className="font-mono">{company.upiId}</span>
                       </p>
                     )}
                   </div>
                 )}
 
                 {/* Footer Notes */}
-                <div className="pt-1 border-t border-dashed border-slate-300 text-center space-y-0.5 text-[10px] text-slate-600">
-                  <p className="font-medium">{company.termsAndConditions || 'Thank you! Visit again.'}</p>
+                <div className="pt-0.5 border-t border-dashed border-slate-300 text-center space-y-0.5 text-[9px] text-slate-500">
+                  <p className="font-medium text-slate-700">{company.termsAndConditions || 'Thank you! Visit again.'}</p>
                   {posStateObj?.name && (
-                    <p className="text-[9px] text-slate-500 italic">
+                    <p className="italic">
                       Subject to {posStateObj.name} jurisdiction
                     </p>
                   )}
-                  <p className="text-[9px] text-slate-400 font-mono tracking-tight pt-0.5">
-                    Printed via Vyapar POS • {thermalWidth === 32 ? '58mm (2-inch)' : '80mm (3-inch)'}
-                  </p>
                 </div>
               </div>
             </div>
@@ -1311,9 +1265,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         </div>
 
         {/* Sticky Bottom Actions Toolbar */}
-        <div className="no-print px-3 sm:px-4 py-2.5 border-t border-outline-variant/20 bg-surface-container-low/95 backdrop-blur-md flex items-center justify-between gap-2 z-10 flex-wrap">
+        <div className="no-print px-2 sm:px-3 py-1.5 border-t border-outline-variant/20 bg-surface-container-low/95 backdrop-blur-md flex items-center justify-between gap-1.5 z-10 shrink-0">
           {/* Left Actions: Edit & Export Menu */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             {onEditInvoice && (
               <button
                 type="button"
@@ -1321,10 +1275,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   onClose();
                   onEditInvoice(invoice);
                 }}
-                className="inline-flex items-center gap-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border border-outline-variant/30 active:scale-95"
+                className="inline-flex items-center gap-1 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border border-outline-variant/30 active:scale-95"
                 title="Edit and update invoice"
               >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
+                <span className="material-symbols-outlined text-[14px]">edit</span>
                 <span>Edit</span>
               </button>
             )}
@@ -1334,21 +1288,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowMoreActions(!showMoreActions)}
-                className="h-9 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center gap-1 text-on-surface-variant hover:text-on-surface text-xs font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
+                className="h-7 sm:h-8 px-2 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center gap-1 text-on-surface-variant hover:text-on-surface text-xs font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
                 title="More Export Options"
               >
-                <MoreVertical size={16} />
+                <MoreVertical size={14} />
                 <span className="hidden sm:inline">Export</span>
               </button>
 
               {showMoreActions && (
-                <div className="absolute left-0 bottom-11 z-50 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 w-52 animate-in fade-in">
+                <div className="absolute left-0 bottom-9 z-50 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 w-52 animate-in fade-in">
                   <button
                     onClick={() => {
                       setShowMoreActions(false);
                       downloadEWayBillJson(company, invoice);
                     }}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
                   >
                     <Download size={14} className="text-secondary" />
                     <span>NIC E-Way Bill (JSON)</span>
@@ -1359,7 +1313,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       setShowMoreActions(false);
                       downloadEInvoiceJson(company, invoice);
                     }}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
                   >
                     <Download size={14} className="text-primary" />
                     <span>NIC E-Invoice (JSON)</span>
@@ -1373,7 +1327,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         alert('Thermal receipt plain text copied to clipboard!');
                       }
                     }}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
                   >
                     <Receipt size={14} className="text-amber-600" />
                     <span>Copy Raw Slip Text</span>
@@ -1384,22 +1338,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           </div>
 
           {/* Right Primary Actions: WhatsApp & Print */}
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
             <button
               type="button"
               onClick={() => setIsWhatsAppModalOpen(true)}
-              className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#20ba59] text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer active:scale-95"
             >
-              <Share2 size={15} />
+              <Share2 size={13} />
               <span>WhatsApp</span>
             </button>
 
             <button
               type="button"
               onClick={viewMode === 'THERMAL' ? () => setIsThermalModalOpen(true) : handlePrint}
-              className="inline-flex items-center gap-1.5 bg-secondary hover:bg-secondary/90 text-on-secondary px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1 bg-secondary hover:bg-secondary/90 text-on-secondary px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
             >
-              <Printer size={15} />
+              <Printer size={13} />
               <span>{viewMode === 'THERMAL' ? 'Print Slip' : 'Print / PDF'}</span>
             </button>
           </div>
