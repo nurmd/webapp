@@ -38,6 +38,7 @@ import { DaybookView } from './components/Reports/DaybookView.tsx';
 import { CashBankManagementView } from './components/CashBank/CashBankManagementView.tsx';
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
+import { PrintSettingsView } from './components/Settings/PrintSettingsView.tsx';
 import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHubView.tsx';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
@@ -743,6 +744,13 @@ export const App: React.FC = () => {
           <CompanySettingsView
             company={company}
             onSave={handleSaveCompany}
+          />
+        )}
+
+        {activeTab === 'print_settings' && (
+          <PrintSettingsView
+            company={company}
+            onBack={() => setActiveTab('settings')}
           />
         )}
 

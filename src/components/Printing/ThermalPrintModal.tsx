@@ -9,6 +9,7 @@ import {
   buildThermalReceiptBinary,
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
+import { printSettingsService } from '../../services/printSettingsService.ts';
 
 interface ThermalPrintModalProps {
   invoice: Invoice;
@@ -32,11 +33,13 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     localStorage.setItem('printer_paper_width', width.toString());
   }, [width]);
 
+  const thermalSettings = printSettingsService.getSettings().thermal;
+
   const receiptData: ThermalReceiptData = {
-    companyName: company.tradeName || company.businessName,
-    companyAddress: company.address,
-    gstin: company.gstin,
-    phone: company.phone,
+    companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
+    companyAddress: thermalSettings.showAddress ? company.address : '',
+    gstin: thermalSettings.showGstin ? company.gstin : '',
+    phone: thermalSettings.showPhone ? company.phone : '',
     invoiceNo: invoice.invoiceNumber,
     date: invoice.date,
     customerName: invoice.partyName,
@@ -47,15 +50,15 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       amount: i.totalAmount,
     })),
     taxableAmount: invoice.totalTaxableAmount,
-    totalDiscount: invoice.totalDiscount,
-    cgstAmount: invoice.totalCgst,
-    sgstAmount: invoice.totalSgst,
-    igstAmount: invoice.totalIgst,
+    totalDiscount: thermalSettings.showItemDiscount ? invoice.totalDiscount : 0,
+    cgstAmount: thermalSettings.showTaxBreakdown ? invoice.totalCgst : 0,
+    sgstAmount: thermalSettings.showTaxBreakdown ? invoice.totalSgst : 0,
+    igstAmount: thermalSettings.showTaxBreakdown ? invoice.totalIgst : 0,
     shippingAmount: invoice.shippingAmount,
     roundOff: invoice.roundOff,
     grandTotal: invoice.grandTotal,
-    upiId: company.upiId,
-    terms: company.termsAndConditions,
+    upiId: thermalSettings.showUpiQr ? company.upiId : undefined,
+    terms: thermalSettings.greetingText || company.termsAndConditions,
   };
 
   const previewText = formatThermalReceiptText(receiptData, width);
@@ -107,8 +110,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       try {
         const binary = buildThermalReceiptBinary(receiptData, {
           width,
-          kickDrawer: false,
-          printQr: !!company.upiId,
+          kickDrawer: thermalSettings.kickDrawer,
+          printQr: thermalSettings.showUpiQr && !!company.upiId,
         });
         const base64Data = btoa(String.fromCharCode.apply(null, binary as unknown as number[]));
 
@@ -139,8 +142,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       try {
         const binary = buildThermalReceiptBinary(receiptData, {
           width,
-          kickDrawer: false,
-          printQr: !!company.upiId,
+          kickDrawer: thermalSettings.kickDrawer,
+          printQr: thermalSettings.showUpiQr && !!company.upiId,
         });
 
         const res = await printViaWebBluetooth(binary);

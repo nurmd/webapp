@@ -7,6 +7,7 @@ import { db } from '../../services/db.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { PrintSettingsView } from './PrintSettingsView.tsx';
 
 interface CompanySettingsViewProps {
   company: CompanyProfile;
@@ -18,7 +19,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   onSave,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>({ ...company });
-  const [activeTab, setActiveTab] = useState<'profile' | 'general'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'print'>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
@@ -352,6 +353,17 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         <button
           type="button"
           className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+            activeTab === 'print'
+              ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+              : 'text-on-surface-variant hover:bg-surface-container-high'
+          }`}
+          onClick={() => setActiveTab('print')}
+        >
+          Print Settings
+        </button>
+        <button
+          type="button"
+          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
             activeTab === 'general'
               ? 'bg-surface-container-lowest text-on-surface shadow-sm'
               : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -538,17 +550,17 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             </div>
           </div>
 
-          {/* Thermal Printing Themes & Details Modal */}
+          {/* Thermal Printing Themes & Details Link */}
           <button
             type="button"
-            onClick={() => setActiveSubModal('printing')}
+            onClick={() => setActiveTab('print')}
             className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
           >
             <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
               <span className="material-symbols-outlined text-[22px]">tune</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes & Thermal Printing Details</div>
+              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes &amp; Thermal Printing Details</div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
                 Current Default: {defaultPrintOption === 'Thermal-58mm' ? '2-Inch (58mm) Thermal' : defaultPrintOption === 'Thermal-80mm' ? '3-Inch (80mm) Thermal' : 'Standard A4 Laser'}
               </div>
@@ -617,6 +629,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       </section>
 
           </>
+        )}
+
+        {activeTab === 'print' && (
+          <PrintSettingsView company={company} />
         )}
 
         {activeTab === 'general' && (

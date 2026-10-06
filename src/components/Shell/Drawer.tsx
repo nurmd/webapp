@@ -15,6 +15,7 @@ export type AppTab =
   | 'accounting'
   | 'pos'
   | 'settings'
+  | 'print_settings'
   | 'menu';
 
 interface DrawerProps {
@@ -71,6 +72,7 @@ export const Drawer: React.FC<DrawerProps> = ({
         { id: 'expenses', label: 'Expenses & Overheads', icon: 'receipt_long' },
         { id: 'reports', label: company.isGstEnabled !== false ? 'Reports & GSTR' : 'Reports & Analytics', icon: 'analytics' },
         { id: 'accounting', label: 'Daybook Journal', icon: 'menu_book' },
+        { id: 'print_settings', label: 'Print Settings', icon: 'print' },
         { id: 'menu', label: 'Navigation Menu Hub', icon: 'grid_view' },
         { id: 'settings', label: 'Company Settings', icon: 'settings' },
       ],
