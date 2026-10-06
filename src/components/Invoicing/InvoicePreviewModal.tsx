@@ -410,83 +410,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             })()}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 flex-wrap ml-auto">
-            {onEditInvoice && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onEditInvoice(invoice);
-                }}
-                className="inline-flex items-center gap-1 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-outline-variant/30 active:scale-95"
-                title="Edit and update invoice"
-              >
-                <span className="material-symbols-outlined text-[15px]">edit</span>
-                <span>Edit</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setIsWhatsAppModalOpen(true)}
-              className="inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#20ba59] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-            >
-              <Share2 size={14} />
-              <span>WhatsApp</span>
-            </button>
-
-            <button
-              onClick={viewMode === 'THERMAL' ? () => setIsThermalModalOpen(true) : handlePrint}
-              className="inline-flex items-center gap-1.5 bg-secondary hover:bg-secondary/90 text-on-secondary px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
-            >
-              <Printer size={14} />
-              <span>{viewMode === 'THERMAL' ? 'Print Receipt' : 'Print / PDF'}</span>
-            </button>
-
-            {/* More Menu (E-Way / E-Invoice) */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreActions(!showMoreActions)}
-                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant cursor-pointer"
-                title="More Export Options"
-              >
-                <MoreVertical size={16} />
-              </button>
-
-              {showMoreActions && (
-                <div className="absolute right-0 top-10 z-50 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 w-48 animate-in fade-in">
-                  <button
-                    onClick={() => {
-                      setShowMoreActions(false);
-                      downloadEWayBillJson(company, invoice);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
-                  >
-                    <Download size={14} className="text-blue-500" />
-                    <span>Download E-Way JSON</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowMoreActions(false);
-                      downloadEInvoiceJson(company, invoice);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
-                  >
-                    <Download size={14} className="text-purple-500" />
-                    <span>Download E-Invoice JSON</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer ml-1"
-            >
-              <X size={18} />
-            </button>
-          </div>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            aria-label="Close Preview"
+            className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer ml-auto active:scale-95"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Notice banner if displaying sample fallback items */}
@@ -497,21 +428,199 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         )}
 
         {/* Printable Invoice Container (Scrollable on small mobile screens) */}
-        <div className="overflow-auto p-2 sm:p-5 flex justify-start sm:justify-center bg-slate-200/50 flex-1">
+        <div className={`overflow-auto p-2 sm:p-5 flex ${viewMode === 'THERMAL' ? 'justify-center overflow-x-hidden' : 'justify-start sm:justify-center'} bg-slate-200/50 flex-1`}>
           {viewMode === 'THERMAL' ? (
-            /* Thermal POS Receipt View */
+            /* Standard POS Thermal Slip Preview */
             <div
-              className="printable-invoice bg-white text-black p-4 rounded-md shadow-md mx-auto"
+              className={`printable-invoice bg-white text-slate-900 rounded-sm shadow-xl border border-slate-300/80 mx-auto overflow-hidden ${
+                thermalWidth === 32 ? 'max-w-[290px] sm:max-w-[310px]' : 'max-w-[330px] sm:max-w-[360px]'
+              } w-full font-mono text-xs`}
               style={{
-                fontFamily: 'monospace',
-                maxWidth: thermalWidth === 32 ? '300px' : '380px',
-                width: '100%',
-                whiteSpace: 'pre-wrap',
-                fontSize: thermalWidth === 32 ? '0.75rem' : '0.8rem',
-                lineHeight: '1.25',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
               }}
             >
-              {thermalText}
+              {/* Paper Top Dashed Edge */}
+              <div className="h-1.5 border-b border-dashed border-slate-300 bg-slate-50" />
+
+              <div className="p-3.5 sm:p-4 space-y-2.5">
+                {/* Store Header */}
+                <div className="text-center space-y-0.5">
+                  <h2 className="font-black text-sm sm:text-base uppercase tracking-tight text-slate-950 leading-tight">
+                    {company.tradeName || company.businessName}
+                  </h2>
+                  {company.address && (
+                    <p className="text-[10px] sm:text-[11px] text-slate-700 leading-snug">
+                      {company.address}
+                      {company.pincode ? ` - ${company.pincode}` : ''}
+                    </p>
+                  )}
+                  {isGst && company.gstin && (
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-800 tracking-wider">
+                      GSTIN: {company.gstin}
+                    </p>
+                  )}
+                  {company.phone && (
+                    <p className="text-[10px] sm:text-[11px] text-slate-700">
+                      Ph: {company.phone}
+                    </p>
+                  )}
+                  <div className="pt-1">
+                    <span className="inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-900 border border-slate-300 rounded">
+                      {isGst ? 'TAX INVOICE' : 'RETAIL INVOICE'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Dashed Divider */}
+                <div className="border-b border-dashed border-slate-400" />
+
+                {/* Metadata Row */}
+                <div className="text-[11px] space-y-0.5 leading-tight">
+                  <div className="flex justify-between items-center">
+                    <span><strong className="text-slate-800">Bill:</strong> {invoice.invoiceNumber}</span>
+                    <span className="text-slate-700">{formatDate(invoice.date)}</span>
+                  </div>
+                  {invoice.partyName && (
+                    <div className="truncate">
+                      <strong className="text-slate-800">Party:</strong> {invoice.partyName}
+                    </div>
+                  )}
+                </div>
+
+                {/* Dashed Divider */}
+                <div className="border-b border-dashed border-slate-400" />
+
+                {/* Item Table */}
+                <table className="w-full text-[10px] sm:text-[11px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-dashed border-slate-400 text-slate-800 font-bold uppercase">
+                      <th className="text-left pb-1 font-bold">Item</th>
+                      <th className="text-center pb-1 w-10 font-bold">Qty</th>
+                      <th className="text-right pb-1 w-12 font-bold">Rate</th>
+                      <th className="text-right pb-1 w-14 font-bold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dotted divide-slate-200">
+                    {itemsList.map((item, idx) => (
+                      <tr key={item.id || idx} className="align-top">
+                        <td className="py-1 text-left pr-1">
+                          <div className="font-semibold text-slate-900 leading-tight break-words">
+                            {item.name}
+                          </div>
+                          {item.discountPercent > 0 && (
+                            <span className="text-[9px] text-emerald-700 block">
+                              Disc {item.discountPercent}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1 text-center font-medium text-slate-800">
+                          {item.quantity}
+                        </td>
+                        <td className="py-1 text-right font-medium text-slate-800">
+                          {item.unitPrice.toFixed(0)}
+                        </td>
+                        <td className="py-1 text-right font-bold text-slate-950">
+                          {item.totalAmount.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Dashed Divider */}
+                <div className="border-b border-dashed border-slate-400" />
+
+                {/* Totals & Tax Calculation Breakdown */}
+                <div className="text-[11px] space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">{isGst ? 'Subtotal (Taxable):' : 'Subtotal:'}</span>
+                    <span className="font-medium text-slate-900">₹{totalTaxable.toFixed(2)}</span>
+                  </div>
+
+                  {invoice.totalDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-700 font-medium">
+                      <span>Discount:</span>
+                      <span>-₹{invoice.totalDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {totalCgst > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>CGST:</span>
+                      <span>₹{totalCgst.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {totalSgst > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>SGST:</span>
+                      <span>₹{totalSgst.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {totalIgst > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>IGST:</span>
+                      <span>₹{totalIgst.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {((invoice as any).shippingCharges > 0 || (invoice as any).shippingAmount > 0) && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Shipping:</span>
+                      <span>+₹{Number((invoice as any).shippingCharges || (invoice as any).shippingAmount).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {(invoice as any).roundOff && (invoice as any).roundOff !== 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Round Off:</span>
+                      <span>{Number((invoice as any).roundOff) > 0 ? '+' : ''}₹{Number((invoice as any).roundOff).toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* Grand Total Highlight */}
+                  <div className="pt-1.5 border-t-2 border-slate-900 border-b-2 py-1 flex justify-between items-center font-black text-xs sm:text-sm text-slate-950">
+                    <span className="uppercase tracking-wide">GRAND TOTAL:</span>
+                    <span className="text-sm sm:text-base">₹{resolvedGrandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Payment Status / Balance Due */}
+                {invoice.balanceAmount > 0 && (
+                  <div className="flex justify-between items-center text-[11px] text-rose-700 font-bold bg-rose-50 px-2 py-1 rounded">
+                    <span>Balance Due:</span>
+                    <span>₹{invoice.balanceAmount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Dynamic UPI QR Code */}
+                {upiQrUrl && (
+                  <div className="pt-1 text-center flex flex-col items-center">
+                    <div className="p-1.5 bg-white border border-slate-300 rounded inline-block shadow-2xs">
+                      <img src={upiQrUrl} alt="UPI QR" className="w-24 h-24 block" />
+                    </div>
+                    {company.upiId && (
+                      <p className="text-[10px] text-slate-700 font-bold mt-1">
+                        Pay via UPI: <span className="font-mono">{company.upiId}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer Notes */}
+                <div className="pt-1 border-t border-dashed border-slate-300 text-center space-y-0.5 text-[10px] text-slate-600">
+                  <p className="font-medium">{company.termsAndConditions || 'Thank you! Visit again.'}</p>
+                  {posStateObj?.name && (
+                    <p className="text-[9px] text-slate-500 italic">
+                      Subject to {posStateObj.name} jurisdiction
+                    </p>
+                  )}
+                  <p className="text-[9px] text-slate-400 font-mono tracking-tight pt-0.5">
+                    Printed via Vyapar POS • {thermalWidth === 32 ? '58mm (2-inch)' : '80mm (3-inch)'}
+                  </p>
+                </div>
+              </div>
             </div>
           ) : (
             /* Standard Tally Prime / ClearTax Official GST Tax Invoice */
@@ -1199,6 +1308,101 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Sticky Bottom Actions Toolbar */}
+        <div className="no-print px-3 sm:px-4 py-2.5 border-t border-outline-variant/20 bg-surface-container-low/95 backdrop-blur-md flex items-center justify-between gap-2 z-10 flex-wrap">
+          {/* Left Actions: Edit & Export Menu */}
+          <div className="flex items-center gap-1.5">
+            {onEditInvoice && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEditInvoice(invoice);
+                }}
+                className="inline-flex items-center gap-1.5 bg-surface-container hover:bg-surface-container-high text-on-surface px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border border-outline-variant/30 active:scale-95"
+                title="Edit and update invoice"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                <span>Edit</span>
+              </button>
+            )}
+
+            {/* More Menu (E-Way / E-Invoice / Plain Text) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowMoreActions(!showMoreActions)}
+                className="h-9 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center gap-1 text-on-surface-variant hover:text-on-surface text-xs font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
+                title="More Export Options"
+              >
+                <MoreVertical size={16} />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+
+              {showMoreActions && (
+                <div className="absolute left-0 bottom-11 z-50 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 w-52 animate-in fade-in">
+                  <button
+                    onClick={() => {
+                      setShowMoreActions(false);
+                      downloadEWayBillJson(company, invoice);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                  >
+                    <Download size={14} className="text-secondary" />
+                    <span>NIC E-Way Bill (JSON)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMoreActions(false);
+                      downloadEInvoiceJson(company, invoice);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                  >
+                    <Download size={14} className="text-primary" />
+                    <span>NIC E-Invoice (JSON)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowMoreActions(false);
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(thermalText);
+                        alert('Thermal receipt plain text copied to clipboard!');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
+                  >
+                    <Receipt size={14} className="text-amber-600" />
+                    <span>Copy Raw Slip Text</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Primary Actions: WhatsApp & Print */}
+          <div className="flex items-center gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={() => setIsWhatsAppModalOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20ba59] text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+            >
+              <Share2 size={15} />
+              <span>WhatsApp</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={viewMode === 'THERMAL' ? () => setIsThermalModalOpen(true) : handlePrint}
+              className="inline-flex items-center gap-1.5 bg-secondary hover:bg-secondary/90 text-on-secondary px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
+            >
+              <Printer size={15} />
+              <span>{viewMode === 'THERMAL' ? 'Print Slip' : 'Print / PDF'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
