@@ -35,12 +35,19 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const [isPrinting, setIsPrinting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const [isDefaultPrint, setIsDefaultPrint] = useState(() => {
+    const cur = localStorage.getItem('defaultPrintOption');
+    return cur === 'Thermal-58mm' || cur === 'Thermal-80mm';
+  });
 
   useEffect(() => {
     localStorage.setItem('printer_paper_width', width.toString());
     localStorage.setItem('printer_kick_drawer', kickDrawer.toString());
     localStorage.setItem('printer_include_qr', includeQr.toString());
-  }, [width, kickDrawer, includeQr]);
+    if (isDefaultPrint) {
+      localStorage.setItem('defaultPrintOption', width === 32 ? 'Thermal-58mm' : 'Thermal-80mm');
+    }
+  }, [width, kickDrawer, includeQr, isDefaultPrint]);
 
   const receiptData: ThermalReceiptData = {
     companyName: company.tradeName || company.businessName,
@@ -256,6 +263,22 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                   className="rounded text-secondary focus:ring-secondary w-4 h-4"
                 />
                 <span>Print Dynamic UPI QR</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isDefaultPrint}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsDefaultPrint(checked);
+                    if (!checked) {
+                      localStorage.setItem('defaultPrintOption', 'A4');
+                    }
+                  }}
+                  className="rounded text-secondary focus:ring-secondary w-4 h-4"
+                />
+                <span className="text-secondary font-bold">Set as Default Print</span>
               </label>
             </div>
           </div>

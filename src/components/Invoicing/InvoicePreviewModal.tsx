@@ -41,6 +41,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [isThermalModalOpen, setIsThermalModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [defaultPrintOpt, setDefaultPrintOpt] = useState<string>(() => {
+    return localStorage.getItem('defaultPrintOption') || 'A4';
+  });
   const [copyType, setCopyType] = useState<InvoiceCopyType>('ORIGINAL FOR RECIPIENT');
 
   const isGst = company.isGstEnabled !== false && (propInvoice as any)?.isGstInvoice !== false;
@@ -373,6 +376,38 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Quick Toggle Default Print Format */}
+            {(() => {
+              const isCurrentDefault =
+                (viewMode === 'A4' && (defaultPrintOpt === 'A4' || defaultPrintOpt === 'None' || !defaultPrintOpt)) ||
+                (viewMode === 'THERMAL' && thermalWidth === 32 && defaultPrintOpt === 'Thermal-58mm') ||
+                (viewMode === 'THERMAL' && thermalWidth === 48 && defaultPrintOpt === 'Thermal-80mm');
+
+              const handleSetDefault = () => {
+                const target = viewMode === 'A4' ? 'A4' : thermalWidth === 32 ? 'Thermal-58mm' : 'Thermal-80mm';
+                localStorage.setItem('defaultPrintOption', target);
+                setDefaultPrintOpt(target);
+              };
+
+              return (
+                <button
+                  type="button"
+                  onClick={handleSetDefault}
+                  title={isCurrentDefault ? 'Current default format for all invoices' : 'Set as default format for all invoices'}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer border ${
+                    isCurrentDefault
+                      ? 'bg-secondary/15 text-secondary border-secondary/40 shadow-xs'
+                      : 'bg-surface-container text-on-surface-variant hover:text-on-surface border-outline-variant/30 hover:bg-surface-container-high'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {isCurrentDefault ? 'check_circle' : 'bookmark_add'}
+                  </span>
+                  <span>{isCurrentDefault ? 'Default' : 'Set Default'}</span>
+                </button>
+              );
+            })()}
           </div>
 
           {/* Action Buttons */}

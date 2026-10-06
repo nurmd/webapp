@@ -481,6 +481,83 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       </section>
 
+      {/* GROUP 2: Invoicing & Printing Setup (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1 flex items-center justify-between">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Billing & Printing Setup
+          </h3>
+          <span className="font-label-sm text-[11px] text-secondary font-bold">
+            Default: {defaultPrintOption === 'Thermal-58mm' ? '2" (58mm) BT' : defaultPrintOption === 'Thermal-80mm' ? '3" (80mm) POS' : 'A4 Laser'}
+          </span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Default Print Format Direct Toggle */}
+          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px]">print</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-label-md text-sm font-bold text-on-surface">Default Print Format</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
+                </div>
+                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                  Choose whether invoices open in A4 Laser or Thermal Slip by default
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto flex-wrap">
+              {[
+                { id: 'A4', label: 'A4 Laser', icon: 'description' },
+                { id: 'Thermal-80mm', label: '3" (80mm)', icon: 'receipt_long' },
+                { id: 'Thermal-58mm', label: '2" (58mm)', icon: 'receipt' },
+              ].map((opt) => {
+                const isSelected =
+                  defaultPrintOption === opt.id ||
+                  (opt.id === 'A4' && (!defaultPrintOption || defaultPrintOption === 'None'));
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleDefaultPrintOptionChange(opt.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-secondary text-on-secondary shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">{opt.icon}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Thermal Printing Themes & Details Modal */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('printing')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">tune</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes & Thermal Printing Details</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                Current Default: {defaultPrintOption === 'Thermal-58mm' ? '2-Inch (58mm) Thermal' : defaultPrintOption === 'Thermal-80mm' ? '3-Inch (80mm) Thermal' : 'Standard A4 Laser'}
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
       {/* GROUP 3: Banking & UPI Payments (Stitch Design) */}
       <section className="flex flex-col gap-2">
         <div className="px-1 flex items-center justify-between">
@@ -983,19 +1060,64 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
 
         <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
-          {/* Thermal Printing */}
+          {/* Default Print Format Direct Toggle */}
+          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low transition-colors">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px]">print</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-label-md text-sm font-bold text-on-surface">Default Print Format</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
+                </div>
+                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                  Choose whether invoices open in A4 Laser or Thermal Slip by default
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto flex-wrap">
+              {[
+                { id: 'A4', label: 'A4 Laser', icon: 'description' },
+                { id: 'Thermal-80mm', label: '3" (80mm)', icon: 'receipt_long' },
+                { id: 'Thermal-58mm', label: '2" (58mm)', icon: 'receipt' },
+              ].map((opt) => {
+                const isSelected =
+                  defaultPrintOption === opt.id ||
+                  (opt.id === 'A4' && (!defaultPrintOption || defaultPrintOption === 'None'));
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleDefaultPrintOptionChange(opt.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-secondary text-on-secondary shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">{opt.icon}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Thermal Printing Themes & Details Modal */}
           <button
             type="button"
             onClick={() => setActiveSubModal('printing')}
             className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
           >
             <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">print</span>
+              <span className="material-symbols-outlined text-[22px]">tune</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes & Thermal Printing</div>
+              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes & Thermal Printing Details</div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                3-inch (80mm) & 2-inch (58mm) Thermal Active • Modern A4
+                Current Default: {defaultPrintOption === 'Thermal-58mm' ? '2-Inch (58mm) Thermal' : defaultPrintOption === 'Thermal-80mm' ? '3-Inch (80mm) Thermal' : 'Standard A4 Laser'}
               </div>
             </div>
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
@@ -1541,14 +1663,80 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               )}
 
               {activeSubModal === 'printing' && (
-                <>
-                  <p className="font-semibold text-on-surface">Thermal & Document Printing Formats:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li><strong>3-Inch (80mm) ESC/POS</strong>: Standard high-speed POS receipt printer.</li>
-                    <li><strong>2-Inch (58mm) Mobile Bluetooth</strong>: Portable battery-powered thermal printers.</li>
-                    <li><strong>A4 Modern Laser</strong>: Detailed GST tax invoice with full company stamp & signature.</li>
-                  </ul>
-                </>
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-semibold text-on-surface text-sm">Choose Default Invoice Print Format</p>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      Select which format automatically launches whenever you open, preview, or print bills on this device:
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {[
+                      {
+                        id: 'A4',
+                        title: 'A4 Modern Laser (Full Sheet)',
+                        desc: 'Full tax invoice with detailed tax breakup table, company logo, terms & signature stamp.',
+                        icon: 'description',
+                      },
+                      {
+                        id: 'Thermal-80mm',
+                        title: '3-Inch (80mm) ESC/POS Thermal Slip',
+                        desc: 'Countertop high-speed receipt printer (48 columns) with UPI QR code & cash drawer kick.',
+                        icon: 'receipt_long',
+                      },
+                      {
+                        id: 'Thermal-58mm',
+                        title: '2-Inch (58mm) Mobile Bluetooth Slip',
+                        desc: 'Handheld portable battery receipt printer (32 columns) for mobile sales & rapid billing.',
+                        icon: 'receipt',
+                      },
+                    ].map((fmt) => {
+                      const isSelected =
+                        defaultPrintOption === fmt.id ||
+                        (fmt.id === 'A4' && (!defaultPrintOption || defaultPrintOption === 'None'));
+                      return (
+                        <div
+                          key={fmt.id}
+                          onClick={() => handleDefaultPrintOptionChange(fmt.id)}
+                          className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'border-secondary bg-secondary/10 shadow-xs ring-1 ring-secondary'
+                              : 'border-outline-variant/30 bg-surface-container-low hover:bg-surface-container'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div
+                              className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                isSelected ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[20px]">{fmt.icon}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-on-surface flex items-center gap-2">
+                                <span>{fmt.title}</span>
+                                {isSelected && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-secondary text-on-secondary font-bold">
+                                    Active Default
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">{fmt.desc}</p>
+                            </div>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'border-secondary bg-secondary text-on-secondary' : 'border-outline-variant'
+                            }`}
+                          >
+                            {isSelected && <span className="material-symbols-outlined text-[13px] font-bold">check</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
 
               {activeSubModal === 'prefix_series' && (
