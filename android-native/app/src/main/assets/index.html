@@ -45,25 +45,105 @@
         display: flex;
         flex-direction: column;
       }
-      .app-splash {
+      .app-splash-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        height: 100vh;
-        background-color: #f9f9ff;
-        color: #111c2d;
+        background: radial-gradient(circle at 50% 40%, #ffffff 0%, #f4f6fa 100%);
+        -moz-user-select: none;
+             user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.35s ease;
+      }
+      .app-splash-overlay.fade-out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .splash-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        flex: 1;
+        padding-top: 40px;
+      }
+      .splash-icon-wrapper {
+        position: relative;
+        margin-bottom: 20px;
       }
       .splash-logo {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        margin-bottom: 16px;
-        animation: pulse 1.5s infinite ease-in-out;
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        box-shadow: 0 10px 25px -5px rgba(14, 27, 77, 0.2), 0 8px 10px -6px rgba(14, 27, 77, 0.1);
+        animation: splashPulse 2s infinite ease-in-out;
       }
-      @keyframes pulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.85; }
+      .splash-title {
+        font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.03em;
+        line-height: 1.2;
+      }
+      .splash-subtitle {
+        font-size: 12px;
+        color: #006c49;
+        font-weight: 700;
+        margin-top: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+      .splash-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #10b981;
+        box-shadow: 0 0 8px #10b981;
+      }
+      .splash-loader-track {
+        width: 130px;
+        height: 3px;
+        background-color: #e2e8f0;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 24px;
+        position: relative;
+      }
+      .splash-loader-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 45%;
+        background: linear-gradient(90deg, #006c49, #10b981);
+        border-radius: 999px;
+        animation: splashShimmer 1.4s infinite ease-in-out;
+      }
+      .splash-footer {
+        padding-bottom: 28px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #94a3b8;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      @keyframes splashPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.04); }
+      }
+      @keyframes splashShimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(300%); }
       }
     </style>
     <script>
@@ -78,34 +158,56 @@
             '</div>';
         }
       });
+      // Safety auto-dismiss fallback for splashscreen in case app takes longer to load
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          var splash = document.getElementById('app-splash');
+          if (splash && !splash.classList.contains('fade-out')) {
+            splash.classList.add('fade-out');
+            setTimeout(function() { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
+          }
+        }, 2500);
+      });
     </script>
-    <script type="module" crossorigin src="./assets/index-NEbxS6l-.js"></script>
+    <script type="module" crossorigin src="./assets/index-L-61QOFE.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-CyODWW1j.css">
   </head>
   <body class="bg-surface font-body-md text-body-md text-on-surface antialiased">
-    <div id="root">
-      <div class="app-splash">
-        <svg class="splash-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="64" height="64">
-          <defs>
-            <linearGradient id="sBrand" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#0B192C"/>
-              <stop offset="100%" stop-color="#1E3A8A"/>
-            </linearGradient>
-            <linearGradient id="sAccent" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#10B981"/>
-              <stop offset="100%" stop-color="#34D399"/>
-            </linearGradient>
-          </defs>
-          <rect width="96" height="96" rx="24" fill="url(#sBrand)"/>
-          <path d="M28 28 L48 68 L68 28" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="68" cy="28" r="6" fill="url(#sAccent)"/>
-          <path d="M42 48 L48 54 L58 40" fill="none" stroke="url(#sAccent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:20px;font-weight:700;color:#111c2d;letter-spacing:-0.02em;">Vyapar Books PRO</div>
-        <div style="font-size:12px;color:#006c49;font-weight:600;margin-top:6px;display:flex;align-items:center;gap:4px;">
-          ● GST Billing &amp; Accounting
+    <!-- App Splashscreen Overlay: Covers viewport until React finishes initial paint -->
+    <div id="app-splash" class="app-splash-overlay">
+      <div class="splash-body">
+        <div class="splash-icon-wrapper">
+          <svg class="splash-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="72" height="72">
+            <defs>
+              <linearGradient id="sBrand" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0B192C"/>
+                <stop offset="100%" stop-color="#1E3A8A"/>
+              </linearGradient>
+              <linearGradient id="sAccent" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#10B981"/>
+                <stop offset="100%" stop-color="#34D399"/>
+              </linearGradient>
+            </defs>
+            <rect width="96" height="96" rx="24" fill="url(#sBrand)"/>
+            <path d="M28 28 L48 68 L68 28" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="68" cy="28" r="6" fill="url(#sAccent)"/>
+            <path d="M42 48 L48 54 L58 40" fill="none" stroke="url(#sAccent)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="splash-title">Vyapar Books PRO</div>
+        <div class="splash-subtitle">
+          <span class="splash-dot"></span>
+          <span>GST Billing &amp; Accounting</span>
+        </div>
+        <div class="splash-loader-track">
+          <div class="splash-loader-bar"></div>
         </div>
       </div>
+      <div class="splash-footer">
+        Fast, Secure &amp; Offline-Ready
+      </div>
     </div>
+
+    <div id="root"></div>
   </body>
 </html>

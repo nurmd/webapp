@@ -178,6 +178,20 @@ export const App: React.FC = () => {
     return unsub;
   }, []);
 
+  React.useEffect(() => {
+    // Gracefully dismiss splashscreen overlay after initial render & layout settle
+    const timer = setTimeout(() => {
+      const splash = document.getElementById('app-splash');
+      if (splash) {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+          splash.remove();
+        }, 400);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Background silent OTA / PWA update check on mount & listen for Service Worker updates
   React.useEffect(() => {
     const unsubPwa = updateService.onPwaUpdate((info) => {
