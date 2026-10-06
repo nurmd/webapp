@@ -21,6 +21,7 @@ export interface A4PrintSettings {
   signatoryText: string;
   termsAndConditions: string;
   customFooterNote: string;
+  showPartyBalance: boolean;
 }
 
 export interface ThermalPrintSettings {
@@ -36,6 +37,7 @@ export interface ThermalPrintSettings {
   showHsn: boolean;
   showTaxBreakdown: boolean;
   showBalanceDue: boolean;
+  showPartyBalance: boolean;
   showUpiQr: boolean;
   kickDrawer: boolean;
   autoCut: boolean;
@@ -75,6 +77,7 @@ export const DEFAULT_A4_SETTINGS: A4PrintSettings = {
   signatoryText: 'Authorised Signatory',
   termsAndConditions: '1. Goods once sold will not be taken back.\n2. Interest @ 18% p.a. will be charged for delayed payment.',
   customFooterNote: 'Thank you for your business!',
+  showPartyBalance: true,
 };
 
 export const DEFAULT_THERMAL_SETTINGS: ThermalPrintSettings = {
@@ -90,6 +93,7 @@ export const DEFAULT_THERMAL_SETTINGS: ThermalPrintSettings = {
   showHsn: false,
   showTaxBreakdown: true,
   showBalanceDue: true,
+  showPartyBalance: true,
   showUpiQr: true,
   kickDrawer: false,
   autoCut: true,

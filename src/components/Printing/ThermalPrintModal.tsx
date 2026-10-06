@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import {
@@ -10,6 +10,7 @@ import {
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
+import { db } from '../../services/db.ts';
 
 interface ThermalPrintModalProps {
   invoice: Invoice;
@@ -35,6 +36,18 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
 
   const thermalSettings = printSettingsService.getSettings().thermal;
 
+  const party = useMemo(() => {
+    if (!invoice.partyName && !invoice.partyId) return null;
+    const parties = db.getParties();
+    return (
+      parties.find(
+        (p) =>
+          (invoice.partyId && p.id === invoice.partyId) ||
+          (p.name && p.name.trim().toLowerCase() === (invoice.partyName || '').trim().toLowerCase())
+      ) || null
+    );
+  }, [invoice.partyId, invoice.partyName]);
+
   const receiptData: ThermalReceiptData = {
     companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
     companyAddress: thermalSettings.showAddress ? company.address : '',
@@ -57,11 +70,16 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     shippingAmount: invoice.shippingAmount,
     roundOff: invoice.roundOff,
     grandTotal: invoice.grandTotal,
+    paidAmount: invoice.paidAmount,
+    balanceAmount: thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined,
+    partyBalance: thermalSettings.showPartyBalance && party ? party.currentBalance : undefined,
     upiId: thermalSettings.showUpiQr ? company.upiId : undefined,
     terms: thermalSettings.greetingText || company.termsAndConditions,
   };
 
-  const previewText = formatThermalReceiptText(receiptData, width);
+  const previewText = formatThermalReceiptText(receiptData, width, {
+    showPartyBalance: thermalSettings.showPartyBalance,
+  });
 
   const [printersList, setPrintersList] = useState<{ name: string; address: string }[]>([]);
 
@@ -114,6 +132,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           printQr: thermalSettings.showUpiQr && !!company.upiId,
           autoCut: thermalSettings.autoCut,
           extraFeedLines: thermalSettings.extraFeedLines,
+          showPartyBalance: thermalSettings.showPartyBalance,
         });
         const base64Data = btoa(String.fromCharCode.apply(null, binary as unknown as number[]));
 
@@ -148,6 +167,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           printQr: thermalSettings.showUpiQr && !!company.upiId,
           autoCut: thermalSettings.autoCut,
           extraFeedLines: thermalSettings.extraFeedLines,
+          showPartyBalance: thermalSettings.showPartyBalance,
         });
 
         const res = await printViaWebBluetooth(binary);

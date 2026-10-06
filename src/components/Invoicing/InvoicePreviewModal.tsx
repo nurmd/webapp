@@ -10,7 +10,8 @@ import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
-import { DEFAULT_INVOICES } from '../../services/db.ts';
+import { DEFAULT_INVOICES, db } from '../../services/db.ts';
+import { printSettingsService } from '../../services/printSettingsService.ts';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -79,6 +80,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const buyerStateObj = getStateByCode(invoice.partyStateCode || '');
   const posStateCode = invoice.placeOfSupplyStateCode || company.stateCode || '';
   const posStateObj = getStateByCode(posStateCode);
+
+  const a4Settings = printSettingsService.getSettings().a4;
+
+  const party = useMemo(() => {
+    if (!invoice.partyName && !invoice.partyId) return null;
+    const parties = db.getParties();
+    return (
+      parties.find(
+        (p) =>
+          (invoice.partyId && p.id === invoice.partyId) ||
+          (p.name && p.name.trim().toLowerCase() === (invoice.partyName || '').trim().toLowerCase())
+      ) || null
+    );
+  }, [invoice.partyId, invoice.partyName]);
 
   // Normalize every line item to ensure all tax and numeric columns display accurately
   const itemsList = useMemo(() => {
@@ -271,6 +286,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       shippingAmount: invoice.shippingAmount,
       roundOff: invoice.roundOff,
       grandTotal: resolvedGrandTotal,
+      paidAmount: invoice.paidAmount,
+      balanceAmount: invoice.balanceAmount,
+      partyBalance: party ? party.currentBalance : undefined,
       upiId: company.upiId,
       terms: company.termsAndConditions,
       stateName: sellerStateObj?.name,
@@ -798,6 +816,30 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {a4Settings.showPartyBalance && party && (
+                    <div className="mt-2 pt-1 border-t border-slate-200 text-xs flex items-center justify-between">
+                      <span className="text-slate-600 font-semibold uppercase text-[10px]">
+                        Total Party Balance:
+                      </span>
+                      <span
+                        className={`font-black font-tabular-data ${
+                          party.currentBalance > 0
+                            ? 'text-rose-700'
+                            : party.currentBalance < 0
+                            ? 'text-emerald-700'
+                            : 'text-slate-800'
+                        }`}
+                      >
+                        {formatINR(Math.abs(party.currentBalance))}{' '}
+                        {party.currentBalance > 0
+                          ? '(Dr - Due)'
+                          : party.currentBalance < 0
+                          ? '(Cr - Advance)'
+                          : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1241,6 +1283,29 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           {invoice.paymentStatus}
                         </span>
                       </div>
+                      {a4Settings.showPartyBalance && party && (
+                        <div className="mt-2 pt-1 border-t border-slate-300">
+                          <span className="text-[10px] uppercase font-bold text-slate-600 block">
+                            Total Party Balance
+                          </span>
+                          <span
+                            className={`font-black text-xs font-tabular-data ${
+                              party.currentBalance > 0
+                                ? 'text-rose-700'
+                                : party.currentBalance < 0
+                                ? 'text-emerald-700'
+                                : 'text-slate-800'
+                            }`}
+                          >
+                            {formatINR(Math.abs(party.currentBalance))}{' '}
+                            {party.currentBalance > 0
+                              ? '(Dr)'
+                              : party.currentBalance < 0
+                              ? '(Cr)'
+                              : ''}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

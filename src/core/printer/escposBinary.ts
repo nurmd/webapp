@@ -132,6 +132,7 @@ export function buildThermalReceiptBinary(
     printQr?: boolean;
     autoCut?: boolean;
     extraFeedLines?: number;
+    showPartyBalance?: boolean;
   } = {}
 ): Uint8Array {
   const width = options.width || 32;
@@ -206,6 +207,22 @@ export function buildThermalReceiptBinary(
   builder.line(`TOTAL: Rs. ${data.grandTotal.toFixed(2)}`);
   builder.doubleSize(false).bold(false);
   builder.line('='.repeat(width));
+
+  if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+    builder.line(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+  }
+  if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
+    builder.line(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+  }
+  if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
+    const balText = data.partyBalance > 0
+      ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
+      : data.partyBalance < 0
+      ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+      : 'Rs. 0.00';
+    builder.line(padRow('Total Party Bal:', balText, width));
+    builder.line('-'.repeat(width));
+  }
 
   // UPI Dynamic QR Code
   if (options.printQr !== false && data.upiId) {

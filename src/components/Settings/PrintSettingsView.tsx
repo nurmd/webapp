@@ -440,6 +440,16 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                   />
                   <span>Show Dynamic UPI QR Code</span>
                 </label>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={a4.showPartyBalance}
+                    onChange={(e) => handleA4Change('showPartyBalance', e.target.checked)}
+                    className="rounded text-secondary focus:ring-secondary w-4 h-4"
+                  />
+                  <span>Show Total Party Balance</span>
+                </label>
               </div>
 
               {a4.showUpiQr && (
@@ -594,6 +604,13 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                   <span>Grand Total:</span>
                   <span>₹855.00</span>
                 </div>
+
+                {a4.showPartyBalance && (
+                  <div className="flex justify-between items-center text-[9px] font-bold text-rose-700 bg-rose-50/50 px-1 py-0.5 rounded border border-rose-200 my-0.5">
+                    <span>Total Party Balance:</span>
+                    <span>₹1,250.00 (Dr - Due)</span>
+                  </div>
+                )}
 
                 {/* Words */}
                 {a4.showAmountInWords && (
@@ -852,6 +869,16 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                 <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
                   <input
                     type="checkbox"
+                    checked={thermal.showPartyBalance}
+                    onChange={(e) => handleThermalChange('showPartyBalance', e.target.checked)}
+                    className="rounded text-secondary focus:ring-secondary w-4 h-4"
+                  />
+                  <span>Show Total Party Balance</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
+                  <input
+                    type="checkbox"
                     checked={thermal.showUpiQr}
                     onChange={(e) => handleThermalChange('showUpiQr', e.target.checked)}
                     className="rounded text-secondary focus:ring-secondary w-4 h-4"
@@ -984,6 +1011,12 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                     <div className="flex justify-between text-[9px] text-emerald-700 font-bold">
                       <span>Paid (Cash):</span>
                       <span>₹632.00</span>
+                    </div>
+                  )}
+                  {thermal.showPartyBalance && (
+                    <div className="flex justify-between text-[9px] text-rose-700 font-bold border-t border-slate-200 pt-0.5 mt-0.5">
+                      <span>Total Party Bal:</span>
+                      <span>₹1,250.00 Dr</span>
                     </div>
                   )}
                 </div>

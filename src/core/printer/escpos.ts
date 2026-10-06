@@ -20,6 +20,9 @@ export interface ThermalReceiptData {
   shippingAmount?: number;
   roundOff?: number;
   grandTotal: number;
+  paidAmount?: number;
+  balanceAmount?: number;
+  partyBalance?: number;
   upiId?: string;
   terms?: string;
   stateName?: string;
@@ -28,7 +31,11 @@ export interface ThermalReceiptData {
 /**
  * Generates formatted text layout for 58mm (32 chars) or 80mm (48 chars) thermal printers.
  */
-export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 48 = 32): string {
+export function formatThermalReceiptText(
+  data: ThermalReceiptData,
+  width: 32 | 48 = 32,
+  options: { showPartyBalance?: boolean } = {}
+): string {
   const padCenter = (str: string, len: number) => {
     if (str.length >= len) return str.substring(0, len);
     const left = Math.floor((len - str.length) / 2);
@@ -97,6 +104,22 @@ export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 4
   lines.push(doubleLine);
   lines.push(padRow('GRAND TOTAL:', `Rs. ${data.grandTotal.toFixed(2)}`, width));
   lines.push(doubleLine);
+
+  if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+    lines.push(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+  }
+  if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
+    lines.push(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+  }
+  if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
+    const balText = data.partyBalance > 0
+      ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
+      : data.partyBalance < 0
+      ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+      : 'Rs. 0.00';
+    lines.push(padRow('Total Party Bal:', balText, width));
+    lines.push(line);
+  }
 
   if (data.upiId) {
     lines.push(padCenter(`Pay via UPI: ${data.upiId}`, width));
