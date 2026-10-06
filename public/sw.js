@@ -3,7 +3,7 @@
  * Provides resilient offline caching, app shell hydration, and instant updates.
  */
 
-const CACHE_VERSION = 'vyapar-pwa-v1.1.5';
+const CACHE_VERSION = 'vyapar-pwa-v1.1.6';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

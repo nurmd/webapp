@@ -24,30 +24,13 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const [width, setWidth] = useState<32 | 48>(
     () => (Number(localStorage.getItem('printer_paper_width')) as 32 | 48) || 32
   );
-  const [kickDrawer, setKickDrawer] = useState(() => {
-    const val = localStorage.getItem('printer_kick_drawer');
-    return val !== null ? val === 'true' : true;
-  });
-  const [includeQr, setIncludeQr] = useState(() => {
-    const val = localStorage.getItem('printer_include_qr');
-    return val !== null ? val === 'true' : true;
-  });
   const [isPrinting, setIsPrinting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
-  const [isDefaultPrint, setIsDefaultPrint] = useState(() => {
-    const cur = localStorage.getItem('defaultPrintOption');
-    return cur === 'Thermal-58mm' || cur === 'Thermal-80mm';
-  });
 
   useEffect(() => {
     localStorage.setItem('printer_paper_width', width.toString());
-    localStorage.setItem('printer_kick_drawer', kickDrawer.toString());
-    localStorage.setItem('printer_include_qr', includeQr.toString());
-    if (isDefaultPrint) {
-      localStorage.setItem('defaultPrintOption', width === 32 ? 'Thermal-58mm' : 'Thermal-80mm');
-    }
-  }, [width, kickDrawer, includeQr, isDefaultPrint]);
+  }, [width]);
 
   const receiptData: ThermalReceiptData = {
     companyName: company.tradeName || company.businessName,
@@ -77,12 +60,12 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
 
   const previewText = formatThermalReceiptText(receiptData, width);
 
-  const [printersList, setPrintersList] = useState<{name: string, address: string}[]>([]);
+  const [printersList, setPrintersList] = useState<{ name: string; address: string }[]>([]);
 
   const handleBluetoothPrint = async (macAddress?: string) => {
     const androidBridge = (window as any).AndroidBridge;
-    
-    // Check if running inside Android wrapper
+
+    // Check if running inside Android native wrapper
     if (androidBridge && typeof androidBridge.checkBluetoothStatus === 'function') {
       const btStatus = androidBridge.checkBluetoothStatus();
       if (btStatus === 'DISABLED') {
@@ -91,7 +74,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
         setIsError(true);
         return;
       }
-      
+
       // Native Android Printing Logic
       if (!macAddress) {
         try {
@@ -118,13 +101,17 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       }
 
       setIsPrinting(true);
-      setStatusMessage(`Sending print job to printer...`);
+      setStatusMessage('Sending print job to printer...');
       setIsError(false);
-      
+
       try {
-        const binary = buildThermalReceiptBinary(receiptData, { width, kickDrawer, printQr: includeQr });
+        const binary = buildThermalReceiptBinary(receiptData, {
+          width,
+          kickDrawer: false,
+          printQr: !!company.upiId,
+        });
         const base64Data = btoa(String.fromCharCode.apply(null, binary as unknown as number[]));
-        
+
         const res = androidBridge.printToBluetoothDevice(macAddress, base64Data);
         if (res === 'SUCCESS') {
           setStatusMessage('Receipt printed successfully!');
@@ -144,64 +131,51 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     }
 
     // Web Bluetooth API Fallback (for Chrome/Edge)
-    setIsPrinting(true);
-    setStatusMessage('Scanning for nearby Bluetooth thermal printers...');
-    setIsError(false);
+    if (typeof navigator !== 'undefined' && 'bluetooth' in navigator) {
+      setIsPrinting(true);
+      setStatusMessage('Scanning for nearby Bluetooth thermal printers...');
+      setIsError(false);
 
-    try {
-      const binary = buildThermalReceiptBinary(receiptData, {
-        width,
-        kickDrawer,
-        printQr: includeQr,
-      });
+      try {
+        const binary = buildThermalReceiptBinary(receiptData, {
+          width,
+          kickDrawer: false,
+          printQr: !!company.upiId,
+        });
 
-      const res = await printViaWebBluetooth(binary);
-      if (res.success) {
-        setStatusMessage('Receipt printed successfully!');
-        setTimeout(() => onClose(), 1500);
-      } else {
+        const res = await printViaWebBluetooth(binary);
+        if (res.success) {
+          setStatusMessage('Receipt printed successfully!');
+          setTimeout(() => onClose(), 1500);
+        } else {
+          setIsError(true);
+          setStatusMessage(res.error || 'Failed to print.');
+        }
+      } catch (err: any) {
         setIsError(true);
-        setStatusMessage(res.error || 'Failed to print. Try downloading raw file or system print.');
+        setStatusMessage(err.message || 'Bluetooth printing error.');
+      } finally {
+        setIsPrinting(false);
       }
-    } catch (err: any) {
-      setIsError(true);
-      setStatusMessage(err.message || 'Bluetooth printing error.');
-    } finally {
-      setIsPrinting(false);
+      return;
     }
-  };
 
-  const handleDownloadEscPos = () => {
-    const binary = buildThermalReceiptBinary(receiptData, {
-      width,
-      kickDrawer,
-      printQr: includeQr,
-    });
-    const blob = new Blob([binary as any], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `receipt_${invoice.invoiceNumber}.bin`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleSystemPrint = () => {
+    // Default fallback: window.print()
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-on-surface/40 backdrop-blur-sm animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col border border-outline-variant/30 overflow-hidden">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-surface-container-lowest rounded-2xl shadow-2xl max-w-md w-full max-h-[92vh] flex flex-col border border-outline-variant/30 overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/40">
+        <div className="p-3 sm:p-4 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/50">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary text-[24px]">print</span>
+            <span className="material-symbols-outlined text-secondary text-[22px]">print</span>
             <div>
-              <h3 className="font-headline-sm text-base font-bold text-on-surface">
+              <h3 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface">
                 Thermal POS Receipt
               </h3>
-              <p className="text-[11px] text-on-surface-variant">
+              <p className="text-[10px] sm:text-[11px] text-on-surface-variant">
                 Bill #{invoice.invoiceNumber} • ₹{invoice.grandTotal.toFixed(2)}
               </p>
             </div>
@@ -209,84 +183,47 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-4 flex-1 overflow-y-auto space-y-4">
-          {/* Controls */}
-          <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-2 rounded-xl border border-outline-variant/20">
-            <div>
-              <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">
-                Paper Width
-              </label>
-              <div className="flex rounded-lg overflow-hidden border border-outline-variant/30">
-                <button
-                  type="button"
-                  onClick={() => setWidth(32)}
-                  className={`flex-1 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                    width === 32 ? 'bg-secondary text-on-secondary' : 'bg-surface text-on-surface'
-                  }`}
-                >
-                  58mm (2-Inch)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWidth(48)}
-                  className={`flex-1 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                    width === 48 ? 'bg-secondary text-on-secondary' : 'bg-surface text-on-surface'
-                  }`}
-                >
-                  80mm (3-Inch)
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-center space-y-1 pl-2">
-              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={kickDrawer}
-                  onChange={(e) => setKickDrawer(e.target.checked)}
-                  className="rounded text-secondary focus:ring-secondary w-4 h-4"
-                />
-                <span>Kick Drawer Pulse</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeQr}
-                  onChange={(e) => setIncludeQr(e.target.checked)}
-                  className="rounded text-secondary focus:ring-secondary w-4 h-4"
-                />
-                <span>Print Dynamic UPI QR</span>
-              </label>
-
-              <label className="flex items-center gap-2 text-xs font-semibold text-on-surface cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isDefaultPrint}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsDefaultPrint(checked);
-                    if (!checked) {
-                      localStorage.setItem('defaultPrintOption', 'A4');
-                    }
-                  }}
-                  className="rounded text-secondary focus:ring-secondary w-4 h-4"
-                />
-                <span className="text-secondary font-bold">Set as Default Print</span>
-              </label>
+        <div className="p-3 sm:p-4 flex-1 overflow-y-auto space-y-3">
+          {/* Single Paper Size Toggle */}
+          <div className="flex items-center justify-between bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/20">
+            <span className="text-xs font-bold text-on-surface-variant">Paper Size</span>
+            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setWidth(32)}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  width === 32
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                58mm (2")
+              </button>
+              <button
+                type="button"
+                onClick={() => setWidth(48)}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  width === 48
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                80mm (3")
+              </button>
             </div>
           </div>
 
           {/* Feedback Alert */}
           {statusMessage && (
             <div
-              className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+              className={`p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
                 isError
                   ? 'bg-error-container text-on-error-container border border-error/30'
                   : 'bg-secondary-container text-on-secondary-container border border-secondary/30'
@@ -301,7 +238,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
 
           {/* Thermal Slip Preview or Printer Picker */}
           <div>
-            <div className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center justify-between">
+            <div className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>{printersList.length > 0 ? 'Select Printer' : 'Receipt Preview'}</span>
               {!printersList.length && (
                 <span className="text-[10px] font-mono text-secondary">
@@ -309,7 +246,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                 </span>
               )}
             </div>
-            
+
             {printersList.length > 0 ? (
               <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/30 flex flex-col gap-2 max-h-[300px] overflow-y-auto">
                 {printersList.map((p, idx) => (
@@ -317,7 +254,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                     key={idx}
                     type="button"
                     onClick={() => handleBluetoothPrint(p.address)}
-                    className="text-left px-4 py-3 rounded-lg bg-surface hover:bg-surface-container-high transition-colors flex items-center justify-between border border-outline-variant/20 shadow-sm"
+                    className="text-left px-4 py-3 rounded-lg bg-surface hover:bg-surface-container-high transition-colors flex items-center justify-between border border-outline-variant/20 shadow-sm cursor-pointer"
                   >
                     <div>
                       <div className="font-bold text-sm text-on-surface">{p.name}</div>
@@ -329,13 +266,17 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPrintersList([])}
-                  className="mt-2 text-xs font-bold text-on-surface-variant text-center py-2"
+                  className="mt-2 text-xs font-bold text-on-surface-variant text-center py-2 cursor-pointer"
                 >
                   Cancel
                 </button>
               </div>
             ) : (
-              <div className="bg-[#fcfbf9] p-4 rounded-xl border border-outline-variant/30 font-mono text-[11px] leading-tight text-neutral-900 shadow-inner overflow-x-auto whitespace-pre">
+              <div
+                className={`bg-[#fcfbf9] p-3 rounded-xl border border-outline-variant/30 font-mono ${
+                  width === 32 ? 'text-[11px]' : 'text-[10px]'
+                } leading-tight text-neutral-900 shadow-inner overflow-x-auto whitespace-pre`}
+              >
                 {previewText}
               </div>
             )}
@@ -343,36 +284,22 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low/40 flex flex-col sm:flex-row gap-2 items-center justify-between">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handleDownloadEscPos}
-              className="px-3 py-2 border border-outline-variant/40 rounded-xl text-xs font-bold text-on-surface hover:bg-surface transition-colors cursor-pointer flex items-center gap-1.5"
-              title="Download raw ESC/POS binary file for USB / OTG printer apps"
-            >
-              <span className="material-symbols-outlined text-[16px]">download</span>
-              <span>Raw .bin</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSystemPrint}
-              className="px-3 py-2 border border-outline-variant/40 rounded-xl text-xs font-bold text-on-surface hover:bg-surface transition-colors cursor-pointer flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-[16px]">print</span>
-              <span>System Spooler</span>
-            </button>
-          </div>
-
+        <div className="p-3 sm:p-4 border-t border-outline-variant/20 bg-surface-container-low/50 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-outline-variant/30 text-xs font-bold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
           <button
             type="button"
             disabled={isPrinting}
             onClick={() => handleBluetoothPrint()}
-            className="w-full sm:w-auto px-5 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="flex-1 sm:flex-initial px-5 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-[18px]">bluetooth</span>
-            <span>{isPrinting ? 'Printing...' : 'Direct Bluetooth Print'}</span>
+            <span className="material-symbols-outlined text-[18px]">print</span>
+            <span>{isPrinting ? 'Printing...' : 'Print Receipt'}</span>
           </button>
         </div>
       </div>

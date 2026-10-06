@@ -10,7 +10,7 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
-import { InvoicePreviewModal } from './InvoicePreviewModal.tsx';
+import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
@@ -1361,10 +1361,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
                 const inv = constructInvoiceObject();
                 setPreviewInvoiceData(inv);
               }}
-              className="h-10 px-3.5 rounded-xl bg-surface-container font-bold text-xs text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30"
+              className="h-10 px-3.5 rounded-xl bg-surface-container font-bold text-xs text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 active:scale-95"
+              title="Print Thermal POS Receipt"
             >
-              <span className="material-symbols-outlined text-[18px]">visibility</span>
-              <span>Preview</span>
+              <span className="material-symbols-outlined text-[18px]">print</span>
+              <span>Print</span>
             </button>
             <div className="hidden sm:flex flex-col pl-2 border-l border-outline-variant/30">
               <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">Net Payable</span>
@@ -1431,13 +1432,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onScan={handleBarcodeScanned}
       />
 
-      {/* Invoice Preview Modal */}
+      {/* Thermal POS Receipt Print Modal */}
       {previewInvoiceData && (
-        <InvoicePreviewModal
+        <ThermalPrintModal
           invoice={previewInvoiceData}
           company={company}
           onClose={() => setPreviewInvoiceData(null)}
-          onEditInvoice={() => setPreviewInvoiceData(null)}
         />
       )}
 

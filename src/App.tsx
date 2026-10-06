@@ -27,7 +27,7 @@ import { TableGridPurchaseModal } from './components/Purchases/TableGridPurchase
 import { ExpensesView } from './components/Expenses/ExpensesView.tsx';
 import { CreateInvoiceModal } from './components/Invoicing/CreateInvoiceModal.tsx';
 import { TableGridInvoiceModal } from './components/Invoicing/TableGridInvoiceModal.tsx';
-import { InvoicePreviewModal } from './components/Invoicing/InvoicePreviewModal.tsx';
+import { ThermalPrintModal } from './components/Printing/ThermalPrintModal.tsx';
 import { SimplifiedInvoiceModal } from './components/Invoicing/SimplifiedInvoiceModal.tsx';
 import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
 import { QuickBillingView } from './components/POS/QuickBillingView.tsx';
@@ -75,7 +75,7 @@ export const App: React.FC = () => {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [selectedPartyForInvoice, setSelectedPartyForInvoice] = useState<Party | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
-  const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
+  const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
@@ -148,9 +148,9 @@ export const App: React.FC = () => {
   }, !!previewInvoice, 25);
 
   useBackNavigation(() => {
-    setFullA4Invoice(null);
+    setPrintInvoice(null);
     return true;
-  }, !!fullA4Invoice, 25);
+  }, !!printInvoice, 25);
 
   useBackNavigation(() => {
     setIsRoleSwitchOpen(false);
@@ -684,7 +684,7 @@ export const App: React.FC = () => {
             onSaveParty={handleSaveParty}
             onDeleteParty={handleDeleteParty}
             onRecordPartyPayment={handleRecordPartyPayment}
-            onViewInvoice={setFullA4Invoice}
+            onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onEditPurchase={handleEditPurchase}
             onCreateInvoice={handleCreateInvoiceForParty}
@@ -831,23 +831,21 @@ export const App: React.FC = () => {
             setPreviewInvoice(null);
             handleDeleteInvoice(id);
           }}
+          onPrintInvoice={(inv) => {
+            setPrintInvoice(inv);
+          }}
           onOpenFullA4Preview={(inv) => {
-            setPreviewInvoice(null);
-            setFullA4Invoice(inv);
+            setPrintInvoice(inv);
           }}
         />
       )}
 
-      {/* Full A4 / Thermal Document Preview & Print Modal */}
-      {fullA4Invoice && (
-        <InvoicePreviewModal
-          invoice={fullA4Invoice}
+      {/* Thermal POS Receipt Print Modal */}
+      {printInvoice && (
+        <ThermalPrintModal
+          invoice={printInvoice}
           company={company}
-          onClose={() => setFullA4Invoice(null)}
-          onEditInvoice={(inv) => {
-            setFullA4Invoice(null);
-            handleEditInvoice(inv);
-          }}
+          onClose={() => setPrintInvoice(null)}
         />
       )}
 

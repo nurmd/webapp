@@ -14,6 +14,7 @@ export interface SimplifiedInvoiceModalProps {
   onEditInvoice?: (invoice: Invoice) => void;
   onDeleteInvoice?: (id: string) => void;
   onOpenFullA4Preview?: (invoice: Invoice) => void;
+  onPrintInvoice?: (invoice: Invoice) => void;
 }
 
 export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
@@ -23,6 +24,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   onEditInvoice,
   onDeleteInvoice,
   onOpenFullA4Preview,
+  onPrintInvoice,
 }) => {
   // System back navigation (priority 25: closes preview before underlying screens)
   useBackNavigation(() => {
@@ -211,16 +213,19 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
         {/* Bottom Actions Bar */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/20">
-          {/* Preview Button */}
-          {onOpenFullA4Preview && (
+          {/* Print Button */}
+          {(onPrintInvoice || onOpenFullA4Preview) && (
             <button
               type="button"
-              onClick={() => onOpenFullA4Preview(invoice)}
-              className="flex-1 min-w-[120px] py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
-              title="Open print preview"
+              onClick={() => {
+                if (onPrintInvoice) onPrintInvoice(invoice);
+                else if (onOpenFullA4Preview) onOpenFullA4Preview(invoice);
+              }}
+              className="flex-1 min-w-[110px] py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-secondary/90 transition-all"
+              title="Print Thermal POS Receipt"
             >
-              <span className="material-symbols-outlined text-[16px]">visibility</span>
-              <span>Preview</span>
+              <span className="material-symbols-outlined text-[16px]">print</span>
+              <span>Print</span>
             </button>
           )}
 
