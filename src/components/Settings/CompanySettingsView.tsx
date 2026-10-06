@@ -18,11 +18,23 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   onSave,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>({ ...company });
+  const [activeTab, setActiveTab] = useState<'profile' | 'general'>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const [defaultPrintOption, setDefaultPrintOption] = useState<string>(() => {
+    return localStorage.getItem('defaultPrintOption') || 'None';
+  });
+
+  const handleDefaultPrintOptionChange = (value: string) => {
+    setDefaultPrintOption(value);
+    localStorage.setItem('defaultPrintOption', value);
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2000);
+  };
 
   // Multi-Device Profile Sync State
   const [isSyncingProfile, setIsSyncingProfile] = useState(false);
@@ -324,8 +336,37 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       )}
 
-      {/* 1. Merchant Identity Card (Stitch business_settings_profile) */}
-      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col gap-4 relative overflow-hidden">
+      {/* Tabs */}
+      <div className="flex bg-surface-container-low rounded-xl p-1 gap-1 sticky top-[72px] z-40 backdrop-blur-md bg-opacity-90 shadow-sm border border-outline-variant/20">
+        <button
+          type="button"
+          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+            activeTab === 'profile'
+              ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+              : 'text-on-surface-variant hover:bg-surface-container-high'
+          }`}
+          onClick={() => setActiveTab('profile')}
+        >
+          Business Profile
+        </button>
+        <button
+          type="button"
+          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+            activeTab === 'general'
+              ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+              : 'text-on-surface-variant hover:bg-surface-container-high'
+          }`}
+          onClick={() => setActiveTab('general')}
+        >
+          General Settings
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-space-md mt-2">
+        {activeTab === 'profile' && (
+          <>
+            {/* 1. Merchant Identity Card (Stitch business_settings_profile) */}
+            <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col gap-4 relative overflow-hidden">
         {/* Subtle Ambient Corner Accent */}
         <div className="absolute -right-12 -top-12 w-36 h-36 bg-secondary-fixed/40 rounded-full blur-2xl pointer-events-none" />
 
@@ -440,6 +481,69 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       </section>
 
+      {/* GROUP 3: Banking & UPI Payments (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1 flex items-center justify-between">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Payments & Banking
+          </h3>
+          <span className="font-label-sm text-[11px] text-on-surface-variant font-bold">Default UPI Linked</span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          {/* Bank Accounts & Default UPI QR */}
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('banking_upi')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">account_balance_wallet</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Bank Accounts & Default UPI QR</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                {profile.bankName || 'HDFC Bank'} • UPI: {profile.upiId || 'Not Configured'}
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+      {/* GROUP 4: Staff Roles & Permissions (Stitch Design) */}
+      <section className="flex flex-col gap-2">
+        <div className="px-1">
+          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
+            Staff Access & Protection
+          </h3>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+          <button
+            type="button"
+            onClick={() => setActiveSubModal('staff_roles')}
+            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">group</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Staff Roles & Permissions</div>
+              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
+                3 Roles: Owner (Full PIN), Cashier (Bill Only), CA (Audit & Books)
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+          </button>
+        </div>
+      </section>
+
+          </>
+        )}
+
+        {activeTab === 'general' && (
+          <>
       {/* 2. Multi-Device Settings Synchronization Card (All Settings Except Printing) */}
       <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-secondary/30 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
@@ -935,63 +1039,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </div>
       </section>
 
-      {/* GROUP 3: Banking & UPI Payments (Stitch Design) */}
-      <section className="flex flex-col gap-2">
-        <div className="px-1 flex items-center justify-between">
-          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Payments & Banking
-          </h3>
-          <span className="font-label-sm text-[11px] text-on-surface-variant font-bold">Default UPI Linked</span>
-        </div>
+      
 
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
-          {/* Bank Accounts & Default UPI QR */}
-          <button
-            type="button"
-            onClick={() => setActiveSubModal('banking_upi')}
-            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">account_balance_wallet</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Bank Accounts & Default UPI QR</div>
-              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                {profile.bankName || 'HDFC Bank'} • UPI: {profile.upiId || 'Not Configured'}
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-          </button>
-        </div>
-      </section>
-
-      {/* GROUP 4: Staff Roles & Permissions (Stitch Design) */}
-      <section className="flex flex-col gap-2">
-        <div className="px-1">
-          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Staff Access & Protection
-          </h3>
-        </div>
-
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
-          <button
-            type="button"
-            onClick={() => setActiveSubModal('staff_roles')}
-            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">group</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Staff Roles & Permissions</div>
-              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                3 Roles: Owner (Full PIN), Cashier (Bill Only), CA (Audit & Books)
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-          </button>
-        </div>
-      </section>
+      
 
       {/* GROUP 5: Device, Language & App Lock (Stitch Design) */}
       <section className="flex flex-col gap-2">
@@ -1089,6 +1139,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           </div>
         </div>
       </section>
+
+          </>
+        )}
+      </div>
 
       {/* Version Footnote */}
       <div className="text-center py-4 space-y-1">

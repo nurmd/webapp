@@ -13,12 +13,16 @@ export interface ThermalReceiptData {
     amount: number;
   }>;
   taxableAmount: number;
+  totalDiscount?: number;
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
+  shippingAmount?: number;
+  roundOff?: number;
   grandTotal: number;
   upiId?: string;
   terms?: string;
+  stateName?: string;
 }
 
 /**
@@ -77,9 +81,19 @@ export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 4
 
   // Totals
   lines.push(padRow(data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  if (data.totalDiscount && data.totalDiscount > 0) {
+    lines.push(padRow('Discount:', `-Rs. ${data.totalDiscount.toFixed(2)}`, width));
+  }
   if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
   if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
   if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+  if (data.shippingAmount && data.shippingAmount > 0) {
+    lines.push(padRow('Shipping:', `+Rs. ${data.shippingAmount.toFixed(2)}`, width));
+  }
+  if (data.roundOff && data.roundOff !== 0) {
+    const sign = data.roundOff > 0 ? '+' : '';
+    lines.push(padRow('Round Off:', `${sign}Rs. ${data.roundOff.toFixed(2)}`, width));
+  }
   lines.push(doubleLine);
   lines.push(padRow('GRAND TOTAL:', `Rs. ${data.grandTotal.toFixed(2)}`, width));
   lines.push(doubleLine);
@@ -88,6 +102,9 @@ export function formatThermalReceiptText(data: ThermalReceiptData, width: 32 | 4
     lines.push(padCenter(`Pay via UPI: ${data.upiId}`, width));
   }
   lines.push(padCenter(data.terms || 'Thank you! Visit again.', width));
+  if (data.stateName) {
+    lines.push(padCenter(`Subject to ${data.stateName} jurisdiction`, width));
+  }
   lines.push('\n\n');
 
   return lines.join('\n');

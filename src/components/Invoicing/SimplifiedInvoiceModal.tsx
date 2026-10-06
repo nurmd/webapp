@@ -55,9 +55,20 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-            </div>
+            {onDeleteInvoice ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="w-8 h-8 rounded-xl bg-error/15 text-error hover:bg-error/25 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                title="Delete Invoice"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+              </button>
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+              </div>
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 className="font-bold text-sm text-on-surface truncate">
@@ -199,17 +210,17 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         </div>
 
         {/* Bottom Actions Bar */}
-        <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/20 flex-wrap sm:flex-nowrap">
-          {/* Full A4 / PDF Preview Button */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/20">
+          {/* Preview Button */}
           {onOpenFullA4Preview && (
             <button
               type="button"
               onClick={() => onOpenFullA4Preview(invoice)}
               className="flex-1 min-w-[120px] py-2 px-3 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:opacity-90 transition-all"
-              title="Open full A4 / PDF print preview"
+              title="Open print preview"
             >
-              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-              <span>Preview A4 / PDF</span>
+              <span className="material-symbols-outlined text-[16px]">visibility</span>
+              <span>Preview</span>
             </button>
           )}
 
@@ -217,7 +228,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           <button
             type="button"
             onClick={handleWhatsApp}
-            className="py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+            className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
             title="Share via WhatsApp"
           >
             <span className="material-symbols-outlined text-[16px]">send</span>
@@ -263,18 +274,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             >
               <span className="material-symbols-outlined text-[16px]">receipt_long</span>
               <span>E-Inv</span>
-            </button>
-          )}
-
-          {/* Delete Invoice Button */}
-          {onDeleteInvoice && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="w-9 h-9 rounded-xl text-error hover:bg-error/10 flex items-center justify-center cursor-pointer transition-colors active:scale-95 flex-shrink-0"
-              title="Delete Invoice"
-            >
-              <span className="material-symbols-outlined text-[17px]">delete</span>
             </button>
           )}
         </div>

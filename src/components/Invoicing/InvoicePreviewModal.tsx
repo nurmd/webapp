@@ -27,8 +27,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   onClose,
   onEditInvoice,
 }) => {
-  const [viewMode, setViewMode] = useState<'A4' | 'THERMAL'>('A4');
-  const [thermalWidth, setThermalWidth] = useState<32 | 48>(48);
+  const [viewMode, setViewMode] = useState<'A4' | 'THERMAL'>(() => {
+    const defaultPrint = localStorage.getItem('defaultPrintOption');
+    return (defaultPrint === 'Thermal-58mm' || defaultPrint === 'Thermal-80mm') ? 'THERMAL' : 'A4';
+  });
+  const [thermalWidth, setThermalWidth] = useState<32 | 48>(() => {
+    const defaultPrint = localStorage.getItem('defaultPrintOption');
+    if (defaultPrint === 'Thermal-58mm') return 32;
+    if (defaultPrint === 'Thermal-80mm') return 48;
+    const existing = localStorage.getItem('printer_paper_width');
+    return existing ? (Number(existing) as 32 | 48) : 48;
+  });
   const [isThermalModalOpen, setIsThermalModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
@@ -252,12 +261,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         amount: i.totalAmount,
       })),
       taxableAmount: totalTaxable,
+      totalDiscount: invoice.totalDiscount,
       cgstAmount: totalCgst,
       sgstAmount: totalSgst,
       igstAmount: totalIgst,
+      shippingAmount: invoice.shippingAmount,
+      roundOff: invoice.roundOff,
       grandTotal: resolvedGrandTotal,
       upiId: company.upiId,
       terms: company.termsAndConditions,
+      stateName: sellerStateObj?.name,
     },
     thermalWidth
   );
@@ -379,15 +392,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             )}
 
             <button
-              onClick={() => setIsThermalModalOpen(true)}
-              className="inline-flex items-center gap-1 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border border-outline-variant/30 active:scale-95"
-              title="Print directly to Bluetooth / USB thermal printer"
-            >
-              <Receipt size={14} className="text-secondary" />
-              <span>ESC/POS</span>
-            </button>
-
-            <button
               onClick={() => setIsWhatsAppModalOpen(true)}
               className="inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#20ba59] text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
             >
@@ -396,11 +400,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             </button>
 
             <button
-              onClick={handlePrint}
+              onClick={viewMode === 'THERMAL' ? () => setIsThermalModalOpen(true) : handlePrint}
               className="inline-flex items-center gap-1.5 bg-secondary hover:bg-secondary/90 text-on-secondary px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
             >
               <Printer size={14} />
-              <span>Print / PDF</span>
+              <span>{viewMode === 'THERMAL' ? 'Print Receipt' : 'Print / PDF'}</span>
             </button>
 
             {/* More Menu (E-Way / E-Invoice) */}
