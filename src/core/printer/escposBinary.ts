@@ -77,8 +77,10 @@ export class EscPosBuilder {
   /**
    * Cut paper command (Partial cut with feed)
    */
-  public cut(): this {
-    this.feed(3);
+  public cut(feedLines: number = 3): this {
+    if (feedLines > 0) {
+      this.feed(feedLines);
+    }
     this.buffer.push(GS, 0x56, 0x42, 0x00); // GS V 66 0
     return this;
   }
@@ -128,6 +130,8 @@ export function buildThermalReceiptBinary(
     width?: 32 | 48;
     kickDrawer?: boolean;
     printQr?: boolean;
+    autoCut?: boolean;
+    extraFeedLines?: number;
   } = {}
 ): Uint8Array {
   const width = options.width || 32;
@@ -219,10 +223,17 @@ export function buildThermalReceiptBinary(
   }
 
   // Footer notes
-  builder.alignCenter().line(data.terms || 'Thank you! Visit again.').feed(1);
+  builder.alignCenter().line(data.terms || 'Thank you! Visit again.');
 
-  // Cut Paper
-  builder.cut();
+  // Extra Feed Lines so the receipt clears the physical tear bar
+  const extraFeeds = options.extraFeedLines ?? (width === 48 ? 2 : 4);
+  builder.feed(Math.max(1, extraFeeds));
+
+  // Cut Paper: Only execute automatic cut if enabled AND paper is 80mm
+  // (58mm portable printers do not have physical cutters; sending GS V can freeze printer firmware)
+  if (options.autoCut !== false && width === 48) {
+    builder.cut(0);
+  }
 
   return builder.toUint8Array();
 }
@@ -270,8 +281,8 @@ export async function printViaWebBluetooth(binaryData: Uint8Array): Promise<{ su
       throw new Error('No writable ESC/POS characteristic found on this printer.');
     }
 
-    // Send chunks (max 512 bytes per packet for BLE MTU safety)
-    const CHUNK_SIZE = 256;
+    // Send chunks (128 bytes per packet for BLE MTU safety and microcontroller buffer pacing)
+    const CHUNK_SIZE = 128;
     for (let i = 0; i < binaryData.length; i += CHUNK_SIZE) {
       const chunk = binaryData.slice(i, i + CHUNK_SIZE);
       if (targetChar.properties.writeWithoutResponse) {
@@ -279,6 +290,8 @@ export async function printViaWebBluetooth(binaryData: Uint8Array): Promise<{ su
       } else {
         await targetChar.writeValue(chunk);
       }
+      // Pacing delay between BLE packets to prevent buffer overflow
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     return { success: true };

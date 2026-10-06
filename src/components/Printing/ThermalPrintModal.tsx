@@ -112,6 +112,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           width,
           kickDrawer: thermalSettings.kickDrawer,
           printQr: thermalSettings.showUpiQr && !!company.upiId,
+          autoCut: thermalSettings.autoCut,
+          extraFeedLines: thermalSettings.extraFeedLines,
         });
         const base64Data = btoa(String.fromCharCode.apply(null, binary as unknown as number[]));
 
@@ -144,6 +146,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           width,
           kickDrawer: thermalSettings.kickDrawer,
           printQr: thermalSettings.showUpiQr && !!company.upiId,
+          autoCut: thermalSettings.autoCut,
+          extraFeedLines: thermalSettings.extraFeedLines,
         });
 
         const res = await printViaWebBluetooth(binary);

@@ -303,6 +303,7 @@ class AndroidBridge(
 
     @JavascriptInterface
     fun printToBluetoothDevice(macAddress: String, base64Data: String): String {
+        var socket: android.bluetooth.BluetoothSocket? = null
         try {
             val bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
             if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
@@ -310,7 +311,7 @@ class AndroidBridge(
             }
             val device = bluetoothAdapter.getRemoteDevice(macAddress)
             val uuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB") // SPP UUID
-            val socket = device.createRfcommSocketToServiceRecord(uuid)
+            socket = device.createRfcommSocketToServiceRecord(uuid)
             
             try {
                 bluetoothAdapter.cancelDiscovery()
@@ -320,18 +321,29 @@ class AndroidBridge(
             val outputStream = socket.outputStream
             val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
             
-            val chunkSize = 512
+            // Pace transmission with 128-byte chunks and 30ms sleep to avoid buffer overrun on serial microcontrollers
+            val chunkSize = 128
             for (i in decodedBytes.indices step chunkSize) {
                 val end = kotlin.math.min(decodedBytes.size, i + chunkSize)
                 outputStream.write(decodedBytes, i, end - i)
                 outputStream.flush()
-                Thread.sleep(10)
+                Thread.sleep(30)
             }
             
-            socket.close()
+            outputStream.flush()
+            // Wait for thermal printer mechanism to process its input buffer completely before closing RFCOMM socket.
+            // Thermal printers print at ~60-90mm/s (approx 20-30 lines/sec); closing the socket immediately drops
+            // pending hardware buffer midway.
+            val drainTimeMs = kotlin.math.max(1600L, (decodedBytes.size / 64).toLong() * 30L)
+            Thread.sleep(drainTimeMs)
+            
             return "SUCCESS"
         } catch (e: Exception) {
             return "Error: ${e.message}"
+        } finally {
+            try {
+                socket?.close()
+            } catch (e: Exception) {}
         }
     }
 
