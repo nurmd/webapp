@@ -442,10 +442,30 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   };
 
   // Checkout Execution
-  const handleCheckout = (modeOverride?: PaymentMode) => {
+  // Accepts an optional pre-resolved split breakdown to avoid React async state race.
+  const handleCheckout = (modeOverride?: PaymentMode, resolvedSplit?: { cash: number; upi: number; card: number; credit: number } | null) => {
     if (cart.length === 0) return;
 
-    const chosenMode = modeOverride || (paymentMode === 'SPLIT' ? 'CASH' : paymentMode);
+    // Use the directly-passed split (avoids async setSplitBreakdown race condition).
+    const activeSplit = resolvedSplit !== undefined ? resolvedSplit : splitBreakdown;
+
+    // Determine the primary payment mode label for the invoice.
+    // For SPLIT, pick the largest non-zero portion mode (e.g. CASH if cash > upi/card),
+    // so the invoice paymentMode field is meaningful for accounting.
+    let chosenMode: PaymentMode;
+    if (modeOverride && modeOverride !== 'CREDIT') {
+      chosenMode = modeOverride;
+    } else if (paymentMode === 'SPLIT' || activeSplit) {
+      // Pick mode with the highest allocation; fall back to CASH
+      const s = activeSplit ?? { cash: 0, upi: 0, card: 0, credit: 0 };
+      const max = Math.max(s.cash, s.upi, s.card, s.credit);
+      if (max === s.upi) chosenMode = 'UPI';
+      else if (max === s.card) chosenMode = 'CARD';
+      else if (max === s.credit) chosenMode = 'CREDIT';
+      else chosenMode = 'CASH';
+    } else {
+      chosenMode = (paymentMode as PaymentMode) || 'CASH';
+    }
 
     const invoiceItems: InvoiceItemEntry[] = cart.map((c, idx) => {
       const itemCalc = calcSummary.items[idx];
@@ -468,8 +488,43 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       };
     });
 
-    const isCreditSale = chosenMode === 'CREDIT';
     const isB2bInvoice = isGstActive && !!customer.gstin;
+
+    // For split with a credit portion: invoice is PARTIAL — paidNow = non-credit amount,
+    // balance = credit (Udhaar) portion still owed.
+    const splitCreditPortion = activeSplit?.credit ?? 0;
+    const splitPaidNow = activeSplit
+      ? (activeSplit.cash + activeSplit.upi + activeSplit.card)
+      : 0;
+    const isSplitWithCredit = !!activeSplit && splitCreditPortion > 0;
+    const isCreditSale = !activeSplit && chosenMode === 'CREDIT';
+
+    const paidAmount = isSplitWithCredit
+      ? splitPaidNow
+      : isCreditSale
+      ? 0
+      : finalPayableTotal;
+
+    const balanceAmount = isSplitWithCredit
+      ? splitCreditPortion
+      : isCreditSale
+      ? finalPayableTotal
+      : 0;
+
+    const paymentStatus =
+      balanceAmount <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID';
+
+    // Build split note for invoice
+    const splitNote = activeSplit
+      ? [
+          activeSplit.cash > 0 ? `Cash ₹${activeSplit.cash}` : '',
+          activeSplit.upi > 0 ? `UPI ₹${activeSplit.upi}` : '',
+          activeSplit.card > 0 ? `Card ₹${activeSplit.card}` : '',
+          activeSplit.credit > 0 ? `Credit ₹${activeSplit.credit}` : '',
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : null;
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
@@ -505,12 +560,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       grandTotal: finalPayableTotal,
       amountInWords: amountInWords(finalPayableTotal),
       paymentMode: chosenMode,
-      paymentStatus: isCreditSale ? 'UNPAID' : 'PAID',
-      paidAmount: isCreditSale ? 0 : finalPayableTotal,
-      balanceAmount: isCreditSale ? finalPayableTotal : 0,
-      notes: splitBreakdown
-        ? `Split: Cash ₹${splitBreakdown.cash}, UPI ₹${splitBreakdown.upi}, Card ₹${splitBreakdown.card}, Credit ₹${splitBreakdown.credit}`
-        : undefined,
+      paymentStatus,
+      paidAmount,
+      balanceAmount,
+      notes: splitNote ? `Split Payment — ${splitNote}` : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -521,7 +574,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     // Trigger Success Screen
     setCompletedSale({
       invoice: newInvoice,
-      changeDue: chosenMode === 'CASH' ? cashChangeDue : 0,
+      changeDue: chosenMode === 'CASH' && !activeSplit ? cashChangeDue : 0,
       cashTendered: numCashTendered,
     });
 
@@ -1473,9 +1526,12 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           grandTotal={finalPayableTotal}
           hasCustomerSelected={!!customer.party}
           onConfirmSplit={(breakdown) => {
+            // Save to state for display/reset purposes
             setSplitBreakdown(breakdown);
             setPaymentMode('SPLIT');
-            handleCheckout('CASH');
+            // Pass breakdown DIRECTLY to avoid async state race (Bug fix)
+            setIsSplitModalOpen(false);
+            handleCheckout(undefined, breakdown);
           }}
           onClose={() => setIsSplitModalOpen(false)}
         />
