@@ -299,25 +299,29 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     }
     // 6. Opening balance edit
     else if (editingLedgerEntry.isOpening) {
-      const hasOldExplicit = typeof party.openingBalance === 'number';
-      const oldRawOpening = hasOldExplicit ? party.openingBalance! : 0;
-      const oldType = party.openingBalanceType || (party.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
-      const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
+      if (newAmt === 0) {
+        db.clearPartyOpeningBalance(party.id);
+      } else {
+        const hasOldExplicit = typeof party.openingBalance === 'number';
+        const oldRawOpening = hasOldExplicit ? party.openingBalance! : 0;
+        const oldType = party.openingBalanceType || (party.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
+        const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
 
-      const newSignedOpening = newAmt > 0 ? (editOpeningType === 'RECEIVABLE' ? newAmt : -newAmt) : 0;
-      const delta = newSignedOpening - oldSignedOpening;
-      const finalBal = party.currentBalance + delta;
+        const newSignedOpening = editOpeningType === 'RECEIVABLE' ? newAmt : -newAmt;
+        const delta = newSignedOpening - oldSignedOpening;
+        const finalBal = party.currentBalance + delta;
 
-      const updatedParty: Party = {
-        ...party,
-        openingBalance: newAmt > 0 ? newAmt : undefined,
-        openingBalanceType: newAmt > 0 ? (editOpeningType === 'RECEIVABLE' ? 'TO_RECEIVE' : 'TO_PAY') : undefined,
-        openingBalanceDate: editDate,
-        currentBalance: finalBal,
-        updatedAt: new Date().toISOString(),
-      };
-      db.saveParty(updatedParty);
-      db.recalculatePartyBalance(party.id);
+        const updatedParty: Party = {
+          ...party,
+          openingBalance: newAmt,
+          openingBalanceType: editOpeningType === 'RECEIVABLE' ? 'TO_RECEIVE' : 'TO_PAY',
+          openingBalanceDate: editDate,
+          currentBalance: finalBal,
+          updatedAt: new Date().toISOString(),
+        };
+        db.saveParty(updatedParty);
+        db.recalculatePartyBalance(party.id);
+      }
     }
 
     onClose();

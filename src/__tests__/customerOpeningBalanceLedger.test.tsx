@@ -78,9 +78,15 @@ vi.mock('../services/pouchdb.ts', () => {
 import { db } from '../services/db.ts';
 import { Party } from '../models/party.ts';
 import { Invoice } from '../models/invoice.ts';
+import { PurchaseBill } from '../models/purchase.ts';
+import { InventoryItem } from '../models/item.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { usePartyPassbook } from '../components/Parties/usePartyPassbook.ts';
+import { TableGridInvoiceModal } from '../components/Invoicing/TableGridInvoiceModal.tsx';
+import { CreateInvoiceModal } from '../components/Invoicing/CreateInvoiceModal.tsx';
+import { QuickBillingView } from '../components/POS/QuickBillingView.tsx';
+import { VoucherEditorModal } from '../components/Parties/VoucherEditorModal.tsx';
 
 const dummyCompany: CompanyProfile = {
   id: 'COMP-TEST',
@@ -1196,6 +1202,388 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       // deleteVoucher should automatically revert customer balance
       db.deleteVoucher(vch.id);
       expect(db.getParties().find((p) => p.id === customer.id)?.currentBalance).toBe(3000);
+    });
+
+    it('preserves customer opening balance across TableGridInvoiceModal, CreateInvoiceModal, and QuickBillingView lifecycle', () => {
+      const customer: Party = {
+        id: 'PTY-MODAL-TEST-01',
+        name: 'Modal Test Customer',
+        type: 'CUSTOMER',
+        phone: '9812345678',
+        billingAddress: 'Main Market, Pune',
+        stateCode: '27',
+        openingBalance: 4500,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 4500,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      db.saveParty(customer);
+
+      const item: InventoryItem = {
+        id: 'ITM-MODAL-01',
+        name: 'Standard Hardware Unit',
+        hsnSacCode: '8471',
+        category: 'Hardware',
+        unit: 'PCS',
+        salePrice: 1000,
+        purchasePrice: 600,
+        gstRate: 18,
+        currentStock: 50,
+        minStockAlert: 5,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      db.saveItem(item);
+
+      // 1. Simulate saving an invoice via TableGridInvoiceModal
+      const tableGridContainer = document.createElement('div');
+      document.body.appendChild(tableGridContainer);
+      const root1 = createRoot(tableGridContainer);
+      act(() => {
+        root1.render(
+          <TableGridInvoiceModal
+            company={dummyCompany}
+            parties={db.getParties()}
+            itemsCatalog={[item]}
+            initialParty={customer}
+            onClose={() => {}}
+            onSave={(inv) => {
+              db.saveInvoice(inv);
+            }}
+          />
+        );
+      });
+
+      // Save a credit invoice for this customer
+      const tableGridInv: Invoice = {
+        id: 'INV-TG-001',
+        invoiceNumber: 'INV-TG-001',
+        invoiceType: 'B2CS',
+        date: '2026-04-05',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 1500,
+        totalDiscount: 0,
+        totalTaxableAmount: 1500,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 1500,
+        amountInWords: 'One Thousand Five Hundred Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 1500,
+        createdAt: '2026-04-05T10:00:00Z',
+        updatedAt: '2026-04-05T10:00:00Z',
+      };
+      db.saveInvoice(tableGridInv);
+
+      act(() => {
+        root1.unmount();
+      });
+      tableGridContainer.remove();
+
+      // Customer opening balance is intact and currentBalance = 4500 + 1500 = 6000
+      const customerAfterTG = db.getParties().find((p) => p.id === customer.id);
+      expect(customerAfterTG?.openingBalance).toBe(4500);
+      expect(customerAfterTG?.openingBalanceType).toBe('TO_RECEIVE');
+      expect(customerAfterTG?.openingBalanceDate).toBe('2026-04-01');
+      expect(customerAfterTG?.currentBalance).toBe(6000);
+
+      // 2. Simulate saving via CreateInvoiceModal
+      const createModalContainer = document.createElement('div');
+      document.body.appendChild(createModalContainer);
+      const root2 = createRoot(createModalContainer);
+      act(() => {
+        root2.render(
+          <CreateInvoiceModal
+            company={dummyCompany}
+            parties={db.getParties()}
+            itemsCatalog={[item]}
+            onClose={() => {}}
+            onSave={(inv) => {
+              db.saveInvoice(inv);
+            }}
+          />
+        );
+      });
+      act(() => {
+        root2.unmount();
+      });
+      createModalContainer.remove();
+
+      // Customer opening balance still intact
+      const customerAfterCreateModal = db.getParties().find((p) => p.id === customer.id);
+      expect(customerAfterCreateModal?.openingBalance).toBe(4500);
+      expect(customerAfterCreateModal?.openingBalanceType).toBe('TO_RECEIVE');
+      expect(customerAfterCreateModal?.openingBalanceDate).toBe('2026-04-01');
+
+      // 3. Simulate QuickBillingView POS sale
+      const posContainer = document.createElement('div');
+      document.body.appendChild(posContainer);
+      const root3 = createRoot(posContainer);
+      act(() => {
+        root3.render(
+          <QuickBillingView
+            company={dummyCompany}
+            items={[item]}
+            parties={db.getParties()}
+            onCompleteSale={(inv) => db.saveInvoice(inv)}
+            onViewInvoice={() => {}}
+          />
+        );
+      });
+      act(() => {
+        root3.unmount();
+      });
+      posContainer.remove();
+
+      const customerAfterPOS = db.getParties().find((p) => p.id === customer.id);
+      expect(customerAfterPOS?.openingBalance).toBe(4500);
+      expect(customerAfterPOS?.openingBalanceType).toBe('TO_RECEIVE');
+      expect(customerAfterPOS?.openingBalanceDate).toBe('2026-04-01');
+    });
+
+    it('correctly handles editing opening balance to 0 and non-zero in VoucherEditorModal', () => {
+      const customer: Party = {
+        id: 'PTY-VCH-EDIT-01',
+        name: 'Voucher Edit Customer',
+        type: 'CUSTOMER',
+        phone: '9833322211',
+        billingAddress: 'FC Road, Pune',
+        stateCode: '27',
+        openingBalance: 5000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 5000,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      db.saveParty(customer);
+
+      const openingEntry = {
+        id: `opening-${customer.id}`,
+        rawId: customer.id,
+        date: '2026-04-01',
+        docNumber: 'OPENING',
+        type: 'OPENING' as const,
+        description: "Opening Balance (You'll Get)",
+        debit: 5000,
+        credit: 0,
+        runningBalance: 5000,
+        status: 'OPENING',
+        isOpening: true,
+      };
+
+      // Render VoucherEditorModal to edit opening entry
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const root = createRoot(container);
+
+      act(() => {
+        root.render(
+          <VoucherEditorModal
+            party={customer}
+            editingLedgerEntry={openingEntry as any}
+            onClose={() => {}}
+            onRefresh={() => {}}
+          />
+        );
+      });
+
+      // Submit form with amount 0 to clear opening balance
+      const form = container.querySelector('form');
+      expect(form).not.toBeNull();
+      const amountInput = container.querySelector('input[type="number"]') as HTMLInputElement;
+      expect(amountInput).not.toBeNull();
+
+      act(() => {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        nativeInputValueSetter?.call(amountInput, '0');
+        amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+
+      act(() => {
+        form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+
+      // Verify opening balance is completely cleared in DB
+      const clearedParty = db.getParties().find((p) => p.id === customer.id);
+      expect(clearedParty?.openingBalance).toBeUndefined();
+      expect(clearedParty?.openingBalanceType).toBeUndefined();
+      expect(clearedParty?.openingBalanceDate).toBeUndefined();
+      expect(clearedParty?.currentBalance).toBe(0);
+    });
+
+    it('recalculates both previous and target parties when invoice party is edited without altering opening balances', () => {
+      const custA: Party = {
+        id: 'PTY-REASSIGN-A',
+        name: 'Original Party A',
+        type: 'CUSTOMER',
+        billingAddress: 'Road A, Pune',
+        stateCode: '27',
+        phone: '9811111111',
+        openingBalance: 3000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 3000,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      const custB: Party = {
+        id: 'PTY-REASSIGN-B',
+        name: 'Reassigned Party B',
+        type: 'CUSTOMER',
+        billingAddress: 'Road B, Pune',
+        stateCode: '27',
+        phone: '9822222222',
+        openingBalance: 6000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 6000,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      db.saveParty(custA);
+      db.saveParty(custB);
+
+      // Invoice assigned to custA (unpaid 2000)
+      const inv: Invoice = {
+        id: 'INV-REASSIGN-01',
+        invoiceNumber: 'INV-REASSIGN-01',
+        invoiceType: 'B2CS',
+        date: '2026-04-05',
+        partyId: custA.id,
+        partyName: custA.name,
+        partyAddress: custA.billingAddress,
+        partyStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 2000,
+        totalDiscount: 0,
+        totalTaxableAmount: 2000,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 2000,
+        amountInWords: 'Two Thousand Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 2000,
+        createdAt: '2026-04-05T10:00:00Z',
+        updatedAt: '2026-04-05T10:00:00Z',
+      };
+      db.saveInvoice(inv);
+
+      expect(db.getParties().find((p) => p.id === custA.id)?.currentBalance).toBe(5000); // 3000 + 2000
+      expect(db.getParties().find((p) => p.id === custB.id)?.currentBalance).toBe(6000); // 6000 + 0
+
+      // Now edit invoice and reassign to custB
+      const updatedInv: Invoice = {
+        ...inv,
+        partyId: custB.id,
+        partyName: custB.name,
+        partyAddress: custB.billingAddress,
+        updatedAt: '2026-04-06T10:00:00Z',
+      };
+      db.saveInvoice(updatedInv);
+
+      // custA reverts to opening 3000
+      const afterCustA = db.getParties().find((p) => p.id === custA.id);
+      expect(afterCustA?.currentBalance).toBe(3000);
+      expect(afterCustA?.openingBalance).toBe(3000);
+
+      // custB becomes 6000 + 2000 = 8000
+      const afterCustB = db.getParties().find((p) => p.id === custB.id);
+      expect(afterCustB?.currentBalance).toBe(8000);
+      expect(afterCustB?.openingBalance).toBe(6000);
+    });
+
+    it('preserves supplier opening balance (TO_PAY) and accurately factors in purchase bills', () => {
+      const supplier: Party = {
+        id: 'PTY-SUPP-OPENING-01',
+        name: 'National Suppliers',
+        type: 'SUPPLIER',
+        phone: '9899988877',
+        billingAddress: 'Industrial Area, Pune',
+        stateCode: '27',
+        openingBalance: 4000,
+        openingBalanceType: 'TO_PAY',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: -4000,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      db.saveParty(supplier);
+
+      // Save an unpaid purchase bill
+      const bill: PurchaseBill = {
+        id: 'BILL-SUPP-001',
+        billNumber: 'PB-901',
+        date: '2026-04-03',
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        supplierAddress: supplier.billingAddress,
+        supplierStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 2500,
+        totalDiscount: 0,
+        totalTaxableAmount: 2500,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 2500,
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 2500,
+        itcEligibility: 'ALL_OTHER_ITC',
+        isRcm: false,
+        createdAt: '2026-04-03T10:00:00Z',
+        updatedAt: '2026-04-03T10:00:00Z',
+      };
+      db.savePurchase(bill);
+
+      // Balance = -4000 (opening payable) - 2500 (unpaid bill) = -6500
+      expect(db.recalculatePartyBalance(supplier.id)).toBe(-6500);
+
+      const suppRecord = db.getParties().find((p) => p.id === supplier.id);
+      expect(suppRecord?.openingBalance).toBe(4000);
+      expect(suppRecord?.openingBalanceType).toBe('TO_PAY');
+      expect(suppRecord?.currentBalance).toBe(-6500);
+
+      // Delete bill -> reverts back to -4000
+      db.deletePurchase(bill.id);
+      expect(db.getParties().find((p) => p.id === supplier.id)?.currentBalance).toBe(-4000);
+      expect(db.getParties().find((p) => p.id === supplier.id)?.openingBalance).toBe(4000);
     });
   });
 });

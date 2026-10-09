@@ -260,6 +260,12 @@ class StorageService {
           const idx = list.findIndex((p) => p.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.PURCHASES, list);
+          const sId =
+            data?.supplierId ||
+            (data?.supplierName
+              ? this.getParties().find((p) => p.name.trim().toLowerCase() === data.supplierName.trim().toLowerCase())?.id
+              : undefined);
+          if (sId) this.recalculatePartyBalance(sId);
           break;
         }
         case 'party': {
@@ -316,6 +322,15 @@ class StorageService {
           const idx = list.findIndex((v) => v.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.VOUCHERS, list);
+          if (data?.entries && Array.isArray(data.entries)) {
+            const allParties = this.getParties();
+            data.entries.forEach((e: any) => {
+              const match = allParties.find(
+                (p) => p.id === e.accountId || (e.accountName && p.name.trim().toLowerCase() === e.accountName.trim().toLowerCase())
+              );
+              if (match) this.recalculatePartyBalance(match.id);
+            });
+          }
           break;
         }
         case 'adjustment': {
@@ -1052,6 +1067,7 @@ class StorageService {
       this.set(STORAGE_KEYS.PARTIES, parties);
       pouch.putDoc('party', party);
       this.broadcastChange('party', 'save', party.id, party);
+      this.notifyListeners();
     }
 
     return netBalance;
@@ -1523,13 +1539,15 @@ class StorageService {
       .catch((err) => console.error('Audit log failed for deleteVoucher:', err));
 
     if (prevVoucher) {
+      const partyIdsToRecalc = new Set<string>();
       const allParties = this.getParties();
       prevVoucher.entries.forEach((e) => {
         const p = allParties.find(
           (pty) => pty.id === e.accountId || (e.accountName && pty.name.trim().toLowerCase() === e.accountName.trim().toLowerCase())
         );
-        if (p) this.recalculatePartyBalance(p.id);
+        if (p) partyIdsToRecalc.add(p.id);
       });
+      partyIdsToRecalc.forEach((pid) => this.recalculatePartyBalance(pid));
     }
 
     this.notifyListeners();
