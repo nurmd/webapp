@@ -164,18 +164,44 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     return ['ALL', 'FAST MOVERS', ...list];
   }, [items]);
 
-  // Barcode Handler
-  const handleBarcodeScanned = (barcode: string) => {
-    const clean = barcode.trim();
+  // Barcode & Item Search Handler
+  const handleBarcodeScanned = (barcodeOrQuery: string) => {
+    const clean = barcodeOrQuery.trim();
     if (!clean) return;
+    const lower = clean.toLowerCase();
 
-    const found = items.find(
+    // 1. Try exact match first (barcode, SKU, ID, or exact name)
+    let found = items.find(
       (i) =>
         i.barcode === clean ||
-        i.sku?.toLowerCase() === clean.toLowerCase() ||
+        i.sku?.toLowerCase() === lower ||
         i.id === clean ||
-        i.name.toLowerCase() === clean.toLowerCase()
+        i.name.toLowerCase() === lower
     );
+
+    // 2. If no exact match, find item containing the text typed (substring match)
+    if (!found) {
+      found = items.find(
+        (i) =>
+          i.name.toLowerCase().includes(lower) ||
+          (i.barcode && i.barcode.toLowerCase().includes(lower)) ||
+          (i.sku && i.sku.toLowerCase().includes(lower))
+      );
+    }
+
+    // 3. Multi-word search if multiple words typed
+    if (!found) {
+      const words = lower.split(/\s+/).filter(Boolean);
+      if (words.length > 1) {
+        found = items.find((i) =>
+          words.every((w) =>
+            i.name.toLowerCase().includes(w) ||
+            (i.barcode && i.barcode.toLowerCase().includes(w)) ||
+            (i.sku && i.sku.toLowerCase().includes(w))
+          )
+        );
+      }
+    }
 
     if (found) {
       addToCart(found);
@@ -184,7 +210,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       setTimeout(() => setScanMessage(null), 2500);
     } else {
       audioService.playScanError();
-      setScanMessage({ text: `Item not found for barcode: ${clean}`, isError: true });
+      setScanMessage({ text: `Item not found matching "${clean}"`, isError: true });
       setTimeout(() => setScanMessage(null), 3000);
     }
   };
@@ -237,15 +263,20 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart, customer, heldBills]);
 
-  // Catalog Filtering
+  // Catalog Filtering (matches containing text typed across name, barcode, sku, category)
   const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const words = q ? q.split(/\s+/).filter(Boolean) : [];
+
     return items.filter((i) => {
-      const q = search.toLowerCase();
       const matchesSearch =
-        !search ||
-        i.name.toLowerCase().includes(q) ||
-        (i.barcode && i.barcode.includes(search)) ||
-        (i.sku && i.sku.toLowerCase().includes(q));
+        words.length === 0 ||
+        words.every((w) =>
+          i.name.toLowerCase().includes(w) ||
+          (i.barcode && i.barcode.toLowerCase().includes(w)) ||
+          (i.sku && i.sku.toLowerCase().includes(w)) ||
+          (i.category && i.category.toLowerCase().includes(w))
+        );
 
       let matchesCategory = true;
       if (selectedCategory === 'FAST MOVERS') {
@@ -670,6 +701,24 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 placeholder="Scan barcode or search item... (F2 or /)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const query = search.trim();
+                    if (query) {
+                      if (filteredItems.length > 0) {
+                        addToCart(filteredItems[0]);
+                        audioService.playScanSuccess();
+                        setScanMessage({ text: `Added: ${filteredItems[0].name}` });
+                        setTimeout(() => setScanMessage(null), 2500);
+                        setSearch('');
+                      } else {
+                        handleBarcodeScanned(query);
+                        setSearch('');
+                      }
+                    }
+                  }
+                }}
                 className="w-full bg-transparent text-xs sm:text-sm text-on-surface placeholder:text-outline outline-none"
               />
               {search && (

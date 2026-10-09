@@ -423,12 +423,30 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const handleBarcodeScanned = (scannedCode: string) => {
     const code = scannedCode.trim().toLowerCase();
-    const found = itemsCatalog.find(
-      (it) =>
-        (it.barcode && it.barcode.toLowerCase() === code) ||
-        (it.sku && it.sku.toLowerCase() === code) ||
-        it.name.toLowerCase().includes(code)
-    );
+    const words = code.split(/\s+/).filter(Boolean);
+    const found =
+      itemsCatalog.find(
+        (it) =>
+          (it.barcode && it.barcode.toLowerCase() === code) ||
+          (it.sku && it.sku.toLowerCase() === code) ||
+          it.name.toLowerCase() === code
+      ) ||
+      itemsCatalog.find(
+        (it) =>
+          it.name.toLowerCase().includes(code) ||
+          (it.barcode && it.barcode.toLowerCase().includes(code)) ||
+          (it.sku && it.sku.toLowerCase().includes(code))
+      ) ||
+      (words.length > 1
+        ? itemsCatalog.find((it) =>
+            words.every(
+              (w) =>
+                it.name.toLowerCase().includes(w) ||
+                (it.barcode && it.barcode.toLowerCase().includes(w)) ||
+                (it.sku && it.sku.toLowerCase().includes(w))
+            )
+          )
+        : undefined);
 
     if (found) {
       audioService.playScanSuccess();

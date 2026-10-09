@@ -429,14 +429,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           return false;
         }
 
-        // 1. Search query (Matches Name, SKU, Barcode, HSN)
+        // 1. Search query (Matches containing text in Name, SKU, Barcode, Category, HSN)
         const s = search.toLowerCase().trim();
+        const words = s ? s.split(/\s+/).filter(Boolean) : [];
         const matchesSearch =
-          !s ||
-          item.name.toLowerCase().includes(s) ||
-          (item.sku && item.sku.toLowerCase().includes(s)) ||
-          (item.barcode && item.barcode.includes(s)) ||
-          item.hsnSacCode.includes(s);
+          words.length === 0 ||
+          words.every((w) =>
+            item.name.toLowerCase().includes(w) ||
+            (item.sku && item.sku.toLowerCase().includes(w)) ||
+            (item.barcode && item.barcode.toLowerCase().includes(w)) ||
+            (item.category && item.category.toLowerCase().includes(w)) ||
+            item.hsnSacCode.toLowerCase().includes(w)
+          );
 
         if (!matchesSearch) return false;
 

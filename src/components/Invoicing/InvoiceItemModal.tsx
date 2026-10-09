@@ -145,20 +145,31 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setIsDropdownOpen(false);
   };
 
-  // Typeahead catalog suggestions based on Item Name
+  // Typeahead catalog suggestions based on containing text typed
   const suggestions = useMemo(() => {
-    if (!name.trim()) {
+    const q = name.toLowerCase().trim();
+    if (!q) {
       return itemsCatalog.slice(0, 6);
     }
-    const q = name.toLowerCase().trim();
+    const words = q.split(/\s+/).filter(Boolean);
     return itemsCatalog
-      .filter(
-        (it) =>
-          it.name.toLowerCase().includes(q) ||
-          (it.barcode && it.barcode.toLowerCase().includes(q)) ||
-          (it.sku && it.sku.toLowerCase().includes(q)) ||
-          (it.category && it.category.toLowerCase().includes(q))
-      )
+      .filter((it) => {
+        const n = it.name.toLowerCase();
+        const b = (it.barcode || '').toLowerCase();
+        const s = (it.sku || '').toLowerCase();
+        const c = (it.category || '').toLowerCase();
+        const h = (it.hsnSacCode || '').toLowerCase();
+        return words.every((w) => n.includes(w) || b.includes(w) || s.includes(w) || c.includes(w) || h.includes(w));
+      })
+      .sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        if (aName === q && bName !== q) return -1;
+        if (bName === q && aName !== q) return 1;
+        if (aName.startsWith(q) && !bName.startsWith(q)) return -1;
+        if (bName.startsWith(q) && !aName.startsWith(q)) return 1;
+        return 0;
+      })
       .slice(0, 8);
   }, [itemsCatalog, name]);
 
@@ -338,18 +349,31 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  const buildItemData = (): InvoiceItemData => ({
-    itemId: itemId || `CUSTOM-${Date.now()}`,
-    name: name.trim(),
-    description: description.trim() || undefined,
-    hsnSacCode: isGstActive ? (hsnSacCode.trim() || defaultHsn) : '',
-    quantity: Number(quantity) || 1,
-    unit,
-    unitPrice: Number(unitPrice) || 0,
-    mrp: mrp ? Number(mrp) : undefined,
-    discountPercent: Number(discountPercent) || 0,
-    gstRate: isGstActive ? (Number(gstRate) || 0) : 0,
-  });
+  const buildItemData = (): InvoiceItemData => {
+    let resolvedItemId = itemId;
+    if (!resolvedItemId && name.trim()) {
+      const q = name.trim().toLowerCase();
+      const matched =
+        itemsCatalog.find((it) => it.name.trim().toLowerCase() === q) ||
+        itemsCatalog.find((it) => it.name.toLowerCase().includes(q));
+      if (matched) {
+        resolvedItemId = matched.id;
+      }
+    }
+
+    return {
+      itemId: resolvedItemId || `CUSTOM-${Date.now()}`,
+      name: name.trim(),
+      description: description.trim() || undefined,
+      hsnSacCode: isGstActive ? (hsnSacCode.trim() || defaultHsn) : '',
+      quantity: Number(quantity) || 1,
+      unit,
+      unitPrice: Number(unitPrice) || 0,
+      mrp: mrp ? Number(mrp) : undefined,
+      discountPercent: Number(discountPercent) || 0,
+      gstRate: isGstActive ? (Number(gstRate) || 0) : 0,
+    };
+  };
 
   // Save and keep modal open for next product
   const handleSaveAndAddMore = (e?: React.FormEvent) => {
@@ -448,6 +472,12 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   if (itemId) setItemId(''); // user edited name away from linked catalog item
                 }}
                 placeholder="Type item name or search inventory..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isDropdownOpen && suggestions.length > 0 && !itemId) {
+                    e.preventDefault();
+                    handleSelectCatalogItem(suggestions[0]);
+                  }
+                }}
                 className={`w-full pl-9 pr-8 py-2.5 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 ${focusInputClass} transition-all`}
               />
               {name && (
