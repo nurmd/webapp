@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Party } from '../../models/party.ts';
-import { Invoice } from '../../models/invoice.ts';
+import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -26,7 +26,8 @@ interface PartiesViewProps {
     amount: number,
     paymentMode: string,
     notes: string,
-    paymentType?: 'IN' | 'OUT'
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[]
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -145,10 +146,11 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     amount: number,
     paymentMode: string,
     notes: string,
-    paymentType?: 'IN' | 'OUT'
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[]
   ) => {
     if (onRecordPartyPayment) {
-      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType);
+      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits);
     } else {
       const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
       const newBal = isPaymentIn

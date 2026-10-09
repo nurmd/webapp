@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { InventoryItem } from '../../models/item.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
-import { Invoice, InvoiceItemEntry, PaymentMode } from '../../models/invoice.ts';
+import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -526,6 +526,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           .join(', ')
       : null;
 
+    const splitsList: PaymentSplit[] = activeSplit
+      ? ([
+          activeSplit.cash > 0 ? { id: `split-cash-${Date.now()}`, mode: 'CASH' as PaymentMode, amount: activeSplit.cash } : null,
+          activeSplit.upi > 0 ? { id: `split-upi-${Date.now()}`, mode: 'UPI' as PaymentMode, amount: activeSplit.upi } : null,
+          activeSplit.card > 0 ? { id: `split-card-${Date.now()}`, mode: 'CARD' as PaymentMode, amount: activeSplit.card } : null,
+          activeSplit.credit > 0 ? { id: `split-credit-${Date.now()}`, mode: 'CREDIT' as PaymentMode, amount: activeSplit.credit } : null,
+        ].filter(Boolean) as PaymentSplit[])
+      : [{ id: '1', mode: chosenMode, amount: paidAmount }];
+
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
       invoiceNumber: generateNextInvoiceNumber(
@@ -559,10 +568,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       shippingAmount: additionalCharges > 0 ? additionalCharges : undefined,
       grandTotal: finalPayableTotal,
       amountInWords: amountInWords(finalPayableTotal),
-      paymentMode: chosenMode,
+      paymentMode: activeSplit ? 'SPLIT' : chosenMode,
       paymentStatus,
       paidAmount,
       balanceAmount,
+      paymentSplits: splitsList,
       notes: splitNote ? `Split Payment — ${splitNote}` : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

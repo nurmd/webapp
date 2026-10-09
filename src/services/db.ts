@@ -1,13 +1,25 @@
 import { CompanyProfile } from '../models/company.ts';
 import { Party } from '../models/party.ts';
-import { InventoryItem } from '../models/item.ts';
+import { InventoryItem, StockAdjustment, UnitOfMeasurement } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { PurchaseBill } from '../models/purchase.ts';
-import { StockAdjustment } from '../models/item.ts';
+
 import { Expense } from '../models/expense.ts';
 import { BankAccount, CashBankTransaction } from '../models/bankAccount.ts';
 import { pouch, type PouchDocChange } from './pouchdb.ts';
+import {
+  applyInvoiceStockDecrement,
+  revertInvoiceStockAdjustment,
+  restoreInvoiceStock,
+  applyPurchaseStockIncrement,
+  applyPurchaseStockDecrement,
+  revertPurchaseStockAdjustment,
+  applyStockAdjustmentRecord,
+  findMatchingItem,
+  isLowStock,
+} from '../core/inventory/stockEngine.ts';
+
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -899,6 +911,28 @@ class StorageService {
     this.notifyListeners();
   }
 
+  saveItems(items: InventoryItem[]): void {
+    const current = this.getItems();
+    this.persistStockUpdates(current, items);
+  }
+
+  isItemLowStock(item: InventoryItem): boolean {
+    return isLowStock(item);
+  }
+
+  private persistStockUpdates(currentItems: InventoryItem[], updatedItems: InventoryItem[]): void {
+    this.set(STORAGE_KEYS.ITEMS, updatedItems);
+    for (const updated of updatedItems) {
+      const orig = currentItems.find((i) => i.id === updated.id);
+      if (!orig || orig.currentStock !== updated.currentStock || orig.purchasePrice !== updated.purchasePrice) {
+        pouch.putDoc('item', updated);
+        this.broadcastChange('item', 'save', updated.id, updated);
+      }
+    }
+    this.notifyListeners();
+  }
+
+
   // Invoices
   getInvoices(): Invoice[] {
     const list = this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
@@ -928,31 +962,13 @@ class StorageService {
     pouch.putDoc('invoice', invoice);
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
-    // Update stock levels
-    const items = this.getItems();
+    // Update stock levels via pure domain stockEngine
+    const currentItems = this.getItems();
+    const updatedItems = prevInvoice
+      ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items)
+      : applyInvoiceStockDecrement(currentItems, invoice.items);
 
-    // If editing existing invoice, revert previous quantities first
-    if (prevInvoice) {
-      for (const oldLine of prevInvoice.items) {
-        const match = oldLine.itemId
-          ? items.find((itm) => itm.id === oldLine.itemId)
-          : items.find((itm) => itm.name.trim().toLowerCase() === oldLine.name.trim().toLowerCase());
-        if (match) {
-          match.currentStock += oldLine.quantity;
-        }
-      }
-    }
-
-    for (const line of invoice.items) {
-      const match = line.itemId
-        ? items.find((itm) => itm.id === line.itemId)
-        : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
-      if (match) {
-        match.currentStock = Math.max(0, match.currentStock - line.quantity);
-        match.updatedAt = new Date().toISOString();
-        this.saveItem(match);
-      }
-    }
+    this.persistStockUpdates(currentItems, updatedItems);
 
     if (invoice.partyId) {
       this.recalculatePartyBalance(invoice.partyId);
@@ -967,19 +983,11 @@ class StorageService {
     pouch.deleteDoc('invoice', id);
     this.broadcastChange('invoice', 'delete', id);
 
-    // Restore stock upon invoice deletion
+    // Restore stock upon invoice deletion via pure domain stockEngine
     if (inv) {
-      const items = this.getItems();
-      for (const line of inv.items) {
-        const match = line.itemId
-          ? items.find((itm) => itm.id === line.itemId)
-          : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
-        if (match) {
-          match.currentStock += line.quantity;
-          match.updatedAt = new Date().toISOString();
-          this.saveItem(match);
-        }
-      }
+      const currentItems = this.getItems();
+      const updatedItems = restoreInvoiceStock(currentItems, inv.items);
+      this.persistStockUpdates(currentItems, updatedItems);
     }
 
     if (inv?.partyId) {
@@ -1007,36 +1015,17 @@ class StorageService {
     pouch.putDoc('purchase', bill);
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
-    // Increase stock levels and update latest purchase price for purchased items
-    const items = this.getItems();
+    // Increase stock levels and update purchase prices via pure domain stockEngine
+    const currentItems = this.getItems();
+    const updatedItems = prevBill
+      ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items)
+      : applyPurchaseStockIncrement(currentItems, bill.items);
 
-    // If editing existing bill, revert previous quantities first
-    if (prevBill) {
-      for (const oldLine of prevBill.items) {
-        const match = oldLine.itemId
-          ? items.find((itm) => itm.id === oldLine.itemId)
-          : items.find((itm) => itm.name.trim().toLowerCase() === oldLine.name.trim().toLowerCase());
-        if (match) {
-          match.currentStock = Math.max(0, match.currentStock - oldLine.quantity);
-        }
-      }
-    }
-
+    // Auto-register any brand new purchased items not yet in catalog
+    const finalItems = [...updatedItems];
     for (const line of bill.items) {
-      const match = line.itemId
-        ? items.find((itm) => itm.id === line.itemId)
-        : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
-
-      if (match) {
-        match.currentStock += line.quantity;
-        // Update purchase price from bill so the latest purchase price is reflected in items & stock
-        if (typeof line.unitPrice === 'number' && line.unitPrice > 0) {
-          match.purchasePrice = line.unitPrice;
-        }
-        match.updatedAt = new Date().toISOString();
-        this.saveItem(match);
-      } else if (line.name && line.name.trim()) {
-        // If purchased item is not yet in catalog, automatically register it with the bill's purchase price
+      const exists = findMatchingItem(finalItems, line);
+      if (!exists && line.name && line.name.trim()) {
         const newId = line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         line.itemId = newId;
         const newItem: InventoryItem = {
@@ -1044,20 +1033,21 @@ class StorageService {
           name: line.name.trim(),
           hsnSacCode: line.hsnSacCode || '844332',
           category: 'General',
-          unit: line.unit || 'PCS',
-          salePrice: Number((line.unitPrice * 1.2).toFixed(2)),
+          unit: (line.unit as UnitOfMeasurement) || 'PCS',
+          salePrice: Number(((line.unitPrice || 0) * 1.2).toFixed(2)),
           purchasePrice: line.unitPrice || 0,
           gstRate: line.gstRate || 0,
-          currentStock: line.quantity,
+          currentStock: Math.max(0, line.quantity || 0),
           minStockAlert: 5,
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        items.push(newItem);
-        this.saveItem(newItem);
+        finalItems.push(newItem);
       }
     }
+
+    this.persistStockUpdates(currentItems, finalItems);
 
     if (bill.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
@@ -1072,19 +1062,11 @@ class StorageService {
     pouch.deleteDoc('purchase', id);
     this.broadcastChange('purchase', 'delete', id);
 
-    // Revert stock upon bill deletion
+    // Revert stock upon bill deletion via pure domain stockEngine
     if (bill) {
-      const items = this.getItems();
-      for (const line of bill.items) {
-        const match = line.itemId
-          ? items.find((itm) => itm.id === line.itemId)
-          : items.find((itm) => itm.name.trim().toLowerCase() === line.name.trim().toLowerCase());
-        if (match) {
-          match.currentStock = Math.max(0, match.currentStock - line.quantity);
-          match.updatedAt = new Date().toISOString();
-          this.saveItem(match);
-        }
-      }
+      const currentItems = this.getItems();
+      const updatedItems = applyPurchaseStockDecrement(currentItems, bill.items);
+      this.persistStockUpdates(currentItems, updatedItems);
     }
 
     if (bill?.supplierId) {
@@ -1105,18 +1087,10 @@ class StorageService {
     pouch.putDoc('adjustment', adj);
     this.broadcastChange('adjustment', 'save', adj.id, adj);
 
-    // Update item stock
-    const items = this.getItems();
-    const match = items.find((i) => i.id === adj.itemId);
-    if (match) {
-      if (adj.type === 'STOCK_IN') {
-        match.currentStock += adj.quantity;
-      } else {
-        match.currentStock = Math.max(0, match.currentStock - adj.quantity);
-      }
-      this.saveItem(match);
-    }
-    this.notifyListeners();
+    // Update item stock using pure domain stockEngine
+    const currentItems = this.getItems();
+    const updatedItems = applyStockAdjustmentRecord(currentItems, adj);
+    this.persistStockUpdates(currentItems, updatedItems);
   }
 
   // Vouchers

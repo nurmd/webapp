@@ -289,6 +289,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       paidAmount: invoice.paidAmount,
       balanceAmount: invoice.balanceAmount,
       partyBalance: party ? party.currentBalance : undefined,
+      paymentSplits: invoice.paymentSplits,
       upiId: company.upiId,
       terms: company.termsAndConditions,
       stateName: sellerStateObj?.name,
@@ -709,8 +710,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         Payment Mode / Terms
                       </span>
                       <span className="font-semibold text-slate-900 uppercase">
-                        {invoice.paymentMode} ({invoice.paymentStatus})
+                        {invoice.paymentMode === 'SPLIT' ? 'Split Payment' : invoice.paymentMode} ({invoice.paymentStatus})
                       </span>
+                      {((invoice.paymentSplits && invoice.paymentSplits.length > 1) || (invoice.notes && invoice.notes.includes('Split'))) && (
+                        <span className="text-[10px] text-slate-600 block mt-0.5 normal-case font-medium">
+                          {invoice.paymentSplits && invoice.paymentSplits.length > 0
+                            ? invoice.paymentSplits
+                                .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+                                .map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`)
+                                .join(' • ')
+                            : invoice.notes?.replace('Split Payment — ', '')}
+                        </span>
+                      )}
                     </div>
                     <div className="pl-2">
                       <span className="text-[9px] text-slate-500 uppercase font-bold block">

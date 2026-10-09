@@ -208,7 +208,13 @@ export function buildThermalReceiptBinary(
   builder.doubleSize(false).bold(false);
   builder.line('='.repeat(width));
 
-  if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+  if (data.paymentSplits && data.paymentSplits.length > 1) {
+    data.paymentSplits.forEach((s) => {
+      if (s.mode !== 'CREDIT' && s.amount > 0) {
+        builder.line(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+      }
+    });
+  } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
     builder.line(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
   }
   if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Invoice } from '../../models/invoice.ts';
+import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
@@ -42,6 +42,10 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [search, setSearch] = useState('');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
+  const [splitCash, setSplitCash] = useState<string>('');
+  const [splitUPI, setSplitUPI] = useState<string>('');
+  const [splitBank, setSplitBank] = useState<string>('');
 
   // Sorting state - Defaults to NEWEST first as requested
   const [sortBy, setSortBy] = useState<LedgerSortOption>('NEWEST');
@@ -137,15 +141,54 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentModalInvoice || paymentAmount <= 0) return;
+    if (!paymentModalInvoice) return;
 
-    const newPaid = Math.min(paymentModalInvoice.grandTotal, paymentModalInvoice.paidAmount + paymentAmount);
+    let payAmt = paymentAmount;
+    let splitsToAdd: PaymentSplit[] = [];
+
+    if (paymentMode === 'SPLIT') {
+      const c = parseFloat(splitCash) || 0;
+      const u = parseFloat(splitUPI) || 0;
+      const b = parseFloat(splitBank) || 0;
+      const totalSplit = Number((c + u + b).toFixed(2));
+      if (totalSplit <= 0) {
+        alert('Please enter at least one split tender amount (Cash, UPI, or Bank).');
+        return;
+      }
+      payAmt = totalSplit;
+      if (c > 0) splitsToAdd.push({ id: `rcpt-c-${Date.now()}`, mode: 'CASH', amount: c });
+      if (u > 0) splitsToAdd.push({ id: `rcpt-u-${Date.now()}`, mode: 'UPI', amount: u });
+      if (b > 0) splitsToAdd.push({ id: `rcpt-b-${Date.now()}`, mode: 'BANK', amount: b });
+    } else {
+      if (payAmt <= 0) return;
+      splitsToAdd.push({ id: `rcpt-${Date.now()}`, mode: paymentMode, amount: payAmt });
+    }
+
+    if (payAmt <= 0) return;
+
+    const newPaid = Math.min(paymentModalInvoice.grandTotal, paymentModalInvoice.paidAmount + payAmt);
     const newBal = Math.max(0, paymentModalInvoice.grandTotal - newPaid);
+
+    // Maintain updated payment splits
+    const existingSplits = (paymentModalInvoice.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
+    if (existingSplits.length === 0 && paymentModalInvoice.paidAmount > 0) {
+      existingSplits.push({ id: 'split-prev', mode: paymentModalInvoice.paymentMode || 'CASH', amount: paymentModalInvoice.paidAmount });
+    }
+    existingSplits.push(...splitsToAdd);
+    if (newBal > 0) {
+      existingSplits.push({ id: `split-bal-${Date.now()}`, mode: 'CREDIT', amount: newBal });
+    }
+
+    const nonCredit = existingSplits.filter((s) => s.mode !== 'CREDIT');
+    const resolvedMode: PaymentMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || 'CASH');
+
     const updated: Invoice = {
       ...paymentModalInvoice,
       paidAmount: newPaid,
       balanceAmount: newBal,
+      paymentMode: resolvedMode,
       paymentStatus: newBal === 0 ? 'PAID' : 'PARTIAL',
+      paymentSplits: existingSplits,
       updatedAt: new Date().toISOString(),
     };
 
@@ -155,8 +198,9 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       date: new Date().toISOString().split('T')[0],
       customerName: paymentModalInvoice.partyName,
       customerId: paymentModalInvoice.partyId || 'ACC_CASH',
-      amount: paymentAmount,
-      paymentMode: paymentModalInvoice.paymentMode === 'CREDIT' ? 'CASH' : (paymentModalInvoice.paymentMode || 'CASH'),
+      amount: payAmt,
+      paymentMode: paymentMode,
+      paymentSplits: splitsToAdd,
       referenceNo: paymentModalInvoice.invoiceNumber,
       narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}`,
     });
@@ -165,6 +209,9 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
     db.saveInvoice(updated);
     setPaymentModalInvoice(null);
     setPaymentAmount(0);
+    setSplitCash('');
+    setSplitUPI('');
+    setSplitBank('');
   };
 
   return (
@@ -425,6 +472,10 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                             e.stopPropagation();
                             setPaymentModalInvoice(inv);
                             setPaymentAmount(inv.balanceAmount);
+                            setPaymentMode('CASH');
+                            setSplitCash('');
+                            setSplitUPI('');
+                            setSplitBank('');
                           }}
                           className="h-6 px-2 rounded-md bg-secondary/15 hover:bg-secondary/25 text-secondary font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
                         >
@@ -484,20 +535,182 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 </div>
               </div>
 
+              {/* Mode Selector */}
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant mb-1">
-                  Amount Received (₹)
+                  Payment Mode
                 </label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  max={paymentModalInvoice.balanceAmount}
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2.5 rounded-xl border border-outline-variant bg-surface text-on-surface font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-secondary/40"
-                />
+                <div className="grid grid-cols-4 gap-1">
+                  {(['UPI', 'CASH', 'BANK', 'SPLIT'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        setPaymentMode(m);
+                        if (m === 'SPLIT') {
+                          const total = paymentAmount;
+                          if (total > 0 && !splitCash && !splitUPI && !splitBank) {
+                            if (paymentMode === 'CASH') setSplitCash(total.toString());
+                            else if (paymentMode === 'BANK') setSplitBank(total.toString());
+                            else setSplitUPI(total.toString());
+                          }
+                        }
+                      }}
+                      className={`py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                        paymentMode === m
+                          ? 'bg-secondary text-on-secondary shadow-xs'
+                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Single Amount Input */}
+              {paymentMode !== 'SPLIT' ? (
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant mb-1">
+                    Amount Received (₹)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max={paymentModalInvoice.balanceAmount}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  />
+                </div>
+              ) : (
+                /* Split Allocation Box */
+                (() => {
+                  const target = paymentModalInvoice.balanceAmount;
+                  const c = parseFloat(splitCash) || 0;
+                  const u = parseFloat(splitUPI) || 0;
+                  const b = parseFloat(splitBank) || 0;
+                  const allocated = Number((c + u + b).toFixed(2));
+                  const remaining = Number(Math.max(0, target - allocated).toFixed(2));
+
+                  return (
+                    <div className="p-3 bg-surface-container-low rounded-xl border border-secondary/20 flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-on-surface flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[15px] text-secondary">call_split</span>
+                          <span>Split Breakdown</span>
+                        </span>
+                        <span className={`font-bold ${
+                          allocated === target
+                            ? 'text-secondary'
+                            : allocated > target
+                            ? 'text-error'
+                            : 'text-amber-600'
+                        }`}>
+                          Allocated: {formatINR(allocated)} / {formatINR(target)}
+                          {remaining > 0 && ` (${formatINR(remaining)} left)`}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {/* Cash */}
+                        <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface border border-outline-variant/20">
+                          <span className="text-xs font-bold text-on-surface flex items-center gap-1 w-20">
+                            <span className="material-symbols-outlined text-[14px] text-emerald-600">payments</span>
+                            Cash
+                          </span>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={splitCash}
+                              onChange={(e) => setSplitCash(e.target.value)}
+                              className="w-full pl-5 pr-2 py-1 bg-surface-container-lowest rounded-lg text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                          {remaining > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = (c + remaining).toFixed(2);
+                                setSplitCash(parseFloat(next).toString());
+                              }}
+                              className="px-2 py-1 rounded bg-secondary/10 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/20 whitespace-nowrap"
+                            >
+                              + Fill
+                            </button>
+                          )}
+                        </div>
+
+                        {/* UPI */}
+                        <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface border border-outline-variant/20">
+                          <span className="text-xs font-bold text-on-surface flex items-center gap-1 w-20">
+                            <span className="material-symbols-outlined text-[14px] text-blue-600">qr_code_2</span>
+                            UPI
+                          </span>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={splitUPI}
+                              onChange={(e) => setSplitUPI(e.target.value)}
+                              className="w-full pl-5 pr-2 py-1 bg-surface-container-lowest rounded-lg text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                          {remaining > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = (u + remaining).toFixed(2);
+                                setSplitUPI(parseFloat(next).toString());
+                              }}
+                              className="px-2 py-1 rounded bg-secondary/10 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/20 whitespace-nowrap"
+                            >
+                              + Fill
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Bank */}
+                        <div className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-surface border border-outline-variant/20">
+                          <span className="text-xs font-bold text-on-surface flex items-center gap-1 w-20">
+                            <span className="material-symbols-outlined text-[14px] text-purple-600">account_balance</span>
+                            Bank
+                          </span>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={splitBank}
+                              onChange={(e) => setSplitBank(e.target.value)}
+                              className="w-full pl-5 pr-2 py-1 bg-surface-container-lowest rounded-lg text-xs font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                          {remaining > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = (b + remaining).toFixed(2);
+                                setSplitBank(parseFloat(next).toString());
+                              }}
+                              className="px-2 py-1 rounded bg-secondary/10 text-secondary text-[10px] font-bold cursor-pointer hover:bg-secondary/20 whitespace-nowrap"
+                            >
+                              + Fill
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
 
               <div className="flex justify-end gap-2 mt-2">
                 <button

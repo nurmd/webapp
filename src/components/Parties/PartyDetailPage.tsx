@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
-import { Invoice, PaymentMode } from '../../models/invoice.ts';
+import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, JournalEntryLine } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { printPartyLedgerStatement } from '../../core/utils/ledgerStatementPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -25,7 +25,8 @@ export interface PartyDetailPageProps {
     amount: number,
     paymentMode: string,
     notes: string,
-    paymentType?: 'IN' | 'OUT'
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[]
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -83,6 +84,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editMode, setEditMode] = useState('UPI');
+  const [editSplitCash, setEditSplitCash] = useState('');
+  const [editSplitUPI, setEditSplitUPI] = useState('');
+  const [editSplitBank, setEditSplitBank] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
   const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
@@ -127,6 +131,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     party.currentBalance !== 0 ? Math.abs(party.currentBalance).toString() : ''
   );
   const [paymentMode, setPaymentMode] = useState<string>('UPI');
+  const [splitCash, setSplitCash] = useState<string>('');
+  const [splitUPI, setSplitUPI] = useState<string>('');
+  const [splitBank, setSplitBank] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentRef, setPaymentRef] = useState<string>('');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
@@ -215,6 +222,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           (e) => e.docNumber === v.voucherNumber || (v.referenceNo && e.docNumber.includes(v.referenceNo))
         );
         if (!isDupe) {
+          const cashLines = v.entries.filter((e) => e.accountId === 'ACC_CASH' && (e.debit > 0 || e.credit > 0));
+          const bankLines = v.entries.filter((e) => e.accountId === 'ACC_BANK' && (e.debit > 0 || e.credit > 0));
+          const isSplitVoucher = cashLines.length > 0 && bankLines.length > 0;
+          const vMode = isSplitVoucher
+            ? 'SPLIT'
+            : cashLines.length > 0
+            ? 'CASH'
+            : bankLines.length > 0
+            ? (v.narration?.toUpperCase().includes('BANK') ? 'BANK' : 'UPI')
+            : 'UPI';
+
           if (v.voucherType === 'RECEIPT') {
             totalVoucherReceipts += v.totalAmount;
             rawEntries.push({
@@ -223,10 +241,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               date: v.date,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_IN',
-              description: v.narration || 'Payment received',
+              description: v.narration || (isSplitVoucher ? 'Split Payment received' : 'Payment received'),
               debit: 0,
               credit: v.totalAmount,
               status: 'PAID',
+              paymentMode: vMode,
               rawVoucher: v,
             });
           } else if (v.voucherType === 'PAYMENT') {
@@ -237,10 +256,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               date: v.date,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_OUT',
-              description: v.narration || 'Payment made',
+              description: v.narration || (isSplitVoucher ? 'Split Payment disbursed' : 'Payment made'),
               debit: v.totalAmount,
               credit: 0,
               status: 'PAID',
+              paymentMode: vMode,
               rawVoucher: v,
             });
           }
@@ -261,17 +281,21 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         for (const inv of sortedInvs) {
           if (unvoucheredPaid <= 0) break;
           const amt = Math.min(unvoucheredPaid, inv.paidAmount || 0);
+          const hasSplits = inv.paymentSplits && inv.paymentSplits.filter((s) => s.mode !== 'CREDIT').length > 1;
+          const invMode = hasSplits ? 'SPLIT' : (inv.paymentMode || 'Cash');
           rawEntries.push({
             id: `pay-inv-${inv.id}`,
             rawId: inv.id,
             date: inv.date,
             docNumber: `PAY-${inv.invoiceNumber}`,
             type: 'PAYMENT_IN',
-            description: `Payment (${inv.paymentMode || 'Cash'} on #${inv.invoiceNumber})`,
+            description: hasSplits
+              ? `Payment (Split on #${inv.invoiceNumber})`
+              : `Payment (${inv.paymentMode || 'Cash'} on #${inv.invoiceNumber})`,
             debit: 0,
             credit: amt,
             status: 'PAID',
-            paymentMode: inv.paymentMode,
+            paymentMode: invMode,
             rawInvoice: inv,
           });
           unvoucheredPaid -= amt;
@@ -289,17 +313,21 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         for (const pur of sortedPurs) {
           if (unvoucheredPaid <= 0) break;
           const amt = Math.min(unvoucheredPaid, pur.paidAmount || 0);
+          const hasSplits = pur.paymentSplits && pur.paymentSplits.filter((s) => s.mode !== 'CREDIT').length > 1;
+          const purMode = hasSplits ? 'SPLIT' : (pur.paymentMode || 'Cash');
           rawEntries.push({
             id: `pay-pur-${pur.id}`,
             rawId: pur.id,
             date: pur.date,
             docNumber: `PAY-${pur.billNumber}`,
             type: 'PAYMENT_OUT',
-            description: `Payment (${pur.paymentMode || 'Cash'} on #${pur.billNumber})`,
+            description: hasSplits
+              ? `Payment (Split on #${pur.billNumber})`
+              : `Payment (${pur.paymentMode || 'Cash'} on #${pur.billNumber})`,
             debit: amt,
             credit: 0,
             status: 'PAID',
-            paymentMode: pur.paymentMode,
+            paymentMode: purMode,
             rawPurchase: pur,
           });
           unvoucheredPaid -= amt;
@@ -415,18 +443,52 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const amt = parseFloat(paymentAmount);
+    let amt = parseFloat(paymentAmount);
+    let splits: PaymentSplit[] | undefined = undefined;
+
+    if (paymentMode === 'SPLIT') {
+      const c = parseFloat(splitCash) || 0;
+      const u = parseFloat(splitUPI) || 0;
+      const b = parseFloat(splitBank) || 0;
+      const totalSplit = Number((c + u + b).toFixed(2));
+
+      if (totalSplit <= 0) {
+        alert('Please enter at least one split tender amount (Cash, UPI, or Bank).');
+        return;
+      }
+      amt = totalSplit;
+      splits = [
+        ...(c > 0 ? [{ id: 's-cash', mode: 'CASH' as const, amount: c }] : []),
+        ...(u > 0 ? [{ id: 's-upi', mode: 'UPI' as const, amount: u }] : []),
+        ...(b > 0 ? [{ id: 's-bank', mode: 'BANK' as const, amount: b }] : []),
+      ];
+    }
+
     if (!amt || amt <= 0) return;
 
-    const fullNotes = [paymentRef ? `Ref: ${paymentRef}` : '', paymentNotes].filter(Boolean).join(' • ');
+    let splitDesc = '';
+    if (splits && splits.length > 0) {
+      splitDesc = splits.map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`).join(', ');
+    }
+
+    const fullNotes = [
+      paymentRef ? `Ref: ${paymentRef}` : '',
+      splitDesc ? `Split (${splitDesc})` : '',
+      paymentNotes,
+    ].filter(Boolean).join(' • ');
+
     onRecordPayment(
       party,
       amt,
       paymentMode,
       fullNotes || `${paymentType === 'IN' ? 'Payment In' : 'Payment Out'} of ${formatINR(amt)} on ${paymentDate}`,
-      paymentType
+      paymentType,
+      splits
     );
     setIsPaymentOpen(false);
+    setSplitCash('');
+    setSplitUPI('');
+    setSplitBank('');
     onRefresh?.();
   };
 
@@ -465,10 +527,50 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const handleOpenEditLedgerItem = (entry: PassbookEntry) => {
     setEditingLedgerEntry(entry);
     setEditDate(entry.date);
-    setEditAmount((entry.credit > 0 ? entry.credit : entry.debit).toString());
+    const amtVal = entry.credit > 0 ? entry.credit : entry.debit;
+    setEditAmount(amtVal.toString());
     setEditMode(entry.paymentMode || 'UPI');
     setEditNotes(entry.description || '');
     setEditType(entry.type === 'PAYMENT_IN' ? 'IN' : 'OUT');
+
+    if (entry.rawVoucher) {
+      const v = entry.rawVoucher;
+      const cashEntry = v.entries.find((e) => e.accountId === 'ACC_CASH');
+      const bankEntries = v.entries.filter((e) => e.accountId === 'ACC_BANK');
+      const cashVal = cashEntry ? (cashEntry.debit || cashEntry.credit || 0) : 0;
+      const bankVal = bankEntries.reduce((sum, e) => sum + (e.debit || e.credit || 0), 0);
+      if (cashVal > 0 && bankVal > 0) {
+        setEditMode('SPLIT');
+        setEditSplitCash(cashVal.toString());
+        setEditSplitUPI(bankVal.toString());
+        setEditSplitBank('');
+      } else {
+        setEditSplitCash('');
+        setEditSplitUPI('');
+        setEditSplitBank('');
+      }
+    } else if (entry.rawInvoice?.paymentSplits && entry.rawInvoice.paymentSplits.length > 1) {
+      setEditMode('SPLIT');
+      const c = entry.rawInvoice.paymentSplits.find((s) => s.mode === 'CASH')?.amount || 0;
+      const u = entry.rawInvoice.paymentSplits.find((s) => s.mode === 'UPI')?.amount || 0;
+      const b = entry.rawInvoice.paymentSplits.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING')?.amount || 0;
+      setEditSplitCash(c > 0 ? c.toString() : '');
+      setEditSplitUPI(u > 0 ? u.toString() : '');
+      setEditSplitBank(b > 0 ? b.toString() : '');
+    } else if (entry.rawPurchase?.paymentSplits && entry.rawPurchase.paymentSplits.length > 1) {
+      setEditMode('SPLIT');
+      const c = entry.rawPurchase.paymentSplits.find((s) => s.mode === 'CASH')?.amount || 0;
+      const u = entry.rawPurchase.paymentSplits.find((s) => s.mode === 'UPI')?.amount || 0;
+      const b = entry.rawPurchase.paymentSplits.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING')?.amount || 0;
+      setEditSplitCash(c > 0 ? c.toString() : '');
+      setEditSplitUPI(u > 0 ? u.toString() : '');
+      setEditSplitBank(b > 0 ? b.toString() : '');
+    } else {
+      setEditSplitCash('');
+      setEditSplitUPI('');
+      setEditSplitBank('');
+    }
+
     if (entry.isOpening) {
       const isRec = party.openingBalanceType
         ? party.openingBalanceType === 'TO_RECEIVE'
@@ -553,7 +655,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     e.preventDefault();
     if (!editingLedgerEntry) return;
 
-    const newAmt = parseFloat(editAmount);
+    let newAmt = parseFloat(editAmount);
+    if (editMode === 'SPLIT') {
+      const c = parseFloat(editSplitCash) || 0;
+      const u = parseFloat(editSplitUPI) || 0;
+      const b = parseFloat(editSplitBank) || 0;
+      const splitTotal = Number((c + u + b).toFixed(2));
+      if (splitTotal > 0) {
+        newAmt = splitTotal;
+      }
+    }
+
     if (isNaN(newAmt) || newAmt < 0) {
       alert('Please enter a valid amount.');
       return;
@@ -580,29 +692,41 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         adjustedBal += newAmt;
       }
 
+      let entries: JournalEntryLine[] = [];
+      if (editMode === 'SPLIT') {
+        const c = parseFloat(editSplitCash) || 0;
+        const u = parseFloat(editSplitUPI) || 0;
+        const b = parseFloat(editSplitBank) || 0;
+        const bankSum = Number((u + b).toFixed(2));
+
+        if (isReceipt) {
+          if (c > 0) entries.push({ accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: c, credit: 0, narration: 'Payment received via CASH' });
+          if (bankSum > 0) entries.push({ accountId: 'ACC_BANK', accountName: 'Bank Account', debit: bankSum, credit: 0, narration: 'Payment received via BANK/UPI' });
+          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: newAmt, narration: editNotes || v.narration });
+        } else {
+          entries.push({ accountId: party.id, accountName: party.name, debit: newAmt, credit: 0, narration: editNotes || v.narration });
+          if (c > 0) entries.push({ accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 0, credit: c, narration: 'Paid via CASH' });
+          if (bankSum > 0) entries.push({ accountId: 'ACC_BANK', accountName: 'Bank Account', debit: 0, credit: bankSum, narration: 'Paid via BANK/UPI' });
+        }
+      } else {
+        const accId = editMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
+        const accName = editMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
+        if (isReceipt) {
+          entries.push({ accountId: accId, accountName: accName, debit: newAmt, credit: 0, narration: `Payment received via ${editMode}` });
+          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: newAmt, narration: editNotes || v.narration });
+        } else {
+          entries.push({ accountId: party.id, accountName: party.name, debit: newAmt, credit: 0, narration: editNotes || v.narration });
+          entries.push({ accountId: accId, accountName: accName, debit: 0, credit: newAmt, narration: `Paid via ${editMode}` });
+        }
+      }
+
       const updatedVoucher: Voucher = {
         ...v,
         date: editDate,
         voucherType: newVoucherType,
         totalAmount: newAmt,
         narration: editNotes || v.narration,
-        entries: v.entries.map((entry) => {
-          if (entry.accountId === 'ACC_CASH' || entry.accountId === 'ACC_BANK') {
-            return {
-              ...entry,
-              accountId: editMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK',
-              accountName: editMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account',
-              debit: isReceipt ? newAmt : 0,
-              credit: isReceipt ? 0 : newAmt,
-            };
-          }
-          return {
-            ...entry,
-            debit: isReceipt ? 0 : newAmt,
-            credit: isReceipt ? newAmt : 0,
-            narration: editNotes || entry.narration,
-          };
-        }),
+        entries,
       };
 
       db.saveVoucher(updatedVoucher);
@@ -614,7 +738,20 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       const delta = newAmt - prevAmt;
       const newPaid = Math.max(0, inv.paidAmount + delta);
       const newBalInv = Math.max(0, inv.grandTotal - newPaid);
-      const safePaymentMode: PaymentMode = editMode === 'BANK' ? 'NET_BANKING' : (editMode as PaymentMode);
+      const safePaymentMode: PaymentMode = editMode === 'SPLIT' ? 'SPLIT' : editMode === 'BANK' ? 'NET_BANKING' : (editMode as PaymentMode);
+
+      let updatedSplits: PaymentSplit[] | undefined = inv.paymentSplits;
+      if (editMode === 'SPLIT') {
+        const c = parseFloat(editSplitCash) || 0;
+        const u = parseFloat(editSplitUPI) || 0;
+        const b = parseFloat(editSplitBank) || 0;
+        const splits: PaymentSplit[] = [];
+        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c });
+        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u });
+        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b });
+        if (newBalInv > 0) splits.push({ id: `s-bal-${Date.now()}`, mode: 'CREDIT', amount: newBalInv });
+        if (splits.length > 0) updatedSplits = splits;
+      }
 
       const updatedInv: Invoice = {
         ...inv,
@@ -622,6 +759,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         balanceAmount: newBalInv,
         paymentStatus: newBalInv <= 0.01 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID',
         paymentMode: safePaymentMode,
+        paymentSplits: updatedSplits,
         updatedAt: new Date().toISOString(),
       };
       db.saveInvoice(updatedInv);
@@ -637,7 +775,20 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       const delta = newAmt - prevAmt;
       const newPaid = Math.max(0, pur.paidAmount + delta);
       const newBalPur = Math.max(0, pur.grandTotal - newPaid);
-      const safePaymentMode: PaymentMode = editMode === 'BANK' ? 'NET_BANKING' : (editMode as PaymentMode);
+      const safePaymentMode: PaymentMode = editMode === 'SPLIT' ? 'SPLIT' : editMode === 'BANK' ? 'NET_BANKING' : (editMode as PaymentMode);
+
+      let updatedSplits: PaymentSplit[] | undefined = pur.paymentSplits;
+      if (editMode === 'SPLIT') {
+        const c = parseFloat(editSplitCash) || 0;
+        const u = parseFloat(editSplitUPI) || 0;
+        const b = parseFloat(editSplitBank) || 0;
+        const splits: PaymentSplit[] = [];
+        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c });
+        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u });
+        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b });
+        if (newBalPur > 0) splits.push({ id: `s-bal-${Date.now()}`, mode: 'CREDIT', amount: newBalPur });
+        if (splits.length > 0) updatedSplits = splits;
+      }
 
       const updatedPur: PurchaseBill = {
         ...pur,
@@ -645,6 +796,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         balanceAmount: newBalPur,
         paymentStatus: newBalPur <= 0.01 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID',
         paymentMode: safePaymentMode,
+        paymentSplits: updatedSplits,
         updatedAt: new Date().toISOString(),
       };
       db.savePurchase(updatedPur);
@@ -1176,7 +1328,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             )}
 
             {/* Amount & Mode */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="relative flex items-center">
                 <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
                 <input
@@ -1190,12 +1342,22 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-1">
-                {['UPI', 'CASH', 'BANK'].map((m) => (
+              <div className="grid grid-cols-4 gap-1">
+                {['UPI', 'CASH', 'BANK', 'SPLIT'].map((m) => (
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setPaymentMode(m)}
+                    onClick={() => {
+                      setPaymentMode(m);
+                      if (m === 'SPLIT') {
+                        const total = parseFloat(paymentAmount) || 0;
+                        if (total > 0 && !splitCash && !splitUPI && !splitBank) {
+                          if (paymentMode === 'CASH') setSplitCash(total.toString());
+                          else if (paymentMode === 'BANK') setSplitBank(total.toString());
+                          else setSplitUPI(total.toString());
+                        }
+                      }
+                    }}
                     className={`py-1.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all ${
                       paymentMode === m
                         ? paymentType === 'IN'
@@ -1209,6 +1371,138 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Split Tender Allocation Box when SPLIT is selected */}
+            {paymentMode === 'SPLIT' && (() => {
+              const target = parseFloat(paymentAmount) || 0;
+              const c = parseFloat(splitCash) || 0;
+              const u = parseFloat(splitUPI) || 0;
+              const b = parseFloat(splitBank) || 0;
+              const allocated = Number((c + u + b).toFixed(2));
+              const remaining = target > 0 ? Number(Math.max(0, target - allocated).toFixed(2)) : 0;
+
+              return (
+                <div className="p-2.5 bg-surface rounded-xl border border-secondary/20 flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-on-surface flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-secondary">call_split</span>
+                      <span>Split Breakdown</span>
+                    </span>
+                    <span className={`font-bold ${
+                      target > 0 && allocated === target
+                        ? 'text-secondary'
+                        : target > 0 && allocated > target
+                        ? 'text-error'
+                        : 'text-amber-600'
+                    }`}>
+                      Allocated: {formatINR(allocated)} {target > 0 ? `/ ${formatINR(target)}` : ''}
+                      {remaining > 0 && ` (${formatINR(remaining)} left)`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Cash */}
+                    <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[12px] text-emerald-600">payments</span>
+                          Cash
+                        </span>
+                        {remaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = (c + remaining).toFixed(2);
+                              setSplitCash(parseFloat(next).toString());
+                            }}
+                            className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
+                          >
+                            + Fill
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={splitCash}
+                          onChange={(e) => setSplitCash(e.target.value)}
+                          className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* UPI */}
+                    <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[12px] text-blue-600">qr_code_2</span>
+                          UPI
+                        </span>
+                        {remaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = (u + remaining).toFixed(2);
+                              setSplitUPI(parseFloat(next).toString());
+                            }}
+                            className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
+                          >
+                            + Fill
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={splitUPI}
+                          onChange={(e) => setSplitUPI(e.target.value)}
+                          className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bank */}
+                    <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[12px] text-purple-600">account_balance</span>
+                          Bank / Cheque
+                        </span>
+                        {remaining > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = (b + remaining).toFixed(2);
+                              setSplitBank(parseFloat(next).toString());
+                            }}
+                            className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
+                          >
+                            + Fill
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={splitBank}
+                          onChange={(e) => setSplitBank(e.target.value)}
+                          className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Note & Save */}
             <div className="flex items-center gap-2">
@@ -1602,21 +1896,143 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
               {/* Payment Mode */}
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.paymentMode) && (
-                <div className="grid grid-cols-4 gap-1">
-                  {['UPI', 'CASH', 'BANK', 'CHEQUE'].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setEditMode(m)}
-                      className={`py-1 rounded-lg text-[10px] font-bold cursor-pointer ${
-                        editMode === m
-                          ? 'bg-secondary text-on-secondary shadow-xs'
-                          : 'bg-surface-container-low text-on-surface-variant'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-4 gap-1">
+                    {['UPI', 'CASH', 'BANK', 'SPLIT'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setEditMode(m);
+                          if (m === 'SPLIT') {
+                            const total = parseFloat(editAmount) || 0;
+                            if (total > 0 && !editSplitCash && !editSplitUPI && !editSplitBank) {
+                              if (editMode === 'CASH') setEditSplitCash(total.toString());
+                              else if (editMode === 'BANK') setEditSplitBank(total.toString());
+                              else setEditSplitUPI(total.toString());
+                            }
+                          }
+                        }}
+                        className={`py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                          editMode === m
+                            ? 'bg-secondary text-on-secondary shadow-xs'
+                            : 'bg-surface-container-low text-on-surface-variant'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {editMode === 'SPLIT' && (() => {
+                    const target = parseFloat(editAmount) || 0;
+                    const c = parseFloat(editSplitCash) || 0;
+                    const u = parseFloat(editSplitUPI) || 0;
+                    const b = parseFloat(editSplitBank) || 0;
+                    const allocated = Number((c + u + b).toFixed(2));
+                    const remaining = target > 0 ? Number(Math.max(0, target - allocated).toFixed(2)) : 0;
+
+                    return (
+                      <div className="p-2 bg-surface rounded-xl border border-secondary/20 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold text-on-surface flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[13px] text-secondary">call_split</span>
+                            <span>Split Breakdown</span>
+                          </span>
+                          <span className={`font-bold ${
+                            target > 0 && allocated === target
+                              ? 'text-secondary'
+                              : target > 0 && allocated > target
+                              ? 'text-error'
+                              : 'text-amber-600'
+                          }`}>
+                            Allocated: {formatINR(allocated)} {target > 0 ? `/ ${formatINR(target)}` : ''}
+                            {remaining > 0 && ` (${formatINR(remaining)} left)`}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-on-surface">Cash</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (c + remaining).toFixed(2);
+                                    setEditSplitCash(parseFloat(next).toString());
+                                  }}
+                                  className="text-[9px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitCash}
+                              onChange={(e) => setEditSplitCash(e.target.value)}
+                              className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-on-surface">UPI</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (u + remaining).toFixed(2);
+                                    setEditSplitUPI(parseFloat(next).toString());
+                                  }}
+                                  className="text-[9px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitUPI}
+                              onChange={(e) => setEditSplitUPI(e.target.value)}
+                              className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-bold text-on-surface">Bank</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (b + remaining).toFixed(2);
+                                    setEditSplitBank(parseFloat(next).toString());
+                                  }}
+                                  className="text-[9px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitBank}
+                              onChange={(e) => setEditSplitBank(e.target.value)}
+                              className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

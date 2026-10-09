@@ -23,3 +23,8 @@ src-tauri/target/
 dist-pwa/*
 !dist-pwa/vyapar-pwa.tar.gz
 !dist-pwa/vyapar-pwa.tar.gz.sha256
+
+# Agent artifacts & test scratch
+.agents/
+dist-test/
+

@@ -73,6 +73,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     paidAmount: invoice.paidAmount,
     balanceAmount: thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined,
     partyBalance: thermalSettings.showPartyBalance && party ? party.currentBalance : undefined,
+    paymentSplits: invoice.paymentSplits,
     upiId: thermalSettings.showUpiQr ? company.upiId : undefined,
     terms: thermalSettings.greetingText || company.termsAndConditions,
   };

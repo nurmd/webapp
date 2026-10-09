@@ -1,8 +1,8 @@
-import { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
-import { Invoice } from '../../models/invoice.ts';
-import { PurchaseBill } from '../../models/purchase.ts';
-import { Expense } from '../../models/expense.ts';
-import { Voucher } from './voucherTypes.ts';
+import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
+import type { Invoice } from '../../models/invoice.ts';
+import type { PurchaseBill } from '../../models/purchase.ts';
+import type { Expense } from '../../models/expense.ts';
+import type { Voucher } from './voucherTypes.ts';
 
 export interface CashBankFinancialSummary {
   totalLiquidBalance: number;
@@ -87,31 +87,70 @@ export function computeCashBankSummary(params: {
       }
 
       if (unvoucheredPaid > 0) {
-        const isCash = inv.paymentMode === 'CASH';
-        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+        const splits = (inv.paymentSplits && inv.paymentSplits.length > 0)
+          ? inv.paymentSplits.filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+          : [];
 
-        balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
+        if (splits.length > 0) {
+          const totalSplitsPaid = splits.reduce((sum, s) => sum + s.amount, 0) || unvoucheredPaid;
+          const ratio = unvoucheredPaid / totalSplitsPaid;
 
-        const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
-        if (dateStr === todayStr) {
-          todayInflow += unvoucheredPaid;
+          splits.forEach((s, sIdx) => {
+            const splitAmt = Number((s.amount * ratio).toFixed(2));
+            if (splitAmt <= 0) return;
+            const isCash = s.mode === 'CASH';
+            const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+            const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+            balances[targetAccId] = (balances[targetAccId] || 0) + splitAmt;
+
+            const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
+            if (dateStr === todayStr) {
+              todayInflow += splitAmt;
+            }
+
+            entries.push({
+              id: `LEDGER-SALE-${inv.id}-${sIdx}`,
+              date: dateStr,
+              type: 'SALE',
+              category: isCash ? 'CASH' : 'BANK',
+              accountId: targetAccId,
+              accountName: targetAccName,
+              counterpartyOrTitle: inv.partyName || 'Retail Customer',
+              referenceNo: inv.invoiceNumber,
+              mode: s.mode,
+              flow: 'IN',
+              amount: splitAmt,
+              description: `Sale Receipt #${inv.invoiceNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            });
+          });
+        } else {
+          const isCash = inv.paymentMode === 'CASH';
+          const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+          const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+          balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
+
+          const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
+          if (dateStr === todayStr) {
+            todayInflow += unvoucheredPaid;
+          }
+
+          entries.push({
+            id: `LEDGER-SALE-${inv.id}`,
+            date: dateStr,
+            type: 'SALE',
+            category: isCash ? 'CASH' : 'BANK',
+            accountId: targetAccId,
+            accountName: targetAccName,
+            counterpartyOrTitle: inv.partyName || 'Retail Customer',
+            referenceNo: inv.invoiceNumber,
+            mode: inv.paymentMode || (isCash ? 'CASH' : 'UPI'),
+            flow: 'IN',
+            amount: unvoucheredPaid,
+            description: `Sale Receipt #${inv.invoiceNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+          });
         }
-
-        entries.push({
-          id: `LEDGER-SALE-${inv.id}`,
-          date: dateStr,
-          type: 'SALE',
-          category: isCash ? 'CASH' : 'BANK',
-          accountId: targetAccId,
-          accountName: targetAccName,
-          counterpartyOrTitle: inv.partyName || 'Retail Customer',
-          referenceNo: inv.invoiceNumber,
-          mode: inv.paymentMode || (isCash ? 'CASH' : 'UPI'),
-          flow: 'IN',
-          amount: unvoucheredPaid,
-          description: `Sale Receipt #${inv.invoiceNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
-        });
       }
     }
   });
@@ -149,31 +188,70 @@ export function computeCashBankSummary(params: {
       }
 
       if (unvoucheredPaid > 0) {
-        const isCash = pur.paymentMode === 'CASH';
-        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+        const splits = (pur.paymentSplits && pur.paymentSplits.length > 0)
+          ? pur.paymentSplits.filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+          : [];
 
-        balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
+        if (splits.length > 0) {
+          const totalSplitsPaid = splits.reduce((sum, s) => sum + s.amount, 0) || unvoucheredPaid;
+          const ratio = unvoucheredPaid / totalSplitsPaid;
 
-        const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
-        if (dateStr === todayStr) {
-          todayOutflow += unvoucheredPaid;
+          splits.forEach((s, sIdx) => {
+            const splitAmt = Number((s.amount * ratio).toFixed(2));
+            if (splitAmt <= 0) return;
+            const isCash = s.mode === 'CASH';
+            const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+            const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+            balances[targetAccId] = (balances[targetAccId] || 0) - splitAmt;
+
+            const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
+            if (dateStr === todayStr) {
+              todayOutflow += splitAmt;
+            }
+
+            entries.push({
+              id: `LEDGER-PUR-${pur.id}-${sIdx}`,
+              date: dateStr,
+              type: 'PURCHASE',
+              category: isCash ? 'CASH' : 'BANK',
+              accountId: targetAccId,
+              accountName: targetAccName,
+              counterpartyOrTitle: pur.supplierName || 'Vendor Payment',
+              referenceNo: pur.billNumber,
+              mode: s.mode,
+              flow: 'OUT',
+              amount: splitAmt,
+              description: `Purchase Payment #${pur.billNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            });
+          });
+        } else {
+          const isCash = pur.paymentMode === 'CASH';
+          const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
+          const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+
+          balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
+
+          const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
+          if (dateStr === todayStr) {
+            todayOutflow += unvoucheredPaid;
+          }
+
+          entries.push({
+            id: `LEDGER-PUR-${pur.id}`,
+            date: dateStr,
+            type: 'PURCHASE',
+            category: isCash ? 'CASH' : 'BANK',
+            accountId: targetAccId,
+            accountName: targetAccName,
+            counterpartyOrTitle: pur.supplierName || 'Vendor Payment',
+            referenceNo: pur.billNumber,
+            mode: pur.paymentMode || (isCash ? 'CASH' : 'NET_BANKING'),
+            flow: 'OUT',
+            amount: unvoucheredPaid,
+            description: `Purchase Payment #${pur.billNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+          });
         }
-
-        entries.push({
-          id: `LEDGER-PUR-${pur.id}`,
-          date: dateStr,
-          type: 'PURCHASE',
-          category: isCash ? 'CASH' : 'BANK',
-          accountId: targetAccId,
-          accountName: targetAccName,
-          counterpartyOrTitle: pur.supplierName || 'Vendor Payment',
-          referenceNo: pur.billNumber,
-          mode: pur.paymentMode || (isCash ? 'CASH' : 'NET_BANKING'),
-          flow: 'OUT',
-          amount: unvoucheredPaid,
-          description: `Purchase Payment #${pur.billNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
-        });
       }
     }
   });
@@ -211,21 +289,21 @@ export function computeCashBankSummary(params: {
 
   // 5. Process Payment Vouchers (Receipts / Payments with specific accounts)
   vouchers.forEach((v) => {
-    // Only process explicit receipt / payment vouchers that affect cash or bank
+    // Process explicit receipt / payment vouchers that affect cash or bank
     if (v.voucherType === 'RECEIPT') {
-      const cashOrBankEntry = v.entries.find((e) => e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK');
-      if (cashOrBankEntry && cashOrBankEntry.debit > 0) {
-        const isCash = cashOrBankEntry.accountId === 'ACC_CASH';
+      const cashOrBankEntries = v.entries.filter((e) => (e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK') && e.debit > 0);
+      cashOrBankEntries.forEach((entry, idx) => {
+        const isCash = entry.accountId === 'ACC_CASH';
         const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
         const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
-        const amt = cashOrBankEntry.debit;
+        const amt = entry.debit;
 
         balances[targetAccId] = (balances[targetAccId] || 0) + amt;
         const dateStr = v.date || todayStr;
         if (dateStr === todayStr) todayInflow += amt;
 
         entries.push({
-          id: `LEDGER-VCH-${v.id}`,
+          id: `LEDGER-VCH-${v.id}-${idx}`,
           date: dateStr,
           type: 'PARTY_RECEIPT',
           category: isCash ? 'CASH' : 'BANK',
@@ -238,21 +316,21 @@ export function computeCashBankSummary(params: {
           amount: amt,
           description: v.narration || `Receipt Voucher #${v.voucherNumber}`,
         });
-      }
+      });
     } else if (v.voucherType === 'PAYMENT') {
-      const cashOrBankEntry = v.entries.find((e) => e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK');
-      if (cashOrBankEntry && cashOrBankEntry.credit > 0) {
-        const isCash = cashOrBankEntry.accountId === 'ACC_CASH';
+      const cashOrBankEntries = v.entries.filter((e) => (e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK') && e.credit > 0);
+      cashOrBankEntries.forEach((entry, idx) => {
+        const isCash = entry.accountId === 'ACC_CASH';
         const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
         const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
-        const amt = cashOrBankEntry.credit;
+        const amt = entry.credit;
 
         balances[targetAccId] = (balances[targetAccId] || 0) - amt;
         const dateStr = v.date || todayStr;
         if (dateStr === todayStr) todayOutflow += amt;
 
         entries.push({
-          id: `LEDGER-VCH-${v.id}`,
+          id: `LEDGER-VCH-${v.id}-${idx}`,
           date: dateStr,
           type: 'PARTY_PAYMENT',
           category: isCash ? 'CASH' : 'BANK',
@@ -265,7 +343,7 @@ export function computeCashBankSummary(params: {
           amount: amt,
           description: v.narration || `Payment Voucher #${v.voucherNumber}`,
         });
-      }
+      });
     }
   });
 

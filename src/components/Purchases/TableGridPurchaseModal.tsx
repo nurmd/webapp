@@ -3,7 +3,8 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { PurchaseBill, PurchaseItemEntry, ItcEligibility } from '../../models/purchase.ts';
-import { PaymentMode, PaymentStatus } from '../../models/invoice.ts';
+import { PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
+import { parseSplitsFromPurchase, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
@@ -41,12 +42,6 @@ interface PurchaseGridRow {
   gstRate: number;
 }
 
-interface PaymentSplit {
-  id: string;
-  mode: PaymentMode;
-  amount: number;
-}
-
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'NET_BANKING', label: 'Bank Transfer' },
   { value: 'UPI', label: 'UPI / QR' },
@@ -54,6 +49,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'CARD', label: 'Card' },
   { value: 'CHEQUE', label: 'Cheque' },
   { value: 'CREDIT', label: 'Credit (Unpaid)' },
+  { value: 'SPLIT', label: 'Split Payment' },
 ];
 
 export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
@@ -261,17 +257,18 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   // Payment splits state
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
-    if (initialBill) {
-      if (initialBill.paymentStatus === 'UNPAID' || initialBill.paymentMode === 'CREDIT') {
-        return [{ id: '1', mode: 'CREDIT', amount: 0 }];
-      }
-      return [{ id: '1', mode: initialBill.paymentMode || 'NET_BANKING', amount: initialBill.paidAmount }];
-    }
-    return [{ id: '1', mode: 'NET_BANKING', amount: finalGrandTotal }];
+    return parseSplitsFromPurchase(initialBill, finalGrandTotal);
   });
 
   const [isManualAmount, setIsManualAmount] = useState<boolean>(() => {
-    return Boolean(initialBill && initialBill.paymentStatus === 'PARTIAL');
+    if (!initialBill) return false;
+    const initialSplits = parseSplitsFromPurchase(initialBill, finalGrandTotal);
+    return Boolean(
+      initialSplits.length > 1 ||
+      initialBill.paymentStatus === 'PARTIAL' ||
+      (initialBill.paymentSplits && initialBill.paymentSplits.length > 1) ||
+      (initialBill.notes && (initialBill.notes.includes('Split Payment') || initialBill.notes.includes('Split:')))
+    );
   });
 
   // Auto-sync single non-credit payment with finalGrandTotal
@@ -290,33 +287,34 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   }, [finalGrandTotal, isManualAmount, paymentSplits]);
 
   const totalPaid = useMemo(() => {
-    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
-      return 0;
-    }
-    return paymentSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    return paymentSplits.reduce((sum, s) => {
+      if (s.mode === 'CREDIT') return sum;
+      return sum + (Number(s.amount) || 0);
+    }, 0);
   }, [paymentSplits]);
 
   const balanceDue = useMemo(() => {
-    return Math.max(0, finalGrandTotal - totalPaid);
+    return Math.max(0, Number((finalGrandTotal - totalPaid).toFixed(2)));
   }, [finalGrandTotal, totalPaid]);
 
   const autoPaymentStatus: PaymentStatus = useMemo(() => {
-    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
-      return 'UNPAID';
-    }
     if (finalGrandTotal <= 0) {
       return 'PAID';
     }
     if (totalPaid >= finalGrandTotal) {
       return 'PAID';
     }
-    if (totalPaid > 0 && totalPaid < finalGrandTotal) {
+    if (totalPaid > 0) {
       return 'PARTIAL';
     }
     return 'UNPAID';
-  }, [paymentSplits, totalPaid, finalGrandTotal]);
+  }, [totalPaid, finalGrandTotal]);
 
   const handleUpdateSplitMode = (id: string, newMode: PaymentMode) => {
+    if (newMode === 'SPLIT') {
+      handleAddSplitMode();
+      return;
+    }
     setPaymentSplits((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s;
@@ -326,7 +324,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         return {
           ...s,
           mode: newMode,
-          amount: prev.length === 1 && !isManualAmount ? finalGrandTotal : s.amount,
+          amount: prev.length === 1 && !isManualAmount ? finalGrandTotal : s.mode === 'CREDIT' ? (balanceDue || finalGrandTotal) : s.amount,
         };
       })
     );
@@ -342,16 +340,23 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const handleAddSplitMode = () => {
     setIsManualAmount(true);
     const existingModes = new Set(paymentSplits.map((s) => s.mode));
-    const nextMode: PaymentMode = !existingModes.has('UPI')
-      ? 'UPI'
-      : !existingModes.has('CASH')
-      ? 'CASH'
-      : !existingModes.has('CARD')
-      ? 'CARD'
-      : 'NET_BANKING';
+    const candidateModes: PaymentMode[] = ['NET_BANKING', 'UPI', 'CASH', 'CARD', 'CHEQUE'];
+    const nextMode = candidateModes.find((m) => !existingModes.has(m)) || 'NET_BANKING';
 
-    const currentTotal = paymentSplits.reduce((acc, s) => acc + (Number(s.amount) || 0), 0);
-    const remaining = Math.max(0, finalGrandTotal - currentTotal);
+    const currentNonCreditTotal = paymentSplits.reduce(
+      (acc, s) => (s.mode === 'CREDIT' ? acc : acc + (Number(s.amount) || 0)),
+      0
+    );
+    const remaining = Math.max(0, Number((finalGrandTotal - currentNonCreditTotal).toFixed(2)));
+
+    // If single CREDIT row exists, convert row 1 to NET_BANKING and add CREDIT row
+    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
+      setPaymentSplits([
+        { id: '1', mode: 'NET_BANKING', amount: 0 },
+        { id: String(Date.now()), mode: 'CREDIT', amount: 0 },
+      ]);
+      return;
+    }
 
     setPaymentSplits([
       ...paymentSplits,
@@ -365,7 +370,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   const handleRemoveSplit = (id: string) => {
     const updated = paymentSplits.filter((s) => s.id !== id);
-    if (updated.length === 1 && updated[0].amount >= finalGrandTotal) {
+    if (updated.length === 1 && (updated[0].amount >= finalGrandTotal || updated[0].mode === 'CREDIT')) {
       setIsManualAmount(false);
     }
     setPaymentSplits(updated);
@@ -475,13 +480,22 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     const supState = supplierStateCode || selectedSupplier?.stateCode || company.stateCode;
     const isIntra = supState === company.stateCode;
 
-    let resolvedPaymentMode: PaymentMode = paymentSplits[0]?.mode || 'NET_BANKING';
-    if (autoPaymentStatus === 'UNPAID' && paymentSplits[0]?.mode === 'CREDIT') {
+    const nonCreditSplits = paymentSplits.filter((s) => s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0);
+    let resolvedPaymentMode: PaymentMode;
+    if (autoPaymentStatus === 'UNPAID' || nonCreditSplits.length === 0) {
       resolvedPaymentMode = 'CREDIT';
-    } else if (paymentSplits.length > 1) {
-      const nonCredit = paymentSplits.find((s) => s.mode !== 'CREDIT');
-      resolvedPaymentMode = nonCredit ? nonCredit.mode : paymentSplits[0].mode;
+    } else if (nonCreditSplits.length === 1 && balanceDue <= 0.01) {
+      resolvedPaymentMode = nonCreditSplits[0].mode;
+    } else {
+      resolvedPaymentMode = 'SPLIT';
     }
+
+    const splitNote = formatSplitNotes(paymentSplits, balanceDue);
+    const savedSplits: PaymentSplit[] = paymentSplits.map((s) => ({
+      id: s.id,
+      mode: s.mode,
+      amount: s.mode === 'CREDIT' ? balanceDue : Number(s.amount) || 0,
+    }));
 
     const purchaseItems: PurchaseItemEntry[] = rows.map((r, idx) => {
       const calcItem = calcSummary.items[idx];
@@ -534,6 +548,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       balanceAmount: balanceDue,
       paymentMode: resolvedPaymentMode,
       paymentStatus: autoPaymentStatus,
+      paymentSplits: savedSplits,
+      notes: splitNote || initialBill?.notes,
       createdAt: initialBill ? initialBill.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1174,21 +1190,21 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                         type="number"
                         min="0"
                         step="any"
-                        value={split.amount || ''}
-                        onChange={(e) => handleUpdateSplitAmount(split.id, Number(e.target.value) || 0)}
+                        value={split.amount === 0 ? '' : split.amount}
+                        onChange={(e) => handleUpdateSplitAmount(split.id, e.target.value === '' ? 0 : Number(e.target.value))}
                         placeholder="0.00"
                         className="w-full h-8 pl-5 pr-2 rounded-lg bg-surface-container-low text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-orange-500 transition-all"
                       />
                     </div>
                   ) : (
                     <div className="flex-1 h-8 px-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300 font-medium flex items-center justify-between">
-                      <span className="truncate">Vendor Payable Balance</span>
-                      <span className="font-tabular-data font-bold shrink-0">{formatINR(finalGrandTotal)}</span>
+                      <span className="truncate">Vendor Payable Balance (Credit)</span>
+                      <span className="font-tabular-data font-bold shrink-0">{formatINR(balanceDue)}</span>
                     </div>
                   )}
 
                   {/* Plus button next to it for split payment modes */}
-                  {index === 0 && split.mode !== 'CREDIT' && (
+                  {index === 0 && (
                     <button
                       type="button"
                       onClick={handleAddSplitMode}
@@ -1213,6 +1229,18 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                   )}
                 </div>
               ))}
+              {paymentSplits.length > 1 && paymentSplits.length < 5 && (
+                <div className="flex justify-end pt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleAddSplitMode}
+                    className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:opacity-80 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">add_circle</span>
+                    <span>Add another tender mode</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           {/* Bottom spacing clearance to prevent overlap with sticky action dock */}

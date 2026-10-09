@@ -23,6 +23,7 @@ export interface ThermalReceiptData {
   paidAmount?: number;
   balanceAmount?: number;
   partyBalance?: number;
+  paymentSplits?: Array<{ mode: string; amount: number }>;
   upiId?: string;
   terms?: string;
   stateName?: string;
@@ -105,7 +106,13 @@ export function formatThermalReceiptText(
   lines.push(padRow('GRAND TOTAL:', `Rs. ${data.grandTotal.toFixed(2)}`, width));
   lines.push(doubleLine);
 
-  if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+  if (data.paymentSplits && data.paymentSplits.length > 1) {
+    data.paymentSplits.forEach((s) => {
+      if (s.mode !== 'CREDIT' && s.amount > 0) {
+        lines.push(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+      }
+    });
+  } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
     lines.push(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
   }
   if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {

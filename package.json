@@ -1,6 +1,6 @@
 {
   "name": "gst-billing-app",
-  "version": "1.1.11",
+  "version": "1.1.12",
   "private": true,
   "description": "Cross-platform GST Billing & Accounting Application (Web, Android, iOS, Windows, Linux)",
   "type": "module",
@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test:gst": "node --loader ts-node/esm scripts/test-gst-engine.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:gst": "node --experimental-strip-types scripts/test-gst-engine.ts",
+    "test:gstr": "node --experimental-strip-types scripts/test-gstr-engine.ts",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
@@ -34,9 +37,11 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.6.1",
+    "happy-dom": "^15.11.7",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.5.4",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }

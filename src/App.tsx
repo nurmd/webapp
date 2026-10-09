@@ -4,7 +4,7 @@ import { pouch } from './services/pouchdb.ts';
 import { CompanyProfile } from './models/company.ts';
 import { Party } from './models/party.ts';
 import { InventoryItem, StockAdjustment } from './models/item.ts';
-import { Invoice } from './models/invoice.ts';
+import { Invoice, PaymentSplit, PaymentMode } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
 import { Expense } from './models/expense.ts';
 import { Voucher } from './core/accounting/voucherTypes.ts';
@@ -283,6 +283,8 @@ export const App: React.FC = () => {
       cessAmount: newInvoice.totalCess,
       grandTotal: newInvoice.grandTotal,
       isCashSale: newInvoice.paymentMode === 'CASH',
+      roundOff: newInvoice.roundOff,
+      paymentSplits: newInvoice.paymentSplits,
     });
     db.saveVoucher(voucher);
 
@@ -339,6 +341,8 @@ export const App: React.FC = () => {
       cessAmount: newBill.totalCess,
       grandTotal: newBill.grandTotal,
       isCashPurchase: newBill.paymentMode === 'CASH',
+      roundOff: newBill.roundOff,
+      paymentSplits: newBill.paymentSplits,
     });
     db.saveVoucher(voucher);
 
@@ -398,7 +402,8 @@ export const App: React.FC = () => {
     amount: number,
     paymentMode: string,
     notes: string,
-    paymentType?: 'IN' | 'OUT'
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[]
   ) => {
     const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
     const newBal = isPaymentIn
@@ -414,7 +419,7 @@ export const App: React.FC = () => {
 
     const docId = Date.now().toString().slice(-6);
     if (isPaymentIn) {
-      // 1. Create Double-Entry Receipt Voucher
+      // 1. Create Double-Entry Receipt Voucher with Split Support
       const voucher = createPaymentReceiptVoucher({
         receiptNumber: `RCPT-${docId}`,
         date: new Date().toISOString().split('T')[0],
@@ -422,6 +427,7 @@ export const App: React.FC = () => {
         customerId: party.id,
         amount,
         paymentMode,
+        paymentSplits,
         narration: notes || `Payment received from ${party.name}`,
       });
       db.saveVoucher(voucher);
@@ -442,18 +448,52 @@ export const App: React.FC = () => {
         const settleAmt = Math.min(remaining, inv.balanceAmount);
         const newPaid = inv.paidAmount + settleAmt;
         const newBalInv = inv.grandTotal - newPaid;
+
+        // Maintain payment splits on settled invoice
+        const updatedSplits: PaymentSplit[] = (inv.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
+        if (paymentSplits && paymentSplits.length > 0) {
+          const ratio = amount > 0 ? settleAmt / amount : 1;
+          paymentSplits.forEach((s) => {
+            if (s.amount > 0 && s.mode !== 'CREDIT') {
+              updatedSplits.push({
+                id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                mode: s.mode,
+                amount: Number((s.amount * ratio).toFixed(2)),
+              });
+            }
+          });
+        } else {
+          updatedSplits.push({
+            id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            mode: (paymentMode as PaymentMode) || 'CASH',
+            amount: settleAmt,
+          });
+        }
+        if (newBalInv > 0) {
+          updatedSplits.push({
+            id: `split-bal-${Date.now()}`,
+            mode: 'CREDIT',
+            amount: newBalInv,
+          });
+        }
+
+        const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
+        const resolvedMode: PaymentMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || 'CASH');
+
         const updatedInv: Invoice = {
           ...inv,
           paidAmount: newPaid,
           balanceAmount: Math.max(0, newBalInv),
           paymentStatus: newBalInv <= 0.01 ? 'PAID' : 'PARTIAL',
+          paymentMode: resolvedMode,
+          paymentSplits: updatedSplits,
           updatedAt: new Date().toISOString(),
         };
         db.saveInvoice(updatedInv);
         remaining -= settleAmt;
       }
     } else {
-      // 1. Create Double-Entry Payment Out Voucher
+      // 1. Create Double-Entry Payment Out Voucher with Split Support
       const voucher = createPaymentOutVoucher({
         voucherNumber: `PYMT-${docId}`,
         date: new Date().toISOString().split('T')[0],
@@ -461,6 +501,7 @@ export const App: React.FC = () => {
         supplierId: party.id,
         amount,
         paymentMode,
+        paymentSplits,
         narration: notes || `Payment disbursed to ${party.name}`,
       });
       db.saveVoucher(voucher);
@@ -481,11 +522,44 @@ export const App: React.FC = () => {
         const settleAmt = Math.min(remaining, pur.balanceAmount);
         const newPaid = pur.paidAmount + settleAmt;
         const newBalPur = pur.grandTotal - newPaid;
+
+        const updatedSplits: PaymentSplit[] = (pur.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
+        if (paymentSplits && paymentSplits.length > 0) {
+          const ratio = amount > 0 ? settleAmt / amount : 1;
+          paymentSplits.forEach((s) => {
+            if (s.amount > 0 && s.mode !== 'CREDIT') {
+              updatedSplits.push({
+                id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                mode: s.mode,
+                amount: Number((s.amount * ratio).toFixed(2)),
+              });
+            }
+          });
+        } else {
+          updatedSplits.push({
+            id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            mode: (paymentMode as PaymentMode) || 'CASH',
+            amount: settleAmt,
+          });
+        }
+        if (newBalPur > 0) {
+          updatedSplits.push({
+            id: `split-bal-${Date.now()}`,
+            mode: 'CREDIT',
+            amount: newBalPur,
+          });
+        }
+
+        const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
+        const resolvedMode: PaymentMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || 'CASH');
+
         const updatedPur: PurchaseBill = {
           ...pur,
           paidAmount: newPaid,
           balanceAmount: Math.max(0, newBalPur),
           paymentStatus: newBalPur <= 0.01 ? 'PAID' : 'PARTIAL',
+          paymentMode: resolvedMode,
+          paymentSplits: updatedSplits,
           updatedAt: new Date().toISOString(),
         };
         db.savePurchase(updatedPur);

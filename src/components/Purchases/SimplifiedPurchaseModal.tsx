@@ -175,23 +175,43 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         </div>
 
         {/* Compact Payment Status Bar */}
-        <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-surface-container text-xs">
-          <span className="text-[11px] text-on-surface-variant font-medium">
-            Payment ({bill.paymentMode || 'Cash'}):
-          </span>
-          <span className="text-[11px] font-bold">
-            {bill.balanceAmount <= 0.01 ? (
-              <span className="text-secondary flex items-center gap-1 font-bold">
-                <span className="material-symbols-outlined text-[15px]">check_circle</span>
-                Fully Settled
-              </span>
-            ) : (
-              <span className="text-on-surface">
-                Paid: <span className="text-secondary">{formatINR(bill.paidAmount)}</span> • Due:{' '}
-                <span className="text-error">{formatINR(bill.balanceAmount)}</span>
-              </span>
-            )}
-          </span>
+        <div className="flex flex-col gap-1 px-3 py-1.5 rounded-xl bg-surface-container text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-on-surface-variant font-medium">
+              Payment ({bill.paymentMode === 'SPLIT' ? 'Split Tender' : (bill.paymentMode || 'Cash')}):
+            </span>
+            <span className="text-[11px] font-bold">
+              {bill.balanceAmount <= 0.01 ? (
+                <span className="text-secondary flex items-center gap-1 font-bold">
+                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                  Fully Settled
+                </span>
+              ) : (
+                <span className="text-on-surface">
+                  Paid: <span className="text-secondary">{formatINR(bill.paidAmount)}</span> • Due:{' '}
+                  <span className="text-error">{formatINR(bill.balanceAmount)}</span>
+                </span>
+              )}
+            </span>
+          </div>
+          {/* Split Tender Breakdown */}
+          {((bill.paymentSplits && bill.paymentSplits.length > 1) || (bill.notes && bill.notes.includes('Split'))) && (
+            <div className="flex flex-wrap gap-1.5 pt-0.5 border-t border-outline-variant/15 text-[10px]">
+              {bill.paymentSplits && bill.paymentSplits.length > 0
+                ? bill.paymentSplits
+                    .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+                    .map((s, idx) => (
+                      <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant">
+                        {s.mode}: {formatINR(s.amount)}
+                      </span>
+                    ))
+                : (bill.notes?.replace('Split Payment — ', '') || '').split(', ').map((chunk, idx) => (
+                    <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant">
+                      {chunk}
+                    </span>
+                  ))}
+            </div>
+          )}
         </div>
 
         {/* Bottom Actions Bar */}
