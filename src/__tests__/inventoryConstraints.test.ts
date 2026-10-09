@@ -487,4 +487,117 @@ describe('Suite 6: Inventory Constraints & Historic Integrity', () => {
     };
     expect(isLowStock(item5 as InventoryItem)).toBe(true);
   });
+
+  // =========================================================================
+  // TC-INVC-13: Negative Stock Allowance Toggle in Stock Calculations
+  // =========================================================================
+  it('TC-INVC-13: calculateStockDecrement respects allowNegativeStock parameter', () => {
+    // Default / false: Clamps to 0
+    expect(calculateStockDecrement(10, 15, false)).toBe(0);
+    expect(calculateStockDecrement(10, 15)).toBe(0);
+    expect(calculateStockDecrement(0, 5, false)).toBe(0);
+    expect(calculateStockDecrement(-2, 3, false)).toBe(0);
+
+    // Enabled (true): Allows negative stock drops
+    expect(calculateStockDecrement(10, 15, true)).toBe(-5);
+    expect(calculateStockDecrement(0, 5, true)).toBe(-5);
+    expect(calculateStockDecrement(-2, 3, true)).toBe(-5);
+    expect(calculateStockDecrement(10, 4, true)).toBe(6);
+  });
+
+  // =========================================================================
+  // TC-INVC-14: Sales Invoice Decrement with Negative Stock Allowed
+  // =========================================================================
+  it('TC-INVC-14: applyInvoiceStockDecrement allows negative stock when allowNegativeStock is true', () => {
+    const catalog: InventoryItem[] = [
+      {
+        id: 'ITM-NEG',
+        name: 'Oversold Item',
+        hsnSacCode: '1234',
+        category: 'Goods',
+        unit: 'PCS',
+        salePrice: 200,
+        purchasePrice: 100,
+        gstRate: 18,
+        currentStock: 5,
+        minStockAlert: 2,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const lines: InvoiceItemEntry[] = [
+      {
+        itemId: 'ITM-NEG',
+        name: 'Oversold Item',
+        hsnSacCode: '1234',
+        unit: 'PCS',
+        quantity: 12,
+        unitPrice: 200,
+        taxableAmount: 2400,
+        gstRate: 18,
+        cgstAmount: 216,
+        sgstAmount: 216,
+        igstAmount: 0,
+        cessAmount: 0,
+        totalAmount: 2832,
+      },
+    ];
+
+    // When allowNegativeStock = false -> 5 - 12 clamped to 0
+    const clamped = applyInvoiceStockDecrement(catalog, lines, false);
+    expect(clamped[0].currentStock).toBe(0);
+
+    // When allowNegativeStock = true -> 5 - 12 results in -7
+    const negative = applyInvoiceStockDecrement(catalog, lines, true);
+    expect(negative[0].currentStock).toBe(-7);
+  });
+
+  // =========================================================================
+  // TC-INVC-15: Purchase Deletion Decrement with Negative Stock Allowed
+  // =========================================================================
+  it('TC-INVC-15: applyPurchaseStockDecrement allows negative stock when allowNegativeStock is true', () => {
+    const catalog: InventoryItem[] = [
+      {
+        id: 'ITM-PUR-DEL',
+        name: 'Purchase Item',
+        hsnSacCode: '1234',
+        category: 'Goods',
+        unit: 'PCS',
+        salePrice: 200,
+        purchasePrice: 100,
+        gstRate: 18,
+        currentStock: 3,
+        minStockAlert: 2,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const deletedLines: PurchaseItemEntry[] = [
+      {
+        itemId: 'ITM-PUR-DEL',
+        name: 'Purchase Item',
+        hsnSacCode: '1234',
+        unit: 'PCS',
+        quantity: 8,
+        unitPrice: 100,
+        taxableAmount: 800,
+        gstRate: 18,
+        cgstAmount: 72,
+        sgstAmount: 72,
+        igstAmount: 0,
+        cessAmount: 0,
+        totalAmount: 944,
+      },
+    ];
+
+    // When allowNegativeStock = false -> 3 - 8 clamped to 0
+    const clamped = applyPurchaseStockDecrement(catalog, deletedLines, false);
+    expect(clamped[0].currentStock).toBe(0);
+
+    // When allowNegativeStock = true -> 3 - 8 results in -5
+    const negative = applyPurchaseStockDecrement(catalog, deletedLines, true);
+    expect(negative[0].currentStock).toBe(-5);
+  });
 });

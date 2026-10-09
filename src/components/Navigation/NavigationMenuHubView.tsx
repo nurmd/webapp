@@ -312,6 +312,21 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       action: () => onNavigate('inventory'),
       keywords: ['low stock', 'reorder', 'alert', 'shortage'],
     },
+    {
+      id: 'items_inventory_settings',
+      title: 'Items & Inventory Settings',
+      subtitle: 'Allow negative stock, purchase price visibility & stock accounting rules',
+      icon: 'settings_suggest',
+      category: 'inventory',
+      badge: { text: 'Config', type: 'neutral' },
+      action: () => {
+        onNavigate('settings');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'items' }));
+        }, 50);
+      },
+      keywords: ['item settings', 'negative stock', 'inventory settings', 'stock rules', 'buy price', 'items'],
+    },
 
     // Accounting & Finance
     {
@@ -415,6 +430,21 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         }, 120);
       },
       keywords: ['tax', 'gstin', 'composition', 'hsn', 'settings'],
+    },
+    {
+      id: 'items_settings_config',
+      title: 'Items & Stock Settings',
+      subtitle: 'Allow negative stock, overselling control & purchase price visibility',
+      icon: 'inventory_2',
+      category: 'settings',
+      badge: { text: 'Inventory', type: 'neutral' },
+      action: () => {
+        onNavigate('settings');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'items' }));
+        }, 50);
+      },
+      keywords: ['item settings', 'negative stock', 'stock control', 'inventory settings', 'allow negative stock'],
     },
     {
       id: 'print_themes',

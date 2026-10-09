@@ -49,7 +49,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   // Handle party change
   const handlePartySelect = (partyId: string) => {
     setSelectedPartyId(partyId);
-    const p = parties.find((party) => party.id === partyId);
+    const p = parties.find((party) => party.id === partyId) || db.getParties().find((party) => party.id === partyId);
     if (p) {
       setCustomerName(p.name);
       setCustomerGstin(p.gstin || '');

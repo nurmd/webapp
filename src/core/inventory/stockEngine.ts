@@ -35,13 +35,18 @@ export function findMatchingItem(
 }
 
 /**
- * Pure calculation: Decrements stock by quantity sold, clamped to minimum 0.
- * Ensures stock never drops below zero (non-negative stock constraint).
+ * Pure calculation: Decrements stock by quantity sold.
+ * When allowNegativeStock is false (default), clamped to minimum 0 (non-negative constraint).
+ * When allowNegativeStock is true, stock can drop below zero (recording negative inventory balances).
  */
-export function calculateStockDecrement(currentStock: number, quantitySold: number): number {
+export function calculateStockDecrement(
+  currentStock: number,
+  quantitySold: number,
+  allowNegativeStock: boolean = false
+): number {
   const stock = typeof currentStock === 'number' && !isNaN(currentStock) ? currentStock : 0;
   const qty = typeof quantitySold === 'number' && !isNaN(quantitySold) ? Math.max(0, quantitySold) : 0;
-  return Math.max(0, stock - qty);
+  return allowNegativeStock ? stock - qty : Math.max(0, stock - qty);
 }
 
 /**
@@ -64,12 +69,14 @@ export function isLowStock(item: Pick<InventoryItem, 'currentStock' | 'minStockA
 
 /**
  * Decrements catalog item stock for each line item in a sales invoice.
- * Stock is clamped to 0 on overselling (never drops below zero).
+ * When allowNegativeStock is false (default), stock is clamped to 0.
+ * When allowNegativeStock is true, negative inventory balances are permitted.
  * Returns a new array with updated items (pure, immutable).
  */
 export function applyInvoiceStockDecrement(
   catalogItems: InventoryItem[],
-  invoiceItems: Array<InvoiceItemEntry | StockLineItem>
+  invoiceItems: Array<InvoiceItemEntry | StockLineItem>,
+  allowNegativeStock: boolean = false
 ): InventoryItem[] {
   const itemsList = catalogItems.map((item) => ({ ...item }));
   const now = new Date().toISOString();
@@ -77,7 +84,7 @@ export function applyInvoiceStockDecrement(
   for (const line of invoiceItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity);
+      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity, allowNegativeStock);
       match.updatedAt = now;
     }
   }
@@ -117,10 +124,11 @@ export function restoreInvoiceStock(
 export function revertInvoiceStockAdjustment(
   catalogItems: InventoryItem[],
   previousInvoiceItems: Array<InvoiceItemEntry | StockLineItem>,
-  newInvoiceItems: Array<InvoiceItemEntry | StockLineItem>
+  newInvoiceItems: Array<InvoiceItemEntry | StockLineItem>,
+  allowNegativeStock: boolean = false
 ): InventoryItem[] {
   const restored = restoreInvoiceStock(catalogItems, previousInvoiceItems);
-  return applyInvoiceStockDecrement(restored, newInvoiceItems);
+  return applyInvoiceStockDecrement(restored, newInvoiceItems, allowNegativeStock);
 }
 
 /**
@@ -151,12 +159,13 @@ export function applyPurchaseStockIncrement(
 
 /**
  * Decrements catalog item stock when a purchase bill is deleted or cancelled.
- * Stock is clamped to 0 if decrement exceeds stock.
+ * When allowNegativeStock is false (default), stock is clamped to 0.
  * Returns a new array with updated items (pure, immutable).
  */
 export function applyPurchaseStockDecrement(
   catalogItems: InventoryItem[],
-  purchaseItems: Array<PurchaseItemEntry | InvoiceItemEntry | StockLineItem>
+  purchaseItems: Array<PurchaseItemEntry | InvoiceItemEntry | StockLineItem>,
+  allowNegativeStock: boolean = false
 ): InventoryItem[] {
   const itemsList = catalogItems.map((item) => ({ ...item }));
   const now = new Date().toISOString();
@@ -164,7 +173,7 @@ export function applyPurchaseStockDecrement(
   for (const line of purchaseItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity);
+      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity, allowNegativeStock);
       match.updatedAt = now;
     }
   }
@@ -181,9 +190,10 @@ export function applyPurchaseStockDecrement(
 export function revertPurchaseStockAdjustment(
   catalogItems: InventoryItem[],
   previousPurchaseItems: Array<PurchaseItemEntry | InvoiceItemEntry | StockLineItem>,
-  newPurchaseItems: Array<PurchaseItemEntry | InvoiceItemEntry | StockLineItem>
+  newPurchaseItems: Array<PurchaseItemEntry | InvoiceItemEntry | StockLineItem>,
+  allowNegativeStock: boolean = false
 ): InventoryItem[] {
-  const reverted = applyPurchaseStockDecrement(catalogItems, previousPurchaseItems);
+  const reverted = applyPurchaseStockDecrement(catalogItems, previousPurchaseItems, allowNegativeStock);
   return applyPurchaseStockIncrement(reverted, newPurchaseItems);
 }
 
@@ -193,7 +203,8 @@ export function revertPurchaseStockAdjustment(
  */
 export function applyStockAdjustmentRecord(
   catalogItems: InventoryItem[],
-  adjustment: StockAdjustment
+  adjustment: StockAdjustment,
+  allowNegativeStock: boolean = false
 ): InventoryItem[] {
   const itemsList = catalogItems.map((item) => ({ ...item }));
   const match = itemsList.find((i) => i.id === adjustment.itemId);
@@ -201,7 +212,7 @@ export function applyStockAdjustmentRecord(
     if (adjustment.type === 'STOCK_IN') {
       match.currentStock = calculateStockIncrement(match.currentStock, adjustment.quantity);
     } else {
-      match.currentStock = calculateStockDecrement(match.currentStock, adjustment.quantity);
+      match.currentStock = calculateStockDecrement(match.currentStock, adjustment.quantity, allowNegativeStock);
     }
     match.updatedAt = new Date().toISOString();
   }

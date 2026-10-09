@@ -41,6 +41,8 @@ export interface GeneralSettingsTabProps {
   handleDefaultPrintOptionChange: (opt: string) => void;
   showBuyPricesGlobally: boolean;
   handleToggleBuyPriceVisibility: (show: boolean) => void;
+  allowNegativeStock?: boolean;
+  handleToggleNegativeStock?: (allow: boolean) => void;
 }
 
 export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
@@ -81,6 +83,8 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
   handleDefaultPrintOptionChange,
   showBuyPricesGlobally,
   handleToggleBuyPriceVisibility,
+  allowNegativeStock = false,
+  handleToggleNegativeStock,
 }) => {
   return (
     <>
@@ -659,6 +663,39 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Allow Negative Stock Toggle */}
+          {handleToggleNegativeStock && (
+            <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+                  <span className="material-symbols-outlined text-[22px]">production_quantity_limits</span>
+                </div>
+                <div className="flex-1 min-w-0 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-label-md text-sm font-bold text-on-surface">Allow Negative Stock</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Inventory Policy</span>
+                  </div>
+                  <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                    {allowNegativeStock
+                      ? 'Allowed: Invoices can be created when stock is zero, tracking negative balances.'
+                      : 'Blocked: Stock clamped to 0 and cannot drop below zero.'}
+                  </div>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={allowNegativeStock}
+                  onChange={(e) => handleToggleNegativeStock(e.target.checked)}
+                  className="sr-only peer"
+                  aria-label="Toggle Allow Negative Stock"
+                />
+                <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+              </label>
+            </div>
+          )}
 
           {/* Buy Price Global Show / Hidden Privacy Toggle */}
           <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">

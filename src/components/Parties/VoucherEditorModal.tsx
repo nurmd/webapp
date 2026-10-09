@@ -365,21 +365,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       db.saveParty({ ...party, currentBalance: party.currentBalance - amt, updatedAt: new Date().toISOString() });
       db.recalculatePartyBalance(party.id);
     } else if (entry.isOpening) {
-      const hasOldExplicit = typeof party.openingBalance === 'number';
-      const oldRawOpening = hasOldExplicit ? party.openingBalance! : 0;
-      const oldType = party.openingBalanceType || (party.type === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
-      const oldSignedOpening = oldRawOpening > 0 ? (oldType === 'TO_RECEIVE' ? oldRawOpening : -oldRawOpening) : 0;
-
-      const updatedParty: Party = {
-        ...party,
-        openingBalance: undefined,
-        openingBalanceType: undefined,
-        openingBalanceDate: undefined,
-        currentBalance: party.currentBalance - oldSignedOpening,
-        updatedAt: new Date().toISOString(),
-      };
-      db.saveParty(updatedParty);
-      db.recalculatePartyBalance(party.id);
+      db.clearPartyOpeningBalance(party.id);
     }
 
     onClose();

@@ -143,6 +143,10 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
 
       const delta = newSignedOpening - oldSignedOpening;
       finalCurrentBalance = editingParty.currentBalance + delta;
+
+      if (numOpening === 0 && hasOldExplicit && oldRawOpening !== 0) {
+        db.clearPartyOpeningBalance(editingParty.id);
+      }
     }
 
     const partyToSave: Party = {
@@ -157,7 +161,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       billingAddress: address.trim() || 'Local Counter',
       shippingAddress: hasSeparateShipping ? shippingAddress.trim() : undefined,
       creditLimit: numCreditLimit && numCreditLimit > 0 ? numCreditLimit : undefined,
-      openingBalance: numOpening > 0 ? numOpening : undefined,
+      openingBalance: numOpening > 0 ? numOpening : 0,
       openingBalanceType: numOpening > 0 ? openingBalanceType : undefined,
       openingBalanceDate: numOpening > 0 ? openingBalanceDate : undefined,
       currentBalance: finalCurrentBalance,

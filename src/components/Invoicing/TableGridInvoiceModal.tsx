@@ -59,6 +59,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [localParties, setLocalParties] = useState<Party[]>(parties);
   useEffect(() => {
     setLocalParties(parties);
+    if (selectedParty?.id) {
+      const fresh = parties.find((p) => p.id === selectedParty.id) || db.getParties().find((p) => p.id === selectedParty.id);
+      if (fresh) {
+        setSelectedParty(fresh);
+      }
+    }
   }, [parties]);
 
   const [isAddPartyModalOpen, setIsAddPartyModalOpen] = useState(false);
@@ -91,8 +97,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Party selection
   const [selectedParty, setSelectedParty] = useState<Party | null>(() => {
     if (initialInvoice) {
-      const found = parties.find(
-        (p) => p.id === initialInvoice.partyId || p.name === initialInvoice.partyName
+      const dbParties = db.getParties();
+      const allKnownParties = [...parties, ...dbParties.filter((dp) => !parties.some((p) => p.id === dp.id))];
+      const found = allKnownParties.find(
+        (p) =>
+          (initialInvoice.partyId && p.id === initialInvoice.partyId) ||
+          (p.name && initialInvoice.partyName && p.name.trim().toLowerCase() === initialInvoice.partyName.trim().toLowerCase())
       );
       if (found) return found;
       return {
@@ -110,7 +120,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       };
     }
     if (initialParty) {
-      return initialParty;
+      const dbParty = initialParty.id ? db.getParties().find((p) => p.id === initialParty.id) : null;
+      return dbParty || initialParty;
     }
     return null;
   });
@@ -723,8 +734,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         <SelectPartyModal
           parties={localParties}
           onSelectParty={(p) => {
-            setSelectedParty(p);
-            setPosStateCode(p.stateCode);
+            const fresh = (p.id ? db.getParties().find((item) => item.id === p.id) : null) || p;
+            setSelectedParty(fresh);
+            setPosStateCode(fresh.stateCode);
             setIsPartyModalOpen(false);
           }}
           onClose={() => setIsPartyModalOpen(false)}

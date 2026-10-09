@@ -885,6 +885,14 @@ export const App: React.FC = () => {
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
             onScanBarcodeClick={() => handleSelectTab('pos')}
+            onOpenSettings={(tab) => {
+              handleSelectTab('settings');
+              if (tab) {
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: tab }));
+                }, 50);
+              }
+            }}
           />
         )}
 

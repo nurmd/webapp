@@ -11,6 +11,7 @@ import { PrintSettingsView } from './PrintSettingsView.tsx';
 import { AuditLogView } from '../Audit/AuditLogView.tsx';
 import { CompanyProfileTab } from './CompanyProfileTab.tsx';
 import { GeneralSettingsTab } from './GeneralSettingsTab.tsx';
+import { ItemSettingsTab } from './ItemSettingsTab.tsx';
 import { EditBusinessProfileModal } from './modals/EditBusinessProfileModal.tsx';
 import { StoreQrModal } from './modals/StoreQrModal.tsx';
 import { DevicePairModals } from './modals/DevicePairModals.tsx';
@@ -19,14 +20,18 @@ import { SettingsSubModal } from './modals/SettingsSubModal.tsx';
 interface CompanySettingsViewProps {
   company: CompanyProfile;
   onSave: (updated: CompanyProfile) => void;
+  initialTab?: 'profile' | 'items' | 'general' | 'print' | 'audit';
 }
 
 export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   company,
   onSave,
+  initialTab,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>({ ...company });
-  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'print' | 'audit'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'items' | 'general' | 'print' | 'audit'>(() => {
+    return initialTab || 'profile';
+  });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
@@ -80,6 +85,28 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2000);
   };
+
+  // Inventory Negative Stock Preference
+  const [allowNegativeStock, setAllowNegativeStock] = useState<boolean>(() => {
+    return db.getAllowNegativeStock();
+  });
+
+  const handleToggleNegativeStock = (enabled: boolean) => {
+    setAllowNegativeStock(enabled);
+    db.setAllowNegativeStock(enabled);
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2000);
+  };
+
+  useEffect(() => {
+    const handleSwitch = (e: any) => {
+      if (e.detail && ['profile', 'items', 'general', 'print', 'audit'].includes(e.detail)) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener('switch_settings_tab', handleSwitch);
+    return () => window.removeEventListener('switch_settings_tab', handleSwitch);
+  }, []);
 
   const isAnySettingsModalOpen =
     isEditModalOpen ||
@@ -257,13 +284,14 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         isGstEnabled: isGstActive,
         appLanguage,
         isAppLockEnabled,
+        allowNegativeStock,
         // Explicitly exclude any printer / printing / device-local privacy settings
       };
       return btoa(unescape(encodeURIComponent(JSON.stringify(fullSettings))));
     } catch {
       return '';
     }
-  }, [profile, isGstActive, appLanguage, isAppLockEnabled]);
+  }, [profile, isGstActive, appLanguage, isAppLockEnabled, allowNegativeStock]);
 
   const handleCopySyncCode = () => {
     if (allSettingsSyncPayload) {
@@ -299,6 +327,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       onSave(incomingCompany);
       if (parsed.appLanguage) setAppLanguage(parsed.appLanguage);
       if (parsed.isAppLockEnabled !== undefined) setIsAppLockEnabled(parsed.isAppLockEnabled);
+      if (parsed.allowNegativeStock !== undefined) {
+        setAllowNegativeStock(parsed.allowNegativeStock);
+        db.setAllowNegativeStock(parsed.allowNegativeStock);
+      }
 
       // Save all settings excluding printing and local privacy preferences
       db.syncAllSettingsAcrossDevices({
@@ -306,6 +338,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         isGstEnabled: incomingCompany.isGstEnabled ?? true,
         appLanguage: parsed.appLanguage || appLanguage,
         isAppLockEnabled: parsed.isAppLockEnabled !== undefined ? parsed.isAppLockEnabled : isAppLockEnabled,
+        allowNegativeStock: parsed.allowNegativeStock !== undefined ? parsed.allowNegativeStock : allowNegativeStock,
       });
 
       setProfile(incomingCompany);
@@ -345,10 +378,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="flex bg-surface-container-low rounded-xl p-1 gap-1 sticky top-[72px] z-40 backdrop-blur-md bg-opacity-90 shadow-sm border border-outline-variant/20">
+      <div className="flex bg-surface-container-low rounded-xl p-1 gap-1 sticky top-[72px] z-40 backdrop-blur-md bg-opacity-90 shadow-sm border border-outline-variant/20 overflow-x-auto no-scrollbar">
         <button
           type="button"
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+          className={`flex-1 py-2.5 px-3 whitespace-nowrap rounded-lg text-sm font-bold transition-all ${
             activeTab === 'profile'
               ? 'bg-surface-container-lowest text-on-surface shadow-sm'
               : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -359,7 +392,18 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </button>
         <button
           type="button"
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+          className={`flex-1 py-2.5 px-3 whitespace-nowrap rounded-lg text-sm font-bold transition-all ${
+            activeTab === 'items'
+              ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+              : 'text-on-surface-variant hover:bg-surface-container-high'
+          }`}
+          onClick={() => setActiveTab('items')}
+        >
+          Items Settings
+        </button>
+        <button
+          type="button"
+          className={`flex-1 py-2.5 px-3 whitespace-nowrap rounded-lg text-sm font-bold transition-all ${
             activeTab === 'print'
               ? 'bg-surface-container-lowest text-on-surface shadow-sm'
               : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -370,7 +414,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </button>
         <button
           type="button"
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+          className={`flex-1 py-2.5 px-3 whitespace-nowrap rounded-lg text-sm font-bold transition-all ${
             activeTab === 'general'
               ? 'bg-surface-container-lowest text-on-surface shadow-sm'
               : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -381,7 +425,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         </button>
         <button
           type="button"
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2.5 px-3 whitespace-nowrap rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeTab === 'audit'
               ? 'bg-surface-container-lowest text-on-surface shadow-sm'
               : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -405,6 +449,15 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             setIsQrModalOpen={setIsQrModalOpen}
             setActiveTab={setActiveTab}
             setActiveSubModal={setActiveSubModal}
+          />
+        )}
+
+        {activeTab === 'items' && (
+          <ItemSettingsTab
+            allowNegativeStock={allowNegativeStock}
+            onToggleNegativeStock={handleToggleNegativeStock}
+            showBuyPricesGlobally={showBuyPricesGlobally}
+            onToggleBuyPrices={handleToggleBuyPriceVisibility}
           />
         )}
 
@@ -451,6 +504,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
             showBuyPricesGlobally={showBuyPricesGlobally}
             handleToggleBuyPriceVisibility={handleToggleBuyPriceVisibility}
+            allowNegativeStock={allowNegativeStock}
+            handleToggleNegativeStock={handleToggleNegativeStock}
           />
         )}
         {activeTab === 'audit' && (

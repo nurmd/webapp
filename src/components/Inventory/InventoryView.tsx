@@ -22,6 +22,7 @@ interface InventoryViewProps {
   onDeleteItem: (id: string) => void;
   onSaveAdjustment: (adj: StockAdjustment) => void;
   onScanBarcodeClick?: () => void;
+  onOpenSettings?: (tab?: 'profile' | 'items' | 'general' | 'print' | 'audit') => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -33,6 +34,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onDeleteItem,
   onSaveAdjustment,
   onScanBarcodeClick,
+  onOpenSettings,
 }) => {
   const isGstActive = db.getCompany().isGstEnabled !== false;
 
@@ -439,6 +441,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               </span>
             </button>
             <button
+              aria-label="Items & Stock Settings"
+              title="Items Settings (Allow Negative Stock, Pricing Rules)"
+              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-outline hover:text-primary shadow-sm active:bg-surface-container-low transition-colors cursor-pointer"
+              type="button"
+              onClick={() => {
+                if (onOpenSettings) {
+                  onOpenSettings('items');
+                } else {
+                  window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'items' }));
+                }
+              }}
+            >
+              <span className="material-symbols-outlined text-[20px]">tune</span>
+            </button>
+            <button
               aria-label="Filter & Sort Options"
               className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
                 activeFilterCount > 0 ? 'border-2 border-secondary text-secondary bg-secondary/5 font-bold' : ''
@@ -446,7 +463,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               type="button"
               onClick={() => setIsFilterModalOpen(true)}
             >
-              <span className="material-symbols-outlined text-[20px]">tune</span>
+              <span className="material-symbols-outlined text-[20px]">filter_list</span>
               {activeFilterCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center shadow">
                   {activeFilterCount}

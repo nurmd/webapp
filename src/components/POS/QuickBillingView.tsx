@@ -455,12 +455,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   // Customer Party Select
   const handleSelectCustomer = (party: Party | null) => {
     if (party) {
+      const freshParty = (party.id ? db.getParties().find((p) => p.id === party.id) : null) || party;
       setCustomer({
-        party,
-        phone: party.phone || '',
-        isB2b: !!party.gstin,
-        gstin: party.gstin,
-        stateCode: party.stateCode || company.stateCode || '27',
+        party: freshParty,
+        phone: freshParty.phone || '',
+        isB2b: !!freshParty.gstin,
+        gstin: freshParty.gstin,
+        stateCode: freshParty.stateCode || company.stateCode || '27',
       });
     } else {
       setCustomer({

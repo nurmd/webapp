@@ -48,6 +48,7 @@ export interface SyncedSettings {
   enableEwayBill?: boolean;
   ewayBillThreshold?: number;
   autoWhatsAppAlerts?: boolean;
+  allowNegativeStock?: boolean;
   updatedAt: string;
 }
 
@@ -246,6 +247,12 @@ class StorageService {
           const idx = list.findIndex((i) => i.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.INVOICES, list);
+          const pId =
+            data?.partyId ||
+            (data?.partyName
+              ? this.getParties().find((p) => p.name.trim().toLowerCase() === data.partyName.trim().toLowerCase())?.id
+              : undefined);
+          if (pId) this.recalculatePartyBalance(pId);
           break;
         }
         case 'purchase': {
@@ -258,8 +265,36 @@ class StorageService {
         case 'party': {
           const list = this.getParties();
           const idx = list.findIndex((p) => p.id === id);
-          if (idx >= 0) list[idx] = data; else list.push(data);
+          if (idx >= 0) {
+            const existing = list[idx];
+            const isExplicitZero = data.openingBalance !== undefined && data.openingBalance === 0;
+            list[idx] = {
+              ...data,
+              openingBalance: isExplicitZero
+                ? undefined
+                : data.openingBalance !== undefined
+                ? data.openingBalance
+                : existing.openingBalance,
+              openingBalanceType: isExplicitZero
+                ? undefined
+                : data.openingBalanceType !== undefined
+                ? data.openingBalanceType
+                : existing.openingBalanceType,
+              openingBalanceDate: isExplicitZero
+                ? undefined
+                : data.openingBalanceDate !== undefined
+                ? data.openingBalanceDate
+                : existing.openingBalanceDate,
+            };
+          } else {
+            const partyData =
+              data.openingBalance === 0
+                ? { ...data, openingBalance: undefined, openingBalanceType: undefined, openingBalanceDate: undefined }
+                : data;
+            list.push(partyData);
+          }
           this.set(STORAGE_KEYS.PARTIES, list);
+          this.recalculatePartyBalance(id);
           break;
         }
         case 'item': {
@@ -422,12 +457,37 @@ class StorageService {
       case 'party': {
         const list = this.getParties();
         const idx = list.findIndex((p) => p.id === docId);
+        const incoming = cleanEntity as Party;
         if (idx >= 0) {
-          list[idx] = cleanEntity as Party;
+          const existing = list[idx];
+          const isExplicitZero = incoming.openingBalance !== undefined && incoming.openingBalance === 0;
+          list[idx] = {
+            ...incoming,
+            openingBalance: isExplicitZero
+              ? undefined
+              : incoming.openingBalance !== undefined
+              ? incoming.openingBalance
+              : existing.openingBalance,
+            openingBalanceType: isExplicitZero
+              ? undefined
+              : incoming.openingBalanceType !== undefined
+              ? incoming.openingBalanceType
+              : existing.openingBalanceType,
+            openingBalanceDate: isExplicitZero
+              ? undefined
+              : incoming.openingBalanceDate !== undefined
+              ? incoming.openingBalanceDate
+              : existing.openingBalanceDate,
+          };
         } else {
-          list.push(cleanEntity as Party);
+          const partyDoc =
+            incoming.openingBalance === 0
+              ? { ...incoming, openingBalance: undefined, openingBalanceType: undefined, openingBalanceDate: undefined }
+              : incoming;
+          list.push(partyDoc);
         }
         this.set(STORAGE_KEYS.PARTIES, list);
+        this.recalculatePartyBalance(docId);
         break;
       }
       case 'item': {
@@ -748,9 +808,33 @@ class StorageService {
       enableEwayBill: true,
       ewayBillThreshold: 50000,
       autoWhatsAppAlerts: true,
+      allowNegativeStock: this.getAllowNegativeStock(),
       updatedAt: new Date().toISOString(),
     };
     return this.get<SyncedSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
+  }
+
+  // Allow Negative Stock Inventory Setting
+  getAllowNegativeStock(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const stored = localStorage.getItem('gst_allow_negative_stock');
+      if (stored !== null) {
+        return stored === 'true';
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  setAllowNegativeStock(allow: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('gst_allow_negative_stock', allow.toString());
+      this.saveSettings({ allowNegativeStock: allow });
+      window.dispatchEvent(new CustomEvent('gst_negative_stock_change', { detail: { allow } }));
+    } catch {}
   }
 
   // Device-local Buy Price Privacy Setting (Never synced to remote devices)
@@ -811,15 +895,65 @@ class StorageService {
   saveParty(party: Party): void {
     const list = this.getParties();
     const idx = list.findIndex((p) => p.id === party.id);
+    let partyToSave = party;
     if (idx >= 0) {
-      list[idx] = party;
+      const existing = list[idx];
+      const isExplicitZero = party.openingBalance !== undefined && party.openingBalance === 0;
+      partyToSave = {
+        ...party,
+        openingBalance: isExplicitZero
+          ? undefined
+          : party.openingBalance !== undefined
+          ? party.openingBalance
+          : existing.openingBalance,
+        openingBalanceType: isExplicitZero
+          ? undefined
+          : party.openingBalanceType !== undefined
+          ? party.openingBalanceType
+          : existing.openingBalanceType,
+        openingBalanceDate: isExplicitZero
+          ? undefined
+          : party.openingBalanceDate !== undefined
+          ? party.openingBalanceDate
+          : existing.openingBalanceDate,
+      };
+      list[idx] = partyToSave;
     } else {
-      list.push(party);
+      if (partyToSave.openingBalance === 0) {
+        partyToSave = {
+          ...partyToSave,
+          openingBalance: undefined,
+          openingBalanceType: undefined,
+          openingBalanceDate: undefined,
+        };
+      }
+      list.push(partyToSave);
     }
     this.set(STORAGE_KEYS.PARTIES, list);
-    pouch.putDoc('party', party);
-    this.broadcastChange('party', 'save', party.id, party);
+    pouch.putDoc('party', partyToSave);
+    this.broadcastChange('party', 'save', partyToSave.id, partyToSave);
+    this.recalculatePartyBalance(partyToSave.id);
     this.notifyListeners();
+  }
+
+  clearPartyOpeningBalance(id: string): void {
+    const list = this.getParties();
+    const idx = list.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      const party: Party = {
+        ...list[idx],
+        openingBalance: undefined,
+        openingBalanceType: undefined,
+        openingBalanceDate: undefined,
+        updatedAt: new Date().toISOString(),
+      };
+      list[idx] = party;
+      this.set(STORAGE_KEYS.PARTIES, list);
+      pouch.putDoc('party', party);
+      this.broadcastChange('party', 'save', party.id, party);
+      this.recalculatePartyBalance(id);
+      this.notifyListeners();
+    }
   }
 
   deleteParty(id: string): void {
@@ -842,13 +976,20 @@ class StorageService {
 
     // 1. Explicit Opening Balance
     let balance = 0;
-    if (typeof party.openingBalance === 'number' && party.openingBalance > 0) {
-      const amt = party.openingBalance;
-      const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
+    if (typeof party.openingBalance === 'number' && party.openingBalance !== 0) {
+      const absAmt = Math.abs(party.openingBalance);
+      let opType = party.openingBalanceType;
+      if (!opType) {
+        if (party.openingBalance > 0) {
+          opType = isCustomer ? 'TO_RECEIVE' : 'TO_PAY';
+        } else {
+          opType = isCustomer ? 'TO_PAY' : 'TO_RECEIVE';
+        }
+      }
       if (opType === 'TO_RECEIVE') {
-        balance += amt;
+        balance += absAmt;
       } else {
-        balance -= amt;
+        balance -= absAmt;
       }
     }
 
@@ -856,7 +997,7 @@ class StorageService {
       // Invoices: customer owes remaining unpaid balance (positive = receivable)
       const invoices = this.getInvoices();
       const partyInvoices = invoices.filter(
-        (inv) => inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm)
+        (inv) => !inv.isCancelled && (inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm))
       );
       partyInvoices.forEach((inv) => {
         const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
@@ -868,8 +1009,9 @@ class StorageService {
       const partyReceipts = vouchers.filter(
         (v) =>
           v.voucherType === 'RECEIPT' &&
-          v.entries.some((e) => e.accountId === party.id || e.accountName.toLowerCase() === partyNameNorm)
+          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
+
       const totalReceipts = partyReceipts.reduce((sum, v) => sum + v.totalAmount, 0);
       const totalInvoicePaid = partyInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
       if (totalReceipts > totalInvoicePaid) {
@@ -892,7 +1034,7 @@ class StorageService {
       const partyPayments = vouchers.filter(
         (v) =>
           v.voucherType === 'PAYMENT' &&
-          v.entries.some((e) => e.accountId === party.id || e.accountName.toLowerCase() === partyNameNorm)
+          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
       const totalPayments = partyPayments.reduce((sum, v) => sum + v.totalAmount, 0);
       const totalPurchasePaid = partyPurchases.reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
@@ -1002,15 +1144,33 @@ class StorageService {
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
     // Update stock levels via pure domain stockEngine
+    const allowNegativeStock = this.getAllowNegativeStock();
     const currentItems = this.getItems();
     const updatedItems = prevInvoice
-      ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items)
-      : applyInvoiceStockDecrement(currentItems, invoice.items);
+      ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items, allowNegativeStock)
+      : applyInvoiceStockDecrement(currentItems, invoice.items, allowNegativeStock);
 
     this.persistStockUpdates(currentItems, updatedItems);
 
-    if (invoice.partyId) {
-      this.recalculatePartyBalance(invoice.partyId);
+    const targetPartyId =
+      invoice.partyId ||
+      (invoice.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === invoice.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (targetPartyId) {
+      this.recalculatePartyBalance(targetPartyId);
+    }
+    const prevPartyId =
+      prevInvoice?.partyId ||
+      (prevInvoice?.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === prevInvoice.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (prevPartyId && prevPartyId !== targetPartyId) {
+      this.recalculatePartyBalance(prevPartyId);
     }
 
     // MCA Audit Trail Hook
@@ -1059,8 +1219,15 @@ class StorageService {
       this.persistStockUpdates(currentItems, updatedItems);
     }
 
-    if (inv?.partyId) {
-      this.recalculatePartyBalance(inv.partyId);
+    const partyIdToRecalc =
+      inv?.partyId ||
+      (inv?.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === inv.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (partyIdToRecalc) {
+      this.recalculatePartyBalance(partyIdToRecalc);
     }
 
     // MCA Audit Trail Hook
@@ -1102,9 +1269,10 @@ class StorageService {
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
     // Increase stock levels and update purchase prices via pure domain stockEngine
+    const allowNegativeStock = this.getAllowNegativeStock();
     const currentItems = this.getItems();
     const updatedItems = prevBill
-      ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items)
+      ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
       : applyPurchaseStockIncrement(currentItems, bill.items);
 
     // Auto-register any brand new purchased items not yet in catalog
@@ -1135,8 +1303,25 @@ class StorageService {
 
     this.persistStockUpdates(currentItems, finalItems);
 
-    if (bill.supplierId) {
-      this.recalculatePartyBalance(bill.supplierId);
+    const targetSupplierId =
+      bill.supplierId ||
+      (bill.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (targetSupplierId) {
+      this.recalculatePartyBalance(targetSupplierId);
+    }
+    const prevSupplierId =
+      prevBill?.supplierId ||
+      (prevBill?.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === prevBill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (prevSupplierId && prevSupplierId !== targetSupplierId) {
+      this.recalculatePartyBalance(prevSupplierId);
     }
 
     // MCA Audit Trail Hook
@@ -1169,13 +1354,21 @@ class StorageService {
 
     // Revert stock upon bill deletion via pure domain stockEngine
     if (bill) {
+      const allowNegativeStock = this.getAllowNegativeStock();
       const currentItems = this.getItems();
-      const updatedItems = applyPurchaseStockDecrement(currentItems, bill.items);
+      const updatedItems = applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
       this.persistStockUpdates(currentItems, updatedItems);
     }
 
-    if (bill?.supplierId) {
-      this.recalculatePartyBalance(bill.supplierId);
+    const supplierIdToRecalc =
+      bill?.supplierId ||
+      (bill?.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (supplierIdToRecalc) {
+      this.recalculatePartyBalance(supplierIdToRecalc);
     }
 
     // MCA Audit Trail Hook
@@ -1210,13 +1403,14 @@ class StorageService {
     this.broadcastChange('adjustment', 'save', adj.id, adj);
 
     // Update item stock using pure domain stockEngine
+    const allowNegativeStock = this.getAllowNegativeStock();
     const currentItems = this.getItems();
     const item = currentItems.find((i) => i.id === adj.itemId);
     const prevStock = item?.currentStock ?? 0;
     const delta = adj.type === 'STOCK_IN' ? adj.quantity : -adj.quantity;
-    const resultingStock = Math.max(0, prevStock + delta);
+    const resultingStock = allowNegativeStock ? prevStock + delta : Math.max(0, prevStock + delta);
 
-    const updatedItems = applyStockAdjustmentRecord(currentItems, adj);
+    const updatedItems = applyStockAdjustmentRecord(currentItems, adj, allowNegativeStock);
     this.persistStockUpdates(currentItems, updatedItems);
 
     // MCA Audit Trail Hook
@@ -1277,6 +1471,26 @@ class StorageService {
       })
       .catch((err) => console.error('Audit log failed for saveVoucher:', err));
 
+    const partyIdsToRecalc = new Set<string>();
+    const allParties = this.getParties();
+    const findPartyId = (accountId: string, accountName?: string) => {
+      const match = allParties.find(
+        (p) => p.id === accountId || (accountName && p.name.trim().toLowerCase() === accountName.trim().toLowerCase())
+      );
+      return match?.id;
+    };
+    voucher.entries.forEach((e) => {
+      const pid = findPartyId(e.accountId, e.accountName);
+      if (pid) partyIdsToRecalc.add(pid);
+    });
+    if (prevVoucher) {
+      prevVoucher.entries.forEach((e) => {
+        const pid = findPartyId(e.accountId, e.accountName);
+        if (pid) partyIdsToRecalc.add(pid);
+      });
+    }
+    partyIdsToRecalc.forEach((pid) => this.recalculatePartyBalance(pid));
+
     this.notifyListeners();
   }
 
@@ -1307,6 +1521,16 @@ class StorageService {
         summary,
       })
       .catch((err) => console.error('Audit log failed for deleteVoucher:', err));
+
+    if (prevVoucher) {
+      const allParties = this.getParties();
+      prevVoucher.entries.forEach((e) => {
+        const p = allParties.find(
+          (pty) => pty.id === e.accountId || (e.accountName && pty.name.trim().toLowerCase() === e.accountName.trim().toLowerCase())
+        );
+        if (p) this.recalculatePartyBalance(p.id);
+      });
+    }
 
     this.notifyListeners();
   }

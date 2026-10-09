@@ -128,7 +128,7 @@ export function usePartyPassbook({
 
     vouchers.forEach((v) => {
       const isPartyVoucher = v.entries.some(
-        (e) => e.accountId === party.id || e.accountName.toLowerCase() === party.name.toLowerCase()
+        (e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === party.name.toLowerCase())
       );
 
       if (isPartyVoucher) {
@@ -250,12 +250,12 @@ export function usePartyPassbook({
     }
 
     // Genuine explicit opening balance
-    const hasExplicitOpening = typeof party.openingBalance === 'number' && party.openingBalance > 0;
+    const hasExplicitOpening = typeof party.openingBalance === 'number' && party.openingBalance !== 0;
     const openingDate = party.openingBalanceDate || (party.createdAt ? party.createdAt.split('T')[0] : '2026-01-01');
 
     if (hasExplicitOpening) {
-      const amt = party.openingBalance!;
-      const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
+      const absAmt = Math.abs(party.openingBalance!);
+      const opType = party.openingBalanceType || (party.openingBalance! > 0 ? (isCustomer ? 'TO_RECEIVE' : 'TO_PAY') : (isCustomer ? 'TO_PAY' : 'TO_RECEIVE'));
       const isRec = opType === 'TO_RECEIVE';
       rawEntries.push({
         id: `opening-${party.id}`,
@@ -264,14 +264,26 @@ export function usePartyPassbook({
         docNumber: 'OPENING',
         type: 'OPENING',
         description: `Opening Balance (${isRec ? "You'll Get" : "You'll Give"})`,
-        debit: isRec ? amt : 0,
-        credit: isRec ? 0 : amt,
+        debit: isRec ? absAmt : 0,
+        credit: isRec ? 0 : absAmt,
         status: 'OPENING',
         isOpening: true,
       });
     }
 
-    rawEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    rawEntries.sort((a, b) => {
+      // Opening balance must always be the baseline transaction of the passbook / ledger statement
+      if (a.type === 'OPENING' && b.type === 'OPENING') return 0;
+      if (a.type === 'OPENING') return -1;
+      if (b.type === 'OPENING') return 1;
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
+      const timeDiff = (isNaN(dateA) ? 0 : dateA) - (isNaN(dateB) ? 0 : dateB);
+      if (timeDiff !== 0) return timeDiff;
+      if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
+      if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
+      return 0;
+    });
 
     let running = 0;
     return rawEntries.map((entry) => {
@@ -287,9 +299,10 @@ export function usePartyPassbook({
   // Derived current net balance directly from passbook running balance
   const liveNetBalance = useMemo(() => {
     if (passbook.length === 0) {
-      if (typeof party.openingBalance === 'number' && party.openingBalance > 0) {
-        const opType = party.openingBalanceType || (isCustomer ? 'TO_RECEIVE' : 'TO_PAY');
-        return opType === 'TO_RECEIVE' ? party.openingBalance : -party.openingBalance;
+      if (typeof party.openingBalance === 'number' && party.openingBalance !== 0) {
+        const absAmt = Math.abs(party.openingBalance);
+        const opType = party.openingBalanceType || (party.openingBalance > 0 ? (isCustomer ? 'TO_RECEIVE' : 'TO_PAY') : (isCustomer ? 'TO_PAY' : 'TO_RECEIVE'));
+        return opType === 'TO_RECEIVE' ? absAmt : -absAmt;
       }
       return party.currentBalance || 0;
     }
