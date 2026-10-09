@@ -8,6 +8,7 @@ import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../servic
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { PrintSettingsView } from './PrintSettingsView.tsx';
+import { AuditLogView } from '../Audit/AuditLogView.tsx';
 
 interface CompanySettingsViewProps {
   company: CompanyProfile;
@@ -19,7 +20,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   onSave,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>({ ...company });
-  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'print'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'print' | 'audit'>('profile');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
@@ -371,6 +372,18 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           onClick={() => setActiveTab('general')}
         >
           General Settings
+        </button>
+        <button
+          type="button"
+          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'audit'
+              ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+              : 'text-on-surface-variant hover:bg-surface-container-high'
+          }`}
+          onClick={() => setActiveTab('audit')}
+        >
+          <span className="material-symbols-outlined text-[18px]">verified_user</span>
+          <span>Audit Trail</span>
         </button>
       </div>
 
@@ -1279,6 +1292,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       </section>
 
           </>
+        )}
+        {activeTab === 'audit' && (
+          <AuditLogView />
         )}
       </div>
 

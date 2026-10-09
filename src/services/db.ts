@@ -19,6 +19,8 @@ import {
   findMatchingItem,
   isLowStock,
 } from '../core/inventory/stockEngine.ts';
+import { auditTrail } from './auditTrail.ts';
+import { rbac, UserRole } from './rbac.ts';
 
 
 const STORAGE_KEYS = {
@@ -178,9 +180,11 @@ class StorageService {
         });
 
       // Realtime continuous change listener
-      pouch.subscribeDataChange((change) => {
-        this.applyIncomingChange(change);
-      });
+      if (typeof (pouch as any)?.subscribeDataChange === 'function') {
+        pouch.subscribeDataChange((change) => {
+          this.applyIncomingChange(change);
+        });
+      }
     }, 100);
   }
 
@@ -677,15 +681,50 @@ class StorageService {
     }
   }
 
+  private getAuditUser(): { userId: string; userName: string; userRole: UserRole } {
+    try {
+      const u = rbac.getActiveUser();
+      return {
+        userId: u.id || 'usr_sys',
+        userName: u.name || 'System',
+        userRole: (u.role || 'OWNER') as UserRole,
+      };
+    } catch {
+      return {
+        userId: 'usr_sys',
+        userName: 'System',
+        userRole: 'OWNER' as UserRole,
+      };
+    }
+  }
+
   // Company
   getCompany(): CompanyProfile {
     return this.get<CompanyProfile>(STORAGE_KEYS.COMPANY, DEFAULT_COMPANY);
   }
 
   saveCompany(company: CompanyProfile): void {
+    const prevCompany = this.getCompany();
     this.set(STORAGE_KEYS.COMPANY, company);
     pouch.putDoc('company', company);
     this.broadcastChange('company', 'save', company.id || 'COMP-001', company);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'SETTINGS_UPDATE',
+        documentId: company.id || 'COMP-001',
+        documentType: 'SETTINGS',
+        previousSnapshot: prevCompany,
+        newSnapshot: company,
+        summary: `Updated business profile for "${company.tradeName || company.businessName || 'Company'}" (GSTIN: ${company.gstin || 'None'})`,
+      })
+      .catch((err) => console.error('Audit log failed for saveCompany:', err));
+
     this.notifyListeners();
   }
 
@@ -973,6 +1012,36 @@ class StorageService {
     if (invoice.partyId) {
       this.recalculatePartyBalance(invoice.partyId);
     }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    let actionType: 'INVOICE_CREATE' | 'INVOICE_UPDATE' | 'INVOICE_CANCEL' = 'INVOICE_CREATE';
+    let summary = `Created invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+    if (prevInvoice) {
+      const isNowCancelled = Boolean(invoice.isCancelled);
+      const wasCancelled = Boolean(prevInvoice.isCancelled);
+      if (isNowCancelled && !wasCancelled) {
+        actionType = 'INVOICE_CANCEL';
+        summary = `Cancelled invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+      } else {
+        actionType = 'INVOICE_UPDATE';
+        summary = `Updated invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+      }
+    }
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: invoice.id,
+        documentType: 'INVOICE',
+        previousSnapshot: prevInvoice ? JSON.parse(JSON.stringify(prevInvoice)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(invoice)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for saveInvoice:', err));
+
     this.notifyListeners();
   }
 
@@ -993,6 +1062,23 @@ class StorageService {
     if (inv?.partyId) {
       this.recalculatePartyBalance(inv.partyId);
     }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'INVOICE_DELETE',
+        documentId: id,
+        documentType: 'INVOICE',
+        previousSnapshot: inv ? JSON.parse(JSON.stringify(inv)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted invoice #${inv?.invoiceNumber || id} for ${inv?.partyName || 'Unknown Party'}`,
+      })
+      .catch((err) => console.error('Audit log failed for deleteInvoice:', err));
+
     this.notifyListeners();
   }
 
@@ -1052,6 +1138,25 @@ class StorageService {
     if (bill.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
     }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const actionType = prevBill ? 'PURCHASE_UPDATE' : 'PURCHASE_CREATE';
+    const summary = `${prevBill ? 'Updated' : 'Created'} purchase bill #${bill.billNumber} from ${bill.supplierName}`;
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: bill.id,
+        documentType: 'PURCHASE',
+        previousSnapshot: prevBill ? JSON.parse(JSON.stringify(prevBill)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(bill)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for savePurchase:', err));
+
     this.notifyListeners();
   }
 
@@ -1072,6 +1177,23 @@ class StorageService {
     if (bill?.supplierId) {
       this.recalculatePartyBalance(bill.supplierId);
     }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'PURCHASE_DELETE',
+        documentId: id,
+        documentType: 'PURCHASE',
+        previousSnapshot: bill ? JSON.parse(JSON.stringify(bill)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted purchase bill #${bill?.billNumber || id} from ${bill?.supplierName || 'Unknown Supplier'}`,
+      })
+      .catch((err) => console.error('Audit log failed for deletePurchase:', err));
+
     this.notifyListeners();
   }
 
@@ -1089,8 +1211,29 @@ class StorageService {
 
     // Update item stock using pure domain stockEngine
     const currentItems = this.getItems();
+    const item = currentItems.find((i) => i.id === adj.itemId);
+    const prevStock = item?.currentStock ?? 0;
+    const delta = adj.type === 'STOCK_IN' ? adj.quantity : -adj.quantity;
+    const resultingStock = Math.max(0, prevStock + delta);
+
     const updatedItems = applyStockAdjustmentRecord(currentItems, adj);
     this.persistStockUpdates(currentItems, updatedItems);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'STOCK_ADJUSTMENT',
+        documentId: adj.id,
+        documentType: 'ITEM',
+        previousSnapshot: item ? { itemId: item.id, itemName: item.name, currentStock: prevStock, unit: item.unit } : undefined,
+        newSnapshot: { ...JSON.parse(JSON.stringify(adj)), previousStock: prevStock, resultingStock },
+        summary: `Stock adjustment (${adj.type}): ${adj.quantity} units for "${adj.itemName}". Reason: ${adj.reason || 'None'}`,
+      })
+      .catch((err) => console.error('Audit log failed for saveStockAdjustment:', err));
   }
 
   // Vouchers
@@ -1101,6 +1244,8 @@ class StorageService {
   saveVoucher(voucher: Voucher): void {
     const list = this.getVouchers();
     const idx = list.findIndex((v) => v.id === voucher.id);
+    const prevVoucher = idx >= 0 ? list[idx] : null;
+
     if (idx >= 0) {
       list[idx] = voucher;
     } else {
@@ -1109,14 +1254,60 @@ class StorageService {
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.putDoc('voucher', voucher);
     this.broadcastChange('voucher', 'save', voucher.id, voucher);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const isPaymentOrReceipt = voucher.voucherType === 'PAYMENT' || voucher.voucherType === 'RECEIPT';
+    const actionType = isPaymentOrReceipt ? 'PAYMENT_RECORD' : 'VOUCHER_CREATE';
+    const documentType = isPaymentOrReceipt ? 'PAYMENT' : 'VOUCHER';
+    const typeLabel = voucher.voucherType === 'PAYMENT' ? 'Payment Out' : voucher.voucherType === 'RECEIPT' ? 'Payment Receipt' : 'Voucher';
+    const summary = `${typeLabel} #${voucher.voucherNumber} (₹${(voucher.totalAmount || 0).toFixed(2)})${voucher.narration ? ': ' + voucher.narration : ''}`;
+
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: voucher.id,
+        documentType,
+        previousSnapshot: prevVoucher ? JSON.parse(JSON.stringify(prevVoucher)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(voucher)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for saveVoucher:', err));
+
     this.notifyListeners();
   }
 
   deleteVoucher(id: string): void {
+    const prevVoucher = this.getVouchers().find((v) => v.id === id);
     const list = this.getVouchers().filter((v) => v.id !== id);
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.deleteDoc('voucher', id);
     this.broadcastChange('voucher', 'delete', id);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const isPaymentOrReceipt = prevVoucher?.voucherType === 'PAYMENT' || prevVoucher?.voucherType === 'RECEIPT';
+    const actionType = 'VOUCHER_DELETE';
+    const documentType = isPaymentOrReceipt ? 'PAYMENT' : 'VOUCHER';
+    const summary = `Deleted voucher #${prevVoucher?.voucherNumber || id} (${prevVoucher?.voucherType || 'VOUCHER'})`;
+
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: id,
+        documentType,
+        previousSnapshot: prevVoucher ? JSON.parse(JSON.stringify(prevVoucher)) : { id },
+        newSnapshot: undefined,
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for deleteVoucher:', err));
+
     this.notifyListeners();
   }
 

@@ -111,6 +111,9 @@ export const App: React.FC = () => {
   activeTabRef.current = activeTab;
 
   React.useEffect(() => {
+    rbac.migrateLegacyPins().catch((err) => {
+      console.error('Failed to migrate legacy PINs:', err);
+    });
     db.syncAllPartyBalances();
     refreshData();
     initBackNavigation(() => {
@@ -370,6 +373,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeletePurchase = (id: string) => {
+    if (!rbac.canDeletePurchase(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete purchase bills. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     const bill = db.getPurchases().find((b) => b.id === id);
     if (window.confirm('Delete this purchase bill?')) {
       db.deletePurchase(id);
@@ -386,6 +394,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteExpense = (id: string) => {
+    if (!rbac.canDeleteExpense(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete expense vouchers. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (window.confirm('Delete this expense voucher?')) {
       db.deleteExpense(id);
       refreshData();
@@ -572,6 +585,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteParty = (id: string) => {
+    if (!rbac.canDeleteParty(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete customer/supplier accounts. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (window.confirm('Delete this party?')) {
       db.deleteParty(id);
       refreshData();
@@ -586,6 +604,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteItem = (id: string) => {
+    if (!rbac.canDeleteItem(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete inventory items. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (isItemInBills(id, invoices, purchases)) {
       showToast('Cannot delete: This item exists in bills. You can disable it instead.');
       return;
@@ -602,6 +625,11 @@ export const App: React.FC = () => {
   };
 
   const handleSaveCompany = (updated: CompanyProfile) => {
+    if (!rbac.canEditCompanySettings(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can edit company profile and settings. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     db.saveCompany(updated);
     refreshData();
   };
@@ -612,6 +640,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteBankAccount = (id: string) => {
+    if (!rbac.canDeleteBankAccount(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete bank accounts. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (window.confirm('Delete this bank account?')) {
       db.deleteBankAccount(id);
       refreshData();
@@ -624,6 +657,11 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteCashBankTxn = (id: string) => {
+    if (!rbac.canDeleteCashBankTxn(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete cash/bank transactions. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
     if (window.confirm('Delete this cash/bank transaction?')) {
       db.deleteCashBankTransaction(id);
       refreshData();
