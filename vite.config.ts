@@ -22,5 +22,32 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/scheduler/')
+            ) {
+              return 'vendor-react';
+            }
+            if (
+              id.includes('pouchdb') ||
+              id.includes('/events/') ||
+              id.includes('/spark-md5/') ||
+              id.includes('/vuvuzela/') ||
+              id.includes('/uuid/')
+            ) {
+              return 'vendor-pouchdb';
+            }
+            if (id.includes('/lucide-react/')) {
+              return 'vendor-icons';
+            }
+          }
+        },
+      },
+    },
   },
 });

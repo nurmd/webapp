@@ -20,32 +20,119 @@ import { Drawer, AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
 import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
 
+// Cold-Start Primary View (Statically imported for instant FCP)
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
-import { SalesHubView } from './components/Sales/SalesHubView.tsx';
-import { PurchasesHubView } from './components/Purchases/PurchasesHubView.tsx';
-import { TableGridPurchaseModal } from './components/Purchases/TableGridPurchaseModal.tsx';
-import { ExpensesView } from './components/Expenses/ExpensesView.tsx';
-import { CreateInvoiceModal } from './components/Invoicing/CreateInvoiceModal.tsx';
-import { TableGridInvoiceModal } from './components/Invoicing/TableGridInvoiceModal.tsx';
-import { ThermalPrintModal } from './components/Printing/ThermalPrintModal.tsx';
-import { SimplifiedInvoiceModal } from './components/Invoicing/SimplifiedInvoiceModal.tsx';
+
+// Data models and utilities
 import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
-import { QuickBillingView } from './components/POS/QuickBillingView.tsx';
-import { InventoryView } from './components/Inventory/InventoryView.tsx';
-import { PartiesView } from './components/Parties/PartiesView.tsx';
-import { BusinessReportsView } from './components/Reports/BusinessReportsView.tsx';
-import { DaybookView } from './components/Reports/DaybookView.tsx';
-import { CashBankManagementView } from './components/CashBank/CashBankManagementView.tsx';
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
-import { CompanySettingsView } from './components/Settings/CompanySettingsView.tsx';
-import { PrintSettingsView } from './components/Settings/PrintSettingsView.tsx';
-import { NavigationMenuHubView } from './components/Navigation/NavigationMenuHubView.tsx';
 import { rbac, UserProfile } from './services/rbac.ts';
-import { RoleSwitchModal } from './components/Auth/RoleSwitchModal.tsx';
-import { AppUpdateModal } from './components/Update/AppUpdateModal.tsx';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
+
+// Secondary Views (Dynamic Code-Splitting with named-export unwrapping)
+const BusinessReportsView = React.lazy(() =>
+  import('./components/Reports/BusinessReportsView.tsx').then((m) => ({ default: m.BusinessReportsView }))
+);
+const CompanySettingsView = React.lazy(() =>
+  import('./components/Settings/CompanySettingsView.tsx').then((m) => ({ default: m.CompanySettingsView }))
+);
+const DaybookView = React.lazy(() =>
+  import('./components/Reports/DaybookView.tsx').then((m) => ({ default: m.DaybookView }))
+);
+const ExpensesView = React.lazy(() =>
+  import('./components/Expenses/ExpensesView.tsx').then((m) => ({ default: m.ExpensesView }))
+);
+const CashBankManagementView = React.lazy(() =>
+  import('./components/CashBank/CashBankManagementView.tsx').then((m) => ({ default: m.CashBankManagementView }))
+);
+const PrintSettingsView = React.lazy(() =>
+  import('./components/Settings/PrintSettingsView.tsx').then((m) => ({ default: m.PrintSettingsView }))
+);
+const PurchasesHubView = React.lazy(() =>
+  import('./components/Purchases/PurchasesHubView.tsx').then((m) => ({ default: m.PurchasesHubView }))
+);
+const InventoryView = React.lazy(() =>
+  import('./components/Inventory/InventoryView.tsx').then((m) => ({ default: m.InventoryView }))
+);
+const PartiesView = React.lazy(() =>
+  import('./components/Parties/PartiesView.tsx').then((m) => ({ default: m.PartiesView }))
+);
+const NavigationMenuHubView = React.lazy(() =>
+  import('./components/Navigation/NavigationMenuHubView.tsx').then((m) => ({ default: m.NavigationMenuHubView }))
+);
+const SalesHubView = React.lazy(() =>
+  import('./components/Sales/SalesHubView.tsx').then((m) => ({ default: m.SalesHubView }))
+);
+const QuickBillingView = React.lazy(() =>
+  import('./components/POS/QuickBillingView.tsx').then((m) => ({ default: m.QuickBillingView }))
+);
+
+// Heavy Modals (Dynamic Code-Splitting with named-export unwrapping)
+const TableGridInvoiceModal = React.lazy(() =>
+  import('./components/Invoicing/TableGridInvoiceModal.tsx').then((m) => ({ default: m.TableGridInvoiceModal }))
+);
+const TableGridPurchaseModal = React.lazy(() =>
+  import('./components/Purchases/TableGridPurchaseModal.tsx').then((m) => ({ default: m.TableGridPurchaseModal }))
+);
+const ThermalPrintModal = React.lazy(() =>
+  import('./components/Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
+);
+const RoleSwitchModal = React.lazy(() =>
+  import('./components/Auth/RoleSwitchModal.tsx').then((m) => ({ default: m.RoleSwitchModal }))
+);
+const CreateInvoiceModal = React.lazy(() =>
+  import('./components/Invoicing/CreateInvoiceModal.tsx').then((m) => ({ default: m.CreateInvoiceModal }))
+);
+const SimplifiedInvoiceModal = React.lazy(() =>
+  import('./components/Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
+);
+const AppUpdateModal = React.lazy(() =>
+  import('./components/Update/AppUpdateModal.tsx').then((m) => ({ default: m.AppUpdateModal }))
+);
+
+// Zero-CLS Suspense Fallbacks
+const ViewLoadingSkeleton: React.FC = () => (
+  <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 animate-pulse">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="space-y-2">
+        <div className="h-7 w-48 bg-surface-container-high rounded-lg" />
+        <div className="h-4 w-72 bg-surface-container rounded" />
+      </div>
+      <div className="flex gap-2">
+        <div className="h-10 w-28 bg-surface-container-high rounded-xl" />
+        <div className="h-10 w-32 bg-surface-container-high rounded-xl" />
+      </div>
+    </div>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="h-24 bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 space-y-3">
+          <div className="h-4 w-20 bg-surface-container rounded" />
+          <div className="h-6 w-28 bg-surface-container-high rounded" />
+        </div>
+      ))}
+    </div>
+    <div className="h-80 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 space-y-4">
+      <div className="h-6 w-36 bg-surface-container rounded" />
+      <div className="space-y-3 pt-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-10 w-full bg-surface-container-low rounded-lg" />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const ModalLoadingFallback: React.FC<{ title?: string }> = ({ title = 'Loading...' }) => (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-surface-container-lowest text-on-surface rounded-2xl p-6 shadow-2xl border border-outline-variant/40 flex flex-col items-center gap-3 max-w-xs w-full">
+      <div className="w-9 h-9 border-3 border-secondary/30 border-t-secondary rounded-full animate-spin" />
+      <p className="text-sm font-semibold text-on-surface">{title}</p>
+      <p className="text-xs text-on-surface-variant">Preparing interface...</p>
+    </div>
+  </div>
+);
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
@@ -725,6 +812,7 @@ export const App: React.FC = () => {
 
         {/* Main Scrollable View Area with safe-area padding */}
         <main className="flex-1 w-full pb-24 md:pb-8">
+          <React.Suspense fallback={<ViewLoadingSkeleton />}>
         {activeTab === 'dashboard' && (
           <DashboardView
             company={company}
@@ -888,6 +976,7 @@ export const App: React.FC = () => {
             isCheckingUpdate={isCheckingUpdate}
           />
         )}
+          </React.Suspense>
       </main>
       </div>
 
@@ -900,107 +989,125 @@ export const App: React.FC = () => {
 
       {/* Modals */}
       {isStandardInvoiceOpen && (
-        <CreateInvoiceModal
-          company={company}
-          parties={parties}
-          itemsCatalog={activeItems}
-          onClose={() => setIsStandardInvoiceOpen(false)}
-          onSave={handleSaveInvoice}
-        />
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Standard Invoice..." />}>
+          <CreateInvoiceModal
+            company={company}
+            parties={parties}
+            itemsCatalog={activeItems}
+            onClose={() => setIsStandardInvoiceOpen(false)}
+            onSave={handleSaveInvoice}
+          />
+        </React.Suspense>
       )}
 
       {isTableGridInvoiceOpen && (
-        <TableGridInvoiceModal
-          company={company}
-          parties={parties}
-          itemsCatalog={activeItems}
-          initialInvoice={editingInvoice}
-          initialParty={selectedPartyForInvoice}
-          existingInvoices={invoices}
-          onClose={() => {
-            setIsTableGridInvoiceOpen(false);
-            setEditingInvoice(null);
-            setSelectedPartyForInvoice(null);
-          }}
-          onSave={handleSaveInvoice}
-          onAddNewParty={() => setActiveTab('parties')}
-          onPartyCreated={handleSaveParty}
-        />
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Invoice Editor..." />}>
+          <TableGridInvoiceModal
+            company={company}
+            parties={parties}
+            itemsCatalog={activeItems}
+            initialInvoice={editingInvoice}
+            initialParty={selectedPartyForInvoice}
+            existingInvoices={invoices}
+            onClose={() => {
+              setIsTableGridInvoiceOpen(false);
+              setEditingInvoice(null);
+              setSelectedPartyForInvoice(null);
+            }}
+            onSave={handleSaveInvoice}
+            onAddNewParty={() => setActiveTab('parties')}
+            onPartyCreated={handleSaveParty}
+          />
+        </React.Suspense>
       )}
 
       {isTableGridPurchaseOpen && (
-        <TableGridPurchaseModal
-          company={company}
-          parties={parties}
-          itemsCatalog={activeItems}
-          initialBill={editingPurchase}
-          initialSupplier={selectedSupplierForPurchase}
-          onClose={() => {
-            setIsTableGridPurchaseOpen(false);
-            setEditingPurchase(null);
-            setSelectedSupplierForPurchase(null);
-          }}
-          onSave={(bill) => {
-            handleSavePurchase(bill);
-            setIsTableGridPurchaseOpen(false);
-            setEditingPurchase(null);
-            setSelectedSupplierForPurchase(null);
-          }}
-          onAddNewParty={() => setActiveTab('parties')}
-          onPartyCreated={handleSaveParty}
-        />
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Purchase Entry..." />}>
+          <TableGridPurchaseModal
+            company={company}
+            parties={parties}
+            itemsCatalog={activeItems}
+            initialBill={editingPurchase}
+            initialSupplier={selectedSupplierForPurchase}
+            onClose={() => {
+              setIsTableGridPurchaseOpen(false);
+              setEditingPurchase(null);
+              setSelectedSupplierForPurchase(null);
+            }}
+            onSave={(bill) => {
+              handleSavePurchase(bill);
+              setIsTableGridPurchaseOpen(false);
+              setEditingPurchase(null);
+              setSelectedSupplierForPurchase(null);
+            }}
+            onAddNewParty={() => setActiveTab('parties')}
+            onPartyCreated={handleSaveParty}
+          />
+        </React.Suspense>
       )}
 
       {/* Simplified Mobile Invoice Preview Modal (Home transactions, Invoice Save, etc.) */}
       {previewInvoice && (
-        <SimplifiedInvoiceModal
-          invoice={previewInvoice}
-          company={company}
-          onClose={() => setPreviewInvoice(null)}
-          onEditInvoice={(inv) => {
-            setPreviewInvoice(null);
-            handleEditInvoice(inv);
-          }}
-          onDeleteInvoice={(id) => {
-            setPreviewInvoice(null);
-            handleDeleteInvoice(id);
-          }}
-          onPrintInvoice={(inv) => {
-            setPrintInvoice(inv);
-          }}
-          onOpenFullA4Preview={(inv) => {
-            setPrintInvoice(inv);
-          }}
-        />
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Invoice Preview..." />}>
+          <SimplifiedInvoiceModal
+            invoice={previewInvoice}
+            company={company}
+            onClose={() => setPreviewInvoice(null)}
+            onEditInvoice={(inv) => {
+              setPreviewInvoice(null);
+              handleEditInvoice(inv);
+            }}
+            onDeleteInvoice={(id) => {
+              setPreviewInvoice(null);
+              handleDeleteInvoice(id);
+            }}
+            onPrintInvoice={(inv) => {
+              setPrintInvoice(inv);
+            }}
+            onOpenFullA4Preview={(inv) => {
+              setPrintInvoice(inv);
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* Thermal POS Receipt Print Modal */}
       {printInvoice && (
-        <ThermalPrintModal
-          invoice={printInvoice}
-          company={company}
-          onClose={() => setPrintInvoice(null)}
-        />
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Print Dialog..." />}>
+          <ThermalPrintModal
+            invoice={printInvoice}
+            company={company}
+            onClose={() => setPrintInvoice(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* 4-Digit PIN Security Role Switch Modal */}
-      <RoleSwitchModal
-        isOpen={isRoleSwitchOpen}
-        onClose={() => setIsRoleSwitchOpen(false)}
-        onRoleChanged={(newUser) => {
-          setActiveUser(newUser);
-          if (!rbac.canAccessTab(activeTab, newUser.role)) {
-            setActiveTab('dashboard');
-          }
-        }}
-      />
+      {isRoleSwitchOpen && (
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Security Verification..." />}>
+          <RoleSwitchModal
+            isOpen={isRoleSwitchOpen}
+            onClose={() => setIsRoleSwitchOpen(false)}
+            onRoleChanged={(newUser) => {
+              setActiveUser(newUser);
+              if (!rbac.canAccessTab(activeTab, newUser.role)) {
+                setActiveTab('dashboard');
+              }
+            }}
+          />
+        </React.Suspense>
+      )}
 
       {/* App Auto-Update Modal */}
-      <AppUpdateModal
-        isOpen={isUpdateModalOpen}
-        releaseInfo={latestRelease}
-        onClose={() => setIsUpdateModalOpen(false)}
-      />
+      {isUpdateModalOpen && (
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading Update Details..." />}>
+          <AppUpdateModal
+            isOpen={isUpdateModalOpen}
+            releaseInfo={latestRelease}
+            onClose={() => setIsUpdateModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
 
       {/* Floating Status Toast Notification */}
       {toastMessage && (
