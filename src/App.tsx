@@ -358,7 +358,10 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSaveInvoice = (newInvoice: Invoice, options?: { openPreview?: boolean }) => {
+  const handleSaveInvoice = (
+    newInvoice: Invoice,
+    options?: { openPreview?: boolean; openPrint?: boolean }
+  ) => {
     // Enforce uniqueness of invoice number under GST compliance
     const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, invoices);
     if (conflict) {
@@ -399,6 +402,9 @@ export const App: React.FC = () => {
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
     setEditingInvoice(null);
+    if (options?.openPrint) {
+      setPrintInvoice(newInvoice);
+    }
     if (options?.openPreview !== false) {
       setPreviewInvoice(newInvoice);
     }
