@@ -162,6 +162,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       unitPrice: itemData.unitPrice,
       mrp: itemData.mrp,
       discountPercent: itemData.discountPercent,
+      discountAmount: itemData.discountAmount,
       gstRate: itemData.gstRate,
     };
 
@@ -195,6 +196,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         unitPrice: it.unitPrice,
         mrp: (it as any).mrp,
         discountPercent: it.discountPercent || 0,
+        discountAmount: it.discountAmount,
         gstRate: it.gstRate,
       }));
     }
@@ -208,9 +210,10 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   // Calculations
   const calcInputs = useMemo(() => {
     return rows.map((r) => ({
-      quantity: Number(r.quantity) || 1,
+      quantity: Number(r.quantity) || 0,
       unitPrice: Number(r.unitPrice) || 0,
       discountPercent: Number(r.discountPercent) || 0,
+      discountAmount: r.discountAmount,
       gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
     }));
   }, [rows, isGstActive]);
@@ -621,7 +624,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             onChangeShipping={setShippingAmount}
             isTaxDetailsOpen={isTaxDetailsOpen}
             onToggleTaxDetails={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-            totalUnits={rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)}
+            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))}
             finalGrandTotal={finalGrandTotal}
             accentColor="orange"
           />

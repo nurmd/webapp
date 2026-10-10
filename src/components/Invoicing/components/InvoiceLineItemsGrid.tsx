@@ -11,6 +11,7 @@ export interface GridRow {
   unitPrice: number;
   mrp?: number;
   discountPercent: number;
+  discountAmount?: number;
   gstRate: number;
 }
 
@@ -50,7 +51,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
           </span>
           {rows.length > 0 && (
             <span className="text-xs text-on-surface-variant font-medium">
-              · {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} units total
+              · {Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))} units total
             </span>
           )}
         </div>
@@ -157,9 +158,9 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                         {formatINR(row.unitPrice)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data">
-                        {row.discountPercent > 0 ? (
+                        {row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0) ? (
                           <span className="text-secondary font-bold">
-                            {row.discountPercent}%
+                            {row.discountPercent > 0 ? `${row.discountPercent}%` : `₹${row.discountAmount}`}
                           </span>
                         ) : (
                           <span className="text-outline">-</span>
@@ -224,9 +225,9 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                       <span className="font-tabular-data font-semibold text-on-surface">
                         {formatINR(row.unitPrice)}
                       </span>
-                      {row.discountPercent > 0 && (
+                      {(row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0)) && (
                         <span className="px-1 py-0.2 rounded bg-secondary/15 text-secondary text-[10px] font-bold">
-                          {row.discountPercent}% off
+                          {row.discountPercent > 0 ? `${row.discountPercent}% off` : `₹${row.discountAmount} off`}
                         </span>
                       )}
                     </div>

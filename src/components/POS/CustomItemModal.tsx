@@ -14,7 +14,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
-  const [qty, setQty] = useState('1');
+  const [qty, setQty] = useState('');
   const [gstRate, setGstRate] = useState<number>(18);
   const [hsnCode, setHsnCode] = useState('9983');
   const [unit, setUnit] = useState<UnitOfMeasurement>('PCS');
@@ -104,13 +104,18 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
             <div>
               <label className="block text-xs font-semibold text-outline mb-1">Quantity *</label>
               <input
-                type="number"
-                step="1"
-                min="1"
+                type="text"
+                inputMode="decimal"
                 required
+                placeholder="0"
                 value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary"
+                onChange={(e) => {
+                  const sanitized = e.target.value.replace(/[^0-9.]/g, '');
+                  const parts = sanitized.split('.');
+                  const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+                  setQty(cleanVal);
+                }}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
               />
             </div>
           </div>

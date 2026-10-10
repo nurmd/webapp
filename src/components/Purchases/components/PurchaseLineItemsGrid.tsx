@@ -11,6 +11,7 @@ export interface PurchaseGridRow {
   unitPrice: number;
   mrp?: number;
   discountPercent: number;
+  discountAmount?: number;
   gstRate: number;
 }
 
@@ -51,7 +52,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
           </span>
           {rows.length > 0 && (
             <span className="text-xs text-on-surface-variant font-medium">
-              · {rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)} units total
+              · {Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))} units total
             </span>
           )}
         </div>
@@ -160,9 +161,9 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                         {formatINR(row.unitPrice)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data">
-                        {row.discountPercent > 0 ? (
+                        {row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0) ? (
                           <span className="text-orange-600 dark:text-orange-400 font-bold">
-                            {row.discountPercent}%
+                            {row.discountPercent > 0 ? `${row.discountPercent}%` : `₹${row.discountAmount}`}
                           </span>
                         ) : (
                           <span className="text-outline">-</span>
@@ -226,8 +227,10 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                       </span>
                       <span>×</span>
                       <span>{formatINR(row.unitPrice)}</span>
-                      {row.discountPercent > 0 && (
-                        <span className="text-orange-600 dark:text-orange-400 font-semibold">(-{row.discountPercent}%)</span>
+                      {(row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0)) && (
+                        <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                          (-{row.discountPercent > 0 ? `${row.discountPercent}%` : `₹${row.discountAmount}`})
+                        </span>
                       )}
                     </div>
                     {isGstActive && (

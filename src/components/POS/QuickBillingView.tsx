@@ -317,8 +317,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       removeFromCart(itemId);
       return;
     }
+    const cleanQty = Math.round(qty * 1000) / 1000;
     setCart(
-      cart.map((c) => (c.item.id === itemId ? { ...c, qty } : c))
+      cart.map((c) => (c.item.id === itemId ? { ...c, qty: cleanQty } : c))
     );
   };
 
@@ -1115,24 +1116,25 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   <div className="flex items-center gap-1 bg-surface-container-low rounded-lg p-0.5 border border-outline-variant/25">
                     <button
                       type="button"
-                      onClick={() => updateCartQty(item.id, qty - 1)}
+                      onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(3)))}
                       className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       -
                     </button>
                     <input
                       type="number"
-                      min="1"
+                      step="any"
+                      min="0.001"
                       value={qty}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value) || 1;
-                        updateCartQty(item.id, Math.max(1, val));
+                        const val = parseFloat(e.target.value);
+                        updateCartQty(item.id, !isNaN(val) && val > 0 ? val : 0);
                       }}
-                      className="w-8 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
+                      className="w-12 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
                     />
                     <button
                       type="button"
-                      onClick={() => updateCartQty(item.id, qty + 1)}
+                      onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(3)))}
                       className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       +

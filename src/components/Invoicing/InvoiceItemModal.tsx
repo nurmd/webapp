@@ -13,6 +13,7 @@ export interface InvoiceItemData {
   unitPrice: number;
   mrp?: number;
   discountPercent: number;
+  discountAmount?: number;
   gstRate: number;
 }
 
@@ -59,6 +60,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const defaultHsn = isPurchase ? '844332' : '998313';
   const isEditing = Boolean(initialItem);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
 
   const accentColorClass = isPurchase ? 'text-orange-600 dark:text-orange-400' : 'text-secondary';
   const accentBgLightClass = isPurchase ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400' : 'bg-secondary/10 text-secondary';
@@ -70,11 +72,22 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [name, setName] = useState(initialItem?.name || '');
   const [description, setDescription] = useState(initialItem?.description || '');
   const [hsnSacCode, setHsnSacCode] = useState(initialItem?.hsnSacCode || defaultHsn);
-  const [quantity, setQuantity] = useState<number>(initialItem?.quantity || 1);
+  const [quantity, setQuantity] = useState<string>(
+    initialItem?.quantity !== undefined && initialItem.quantity !== null ? String(initialItem.quantity) : ''
+  );
   const [unit, setUnit] = useState<string>(initialItem?.unit || 'PCS');
   const [unitPrice, setUnitPrice] = useState<number>(initialItem?.unitPrice || 0);
   const [mrp, setMrp] = useState<number | undefined>(initialItem?.mrp);
   const [discountPercent, setDiscountPercent] = useState<number>(initialItem?.discountPercent || 0);
+  const [discountPercentInput, setDiscountPercentInput] = useState<string>(
+    initialItem?.discountPercent ? String(initialItem.discountPercent) : ''
+  );
+  const [discountAmountInput, setDiscountAmountInput] = useState<string>(
+    initialItem?.discountAmount ? String(initialItem.discountAmount) : ''
+  );
+  const [lastDiscountEdited, setLastDiscountEdited] = useState<'percent' | 'amount'>(
+    initialItem?.discountAmount ? 'amount' : 'percent'
+  );
   const [gstRate, setGstRate] = useState<number>(initialItem?.gstRate ?? 18);
 
   // Integrated Search Dropdown State
@@ -96,10 +109,6 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [totalInput, setTotalInput] = useState<string>('');
   const [isEditingTotal, setIsEditingTotal] = useState(false);
 
-  // Editable Discount Amount State
-  const [discountAmountInput, setDiscountAmountInput] = useState<string>('');
-  const [isEditingDiscountAmount, setIsEditingDiscountAmount] = useState(false);
-
   // Sync state whenever modal opens or initialItem changes
   useEffect(() => {
     if (isOpen) {
@@ -108,14 +117,27 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setName(initialItem.name || '');
         setDescription(initialItem.description || '');
         setHsnSacCode(initialItem.hsnSacCode || defaultHsn);
-        setQuantity(initialItem.quantity || 1);
+        setQuantity(initialItem.quantity !== undefined && initialItem.quantity !== null ? String(initialItem.quantity) : '');
         setUnit(initialItem.unit || 'PCS');
         setUnitPrice(initialItem.unitPrice || 0);
         setMrp(initialItem.mrp);
-        setDiscountPercent(initialItem.discountPercent || 0);
+        const initDiscPct = initialItem.discountPercent || 0;
+        setDiscountPercent(initDiscPct);
+        setDiscountPercentInput(initDiscPct > 0 ? String(initDiscPct) : '');
+        if (initialItem.discountAmount && initialItem.discountAmount > 0) {
+          setDiscountAmountInput(String(initialItem.discountAmount));
+          setLastDiscountEdited('amount');
+        } else if (initDiscPct > 0 && initialItem.quantity && initialItem.unitPrice) {
+          const initGross = initialItem.quantity * initialItem.unitPrice;
+          const initAmt = Number(((initGross * initDiscPct) / 100).toFixed(2));
+          setDiscountAmountInput(initAmt > 0 ? initAmt.toFixed(2) : '');
+          setLastDiscountEdited('percent');
+        } else {
+          setDiscountAmountInput('');
+          setLastDiscountEdited('percent');
+        }
         setGstRate(initialItem.gstRate ?? 18);
         setIsEditingTotal(false);
-        setIsEditingDiscountAmount(false);
         setIsDropdownOpen(false);
       } else {
         resetForm();
@@ -132,16 +154,17 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setName('');
     setDescription('');
     setHsnSacCode(defaultHsn);
-    setQuantity(1);
+    setQuantity('');
     setUnit('PCS');
     setUnitPrice(0);
     setMrp(undefined);
     setDiscountPercent(0);
+    setDiscountPercentInput('');
+    setDiscountAmountInput('');
+    setLastDiscountEdited('percent');
     setGstRate(18);
     setTotalInput('');
     setIsEditingTotal(false);
-    setDiscountAmountInput('');
-    setIsEditingDiscountAmount(false);
     setIsDropdownOpen(false);
   };
 
@@ -183,6 +206,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setMrp(item.mrp || item.salePrice || 0);
     setGstRate(item.gstRate ?? 18);
     setIsDropdownOpen(false);
+    setTimeout(() => {
+      quantityInputRef.current?.focus();
+    }, 50);
   };
 
   const handleOpenCreateItem = (prefillName?: string) => {
@@ -230,24 +256,49 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setIsCreateItemModalOpen(false);
   };
 
-  // Live item total calculation ("etitae total")
-  const calculation = useMemo(() => {
-    const qty = Math.max(0.001, Number(quantity) || 0);
-    const rate = Math.max(0, Number(unitPrice) || 0);
-    const gross = qty * rate;
+  // Clean decimal quantity parser
+  const parsedQuantity = useMemo(() => {
+    const val = parseFloat(quantity);
+    return !isNaN(val) && val > 0 ? val : 0;
+  }, [quantity]);
 
-    const discPct = Math.min(100, Math.max(0, Number(discountPercent) || 0));
-    const discountAmount = (gross * discPct) / 100;
-    const taxableAmount = Math.max(0, gross - discountAmount);
+  const handleQuantityChange = (valStr: string) => {
+    const sanitized = valStr.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+    setQuantity(cleanVal);
+  };
+
+  // Live item total calculation with exact decimal discount handling
+  const calculation = useMemo(() => {
+    const qty = parsedQuantity;
+    const rate = Math.max(0, Number(unitPrice) || 0);
+    const gross = Number((qty * rate).toFixed(2));
+
+    let discountAmount = 0;
+    let discPct = 0;
+
+    if (lastDiscountEdited === 'amount') {
+      const enteredAmt = parseFloat(discountAmountInput) || 0;
+      discountAmount = Math.min(gross, Math.max(0, enteredAmt));
+      if (gross > 0 && discountAmount > 0) {
+        discPct = parseFloat(((discountAmount / gross) * 100).toFixed(2));
+      }
+    } else {
+      discPct = Math.min(100, Math.max(0, parseFloat(discountPercentInput) || 0));
+      discountAmount = Number(((gross * discPct) / 100).toFixed(2));
+    }
+
+    const taxableAmount = Math.max(0, Number((gross - discountAmount).toFixed(2)));
 
     const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
-    const gstAmount = (taxableAmount * taxPct) / 100;
+    const gstAmount = Number(((taxableAmount * taxPct) / 100).toFixed(2));
 
-    const cgstAmount = isIntraState ? gstAmount / 2 : 0;
-    const sgstAmount = isIntraState ? gstAmount / 2 : 0;
+    const cgstAmount = isIntraState ? Number((gstAmount / 2).toFixed(2)) : 0;
+    const sgstAmount = isIntraState ? Number((gstAmount / 2).toFixed(2)) : 0;
     const igstAmount = isIntraState ? 0 : gstAmount;
 
-    let totalAmount = taxableAmount + gstAmount;
+    let totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
 
     // If user explicitly typed a total that matches within a small rounding difference (<= 0.02),
     // honor the user's exact entered total so it never falls back or gets rejected
@@ -265,8 +316,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       sgstAmount,
       igstAmount,
       totalAmount,
+      discountPercent: discPct,
     };
-  }, [quantity, unitPrice, discountPercent, gstRate, isIntraState, isGstActive, totalInput]);
+  }, [parsedQuantity, unitPrice, discountPercentInput, discountAmountInput, lastDiscountEdited, gstRate, isIntraState, isGstActive, totalInput]);
 
   // Keep totalInput synchronized with calculated total unless user is actively editing it
   useEffect(() => {
@@ -283,39 +335,83 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     }
   }, [calculation.totalAmount, isEditingTotal]);
 
-  // Keep discountAmountInput synchronized with calculated discount unless user is actively editing it
+  // Sync discount percent and discount amount whenever quantity or unitPrice changes
   useEffect(() => {
-    if (!isEditingDiscountAmount) {
-      if (calculation.discountAmount > 0) {
-        setDiscountAmountInput(calculation.discountAmount.toFixed(2));
-      } else {
+    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+    if (lastDiscountEdited === 'amount') {
+      const amt = parseFloat(discountAmountInput);
+      if (!isNaN(amt) && amt > 0 && gross > 0) {
+        const rawPct = Math.min(100, (amt / gross) * 100);
+        const formattedPct = parseFloat(rawPct.toFixed(2));
+        setDiscountPercent(formattedPct);
+        setDiscountPercentInput(String(formattedPct));
+      } else if (!discountAmountInput.trim()) {
+        setDiscountPercent(0);
+        setDiscountPercentInput('');
+      }
+    } else {
+      const pct = parseFloat(discountPercentInput);
+      if (!isNaN(pct) && pct > 0 && gross > 0) {
+        const amt = Number(((gross * pct) / 100).toFixed(2));
+        setDiscountAmountInput(amt > 0 ? amt.toFixed(2) : '');
+      } else if (!discountPercentInput.trim()) {
         setDiscountAmountInput('');
       }
     }
-  }, [calculation.discountAmount, isEditingDiscountAmount]);
+  }, [parsedQuantity, unitPrice, lastDiscountEdited]);
 
   const handleDiscountPercentChange = (valStr: string) => {
-    if (!valStr.trim()) {
+    const sanitized = valStr.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+
+    setDiscountPercentInput(cleanVal);
+    setLastDiscountEdited('percent');
+
+    if (!cleanVal.trim()) {
       setDiscountPercent(0);
+      setDiscountAmountInput('');
       return;
     }
-    const val = Math.min(100, Math.max(0, Number(valStr)));
-    setDiscountPercent(val);
+
+    const num = Math.min(100, Math.max(0, parseFloat(cleanVal) || 0));
+    setDiscountPercent(num);
+
+    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+    if (gross > 0 && num > 0) {
+      const amt = Number(((gross * num) / 100).toFixed(2));
+      setDiscountAmountInput(amt > 0 ? amt.toFixed(2) : '');
+    } else {
+      setDiscountAmountInput('');
+    }
   };
 
   const handleDiscountAmountChange = (valStr: string) => {
-    setDiscountAmountInput(valStr);
-    if (!valStr.trim()) {
+    const sanitized = valStr.replace(/[^0-9.]/g, '');
+    const parts = sanitized.split('.');
+    const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+
+    setDiscountAmountInput(cleanVal);
+    setLastDiscountEdited('amount');
+
+    if (!cleanVal.trim()) {
       setDiscountPercent(0);
+      setDiscountPercentInput('');
       return;
     }
-    const val = parseFloat(valStr);
-    if (isNaN(val) || val < 0) return;
 
-    const gross = (Number(quantity) || 1) * (Number(unitPrice) || 0);
-    if (gross > 0) {
-      const calculatedPct = Math.min(100, Math.round(((val / gross) * 100) * 100) / 100);
-      setDiscountPercent(calculatedPct);
+    const amt = Math.max(0, parseFloat(cleanVal) || 0);
+    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+
+    if (gross > 0 && amt > 0) {
+      // Better handling of decimal discount percent if discount amount is given
+      const rawPct = Math.min(100, (amt / gross) * 100);
+      const formattedPct = parseFloat(rawPct.toFixed(2));
+      setDiscountPercent(formattedPct);
+      setDiscountPercentInput(String(formattedPct));
+    } else {
+      setDiscountPercent(0);
+      setDiscountPercentInput('');
     }
   };
 
@@ -332,8 +428,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       return;
     }
 
-    const qty = Math.max(0.0001, Number(quantity) || 1);
-    const discPct = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+    const qty = parsedQuantity > 0 ? parsedQuantity : 1;
+    const discPct = Math.min(100, Math.max(0, Number(calculation.discountPercent) || 0));
     const discMultiplier = 1 - discPct / 100;
     const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
     const taxMultiplier = 1 + taxPct / 100;
@@ -361,16 +457,20 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       }
     }
 
+    const qty = parsedQuantity > 0 ? parsedQuantity : 1;
+    const discAmt = calculation.discountAmount > 0 ? calculation.discountAmount : undefined;
+
     return {
       itemId: resolvedItemId || `CUSTOM-${Date.now()}`,
       name: name.trim(),
       description: description.trim() || undefined,
       hsnSacCode: isGstActive ? (hsnSacCode.trim() || defaultHsn) : '',
-      quantity: Number(quantity) || 1,
+      quantity: qty,
       unit,
       unitPrice: Number(unitPrice) || 0,
       mrp: mrp ? Number(mrp) : undefined,
-      discountPercent: Number(discountPercent) || 0,
+      discountPercent: calculation.discountPercent,
+      discountAmount: discAmt,
       gstRate: isGstActive ? (Number(gstRate) || 0) : 0,
     };
   };
@@ -378,7 +478,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Save and keep modal open for next product
   const handleSaveAndAddMore = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!name.trim() || quantity <= 0) return;
+    if (!name.trim() || parsedQuantity <= 0) return;
 
     onSaveItem(buildItemData());
     setJustAddedCount((prev) => prev + 1);
@@ -391,7 +491,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Save and close modal
   const handleSaveAndClose = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!name.trim() || quantity <= 0) return;
+    if (!name.trim() || parsedQuantity <= 0) return;
 
     onSaveItem(buildItemData());
     onClose();
@@ -602,31 +702,16 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               <label className="text-xs font-bold text-on-surface-variant">
                 Quantity <span className="text-error">*</span>
               </label>
-              <div className="flex items-center rounded-xl bg-surface-container-low border border-outline-variant/30 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setQuantity(Math.max(1, Number((quantity - 1).toFixed(2))))}
-                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold text-base"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  min="0.01"
-                  step="any"
-                  required
-                  value={quantity}
-                  onChange={(e) => setQuantity(Math.max(0, Number(e.target.value)))}
-                  className="flex-1 text-center font-tabular-data text-xs sm:text-sm font-bold text-on-surface bg-transparent outline-none py-1.5"
-                />
-                <button
-                  type="button"
-                  onClick={() => setQuantity(Number((quantity + 1).toFixed(2)))}
-                  className="w-9 h-9 flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer font-bold text-base"
-                >
-                  +
-                </button>
-              </div>
+              <input
+                ref={quantityInputRef}
+                type="text"
+                inputMode="decimal"
+                required
+                value={quantity}
+                onChange={(e) => handleQuantityChange(e.target.value)}
+                placeholder="0"
+                className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all font-tabular-data h-[38px]`}
+              />
             </div>
 
             <div className="flex flex-col gap-1">
@@ -698,11 +783,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={discountPercent || ''}
+                  type="text"
+                  inputMode="decimal"
+                  value={discountPercentInput}
                   onChange={(e) => handleDiscountPercentChange(e.target.value)}
                   placeholder="0"
                   className={`w-full pl-3 pr-7 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
@@ -722,19 +805,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   ₹
                 </span>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={discountAmountInput}
-                  onFocus={() => setIsEditingDiscountAmount(true)}
-                  onBlur={() => {
-                    setIsEditingDiscountAmount(false);
-                    if (calculation.discountAmount > 0) {
-                      setDiscountAmountInput(calculation.discountAmount.toFixed(2));
-                    } else {
-                      setDiscountAmountInput('');
-                    }
-                  }}
                   onChange={(e) => handleDiscountAmountChange(e.target.value)}
                   placeholder="0.00"
                   className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
@@ -828,9 +901,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveAndAddMore}
-                  disabled={!name.trim() || quantity <= 0}
+                  disabled={!name.trim() || parsedQuantity <= 0}
                   className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    !name.trim() || quantity <= 0
+                    !name.trim() || parsedQuantity <= 0
                       ? 'bg-outline-variant/40 text-outline cursor-not-allowed'
                       : (isPurchase
                           ? 'bg-surface-container-high hover:bg-surface-container-highest text-orange-600 dark:text-orange-400 border border-orange-500/30'
@@ -849,9 +922,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
               <button
                 type="submit"
-                disabled={!name.trim() || quantity <= 0}
+                disabled={!name.trim() || parsedQuantity <= 0}
                 className={`flex-1 sm:flex-initial py-2.5 px-5 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  !name.trim() || quantity <= 0
+                  !name.trim() || parsedQuantity <= 0
                     ? 'bg-outline-variant text-outline cursor-not-allowed'
                     : (isPurchase
                         ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-600/20'

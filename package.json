@@ -1,6 +1,6 @@
 {
   "name": "gst-billing-app",
-  "version": "1.1.16",
+  "version": "1.1.17",
   "private": true,
   "description": "Cross-platform GST Billing & Accounting Application (Web, Android, iOS, Windows, Linux)",
   "type": "module",

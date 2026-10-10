@@ -279,6 +279,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         unitPrice: it.unitPrice,
         mrp: it.mrp,
         discountPercent: it.discountPercent || 0,
+        discountAmount: it.discountAmount,
         gstRate: it.gstRate,
       }));
     }
@@ -294,9 +295,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         : itemDisc;
 
       return {
-        quantity: Number(r.quantity) || 1,
+        quantity: Number(r.quantity) || 0,
         unitPrice: Number(r.unitPrice) || 0,
         discountPercent: combinedDisc,
+        discountAmount: overallDiscountPercent > 0 ? undefined : r.discountAmount,
         gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
       };
     });
@@ -310,8 +312,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const overallDiscountAmount = useMemo(() => {
     if (overallDiscountPercent <= 0) return 0;
     const rawTaxable = rows.reduce((sum, r) => {
-      const gross = (Number(r.quantity) || 1) * (Number(r.unitPrice) || 0);
-      const itemDisc = (gross * (Number(r.discountPercent) || 0)) / 100;
+      const gross = (Number(r.quantity) || 0) * (Number(r.unitPrice) || 0);
+      const itemDisc = r.discountAmount && r.discountAmount > 0 ? r.discountAmount : (gross * (Number(r.discountPercent) || 0)) / 100;
       return sum + (gross - itemDisc);
     }, 0);
     return Number(((rawTaxable * overallDiscountPercent) / 100).toFixed(2));
@@ -704,7 +706,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             onRemoveDiscount={() => setOverallDiscountPercent(0)}
             isTaxDetailsOpen={isTaxDetailsOpen}
             onToggleTaxDetails={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-            totalUnits={rows.reduce((sum, r) => sum + (Number(r.quantity) || 1), 0)}
+            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))}
             finalGrandTotal={finalGrandTotal}
             accentColor="secondary"
           />
