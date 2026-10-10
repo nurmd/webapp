@@ -39,9 +39,12 @@ describe('Challenger 2 Milestone 5: Empirical APK Artifact & Signature Stress Su
   it('3. verifies Android badging metadata, SDK constraints, and launchable activity via aapt2', () => {
     const badgingOutput = execSync(`aapt2 dump badging "${apkPath}"`, { encoding: 'utf8' });
 
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'));
+    const expectedVersionCode = pkg.version.split('.').map((p: string, i: number) => i === 0 ? p : p.padStart(2, '0')).join('');
     expect(badgingOutput).toMatch(/package:\s+name='com\.gstbilling\.pos'/);
-    expect(badgingOutput).toMatch(/versionCode='10116'/);
-    expect(badgingOutput).toMatch(/versionName='1\.1\.16'/);
+    expect(badgingOutput).toMatch(new RegExp(`versionCode='${expectedVersionCode}'`));
+    expect(badgingOutput).toMatch(new RegExp(`versionName='${pkg.version}'`));
     expect(badgingOutput).toMatch(/minSdkVersion:'24'/);
     expect(badgingOutput).toMatch(/targetSdkVersion:'35'/);
     expect(badgingOutput).toMatch(/launchable-activity:\s+name='com\.gstbilling\.pos\.MainActivity'/);

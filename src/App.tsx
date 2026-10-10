@@ -313,6 +313,19 @@ export const App: React.FC = () => {
     }, 3500);
   };
 
+  React.useEffect(() => {
+    const handleToastEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        showToast(customEvent.detail);
+      }
+    };
+    window.addEventListener('app_show_toast', handleToastEvent);
+    return () => {
+      window.removeEventListener('app_show_toast', handleToastEvent);
+    };
+  }, []);
+
   const handleCheckUpdate = async (explicit: boolean = true) => {
     if (hasUpdate && latestRelease) {
       setIsUpdateModalOpen(true);
@@ -686,6 +699,16 @@ export const App: React.FC = () => {
   const activeItems = React.useMemo(() => getActiveItems(items), [items]);
 
   const handleSaveItem = (item: InventoryItem) => {
+    const trimmed = (item.name || '').normalize('NFC').trim().toLowerCase();
+    const isDup = items.some(
+      (existing) =>
+        String(existing.id) !== String(item.id) &&
+        (existing.name || '').normalize('NFC').trim().toLowerCase() === trimmed
+    );
+    if (isDup) {
+      showToast('An item with this name already exists in inventory');
+      return;
+    }
     db.saveItem(item);
     refreshData();
   };

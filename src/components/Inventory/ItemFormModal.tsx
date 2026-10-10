@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
 import { db } from '../../services/db.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 export interface ItemFormModalProps {
   isOpen: boolean;
@@ -48,6 +49,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   }, [name, existingItems, editingItem]);
 
   useEffect(() => {
+    if (isDuplicateName) {
+      showAppToast('An item with this name already exists in inventory');
+    }
+  }, [isDuplicateName]);
+
+  useEffect(() => {
     if (editingItem) {
       setItemType(editingItem.unit === 'HOURS' || editingItem.unit === 'DAYS' ? 'SERVICE' : 'PRODUCT');
       setName(editingItem.name);
@@ -84,6 +91,10 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const handleSaveItemForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (isDuplicateName) {
+      showAppToast('An item with this name already exists in inventory');
+      return;
+    }
 
     const itemToSave: InventoryItem = {
       id: editingItem ? editingItem.id : 'ITM-' + Date.now(),
@@ -410,7 +421,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-full bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer flex items-center gap-1.5"
+              disabled={isDuplicateName || !name.trim()}
+              className={`px-5 py-2.5 rounded-full font-label-md text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 ${
+                isDuplicateName || !name.trim()
+                  ? 'bg-outline-variant/60 text-outline cursor-not-allowed opacity-50'
+                  : 'bg-secondary text-on-secondary active:scale-95 transition-transform cursor-pointer'
+              }`}
             >
               <span className="material-symbols-outlined text-[16px]">check</span>
               <span>{editingItem ? 'Update Item' : 'Save Item'}</span>

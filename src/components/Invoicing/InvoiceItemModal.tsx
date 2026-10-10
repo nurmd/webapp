@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -104,6 +105,22 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [newItemGstRate, setNewGstRate] = useState<number>(18);
   const [newItemStock, setNewItemStock] = useState('0');
   const [newItemCategory, setNewItemCategory] = useState('General');
+
+  // Check if quick item creation name matches an existing catalog item case-insensitively
+  const isDuplicateQuickItemName = useMemo(() => {
+    const trimmed = newItemName.normalize('NFC').trim().toLowerCase();
+    if (!trimmed) return false;
+    return itemsCatalog.some((item) => {
+      if (!item) return false;
+      return (item.name || '').normalize('NFC').trim().toLowerCase() === trimmed;
+    });
+  }, [newItemName, itemsCatalog]);
+
+  useEffect(() => {
+    if (isDuplicateQuickItemName) {
+      showAppToast('An item with this name already exists in inventory');
+    }
+  }, [isDuplicateQuickItemName]);
 
   // Editable Total State
   const [totalInput, setTotalInput] = useState<string>('');
@@ -228,6 +245,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const handleSaveQuickItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
+    if (isDuplicateQuickItemName) {
+      showAppToast('An item with this name already exists in inventory');
+      return;
+    }
 
     const sale = parseFloat(newItemSalePrice) || 0;
     const purchase = parseFloat(newItemPurchasePrice) || (mode === 'purchase' ? sale : 0);
@@ -256,10 +277,17 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setIsCreateItemModalOpen(false);
   };
 
-  // Clean decimal quantity parser
+  // Clean decimal quantity parser (0 when empty string or invalid)
   const parsedQuantity = useMemo(() => {
     const val = parseFloat(quantity);
     return !isNaN(val) && val > 0 ? val : 0;
+  }, [quantity]);
+
+  // When saving or calculating defaults: if empty string, assume 1
+  const effectiveQuantity = useMemo(() => {
+    if (!quantity.trim()) return 1;
+    const val = parseFloat(quantity);
+    return !isNaN(val) && val > 0 ? val : 1;
   }, [quantity]);
 
   const handleQuantityChange = (valStr: string) => {
@@ -271,7 +299,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   // Live item total calculation with exact decimal discount handling
   const calculation = useMemo(() => {
-    const qty = parsedQuantity;
+    const qty = effectiveQuantity;
     const rate = Math.max(0, Number(unitPrice) || 0);
     const gross = Number((qty * rate).toFixed(2));
 
@@ -318,7 +346,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       totalAmount,
       discountPercent: discPct,
     };
-  }, [parsedQuantity, unitPrice, discountPercentInput, discountAmountInput, lastDiscountEdited, gstRate, isIntraState, isGstActive, totalInput]);
+  }, [effectiveQuantity, unitPrice, discountPercentInput, discountAmountInput, lastDiscountEdited, gstRate, isIntraState, isGstActive, totalInput]);
 
   // Keep totalInput synchronized with calculated total unless user is actively editing it
   useEffect(() => {
@@ -337,7 +365,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   // Sync discount percent and discount amount whenever quantity or unitPrice changes
   useEffect(() => {
-    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+    const gross = effectiveQuantity * Math.max(0, Number(unitPrice) || 0);
     if (lastDiscountEdited === 'amount') {
       const amt = parseFloat(discountAmountInput);
       if (!isNaN(amt) && amt > 0 && gross > 0) {
@@ -358,7 +386,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setDiscountAmountInput('');
       }
     }
-  }, [parsedQuantity, unitPrice, lastDiscountEdited]);
+  }, [effectiveQuantity, unitPrice, lastDiscountEdited]);
 
   const handleDiscountPercentChange = (valStr: string) => {
     const sanitized = valStr.replace(/[^0-9.]/g, '');
@@ -478,7 +506,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Save and keep modal open for next product
   const handleSaveAndAddMore = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!name.trim() || parsedQuantity <= 0) return;
+    if (!name.trim()) return;
 
     onSaveItem(buildItemData());
     setJustAddedCount((prev) => prev + 1);
@@ -491,7 +519,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Save and close modal
   const handleSaveAndClose = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!name.trim() || parsedQuantity <= 0) return;
+    if (!name.trim()) return;
 
     onSaveItem(buildItemData());
     onClose();
@@ -641,25 +669,27 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                       </div>
                     ))}
 
-                    {/* Single Add New Item action in search dropdown */}
-                    <div
-                      onClick={() => handleOpenCreateItem(name)}
-                      className="p-2.5 bg-surface-container-low/70 hover:bg-surface-container-low flex items-center gap-2 cursor-pointer transition-colors text-xs font-bold border-t border-outline-variant/20"
-                    >
-                      <div className={`w-6 h-6 rounded-lg ${accentBgLightClass} flex items-center justify-center flex-shrink-0`}>
-                        <span className="material-symbols-outlined text-[16px]">add</span>
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className={`${accentColorClass} truncate`}>
-                          + Add New Item
-                        </span>
-                        {name.trim() && (
-                          <span className="text-[10px] text-on-surface-variant font-normal truncate">
-                            Create &quot;{name.trim()}&quot; in inventory
+                    {/* Add New Item action in search dropdown (only shown if not an exact match with an existing item) */}
+                    {!itemsCatalog.some((it) => (it.name || '').normalize('NFC').trim().toLowerCase() === name.normalize('NFC').trim().toLowerCase()) && (
+                      <div
+                        onClick={() => handleOpenCreateItem(name)}
+                        className="p-2.5 bg-surface-container-low/70 hover:bg-surface-container-low flex items-center gap-2 cursor-pointer transition-colors text-xs font-bold border-t border-outline-variant/20"
+                      >
+                        <div className={`w-6 h-6 rounded-lg ${accentBgLightClass} flex items-center justify-center flex-shrink-0`}>
+                          <span className="material-symbols-outlined text-[16px]">add</span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className={`${accentColorClass} truncate`}>
+                            + Add New Item
                           </span>
-                        )}
+                          {name.trim() && (
+                            <span className="text-[10px] text-on-surface-variant font-normal truncate">
+                              Create &quot;{name.trim()}&quot; in inventory
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </>
                 ) : (
                   /* Empty state when no catalog item matches */
@@ -667,14 +697,16 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     <span className="text-xs text-on-surface-variant">
                       No matching items found {name.trim() ? <>for &quot;<strong className="text-on-surface">{name}</strong>&quot;</> : ''}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenCreateItem(name)}
-                      className={`py-2 px-3.5 rounded-xl ${accentBgLightClass} ${accentColorClass} font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs`}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>+ Add New Item</span>
-                    </button>
+                    {!itemsCatalog.some((it) => (it.name || '').normalize('NFC').trim().toLowerCase() === name.normalize('NFC').trim().toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCreateItem(name)}
+                        className={`py-2 px-3.5 rounded-xl ${accentBgLightClass} ${accentColorClass} font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                        <span>+ Add New Item</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -700,16 +732,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-on-surface-variant">
-                Quantity <span className="text-error">*</span>
+                Quantity <span className="text-[10px] text-outline font-normal">(defaults to 1)</span>
               </label>
               <input
                 ref={quantityInputRef}
                 type="text"
                 inputMode="decimal"
-                required
                 value={quantity}
                 onChange={(e) => handleQuantityChange(e.target.value)}
-                placeholder="0"
+                placeholder="1"
                 className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-bold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all font-tabular-data h-[38px]`}
               />
             </div>
@@ -901,9 +932,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveAndAddMore}
-                  disabled={!name.trim() || parsedQuantity <= 0}
+                  disabled={!name.trim()}
                   className={`flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    !name.trim() || parsedQuantity <= 0
+                    !name.trim()
                       ? 'bg-outline-variant/40 text-outline cursor-not-allowed'
                       : (isPurchase
                           ? 'bg-surface-container-high hover:bg-surface-container-highest text-orange-600 dark:text-orange-400 border border-orange-500/30'
@@ -922,9 +953,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
               <button
                 type="submit"
-                disabled={!name.trim() || parsedQuantity <= 0}
+                disabled={!name.trim()}
                 className={`flex-1 sm:flex-initial py-2.5 px-5 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  !name.trim() || parsedQuantity <= 0
+                  !name.trim()
                     ? 'bg-outline-variant text-outline cursor-not-allowed'
                     : (isPurchase
                         ? 'bg-orange-600 hover:bg-orange-700 text-white shadow-orange-600/20'
@@ -981,8 +1012,23 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   placeholder="e.g. Wireless Mouse, Cotton Shirt..."
-                  className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 ${focusInputClass}`}
+                  className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface border ${
+                    isDuplicateQuickItemName
+                      ? 'border-amber-500 focus:border-amber-600'
+                      : 'border-outline-variant/30'
+                  } ${focusInputClass}`}
                 />
+                {isDuplicateQuickItemName && (
+                  <div
+                    role="alert"
+                    className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-fade-in"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400 shrink-0">
+                      warning
+                    </span>
+                    <span>An item with this name already exists in inventory</span>
+                  </div>
+                )}
               </div>
 
               {/* Prices: Sale Price & Purchase Price */}
@@ -1119,8 +1165,13 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className={`px-4 py-2 rounded-xl font-bold text-xs text-white shadow-xs cursor-pointer active:scale-95 transition-all flex items-center gap-1 ${
-                    isPurchase ? 'bg-orange-600 hover:bg-orange-700' : 'bg-secondary hover:bg-secondary/90 text-on-secondary'
+                  disabled={isDuplicateQuickItemName || !newItemName.trim()}
+                  className={`px-4 py-2 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-1 ${
+                    isDuplicateQuickItemName || !newItemName.trim()
+                      ? 'bg-outline-variant/60 text-outline cursor-not-allowed opacity-50'
+                      : isPurchase
+                      ? 'bg-orange-600 hover:bg-orange-700 text-white cursor-pointer active:scale-95'
+                      : 'bg-secondary hover:bg-secondary/90 text-on-secondary cursor-pointer active:scale-95'
                   }`}
                 >
                   <span className="material-symbols-outlined text-[16px]">check</span>

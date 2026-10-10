@@ -289,7 +289,7 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
       expect(container.textContent).toContain('An item with this name already exists in inventory');
     });
 
-    it('allows submission to proceed even when duplicate warning is active (non-blocking)', () => {
+    it('strictly blocks submission and disables submit button when duplicate item name is entered', () => {
       const handleSave = vi.fn();
       act(() => {
         root.render(
@@ -311,17 +311,19 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
 
       expect(container.textContent).toContain('An item with this name already exists in inventory');
 
+      // The save button must be disabled
+      const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+      expect(submitBtn).toBeTruthy();
+      expect(submitBtn.disabled).toBe(true);
+
       const form = container.querySelector('form');
       expect(form).toBeTruthy();
       act(() => {
         form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
 
-      expect(handleSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Basmati Rice Premium 5kg',
-        })
-      );
+      // Save must NOT be called when duplicate item name is entered
+      expect(handleSave).not.toHaveBeenCalled();
     });
 
     it('flags duplicate name in edit mode even when neither item has an SKU (undefined or empty)', () => {

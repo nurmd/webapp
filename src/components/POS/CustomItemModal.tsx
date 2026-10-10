@@ -24,7 +24,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedPrice = parseFloat(price);
-    const parsedQty = parseFloat(qty);
+    const parsedQty = !qty.trim() ? 1 : parseFloat(qty);
     if (!name.trim() || isNaN(parsedPrice) || parsedPrice <= 0 || isNaN(parsedQty) || parsedQty <= 0) {
       return;
     }
@@ -102,12 +102,13 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-outline mb-1">Quantity *</label>
+              <label className="block text-xs font-semibold text-outline mb-1">
+                Quantity <span className="text-[10px] text-outline font-normal">(defaults to 1)</span>
+              </label>
               <input
                 type="text"
                 inputMode="decimal"
-                required
-                placeholder="0"
+                placeholder="1"
                 value={qty}
                 onChange={(e) => {
                   const sanitized = e.target.value.replace(/[^0-9.]/g, '');

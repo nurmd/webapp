@@ -111,9 +111,9 @@ describe('Bill Item Quantity and Discount Enhancements', () => {
 
     const qtyInput = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
     expect(qtyInput).not.toBeNull();
-    // Quantity should be empty string, NOT 1
+    // Quantity starts empty so user can type directly, with placeholder '1' (defaults to 1 if left empty)
     expect(qtyInput.value).toBe('');
-    expect(qtyInput.placeholder).toBe('0');
+    expect(qtyInput.placeholder).toBe('1');
   });
 
   it('TC-QTY-02: Quantity input has no increment or decrement (+ / -) buttons', async () => {
@@ -355,5 +355,234 @@ describe('Bill Item Quantity and Discount Enhancements', () => {
     expect(onAddCustomItem).toHaveBeenCalled();
     expect(addedQty).toBe(1.5);
     expect(addedItem!.name).toBe('Special Packaging');
+  });
+
+  it('TC-QTY-04: When quantity is left empty, assumes 1 upon adding item to bill and saving', async () => {
+    let savedItem: InvoiceItemData | null = null;
+    const onSaveItem = vi.fn((item) => {
+      savedItem = item;
+    });
+
+    await act(async () => {
+      root.render(
+        <InvoiceItemModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSaveItem={onSaveItem}
+          itemsCatalog={sampleCatalog}
+          isIntraState={true}
+          isGstActive={false}
+        />
+      );
+    });
+
+    // 1. Enter Name
+    const nameInput = container.querySelector('input[placeholder*="Type item name"]') as HTMLInputElement;
+    act(() => {
+      changeInput(nameInput, 'Cotton Towel');
+    });
+
+    // 2. Enter Price 120
+    const priceInput = container.querySelector('input[placeholder="0.00"]') as HTMLInputElement;
+    act(() => {
+      changeInput(priceInput, '120');
+    });
+
+    // 3. Leave quantity empty (value is '')
+    const qtyInput = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
+    expect(qtyInput.value).toBe('');
+
+    // 4. Submit form
+    const form = container.querySelector('form') as HTMLFormElement;
+    act(() => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    // Verified: savedItem received quantity = 1
+    expect(onSaveItem).toHaveBeenCalled();
+    expect(savedItem).not.toBeNull();
+    expect(savedItem!.quantity).toBe(1);
+    expect(savedItem!.unitPrice).toBe(120);
+  });
+
+  it('TC-DUP-01: Quick item creation modal triggers duplicate alert for lowercase item duplicate', async () => {
+    await act(async () => {
+      root.render(
+        <InvoiceItemModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSaveItem={vi.fn()}
+          itemsCatalog={sampleCatalog} // has 'Basmati Rice'
+          isIntraState={true}
+          isGstActive={false}
+        />
+      );
+    });
+
+    // Open quick add item modal with a lowercase duplicate name
+    const nameInput = container.querySelector('input[placeholder*="Type item name"]') as HTMLInputElement;
+    act(() => {
+      changeInput(nameInput, 'basmati rice');
+    });
+
+    // Dropdown should not show + Add New Item when exact case-insensitive match exists
+    expect(container.textContent).not.toContain('+ Add New Item');
+  });
+
+  it('TC-DUP-02: Quick item creation form blocks duplicate lowercase item, disables button, and displays warning', async () => {
+    const onItemCreated = vi.fn();
+    await act(async () => {
+      root.render(
+        <InvoiceItemModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSaveItem={vi.fn()}
+          onItemCreated={onItemCreated}
+          itemsCatalog={sampleCatalog} // has 'Basmati Rice'
+          isIntraState={true}
+          isGstActive={false}
+        />
+      );
+    });
+
+    // 1. Search for unique name so "+ Add New Item" appears
+    const nameInput = container.querySelector('input[placeholder*="Type item name"]') as HTMLInputElement;
+    act(() => {
+      nameInput.focus();
+      changeInput(nameInput, 'Brand New Item');
+    });
+
+    // 2. Click "+ Add New Item" button in search dropdown
+    const addBtn = Array.from(container.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('+ Add New Item')
+    ) as HTMLButtonElement;
+    expect(addBtn).toBeTruthy();
+    act(() => {
+      addBtn.click();
+    });
+
+    // Quick create modal is now open. Locate quick item name input
+    const quickNameInput = container.querySelector('input[placeholder*="Wireless Mouse"]') as HTMLInputElement;
+    expect(quickNameInput).toBeTruthy();
+
+    // 3. Change quick item name to lowercase existing item: 'basmati rice'
+    act(() => {
+      changeInput(quickNameInput, '   basmati rice   ');
+    });
+
+    // 4. Verify duplicate warning alert is rendered
+    expect(container.textContent).toContain('An item with this name already exists in inventory');
+
+    // 5. Verify the "Save & Use in Bill" button is strictly disabled
+    const saveAndUseBtn = Array.from(container.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Save & Use in Bill')
+    ) as HTMLButtonElement;
+    expect(saveAndUseBtn).toBeTruthy();
+    expect(saveAndUseBtn.disabled).toBe(true);
+
+    // 6. Attempt form submission -> strictly blocked
+    const quickForm = quickNameInput.closest('form');
+    expect(quickForm).toBeTruthy();
+    act(() => {
+      quickForm?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(onItemCreated).not.toHaveBeenCalled();
+  });
+
+  it('TC-DUP-03: Dispatches app_show_toast event when duplicate item name is entered', async () => {
+    const toastSpy = vi.fn();
+    window.addEventListener('app_show_toast', toastSpy);
+
+    await act(async () => {
+      root.render(
+        <InvoiceItemModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onSaveItem={vi.fn()}
+          itemsCatalog={sampleCatalog} // has 'Basmati Rice'
+          isIntraState={true}
+          isGstActive={false}
+        />
+      );
+    });
+
+    // Open quick modal
+    const nameInput = container.querySelector('input[placeholder*="Type item name"]') as HTMLInputElement;
+    act(() => {
+      nameInput.focus();
+      changeInput(nameInput, 'Unique Widget');
+    });
+    const addBtn = Array.from(container.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('+ Add New Item')
+    ) as HTMLButtonElement;
+    expect(addBtn).toBeTruthy();
+    act(() => {
+      addBtn.click();
+    });
+
+    const quickNameInput = container.querySelector('input[placeholder*="Wireless Mouse"]') as HTMLInputElement;
+    expect(quickNameInput).toBeTruthy();
+    act(() => {
+      changeInput(quickNameInput, 'basmati rice');
+    });
+
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: 'An item with this name already exists in inventory',
+      })
+    );
+
+    window.removeEventListener('app_show_toast', toastSpy);
+  });
+
+  it('TC-DUP-04: Ignores ad-hoc items in CustomItemModal and allows submission even if name matches catalog', async () => {
+    const onAddCustomItem = vi.fn();
+    await act(async () => {
+      root.render(
+        <CustomItemModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onAddCustomItem={onAddCustomItem}
+        />
+      );
+    });
+
+    const nameInput = container.querySelector('input[placeholder*="Gift Wrapping"]') as HTMLInputElement;
+    const priceInput = container.querySelector('input[placeholder="0.00"]') as HTMLInputElement;
+    const qtyInput = container.querySelector('input[inputmode="decimal"]') as HTMLInputElement;
+
+    expect(nameInput).toBeTruthy();
+    expect(priceInput).toBeTruthy();
+    expect(qtyInput).toBeTruthy();
+
+    // Type a name matching catalog item
+    act(() => {
+      changeInput(nameInput, 'Basmati Rice');
+      changeInput(priceInput, '250');
+      // Leave qty empty
+      changeInput(qtyInput, '');
+    });
+
+    // Submit button should NOT be disabled
+    const submitBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Add to Bill')
+    ) as HTMLButtonElement;
+    expect(submitBtn).toBeTruthy();
+    expect(submitBtn.disabled).toBe(false);
+
+    // Submit form -> empty qty defaults to 1, ad-hoc item added successfully
+    const form = container.querySelector('form');
+    act(() => {
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(onAddCustomItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Basmati Rice',
+        salePrice: 250,
+      }),
+      1
+    );
   });
 });
