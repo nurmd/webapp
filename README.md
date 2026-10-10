@@ -69,4 +69,4 @@ npm run build
 | **iOS** | `npx cap sync ios && npx cap open ios` | Opens Xcode project for packaging |
 | **Desktop (Linux/Win)** | `./scripts/build-desktop.sh` | Packages desktop binary using Tauri |
 
-See [ARCHITECTURE.md](file:///data/data/com.termux/files/home/gst-billing-app/ARCHITECTURE.md) for full technical documentation.
+See [ARCHITECTURE.md](file:///data/data/com.termux/files/home/gst-billing-app/ARCHITECTURE.md) and [CODEBASE_GUIDE.md](file:///data/data/com.termux/files/home/gst-billing-app/CODEBASE_GUIDE.md) for full technical documentation and engineering guides.

@@ -1,5 +1,7 @@
 # Vyapar Books Engineering Guardrails & Architectural Invariants
 
+> **Notice for Teamwork Agents:** For complete directory layout, domain engines, state synchronization flows, and component architecture, read [CODEBASE_GUIDE.md](./CODEBASE_GUIDE.md).
+
 This workspace hosts the Vyapar Books GST billing, accounting, and POS platform. All agents and developers must uphold the following invariants across features, refactors, and bug fixes:
 
 ---
@@ -48,3 +50,32 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 
 ## 6. Audit Trail & Statutory Compliance
 - Every state-altering database operation (`saveInvoice`, `deleteInvoice`, `saveParty`, `deleteParty`, `savePurchase`, `deletePurchase`, `saveVoucher`, `deleteVoucher`, `saveCompany`) must emit an immutable SHA-256 chained audit record via `src/services/auditTrail.ts`.
+
+---
+
+## 7. Pre-Flight Duplicate Validation in Entity Forms
+- When creating or editing domain entities (items, parties, categories), form modals must validate name uniqueness in real-time (case-insensitive, trimmed) against existing catalog records.
+- If a match is detected:
+  - In creation mode: Render an immediate, non-blocking warning badge (e.g. amber badge below the input field) advising the user that an item/party with this name already exists.
+  - In edit mode: The entity's own record must be excluded from duplicate checks so that saving unmodified names does not trigger a warning.
+- The validation must remain non-blocking so users can proceed if identical names are intentional across different categories or units.
+
+---
+
+## 8. Transaction Histories & Document Preview Interactivity
+- Every transaction record displayed within entity detail views (such as `ItemDetailSheet` or party passbooks) must retain a reference to its source document entity (`invoiceId` for sales, `purchaseId` for inward purchases, `voucherId` for payments).
+- Transaction list rows must provide clear visual affordances (pointer cursor, subtle hover highlight, document badge) and open the respective document preview modal upon click.
+- Manual non-bill entries (e.g., manual inventory stock adjustments) must be handled gracefully without triggering missing document errors.
+
+---
+
+## 9. Catalog Search UI & Scroll Affordances
+- In high-volume master lists (Inventory Items, Parties, Invoices), the search bar and filter controls must be sticky/floating (`sticky top-0 z-20` with surface backdrop) so users retain instant search capability without having to scroll back to the top.
+- When search input contains text, a 1-tap clear button (`close` icon) must appear inside the search input to reset the query in a single tap.
+
+---
+
+## 10. Living Codebase Documentation Invariant
+- The workspace maintains [CODEBASE_GUIDE.md](./CODEBASE_GUIDE.md) as the single source of truth for teamwork multi-agent teams, reviewers, and developers.
+- Whenever adding new domain engines, persistence keys, major components, or modifying architecture, agents must update `CODEBASE_GUIDE.md` alongside code changes to keep the guide current and prevent context drift.
+
