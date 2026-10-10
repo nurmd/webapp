@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
+import { db } from '../../services/db.ts';
 
 export interface ItemFormModalProps {
   isOpen: boolean;
@@ -7,6 +8,7 @@ export interface ItemFormModalProps {
   editingItem: InventoryItem | null;
   onSaveItem: (item: InventoryItem) => void;
   isGstActive: boolean;
+  existingItems?: InventoryItem[];
 }
 
 export const ItemFormModal: React.FC<ItemFormModalProps> = ({
@@ -15,6 +17,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   editingItem,
   onSaveItem,
   isGstActive,
+  existingItems,
 }) => {
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [name, setName] = useState('');
@@ -29,6 +32,20 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [currentStock, setCurrentStock] = useState<number>(0);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
   const [isDisabledState, setIsDisabledState] = useState(false);
+
+  const isDuplicateName = useMemo(() => {
+    const trimmed = name.normalize('NFC').trim().toLowerCase();
+    if (!trimmed) return false;
+    const itemsList = existingItems ?? db.getItems();
+    return itemsList.some((item) => {
+      if (!item) return false;
+      // Exclude the item currently being edited strictly by id
+      if (editingItem && String(item.id) === String(editingItem.id)) {
+        return false;
+      }
+      return (item.name || '').normalize('NFC').trim().toLowerCase() === trimmed;
+    });
+  }, [name, existingItems, editingItem]);
 
   useEffect(() => {
     if (editingItem) {
@@ -164,8 +181,23 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 placeholder="e.g. Basmati Rice Royal Premium 5kg"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full h-11 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface font-body-md text-sm placeholder:text-outline focus:outline-none focus:border-secondary"
+                className={`w-full h-11 px-3 rounded-lg bg-surface-container-lowest border ${
+                  isDuplicateName
+                    ? 'border-amber-500 focus:border-amber-600'
+                    : 'border-outline-variant/30 focus:border-secondary'
+                } text-on-surface font-body-md text-sm placeholder:text-outline focus:outline-none`}
               />
+              {isDuplicateName && (
+                <div
+                  role="alert"
+                  className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-fade-in"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400 shrink-0">
+                    warning
+                  </span>
+                  <span>An item with this name already exists in inventory</span>
+                </div>
+              )}
             </div>
 
             <div className={isGstActive ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>

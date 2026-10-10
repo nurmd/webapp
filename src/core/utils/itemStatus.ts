@@ -13,11 +13,11 @@ export function isItemInBills(
 ): boolean {
   if (!itemId) return false;
   const inInvoice = invoices.some((inv) =>
-    inv.items && inv.items.some((it) => it.itemId === itemId)
+    Boolean(inv && inv.items && inv.items.some((it) => Boolean(it && it.itemId === itemId)))
   );
   if (inInvoice) return true;
   const inPurchase = purchases.some((pur) =>
-    pur.items && pur.items.some((it) => it.itemId === itemId)
+    Boolean(pur && pur.items && pur.items.some((it) => Boolean(it && it.itemId === itemId)))
   );
   return inPurchase;
 }

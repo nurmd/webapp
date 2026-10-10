@@ -649,33 +649,33 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-surface flex flex-col min-h-screen overflow-x-hidden antialiased">
-      <InvoiceHeaderMeta
-        onClose={onClose}
-        initialInvoice={initialInvoice}
-        invoiceNumber={invoiceNumber}
-        invoiceDate={invoiceDate}
-        dueDate={dueDate}
-        posStateCode={posStateCode}
-        isGstActive={isGstActive}
-        isIntraState={calcSummary.isIntraState}
-        selectedParty={selectedParty}
-        currentConflict={currentConflict || null}
-        invoiceConflictError={invoiceConflictError}
-        allInvoices={allInvoices}
-        onSelectPartyClick={() => setIsPartyModalOpen(true)}
-        onClearParty={() => setSelectedParty(null)}
-        onAddPartyClick={() => setIsAddPartyModalOpen(true)}
-        onOpenInvoiceNumberModal={() => setIsInvoiceNumberModalOpen(true)}
-        onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
-        onAutoFixConflict={(newNum) => {
-          setInvoiceNumber(newNum);
-          setInvoiceConflictError(null);
-        }}
-      />
-
       {/* Main Full-Width Scrollable Workstation */}
       <main className="flex-1 flex flex-col relative w-full pt-14 pb-36 sm:pb-32 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
+          <InvoiceHeaderMeta
+            onClose={onClose}
+            initialInvoice={initialInvoice}
+            invoiceNumber={invoiceNumber}
+            invoiceDate={invoiceDate}
+            dueDate={dueDate}
+            posStateCode={posStateCode}
+            isGstActive={isGstActive}
+            isIntraState={calcSummary.isIntraState}
+            selectedParty={selectedParty}
+            currentConflict={currentConflict || null}
+            invoiceConflictError={invoiceConflictError}
+            allInvoices={allInvoices}
+            onSelectPartyClick={() => setIsPartyModalOpen(true)}
+            onClearParty={() => setSelectedParty(null)}
+            onAddPartyClick={() => setIsAddPartyModalOpen(true)}
+            onOpenInvoiceNumberModal={() => setIsInvoiceNumberModalOpen(true)}
+            onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
+            onAutoFixConflict={(newNum) => {
+              setInvoiceNumber(newNum);
+              setInvoiceConflictError(null);
+            }}
+          />
+
           <InvoiceLineItemsGrid
             rows={rows}
             calcItems={calcSummary.items}

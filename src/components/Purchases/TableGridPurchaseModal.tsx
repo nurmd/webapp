@@ -576,26 +576,26 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-surface flex flex-col min-h-screen overflow-x-hidden antialiased">
-      <PurchaseHeaderMeta
-        onClose={onClose}
-        isEditing={Boolean(initialBill)}
-        selectedSupplier={selectedSupplier}
-        billNumber={billNumber}
-        billDate={billDate}
-        dueDate={dueDate}
-        supplierStateCode={supplierStateCode}
-        itcEligibility={itcEligibility}
-        isGstActive={isGstActive}
-        onSelectSupplierClick={() => setIsPartyModalOpen(true)}
-        onAddSupplierClick={() => setIsAddPartyModalOpen(true)}
-        onClearSupplier={() => setSelectedSupplier(null)}
-        onOpenBillNoModal={() => setIsBillNoModalOpen(true)}
-        onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
-      />
-
       {/* Main Full-Width Scrollable Workstation */}
       <main className="flex-1 flex flex-col relative w-full pt-14 pb-36 sm:pb-32 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
+          <PurchaseHeaderMeta
+            onClose={onClose}
+            isEditing={Boolean(initialBill)}
+            selectedSupplier={selectedSupplier}
+            billNumber={billNumber}
+            billDate={billDate}
+            dueDate={dueDate}
+            supplierStateCode={supplierStateCode}
+            itcEligibility={itcEligibility}
+            isGstActive={isGstActive}
+            onSelectSupplierClick={() => setIsPartyModalOpen(true)}
+            onAddSupplierClick={() => setIsAddPartyModalOpen(true)}
+            onClearSupplier={() => setSelectedSupplier(null)}
+            onOpenBillNoModal={() => setIsBillNoModalOpen(true)}
+            onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
+          />
+
           <PurchaseLineItemsGrid
             rows={rows}
             calcItems={calcSummary.items}

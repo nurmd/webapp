@@ -10,6 +10,8 @@ import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
 import { ItemFormModal } from './ItemFormModal.tsx';
 import { ItemDetailSheet, ItemTransactionRecord, ItemTransactionType } from './ItemDetailSheet.tsx';
+import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
+import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 
 export type { ItemTransactionType, ItemTransactionRecord };
 
@@ -23,6 +25,10 @@ interface InventoryViewProps {
   onSaveAdjustment: (adj: StockAdjustment) => void;
   onScanBarcodeClick?: () => void;
   onOpenSettings?: (tab?: 'profile' | 'items' | 'general' | 'print' | 'audit') => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  previewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
+  previewPurchase?: (bill: PurchaseBill) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -35,6 +41,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onSaveAdjustment,
   onScanBarcodeClick,
   onOpenSettings,
+  onViewInvoice,
+  previewInvoice: previewInvoiceProp,
+  onViewPurchase,
+  previewPurchase: previewPurchaseProp,
 }) => {
   const isGstActive = db.getCompany().isGstEnabled !== false;
 
@@ -52,15 +62,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [activeItemDetail, setActiveItemDetail] = useState<InventoryItem | null>(null);
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [previewPurchase, setPreviewPurchase] = useState<PurchaseBill | null>(null);
+  const company = useMemo(() => db.getCompany(), []);
+
+  const handleViewInvoice = (inv: Invoice) => {
+    const viewInv = onViewInvoice || previewInvoiceProp;
+    if (viewInv) {
+      viewInv(inv);
+    } else {
+      setPreviewInvoice(inv);
+    }
+  };
+
+  const handleViewPurchase = (bill: PurchaseBill) => {
+    const viewPur = onViewPurchase || previewPurchaseProp;
+    if (viewPur) {
+      viewPur(bill);
+    } else {
+      setPreviewPurchase(bill);
+    }
+  };
 
   // Back Navigation for modals (priority 20)
   useBackNavigation(() => {
+    if (previewInvoice !== null) { setPreviewInvoice(null); return true; }
+    if (previewPurchase !== null) { setPreviewPurchase(null); return true; }
     if (isModalOpen) { setIsModalOpen(false); return true; }
     if (isFilterModalOpen) { setIsFilterModalOpen(false); return true; }
     if (adjustmentItem !== null) { setAdjustmentItem(null); return true; }
     if (activeItemDetail !== null) { setActiveItemDetail(null); return true; }
     return false;
-  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null, 20);
+  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null || previewInvoice !== null || previewPurchase !== null, 20);
 
   // Privacy toggles: Buy price visibility per item & global setting
   const [showBuyPricesGlobally, setShowBuyPricesGlobally] = useState<boolean>(() => {
@@ -145,32 +178,35 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       let totalPurchased = 0;
       let totalAdjusted = 0;
       let txnCount = 0;
-      const normName = item.name.trim().toLowerCase();
+      const normName = (item?.name || '').trim().toLowerCase();
 
       for (const inv of allInvoices) {
-        if (!inv.items) continue;
+        if (!inv || !inv.items) continue;
         for (const it of inv.items) {
+          if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalSold += it.quantity;
+            totalSold += it.quantity || 0;
             txnCount++;
           }
         }
       }
 
       for (const bill of allPurchases) {
-        if (!bill.items) continue;
+        if (!bill || !bill.items) continue;
         for (const it of bill.items) {
+          if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalPurchased += it.quantity;
+            totalPurchased += it.quantity || 0;
             txnCount++;
           }
         }
       }
 
       for (const adj of allAdjustments) {
+        if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity;
-          else totalAdjusted -= adj.quantity;
+          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity || 0;
+          else totalAdjusted -= adj.quantity || 0;
           txnCount++;
         }
       }
@@ -196,28 +232,31 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       let totalSold = 0;
       let totalPurchased = 0;
       let totalAdjusted = 0;
-      const normName = item.name.trim().toLowerCase();
+      const normName = (item?.name || '').trim().toLowerCase();
 
       for (const inv of allInvoices) {
-        if (!inv.items) continue;
+        if (!inv || !inv.items) continue;
         for (const it of inv.items) {
+          if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalSold += it.quantity;
+            totalSold += it.quantity || 0;
           }
         }
       }
       for (const bill of allPurchases) {
-        if (!bill.items) continue;
+        if (!bill || !bill.items) continue;
         for (const it of bill.items) {
+          if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalPurchased += it.quantity;
+            totalPurchased += it.quantity || 0;
           }
         }
       }
       for (const adj of allAdjustments) {
+        if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity;
-          else totalAdjusted -= adj.quantity;
+          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity || 0;
+          else totalAdjusted -= adj.quantity || 0;
         }
       }
 
@@ -403,27 +442,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Sticky Search & Filter Input Area */}
-        <section className="px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2">
+        <section className="sticky top-0 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/10 shadow-xs">
           <div className="flex items-center gap-space-xs">
             <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm">
               <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
                 search
               </span>
               <input
-                className="w-full h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
+                className="w-full min-w-0 h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
                 placeholder={isGstActive ? "Search items, SKU, or HSN code..." : "Search items or SKU..."}
-                type="search"
+                type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setSearch('');
+                  }
+                }}
               />
-              {onScanBarcodeClick && (
+              {search && (
                 <button
-                  aria-label="Scan Item Barcode"
-                  className="w-10 h-10 mr-1 flex items-center justify-center rounded-lg text-primary active:bg-surface-container-low transition-colors cursor-pointer"
+                  aria-label="Clear Search"
+                  title="Clear Search"
                   type="button"
-                  onClick={onScanBarcodeClick}
+                  onClick={() => setSearch('')}
+                  className="w-10 h-10 mr-1 flex-shrink-0 flex items-center justify-center rounded-lg text-outline hover:text-on-surface active:bg-surface-container-low transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+                  <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               )}
             </div>
@@ -439,21 +484,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <span className="material-symbols-outlined text-[20px]">
                 {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
               </span>
-            </button>
-            <button
-              aria-label="Items & Stock Settings"
-              title="Items Settings (Allow Negative Stock, Pricing Rules)"
-              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-outline hover:text-primary shadow-sm active:bg-surface-container-low transition-colors cursor-pointer"
-              type="button"
-              onClick={() => {
-                if (onOpenSettings) {
-                  onOpenSettings('items');
-                } else {
-                  window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'items' }));
-                }
-              }}
-            >
-              <span className="material-symbols-outlined text-[20px]">tune</span>
             </button>
             <button
               aria-label="Filter & Sort Options"
@@ -732,6 +762,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         onToggleItemStatus={handleToggleItemStatus}
         onDeleteItem={onDeleteItem}
         onReconcileItemStock={handleReconcileItemStock}
+        onViewInvoice={handleViewInvoice}
+        previewInvoice={handleViewInvoice}
+        onViewPurchase={handleViewPurchase}
+        previewPurchase={handleViewPurchase}
       />
 
       {/* 2. Add / Edit Item Modal */}
@@ -744,6 +778,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         editingItem={editingItem}
         onSaveItem={onSaveItem}
         isGstActive={isGstActive}
+        existingItems={items}
       />
 
       {/* 3. Stock Adjustment Modal */}
@@ -777,6 +812,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         onResetFilters={resetAllFilters}
         categoryCounts={categoryCounts}
       />
+
+      {/* 5. Simplified Invoice Preview Modal */}
+      {previewInvoice && (
+        <SimplifiedInvoiceModal
+          invoice={previewInvoice}
+          company={company}
+          onClose={() => setPreviewInvoice(null)}
+        />
+      )}
+
+      {/* 6. Simplified Purchase Bill Preview Modal */}
+      {previewPurchase && (
+        <SimplifiedPurchaseModal
+          bill={previewPurchase}
+          company={company}
+          onClose={() => setPreviewPurchase(null)}
+        />
+      )}
     </div>
   );
 };

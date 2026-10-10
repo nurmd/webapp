@@ -1585,5 +1585,60 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       expect(db.getParties().find((p) => p.id === supplier.id)?.currentBalance).toBe(-4000);
       expect(db.getParties().find((p) => p.id === supplier.id)?.openingBalance).toBe(4000);
     });
+
+    it('renders customer party selector visibly in TableGridInvoiceModal and enables customer selection', () => {
+      const customer: Party = {
+        id: 'PTY-MODAL-SEL-01',
+        name: 'Sharma Traders',
+        type: 'CUSTOMER',
+        phone: '9988776655',
+        billingAddress: 'MG Road, Pune',
+        stateCode: '27',
+        openingBalance: 2000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 2000,
+        createdAt: '2026-04-01T10:00:00Z',
+        updatedAt: '2026-04-01T10:00:00Z',
+      };
+      db.saveParty(customer);
+
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const root = createRoot(container);
+
+      act(() => {
+        root.render(
+          <TableGridInvoiceModal
+            company={dummyCompany}
+            parties={db.getParties()}
+            itemsCatalog={[]}
+            initialParty={customer}
+            onClose={() => {}}
+            onSave={() => {}}
+          />
+        );
+      });
+
+      // Assert customer party pill is rendered visibly inside the document
+      const partyPill = container.querySelector('[title="Select or Change Customer"]');
+      expect(partyPill).not.toBeNull();
+      expect(partyPill?.textContent).toContain('Sharma Traders');
+
+      // Assert "+ New" customer button is rendered
+      const newPartyBtn = container.querySelector('[title="Add New Customer Directly"]');
+      expect(newPartyBtn).not.toBeNull();
+
+      // Assert clicking party pill opens SelectPartyModal
+      act(() => {
+        partyPill?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Select Customer / Party');
+
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+    });
   });
 });

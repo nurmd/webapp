@@ -2,8 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { InventoryItem, StockAdjustment, isItemDisabled } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
+import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
+import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
+import { db } from '../../services/db.ts';
 
 export type ItemTransactionType = 'SALE' | 'PURCHASE' | 'STOCK_IN' | 'STOCK_OUT' | 'WASTAGE' | 'CORRECTION';
 
@@ -19,15 +22,17 @@ export interface ItemTransactionRecord {
   totalAmount?: number;
   notes?: string;
   isInward: boolean;
+  invoiceId?: string;
+  purchaseId?: string;
 }
 
 export interface ItemDetailSheetProps {
   item: InventoryItem | null;
   onClose: () => void;
   isGstActive: boolean;
-  allInvoices: Invoice[];
-  allPurchases: PurchaseBill[];
-  allAdjustments: StockAdjustment[];
+  allInvoices?: Invoice[];
+  allPurchases?: PurchaseBill[];
+  allAdjustments?: StockAdjustment[];
   isBuyPriceVisible: (itemId: string) => boolean;
   toggleBuyPrice: (itemId: string, e?: React.MouseEvent) => void;
   onOpenEdit: (item: InventoryItem) => void;
@@ -35,6 +40,10 @@ export interface ItemDetailSheetProps {
   onToggleItemStatus: (item: InventoryItem) => void;
   onDeleteItem: (itemId: string) => void;
   onReconcileItemStock: (item: InventoryItem, targetStock: number) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  previewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
+  previewPurchase?: (bill: PurchaseBill) => void;
 }
 
 export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
@@ -51,23 +60,75 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   onToggleItemStatus,
   onDeleteItem,
   onReconcileItemStock,
+  onViewInvoice,
+  previewInvoice,
+  onViewPurchase,
+  previewPurchase,
 }) => {
   const [txnFilter, setTxnFilter] = useState<'ALL' | 'SALES' | 'PURCHASES' | 'ADJUSTMENTS'>('ALL');
+  const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
+  const [selectedPurchaseForPreview, setSelectedPurchaseForPreview] = useState<PurchaseBill | null>(null);
+  const company = useMemo(() => db.getCompany(), []);
+
+  const handleRowClick = (txn: ItemTransactionRecord) => {
+    if (txn.type === 'SALE') {
+      const invoicesList = allInvoices ?? db.getInvoices();
+      let inv: Invoice | undefined;
+      if (txn.invoiceId) {
+        inv = invoicesList.find((i) => i.id === txn.invoiceId) || db.getInvoices().find((i) => i.id === txn.invoiceId);
+      } else if (txn.referenceNo) {
+        inv = invoicesList.find((i) => i.invoiceNumber === txn.referenceNo) || db.getInvoices().find((i) => i.invoiceNumber === txn.referenceNo);
+      }
+      if (inv) {
+        const viewInv = onViewInvoice || previewInvoice;
+        if (viewInv) {
+          viewInv(inv);
+        } else {
+          setSelectedInvoiceForPreview(inv);
+        }
+      }
+    } else if (txn.type === 'PURCHASE') {
+      const purchasesList = allPurchases ?? db.getPurchases();
+      let bill: PurchaseBill | undefined;
+      if (txn.purchaseId) {
+        bill = purchasesList.find((b) => b.id === txn.purchaseId) || db.getPurchases().find((b) => b.id === txn.purchaseId);
+      } else if (txn.referenceNo) {
+        bill = purchasesList.find((b) => b.billNumber === txn.referenceNo) || db.getPurchases().find((b) => b.billNumber === txn.referenceNo);
+      }
+      if (bill) {
+        const viewPur = onViewPurchase || previewPurchase;
+        if (viewPur) {
+          viewPur(bill);
+        } else {
+          setSelectedPurchaseForPreview(bill);
+        }
+      }
+    }
+  };
 
   const itemTransactions = useMemo(() => {
     if (!item) return [];
     const list: ItemTransactionRecord[] = [];
+    const invoicesToScan = allInvoices ?? db.getInvoices();
+    const purchasesToScan = allPurchases ?? db.getPurchases();
+    const adjustmentsToScan = allAdjustments ?? db.getStockAdjustments();
+    const normalizedItemName = (item.name || '').normalize('NFC').trim().toLowerCase();
 
     // 1. Sales from Invoices
-    for (const inv of allInvoices) {
+    for (const inv of invoicesToScan) {
       if (!inv.items) continue;
-      for (const it of inv.items) {
-        if (
-          it.itemId === item.id ||
-          (it.name && it.name.trim().toLowerCase() === item.name.trim().toLowerCase())
-        ) {
+      for (let idx = 0; idx < inv.items.length; idx++) {
+        const it = inv.items[idx];
+        if (!it) continue;
+        const isMatch = it.itemId
+          ? String(it.itemId) === String(item.id)
+          : Boolean(
+              normalizedItemName &&
+                (it.name || '').normalize('NFC').trim().toLowerCase() === normalizedItemName
+            );
+        if (isMatch) {
           list.push({
-            id: `inv-${inv.id}-${it.itemId || it.name}`,
+            id: `inv-${inv.id}-${it.itemId || it.name || 'item'}-${idx}`,
             type: 'SALE',
             date: inv.date,
             referenceNo: inv.invoiceNumber || 'INV',
@@ -78,21 +139,27 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             totalAmount: it.totalAmount,
             notes: inv.invoiceType === 'B2B' ? 'B2B Tax Invoice' : 'Retail Sale',
             isInward: false,
+            invoiceId: inv.id,
           });
         }
       }
     }
 
     // 2. Purchases from Purchase Bills
-    for (const bill of allPurchases) {
+    for (const bill of purchasesToScan) {
       if (!bill.items) continue;
-      for (const it of bill.items) {
-        if (
-          it.itemId === item.id ||
-          (it.name && it.name.trim().toLowerCase() === item.name.trim().toLowerCase())
-        ) {
+      for (let idx = 0; idx < bill.items.length; idx++) {
+        const it = bill.items[idx];
+        if (!it) continue;
+        const isMatch = it.itemId
+          ? String(it.itemId) === String(item.id)
+          : Boolean(
+              normalizedItemName &&
+                (it.name || '').normalize('NFC').trim().toLowerCase() === normalizedItemName
+            );
+        if (isMatch) {
           list.push({
-            id: `pur-${bill.id}-${it.itemId || it.name}`,
+            id: `pur-${bill.id}-${it.itemId || it.name || 'item'}-${idx}`,
             type: 'PURCHASE',
             date: bill.date,
             referenceNo: bill.billNumber || 'BILL',
@@ -103,28 +170,34 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             totalAmount: it.totalAmount,
             notes: 'Inward Purchase Bill',
             isInward: true,
+            purchaseId: bill.id,
           });
         }
       }
     }
 
     // 3. Stock Adjustments
-    for (const adj of allAdjustments) {
-      if (
-        adj.itemId === item.id ||
-        (adj.itemName && adj.itemName.trim().toLowerCase() === item.name.trim().toLowerCase())
-      ) {
+    for (let idx = 0; idx < adjustmentsToScan.length; idx++) {
+      const adj = adjustmentsToScan[idx];
+      if (!adj) continue;
+      const isMatch = adj.itemId
+        ? String(adj.itemId) === String(item.id)
+        : Boolean(
+            normalizedItemName &&
+              (adj.itemName || '').normalize('NFC').trim().toLowerCase() === normalizedItemName
+          );
+      if (isMatch) {
         const isInward = adj.type === 'STOCK_IN';
         list.push({
-          id: `adj-${adj.id}`,
+          id: `adj-${adj.id}-${idx}`,
           type: adj.type,
           date: adj.date,
-          referenceNo: `ADJ-${adj.id.substring(Math.max(0, adj.id.length - 4))}`,
+          referenceNo: `ADJ-${String(adj.id || '').slice(-4)}`,
           partyName: adj.adjustedBy || 'Inventory Manager',
           quantity: adj.quantity,
           unit: item.unit,
-          unitPrice: item.purchasePrice,
-          totalAmount: adj.quantity * item.purchasePrice,
+          unitPrice: item.purchasePrice || 0,
+          totalAmount: adj.quantity * (item.purchasePrice || 0),
           notes: adj.reason || (isInward ? 'Manual Stock In' : 'Manual Stock Out'),
           isInward,
         });
@@ -132,7 +205,13 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
     }
 
     // Sort chronologically (newest first)
-    list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    list.sort((a, b) => {
+      const timeA = a.date ? new Date(a.date).getTime() : 0;
+      const timeB = b.date ? new Date(b.date).getTime() : 0;
+      const safeA = Number.isNaN(timeA) ? 0 : timeA;
+      const safeB = Number.isNaN(timeB) ? 0 : timeB;
+      return safeB - safeA;
+    });
     return list;
   }, [item, allInvoices, allPurchases, allAdjustments]);
 
@@ -176,6 +255,15 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
       totalTransactions: itemTransactions.length,
     };
   }, [itemTransactions]);
+
+  const itemInBills = useMemo(() => {
+    if (!item) return false;
+    return isItemInBills(
+      item.id,
+      allInvoices ?? db.getInvoices(),
+      allPurchases ?? db.getPurchases()
+    );
+  }, [item, allInvoices, allPurchases]);
 
   if (!item) return null;
 
@@ -242,7 +330,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
         )}
 
         {/* Historical Bills Reference Banner */}
-        {isItemInBills(item.id, allInvoices, allPurchases) && (
+        {itemInBills && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surface-container-low text-[11px] text-outline flex-shrink-0">
             <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">verified_user</span>
             <span>Referenced in historical bills. Cannot be deleted to preserve accounting records.</span>
@@ -351,11 +439,37 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             filteredItemTransactions.map((txn) => {
               const isSale = txn.type === 'SALE';
               const isPurchase = txn.type === 'PURCHASE';
+              const isDocument = isSale || isPurchase;
 
               return (
                 <div
                   key={txn.id}
-                  className="p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-colors flex items-center justify-between gap-2.5"
+                  onClick={isDocument ? () => handleRowClick(txn) : undefined}
+                  className={`p-2.5 rounded-xl transition-all flex items-center justify-between gap-2.5 group ${
+                    isDocument
+                      ? 'bg-surface-container-low/60 hover:bg-surface-container-low border border-transparent hover:border-outline-variant/30 cursor-pointer active:scale-[0.99]'
+                      : 'bg-surface-container-low/30 border border-transparent'
+                  }`}
+                  role={isDocument ? 'button' : undefined}
+                  tabIndex={isDocument ? 0 : undefined}
+                  onKeyDown={
+                    isDocument
+                      ? (e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleRowClick(txn);
+                          }
+                        }
+                      : undefined
+                  }
+                  title={
+                    isSale
+                      ? 'Click to preview sales invoice'
+                      : isPurchase
+                      ? 'Click to preview purchase bill'
+                      : undefined
+                  }
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -368,13 +482,25 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-bold text-on-surface truncate text-xs">
                           {isSale ? 'Sale' : isPurchase ? 'Purchase' : txn.type.replace('_', ' ')}
                         </span>
                         <span className="text-[10px] text-outline font-mono truncate">
                           #{txn.referenceNo}
                         </span>
+                        {isSale && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
+                            <span className="material-symbols-outlined text-[11px]">receipt</span>
+                            <span>Invoice</span>
+                          </span>
+                        )}
+                        {isPurchase && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                            <span className="material-symbols-outlined text-[11px]">shopping_bag</span>
+                            <span>Bill</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-on-surface-variant truncate">
                         {txn.partyName || txn.notes} • <span className="text-[10px] text-outline">{txn.date}</span>
@@ -382,15 +508,22 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
-                    <span className={`text-xs font-bold font-tabular-data block ${
-                      txn.isInward ? 'text-secondary' : 'text-error'
-                    }`}>
-                      {txn.isInward ? '+' : '-'}{txn.quantity} {txn.unit}
-                    </span>
-                    {txn.totalAmount !== undefined && (
-                      <span className="text-[11px] text-on-surface-variant font-medium font-tabular-data block">
-                        {formatINR(txn.totalAmount)}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="text-right">
+                      <span className={`text-xs font-bold font-tabular-data block ${
+                        txn.isInward ? 'text-secondary' : 'text-error'
+                      }`}>
+                        {txn.isInward ? '+' : '-'}{txn.quantity} {txn.unit}
+                      </span>
+                      {txn.totalAmount !== undefined && (
+                        <span className="text-[11px] text-on-surface-variant font-medium font-tabular-data block">
+                          {formatINR(txn.totalAmount)}
+                        </span>
+                      )}
+                    </div>
+                    {isDocument && (
+                      <span className="material-symbols-outlined text-[16px] text-outline group-hover:text-primary transition-colors">
+                        visibility
                       </span>
                     )}
                   </div>
@@ -452,8 +585,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           <button
             type="button"
             onClick={() => {
-              const inBills = isItemInBills(item.id, allInvoices, allPurchases);
-              if (inBills) {
+              if (itemInBills) {
                 if (window.confirm('This item is referenced in existing bills and CANNOT be deleted to preserve financial records.\n\nWould you like to DISABLE this item instead to hide it from billing?')) {
                   onToggleItemStatus(item);
                 }
@@ -465,22 +597,40 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
               }
             }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 cursor-pointer transition-colors ${
-              isItemInBills(item.id, allInvoices, allPurchases)
+              itemInBills
                 ? 'bg-surface-container text-outline hover:text-error'
                 : 'bg-error/10 text-error hover:bg-error/20'
             }`}
             title={
-              isItemInBills(item.id, allInvoices, allPurchases)
+              itemInBills
                 ? 'Item is in bills (Cannot delete - Click to disable)'
                 : 'Delete Item'
             }
           >
             <span className="material-symbols-outlined text-[18px]">
-              {isItemInBills(item.id, allInvoices, allPurchases) ? 'lock' : 'delete'}
+              {itemInBills ? 'lock' : 'delete'}
             </span>
           </button>
         </div>
       </div>
+
+      {/* Sales Invoice Preview Modal */}
+      {selectedInvoiceForPreview && (
+        <SimplifiedInvoiceModal
+          invoice={selectedInvoiceForPreview}
+          company={company}
+          onClose={() => setSelectedInvoiceForPreview(null)}
+        />
+      )}
+
+      {/* Purchase Bill Preview Modal */}
+      {selectedPurchaseForPreview && (
+        <SimplifiedPurchaseModal
+          bill={selectedPurchaseForPreview}
+          company={company}
+          onClose={() => setSelectedPurchaseForPreview(null)}
+        />
+      )}
     </div>
   );
 };

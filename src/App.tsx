@@ -885,6 +885,7 @@ export const App: React.FC = () => {
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
             onScanBarcodeClick={() => handleSelectTab('pos')}
+            onViewInvoice={setPreviewInvoice}
             onOpenSettings={(tab) => {
               handleSelectTab('settings');
               if (tab) {
