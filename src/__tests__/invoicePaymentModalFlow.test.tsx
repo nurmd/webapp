@@ -408,4 +408,78 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       false
     );
   });
+
+  it('TC-MODAL-02: does not render instant cash denomination helpers on invoice modal and caps saved cash to bill amount when change is given', () => {
+    const onConfirmPayment = vi.fn();
+    const onClose = vi.fn();
+
+    act(() => {
+      root.render(
+        <InvoicePaymentModal
+          isOpen={true}
+          onClose={onClose}
+          finalGrandTotal={420}
+          invoiceNumber="INV-420"
+          partyName="Cash Customer"
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+    });
+
+    // Verify instant cash denomination helper chips are NOT rendered
+    const exactBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Exact (')
+    );
+    expect(exactBtn).toBeUndefined();
+
+    const note500Btn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim() === '₹500' || b.textContent?.trim() === '₹ 500'
+    );
+    expect(note500Btn).toBeUndefined();
+
+    function changeInput(input: HTMLInputElement, val: string) {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(input, val);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Cashier enters 500 for a 420 bill
+    const amountInput = container.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(amountInput).toBeTruthy();
+    act(() => {
+      changeInput(amountInput, '500');
+    });
+
+    // Shows change calculation on screen (500 - 420 = 80)
+    expect(container.textContent).toContain('Change to Return');
+    expect(container.textContent).toContain('₹ 80.00');
+
+    // Click Confirm & Save
+    const confirmBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Confirm & Save')
+    );
+    act(() => {
+      confirmBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    // Must save paidAmount = 420 (NOT 500!) and saved split cash amount = 420 (NOT 500!)
+    // so total cash balance in ledger is never higher than expected
+    expect(onConfirmPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMode: 'CASH',
+        paymentStatus: 'PAID',
+        paidAmount: 420,
+        balanceAmount: 0,
+        paymentSplits: expect.arrayContaining([
+          expect.objectContaining({
+            mode: 'CASH',
+            amount: 420,
+          }),
+        ]),
+        paymentNotes: expect.stringContaining('Change Returned: ₹ 80.00'),
+      }),
+      false
+    );
+  });
 });

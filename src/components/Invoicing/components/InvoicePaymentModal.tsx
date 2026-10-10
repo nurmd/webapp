@@ -175,31 +175,44 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     setSplits((prev) => prev.filter((s) => s.id !== id));
   };
 
-  // Quick cash amount adjuster helper
-  const handleSetCashAmount = (targetAmount: number) => {
-    const cashSplit = splits.find((s) => s.mode === 'CASH');
-    if (cashSplit) {
-      handleUpdateSplitAmount(cashSplit.id, targetAmount);
-    } else {
-      setSplits([{ id: `split-${Date.now()}`, mode: 'CASH', amount: targetAmount }]);
-    }
-  };
-
   const handleSaveWithPayment = (andPrint = false) => {
-    const splitNotes = formatSplitNotes(splits, balanceDue);
-    const combinedNotes = [paymentRefNotes.trim(), splitNotes].filter(Boolean).join(' | ');
+    // If tendered amount exceeds grand total (e.g. customer gave ₹500 for a ₹420 bill),
+    // change returned is ₹80. We must NOT record ₹500 in the cash split or paidAmount,
+    // because that would artificially inflate the business's cash balance by the returned change!
+    const effectivePaidAmount = Math.min(totalPaid, finalGrandTotal);
 
-    const savedSplits: PaymentSplit[] = splits.map((s) => ({
-      id: s.id,
-      mode: s.mode,
-      amount: s.mode === 'CREDIT' ? balanceDue : Number(s.amount) || 0,
-    }));
+    // Adjust cash splits so net saved cash equals net retained cash (excluding returned change)
+    let excessToDeduct = changeToReturn;
+    const savedSplits: PaymentSplit[] = splits.map((s) => {
+      if (s.mode === 'CREDIT') {
+        return { id: s.id, mode: s.mode, amount: balanceDue };
+      }
+      const rawAmount = Number(s.amount) || 0;
+      if (s.mode === 'CASH' && excessToDeduct > 0) {
+        const deduction = Math.min(rawAmount, excessToDeduct);
+        excessToDeduct -= deduction;
+        return {
+          id: s.id,
+          mode: s.mode,
+          amount: Number(Math.max(0, rawAmount - deduction).toFixed(2)),
+        };
+      }
+      return {
+        id: s.id,
+        mode: s.mode,
+        amount: rawAmount,
+      };
+    });
+
+    const splitNotes = formatSplitNotes(savedSplits, balanceDue);
+    const changeNote = changeToReturn > 0 ? `Tendered: ${formatINR(totalPaid)} (Change Returned: ${formatINR(changeToReturn)})` : '';
+    const combinedNotes = [paymentRefNotes.trim(), splitNotes, changeNote].filter(Boolean).join(' | ');
 
     onConfirmPayment(
       {
         paymentMode: resolvedPaymentMode,
         paymentStatus,
-        paidAmount: totalPaid,
+        paidAmount: effectivePaidAmount,
         balanceAmount: balanceDue,
         paymentSplits: savedSplits,
         paymentNotes: combinedNotes || undefined,
@@ -338,33 +351,6 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       className="w-full h-8 pl-6 pr-2.5 rounded-lg bg-surface-container-lowest text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
                     />
                   </div>
-
-                  {/* Cash Quick Tender Chips */}
-                  {splits[0].mode === 'CASH' && (
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => handleSetCashAmount(finalGrandTotal)}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container text-on-surface hover:bg-surface-container-high border border-outline-variant/20 cursor-pointer"
-                      >
-                        Exact ({formatINR(finalGrandTotal)})
-                      </button>
-                      {[100, 200, 500, 2000].map((note) => {
-                        const target = Math.ceil(finalGrandTotal / note) * note;
-                        if (target <= finalGrandTotal) return null;
-                        return (
-                          <button
-                            key={note}
-                            type="button"
-                            onClick={() => handleSetCashAmount(target)}
-                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-surface-container text-on-surface hover:bg-surface-container-high border border-outline-variant/20 cursor-pointer"
-                          >
-                            ₹{target}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-between text-xs py-1">
