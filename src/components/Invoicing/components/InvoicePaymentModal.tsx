@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoice.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { formatSplitNotes } from '../../../core/accounting/paymentSplitUtils.ts';
@@ -27,9 +27,9 @@ const PAYMENT_MODES: { value: PaymentMode; label: string; icon: string }[] = [
   { value: 'CASH', label: 'Cash', icon: 'payments' },
   { value: 'UPI', label: 'UPI / QR', icon: 'qr_code_scanner' },
   { value: 'CARD', label: 'Card', icon: 'credit_card' },
-  { value: 'NET_BANKING', label: 'Bank Transfer', icon: 'account_balance' },
+  { value: 'NET_BANKING', label: 'Bank', icon: 'account_balance' },
   { value: 'CHEQUE', label: 'Cheque', icon: 'receipt_long' },
-  { value: 'CREDIT', label: 'Credit (Udhaar)', icon: 'pending_actions' },
+  { value: 'CREDIT', label: 'Credit', icon: 'pending_actions' },
 ];
 
 export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
@@ -54,6 +54,22 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
   const [paymentRefNotes, setPaymentRefNotes] = useState('');
 
+  // Close on Escape, save on Ctrl+Enter
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSaveWithPayment(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, splits, paymentRefNotes]);
+
   // Total paid via non-credit splits
   const totalPaid = useMemo(() => {
     return Number(
@@ -76,7 +92,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     return totalPaid > finalGrandTotal ? Number((totalPaid - finalGrandTotal).toFixed(2)) : 0;
   }, [totalPaid, finalGrandTotal]);
 
-  // Resolved payment status
+  // Live payment status
   const paymentStatus: PaymentStatus = useMemo(() => {
     if (finalGrandTotal <= 0) return 'PAID';
     if (totalPaid >= finalGrandTotal) return 'PAID';
@@ -98,7 +114,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
   if (!isOpen) return null;
 
-  // 1-tap quick tender shortcuts
+  // 1-tap quick tender
   const handleQuickTender = (mode: PaymentMode) => {
     if (mode === 'CREDIT') {
       setSplits([{ id: `split-${Date.now()}`, mode: 'CREDIT', amount: 0 }]);
@@ -144,8 +160,8 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
       return;
     }
 
-    setSplits([
-      ...splits,
+    setSplits((prev) => [
+      ...prev,
       {
         id: String(Date.now()),
         mode: nextMode,
@@ -157,6 +173,16 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   const handleRemoveSplit = (id: string) => {
     if (splits.length <= 1) return;
     setSplits((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  // Quick cash amount adjuster helper
+  const handleSetCashAmount = (targetAmount: number) => {
+    const cashSplit = splits.find((s) => s.mode === 'CASH');
+    if (cashSplit) {
+      handleUpdateSplitAmount(cashSplit.id, targetAmount);
+    } else {
+      setSplits([{ id: `split-${Date.now()}`, mode: 'CASH', amount: targetAmount }]);
+    }
   };
 
   const handleSaveWithPayment = (andPrint = false) => {
@@ -182,25 +208,27 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     );
   };
 
+  const isSingleCash = splits.length === 1 && splits[0].mode === 'CASH';
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="payment-modal-title"
-      className="fixed inset-0 z-60 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-60 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in"
     >
-      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-lg shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+      <div className="bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full max-w-md shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3.5 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/50">
+        <div className="px-4 py-3 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/50">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">payments</span>
+              <span className="material-symbols-outlined text-[18px]">payments</span>
             </div>
             <div>
-              <h2 id="payment-modal-title" className="font-headline-sm text-sm sm:text-base font-bold text-on-surface">
+              <h2 id="payment-modal-title" className="text-sm font-bold text-on-surface leading-tight">
                 Payment Settlement
               </h2>
-              <p className="text-[11px] text-on-surface-variant font-medium truncate max-w-[260px] sm:max-w-none">
+              <p className="text-[11px] text-on-surface-variant font-medium truncate max-w-[240px]">
                 Invoice #{invoiceNumber} • {partyName || 'Cash Customer'}
               </p>
             </div>
@@ -209,7 +237,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer transition-colors"
-            title="Close payment dialog"
+            title="Close dialog (Esc)"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -217,48 +245,60 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
         {/* Scrollable Content */}
         <div className="p-4 overflow-y-auto space-y-3.5 text-xs">
-          {/* Total Amount Payable Banner */}
+          {/* Net Payable Banner & Status */}
           <div className="bg-surface-container-low/80 border border-outline-variant/25 rounded-xl p-3 flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-wider">
-                Total Amount Payable
+                Net Payable
               </span>
               <span className="font-tabular-data font-black text-xl text-secondary">
                 {formatINR(finalGrandTotal)}
               </span>
             </div>
 
-            {/* Live Payment Status Badge */}
+            {/* Status Chip */}
             <div>
               {paymentStatus === 'PAID' && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-secondary/15 text-secondary border border-secondary/30 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
                   <span>Paid Full</span>
                 </span>
               )}
               {paymentStatus === 'PARTIAL' && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">timelapse</span>
-                  <span>Partial · Due: {formatINR(balanceDue)}</span>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">timelapse</span>
+                  <span>Due: {formatINR(balanceDue)}</span>
                 </span>
               )}
               {paymentStatus === 'UNPAID' && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-error/15 text-error border border-error/30 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">schedule</span>
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-error/15 text-error border border-error/30 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px]">schedule</span>
                   <span>Unpaid (Credit)</span>
                 </span>
               )}
             </div>
           </div>
 
-          {/* Quick 1-Tap Payment Tender Chips */}
+          {/* Quick Payment Mode Selector */}
           <div>
-            <label className="text-[11px] font-bold text-on-surface-variant block mb-1.5 uppercase tracking-wider">
-              Quick 1-Tap Tender
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                Payment Mode
+              </label>
+              {splits.length === 1 && (
+                <button
+                  type="button"
+                  onClick={handleAddSplitMode}
+                  className="text-[11px] font-bold text-secondary hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[13px]">call_split</span>
+                  <span>Split Payment</span>
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
               {PAYMENT_MODES.map((pm) => {
-                const isCurrentOnly =
+                const isSelected =
                   splits.length === 1 &&
                   splits[0].mode === pm.value &&
                   (pm.value === 'CREDIT' ? true : splits[0].amount >= finalGrandTotal);
@@ -268,24 +308,61 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                     type="button"
                     onClick={() => handleQuickTender(pm.value)}
                     className={`py-2 px-1.5 rounded-xl text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all border cursor-pointer ${
-                      isCurrentOnly
-                        ? 'bg-secondary text-on-secondary border-secondary shadow-xs scale-102'
+                      isSelected
+                        ? 'bg-secondary text-on-secondary border-secondary shadow-xs scale-102 ring-1 ring-secondary/50'
                         : 'bg-surface-container hover:bg-surface-container-high text-on-surface border-outline-variant/30'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[16px]">{pm.icon}</span>
-                    <span className="truncate w-full text-center leading-tight">{pm.label.split(' ')[0]}</span>
+                    <span className="truncate w-full text-center leading-tight">{pm.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Split Payment Tender Rows */}
+          {/* Quick Cash Tender Chips (when single Cash tender is active) */}
+          {isSingleCash && (
+            <div className="bg-surface-container-low/50 rounded-xl p-2.5 border border-outline-variant/20 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold text-on-surface-variant uppercase mr-1">
+                Cash Tender:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSetCashAmount(finalGrandTotal)}
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                  splits[0].amount === finalGrandTotal
+                    ? 'bg-secondary/15 text-secondary border-secondary/40'
+                    : 'bg-surface-container border-outline-variant/30 text-on-surface hover:bg-surface-container-high'
+                }`}
+              >
+                Exact ({formatINR(finalGrandTotal)})
+              </button>
+              {[100, 200, 500, 2000]
+                .filter((note) => note >= finalGrandTotal || finalGrandTotal % note !== 0)
+                .slice(0, 3)
+                .map((note) => {
+                  const targetNote = Math.ceil(finalGrandTotal / note) * note;
+                  if (targetNote <= finalGrandTotal) return null;
+                  return (
+                    <button
+                      key={note}
+                      type="button"
+                      onClick={() => handleSetCashAmount(targetNote)}
+                      className="px-2 py-1 rounded-lg text-[11px] font-bold bg-surface-container border border-outline-variant/30 text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+                    >
+                      ₹ {targetNote}
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Payment Tender Breakdown & Amount Allocation */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-3 space-y-2.5 shadow-2xs">
             <div className="flex items-center justify-between pb-1 border-b border-outline-variant/20">
               <span className="font-bold text-xs text-on-surface flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-secondary">tune</span>
+                <span className="material-symbols-outlined text-[15px] text-secondary">tune</span>
                 Payment Tender Breakdown
               </span>
               <button
@@ -299,10 +376,10 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              {splits.map((split, index) => (
+              {splits.map((split) => (
                 <div key={split.id} className="flex items-center gap-2">
-                  {/* Mode Selector */}
-                  <div className="relative flex-1 sm:max-w-[160px]">
+                  {/* Mode Dropdown */}
+                  <div className="relative flex-1 sm:max-w-[150px]">
                     <select
                       value={split.mode}
                       onChange={(e) => handleUpdateSplitMode(split.id, e.target.value as PaymentMode)}
@@ -349,13 +426,13 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                     </div>
                   )}
 
-                  {/* Delete button (if more than 1 tender) */}
+                  {/* Delete Button (when splits > 1) */}
                   {splits.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveSplit(split.id)}
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error/10 cursor-pointer transition-colors shrink-0"
-                      title="Remove this tender"
+                      title="Remove tender"
                     >
                       <span className="material-symbols-outlined text-[16px]">delete</span>
                     </button>
@@ -364,28 +441,28 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               ))}
             </div>
 
-            {/* Real-time Settlement Balance Breakdown */}
-            <div className="pt-2 border-t border-outline-variant/15 flex flex-col gap-1 text-[11px]">
-              <div className="flex items-center justify-between text-on-surface-variant">
-                <span>Total Tendered:</span>
-                <span className="font-tabular-data font-bold text-on-surface">{formatINR(totalPaid)}</span>
+            {/* Change to Return / Balance Due Banners */}
+            {changeToReturn > 0 && (
+              <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-between text-blue-700 dark:text-blue-300 font-bold text-[11px]">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px]">currency_exchange</span>
+                  <span>Change to Return:</span>
+                </span>
+                <span className="font-tabular-data text-xs">{formatINR(changeToReturn)}</span>
               </div>
-              {balanceDue > 0 && (
-                <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 font-bold">
-                  <span>Remaining Balance Due:</span>
-                  <span className="font-tabular-data">{formatINR(balanceDue)}</span>
-                </div>
-              )}
-              {changeToReturn > 0 && (
-                <div className="flex items-center justify-between text-blue-600 dark:text-blue-400 font-bold">
-                  <span>Change to Return to Customer:</span>
-                  <span className="font-tabular-data">{formatINR(changeToReturn)}</span>
-                </div>
-              )}
-            </div>
+            )}
+            {balanceDue > 0 && splits.some((s) => s.mode !== 'CREDIT') && (
+              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-amber-700 dark:text-amber-300 font-bold text-[11px]">
+                <span className="flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[15px]">schedule</span>
+                  <span>Remaining Due (Udhaar):</span>
+                </span>
+                <span className="font-tabular-data text-xs">{formatINR(balanceDue)}</span>
+              </div>
+            )}
           </div>
 
-          {/* Payment Notes / Transaction Reference */}
+          {/* Reference / Notes */}
           <div>
             <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
               Payment Reference / Notes (Optional)
@@ -394,7 +471,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               type="text"
               value={paymentRefNotes}
               onChange={(e) => setPaymentRefNotes(e.target.value)}
-              placeholder="e.g. UPI Ref #, Cheque #, Transaction ID, Bank details..."
+              placeholder="e.g. UPI Ref #, Cheque #, Transaction ID..."
               className="w-full h-9 px-3 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
             />
           </div>
@@ -417,7 +494,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               className="px-3.5 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant/30 text-on-surface font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
               title="Save with payment and open print dialog"
             >
-              <span className="material-symbols-outlined text-[16px]">print</span>
+              <span className="material-symbols-outlined text-[15px]">print</span>
               <span>Save &amp; Print</span>
             </button>
 
@@ -426,7 +503,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               onClick={() => handleSaveWithPayment(false)}
               className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
+              <span className="material-symbols-outlined text-[15px]">check_circle</span>
               <span>Confirm &amp; Save</span>
             </button>
           </div>
