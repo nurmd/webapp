@@ -53,9 +53,11 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     companyAddress: thermalSettings.showAddress ? company.address : '',
     gstin: thermalSettings.showGstin ? company.gstin : '',
     phone: thermalSettings.showPhone ? company.phone : '',
+    receiptTitle: thermalSettings.receiptTitle,
     invoiceNo: invoice.invoiceNumber,
     date: invoice.date,
     customerName: invoice.partyName,
+    customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
     items: invoice.items.map((i) => ({
       name: i.name,
       qty: i.quantity,

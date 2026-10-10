@@ -263,15 +263,19 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const wordsTotal = invoice.amountInWords || amountInWords(resolvedGrandTotal);
   const wordsTax = amountInWords(resolvedTotalTax);
 
+  const thermalSettings = printSettingsService.getSettings().thermal;
+
   const thermalText = formatThermalReceiptText(
     {
-      companyName: company.tradeName || company.businessName,
-      companyAddress: company.address,
-      gstin: isGst ? company.gstin : '',
-      phone: company.phone,
+      companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
+      companyAddress: thermalSettings.showAddress ? company.address : '',
+      gstin: (thermalSettings.showGstin && isGst) ? company.gstin : '',
+      phone: thermalSettings.showPhone ? company.phone : '',
+      receiptTitle: thermalSettings.receiptTitle,
       invoiceNo: invoice.invoiceNumber,
       date: formatDate(invoice.date),
       customerName: invoice.partyName,
+      customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
       items: itemsList.map((i) => ({
         name: i.name,
         qty: i.quantity,

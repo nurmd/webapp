@@ -967,20 +967,33 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
 
                 {/* Items */}
                 <div className="space-y-1 text-[9px]">
-                  <div className="flex justify-between">
-                    <span>1. Basmati Rice 5kg</span>
-                    <span className="font-bold">450.00</span>
+                  <div className="flex justify-between text-[8px] font-bold text-slate-500 border-b border-slate-200 pb-0.5">
+                    <span>ITEM</span>
+                    <div className="flex gap-2">
+                      <span>QTY</span>
+                      <span>RATE</span>
+                      <span>TOTAL</span>
+                    </div>
                   </div>
-                  {thermal.showRateBreakdown && (
-                    <div className="text-[8px] text-slate-500 pl-2">1 x 450.00</div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>2. Sunflower Oil 1L</span>
-                    <span className="font-bold">160.00</span>
+                  <div>
+                    <div className="font-semibold">1. Basmati Rice 5kg</div>
+                    <div className="flex justify-end gap-2 text-[8px] text-slate-700">
+                      <span className="w-6 text-right">1</span>
+                      <span className="w-12 text-right">450.00</span>
+                      <span className="w-12 text-right font-bold">450.00</span>
+                    </div>
                   </div>
                   {thermal.showItemDiscount && (
-                    <div className="text-[8px] text-emerald-700 pl-2">Disc 5% (-₹8.00)</div>
+                    <div className="text-[8px] text-emerald-700 text-right">Disc 5% (-₹8.00)</div>
                   )}
+                  <div>
+                    <div className="font-semibold">2. Sunflower Oil 1L</div>
+                    <div className="flex justify-end gap-2 text-[8px] text-slate-700">
+                      <span className="w-6 text-right">1</span>
+                      <span className="w-12 text-right">160.00</span>
+                      <span className="w-12 text-right font-bold">160.00</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="border-b border-dashed border-slate-400 my-1" />

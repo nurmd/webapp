@@ -155,7 +155,10 @@ export function buildThermalReceiptBinary(
     builder.line(`Ph: ${data.phone}`);
   }
 
-  builder.bold(true).line('TAX INVOICE').bold(false);
+  const title = (data.receiptTitle && data.receiptTitle.trim())
+    ? data.receiptTitle.trim().toUpperCase()
+    : data.gstin ? 'TAX INVOICE' : 'RETAIL INVOICE';
+  builder.bold(true).line(title).bold(false);
   builder.line('='.repeat(width));
 
   // Invoice Meta
@@ -165,28 +168,41 @@ export function buildThermalReceiptBinary(
   if (data.customerName) {
     builder.line(`Customer: ${data.customerName}`);
   }
-  builder.line('-'.repeat(width));
-
-  // Table Columns
-  if (width === 32) {
-    builder.bold(true).line('ITEM            QTY  RATE  TOTAL').bold(false);
-  } else {
-    builder.bold(true).line('ITEM DESCRIPTION        QTY     RATE      TOTAL').bold(false);
+  if (data.customerPhone) {
+    builder.line(`Mobile  : ${data.customerPhone}`);
   }
   builder.line('-'.repeat(width));
 
-  // Line items
+  // Table Columns & Items
   const padRow = (left: string, right: string, len: number) => {
     const space = len - left.length - right.length;
     if (space <= 0) return left.substring(0, len - right.length) + right;
     return left + ' '.repeat(space) + right;
   };
 
-  for (const item of data.items) {
-    const name = item.name.length > 14 ? item.name.substring(0, 14) : item.name;
-    const qtyRate = `${item.qty}x${item.rate.toFixed(0)}`;
-    const amt = item.amount.toFixed(2);
-    builder.line(padRow(`${name.padEnd(14)} ${qtyRate}`, amt, width));
+  if (width === 32) {
+    builder.bold(true).line('ITEM DESCRIPTION').bold(false);
+    builder.bold(true).line('   ' + 'QTY'.padStart(5) + ' ' + 'RATE'.padStart(9) + ' ' + 'TOTAL'.padStart(11)).bold(false);
+    builder.line('-'.repeat(width));
+
+    for (const item of data.items) {
+      builder.line(item.name.substring(0, 32));
+      const qtyStr = `${item.qty}`.padStart(5);
+      const rateStr = item.rate.toFixed(2).padStart(9);
+      const amtStr = item.amount.toFixed(2).padStart(11);
+      builder.line('   ' + qtyStr + ' ' + rateStr + ' ' + amtStr);
+    }
+  } else {
+    builder.bold(true).line('ITEM DESCRIPTION     ' + 'QTY'.padStart(6) + ' ' + 'RATE'.padStart(9) + ' ' + 'TOTAL'.padStart(10)).bold(false);
+    builder.line('-'.repeat(width));
+
+    for (const item of data.items) {
+      const name = item.name.length > 20 ? item.name.substring(0, 20) : item.name.padEnd(20);
+      const qtyStr = `${item.qty}`.padStart(6);
+      const rateStr = item.rate.toFixed(2).padStart(9);
+      const amtStr = item.amount.toFixed(2).padStart(10);
+      builder.line(`${name} ${qtyStr} ${rateStr} ${amtStr}`);
+    }
   }
   builder.line('-'.repeat(width));
 
