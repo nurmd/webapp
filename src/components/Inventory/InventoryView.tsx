@@ -442,7 +442,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Sticky Search & Filter Input Area */}
-        <section className="sticky top-0 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/10 shadow-xs">
+        <section className="sticky top-14 md:top-14 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/10 shadow-xs">
           <div className="flex items-center gap-space-xs">
             <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm">
               <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">

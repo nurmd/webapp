@@ -973,7 +973,7 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
   // Requirement R3: Floating Sticky Search Bar & Toolbar Polish
   // =========================================================================
   describe('R3: Floating Sticky Search Bar & Toolbar Polish', () => {
-    it('renders a sticky search bar with sticky top-0 z-20 styling', () => {
+    it('renders a sticky search bar with sticky top-14 z-20 styling below app header', () => {
       act(() => {
         root.render(
           <InventoryView
@@ -989,7 +989,7 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
 
       const stickySection = container.querySelector('section.sticky');
       expect(stickySection).toBeTruthy();
-      expect(stickySection?.className).toContain('top-0');
+      expect(stickySection?.className).toContain('top-14');
       expect(stickySection?.className).toContain('z-20');
     });
 
