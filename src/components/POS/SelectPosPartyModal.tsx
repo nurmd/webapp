@@ -28,7 +28,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newGstin, setNewGstin] = useState('');
-  const [newStateCode, setNewStateCode] = useState(db.getCompany().stateCode || '27');
+  const [newStateCode, setNewStateCode] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [gstinError, setGstinError] = useState<string | null>(null);
 
@@ -152,6 +152,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                   onChange={(e) => setNewStateCode(e.target.value)}
                   className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-sm text-on-surface outline-none focus:border-secondary"
                 >
+                  <option value="">-- Select State / POS --</option>
                   {getStateList().map((s) => (
                     <option key={s.code} value={s.code}>
                       {s.code} - {s.name}

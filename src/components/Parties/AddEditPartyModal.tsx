@@ -31,7 +31,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const [email, setEmail] = useState('');
   const [gstin, setGstin] = useState('');
   const [pan, setPan] = useState('');
-  const [stateCode, setStateCode] = useState('27');
+  const [stateCode, setStateCode] = useState('');
   const [address, setAddress] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
   const [hasSeparateShipping, setHasSeparateShipping] = useState(false);
@@ -48,7 +48,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setEmail(editingParty.email || '');
       setGstin(editingParty.gstin || '');
       setPan(editingParty.pan || '');
-      setStateCode(editingParty.stateCode || '27');
+      setStateCode(editingParty.stateCode || '');
       setAddress(editingParty.billingAddress || '');
       setShippingAddress(editingParty.shippingAddress || '');
       setHasSeparateShipping(!!editingParty.shippingAddress && editingParty.shippingAddress !== editingParty.billingAddress);
@@ -72,7 +72,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setEmail('');
       setGstin('');
       setPan('');
-      setStateCode('27');
+      setStateCode('');
       setAddress('');
       setShippingAddress('');
       setHasSeparateShipping(false);
@@ -157,7 +157,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       email: email.trim() || undefined,
       gstin: gstin.trim().toUpperCase() || undefined,
       pan: pan.trim().toUpperCase() || undefined,
-      stateCode: stateCode.trim() || '27',
+      stateCode: stateCode.trim(),
       billingAddress: address.trim() || 'Local Counter',
       shippingAddress: hasSeparateShipping ? shippingAddress.trim() : undefined,
       creditLimit: numCreditLimit && numCreditLimit > 0 ? numCreditLimit : undefined,
@@ -318,6 +318,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
                 onChange={(e) => setStateCode(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none focus:ring-2 focus:ring-secondary/40"
               >
+                <option value="">-- Select State / POS --</option>
                 {allStates.map((st) => (
                   <option key={st.code} value={st.code}>
                     {st.code} - {st.name}

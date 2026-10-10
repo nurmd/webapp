@@ -87,6 +87,7 @@ import { TableGridInvoiceModal } from '../components/Invoicing/TableGridInvoiceM
 import { CreateInvoiceModal } from '../components/Invoicing/CreateInvoiceModal.tsx';
 import { QuickBillingView } from '../components/POS/QuickBillingView.tsx';
 import { VoucherEditorModal } from '../components/Parties/VoucherEditorModal.tsx';
+import { AddEditPartyModal } from '../components/Parties/AddEditPartyModal.tsx';
 
 const dummyCompany: CompanyProfile = {
   id: 'COMP-TEST',
@@ -1634,6 +1635,60 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
         partyPill?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
       expect(container.textContent).toContain('Select Customer / Party');
+
+      act(() => {
+        root.unmount();
+      });
+      container.remove();
+    });
+
+    it('initializes stateCode as empty in AddEditPartyModal and auto-populates from GSTIN input', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const root = createRoot(container);
+
+      act(() => {
+        root.render(
+          <AddEditPartyModal
+            isOpen={true}
+            onClose={() => {}}
+            onSave={() => {}}
+            editingParty={null}
+            initialType="CUSTOMER"
+            parties={[]}
+          />
+        );
+      });
+
+      // Verify state dropdown begins empty (not Maharashtra / '27')
+      const stateSelect = container.querySelector('select') as HTMLSelectElement;
+      expect(stateSelect).not.toBeNull();
+      expect(stateSelect.value).toBe('');
+
+      // Enter a Delhi GSTIN: 07AAAAA0000A1Z5
+      const gstinInput = container.querySelector('input[placeholder*="15-digit GSTIN"]') as HTMLInputElement;
+      expect(gstinInput).not.toBeNull();
+
+      act(() => {
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        nativeSetter?.call(gstinInput, '07AAAAA0000A1Z5');
+        gstinInput.dispatchEvent(new Event('input', { bubbles: true }));
+        gstinInput.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+
+      // Verify stateCode auto-populates to Delhi ('07')
+      expect(stateSelect.value).toBe('07');
+
+      // Enter a Karnataka GSTIN: 29ABCDE1234F1Z5
+      act(() => {
+        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        nativeSetter?.call(gstinInput, '29ABCDE1234F1Z5');
+        gstinInput.dispatchEvent(new Event('input', { bubbles: true }));
+        gstinInput.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+
+      // Verify stateCode auto-populates to Karnataka ('29')
+      expect(stateSelect.value).toBe('29');
 
       act(() => {
         root.unmount();
