@@ -7,6 +7,7 @@ export interface CompanyProfile {
   stateCode: string;
   address: string;
   pincode: string;
+  city?: string;
   phone: string;
   email: string;
   website?: string;

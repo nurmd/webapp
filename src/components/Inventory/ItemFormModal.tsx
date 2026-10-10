@@ -30,6 +30,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [salePrice, setSalePrice] = useState<number>(0);
   const [purchasePrice, setPurchasePrice] = useState<number>(0);
   const [gstRate, setGstRate] = useState<number>(18);
+  const [cessRate, setCessRate] = useState<number>(0);
   const [currentStock, setCurrentStock] = useState<number>(0);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
   const [isDisabledState, setIsDisabledState] = useState(false);
@@ -66,6 +67,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setSalePrice(editingItem.salePrice);
       setPurchasePrice(editingItem.purchasePrice);
       setGstRate(editingItem.gstRate);
+      setCessRate(editingItem.cessRate || 0);
       setCurrentStock(editingItem.currentStock);
       setMinStockAlert(editingItem.minStockAlert);
       setIsDisabledState(isItemDisabled(editingItem));
@@ -80,6 +82,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setSalePrice(0);
       setPurchasePrice(0);
       setGstRate(18);
+      setCessRate(0);
       setCurrentStock(0);
       setMinStockAlert(5);
       setIsDisabledState(false);
@@ -107,6 +110,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       salePrice: Number(salePrice),
       purchasePrice: Number(purchasePrice),
       gstRate: Number(gstRate),
+      cessRate: Number(cessRate) || 0,
       currentStock: itemType === 'SERVICE' ? 9999 : Number(currentStock),
       minStockAlert: itemType === 'SERVICE' ? 0 : Number(minStockAlert),
       isActive: !isDisabledState,
@@ -304,25 +308,44 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             </div>
 
             {isGstActive && (
-              <div>
-                <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
-                  GST Tax Rate Slab
-                </label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {[0, 5, 12, 18, 28].map((rate) => (
-                    <button
-                      key={rate}
-                      type="button"
-                      onClick={() => setGstRate(rate)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        gstRate === rate
-                          ? 'bg-secondary text-on-secondary shadow-sm'
-                          : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container'
-                      }`}
-                    >
-                      {rate}%
-                    </button>
-                  ))}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
+                    GST Tax Rate Slab
+                  </label>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                    {[0, 0.1, 0.25, 3, 5, 12, 18, 28].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setGstRate(rate)}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          gstRate === rate
+                            ? 'bg-secondary text-on-secondary shadow-sm'
+                            : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container'
+                        }`}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div>
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
+                      CESS Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={cessRate || ''}
+                      onChange={(e) => setCessRate(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono focus:border-secondary focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
             )}

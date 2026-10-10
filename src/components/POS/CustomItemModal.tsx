@@ -16,7 +16,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   const [price, setPrice] = useState('');
   const [qty, setQty] = useState('');
   const [gstRate, setGstRate] = useState<number>(18);
-  const [hsnCode, setHsnCode] = useState('9983');
+  const [hsnCode, setHsnCode] = useState('998313');
   const [unit, setUnit] = useState<UnitOfMeasurement>('PCS');
 
   if (!isOpen) return null;
@@ -130,6 +130,9 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-on-surface outline-none focus:border-secondary"
               >
                 <option value={0}>0% (Exempt / Nil)</option>
+                <option value={0.1}>0.1% GST</option>
+                <option value={0.25}>0.25% GST</option>
+                <option value={3}>3% GST (Gold/Precious)</option>
                 <option value={5}>5% GST</option>
                 <option value={12}>12% GST</option>
                 <option value={18}>18% GST (Standard)</option>

@@ -58,6 +58,9 @@ export interface Invoice {
   placeOfSupplyStateCode: string;
   isIntraState: boolean;
   isGstInvoice?: boolean;
+  financialYear?: string;                      // Indian Financial Year format: YYYY-YY (e.g. 2026-27)
+  partyPincode?: string;                       // Recipient postal PIN code for e-Invoice / e-Way Bill
+  supplyType?: string;                         // Supply classification: regular, SEZ, export, deemed export
 
   items: InvoiceItemEntry[];
 

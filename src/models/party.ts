@@ -13,6 +13,8 @@ export interface Party {
   stateCode: string;
   billingAddress: string;
   shippingAddress?: string;
+  pincode?: string;
+  city?: string;
   creditLimit?: number;
   openingBalance?: number; // Raw absolute amount
   openingBalanceType?: BalanceType; // 'TO_RECEIVE' | 'TO_PAY'

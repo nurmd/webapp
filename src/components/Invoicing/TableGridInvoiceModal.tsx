@@ -5,6 +5,7 @@ import { InventoryItem } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
+import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
@@ -306,6 +307,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         discountPercent: combinedDisc,
         discountAmount: overallDiscountPercent > 0 ? undefined : r.discountAmount,
         gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
+        cessPercent: isGstActive ? (Number(r.cessRate) || 0) : 0,
       };
     });
   }, [rows, isGstActive, overallDiscountPercent]);
@@ -423,6 +425,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
         sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
         igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
+        cessRate: isGstActive ? (Number(r.cessRate) || 0) : 0,
         cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
         totalAmount: calcItem?.totalAmount || 0,
       };
@@ -510,8 +513,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       return false;
     }
 
+    // Statutory GST Pre-Save Validation Gate
+    const draftInvoice = constructInvoiceObject();
+    const gstCheck = validateSingleInvoice(draftInvoice, company.stateCode, isGstActive);
+    if (!gstCheck.isValid && gstCheck.errors.length > 0) {
+      alert(`GST Compliance Alert:\n• ${gstCheck.errors.join('\n• ')}`);
+      return false;
+    }
+
     return true;
-  }, [rows, invoiceNumber, initialInvoice, allInvoices]);
+  }, [rows, invoiceNumber, initialInvoice, allInvoices, constructInvoiceObject, company.stateCode, isGstActive]);
 
   // "Save & Print" from Action Dock: saves bill as UNPAID and triggers print
   const handleSaveAndPrint = useCallback(() => {

@@ -4,7 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
-import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
+import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 
 export interface SimplifiedInvoiceModalProps {
@@ -280,7 +280,15 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           {isGstActive && (
             <button
               type="button"
-              onClick={() => downloadEWayBillJson(company, invoice)}
+              onClick={() => {
+                if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
+                  const proceed = confirm(
+                    `Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`
+                  );
+                  if (!proceed) return;
+                }
+                downloadEWayBillJson(company, invoice);
+              }}
               className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
               title="Download E-Way Bill JSON"
             >

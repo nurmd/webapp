@@ -62,10 +62,45 @@ export interface EWayBillBulkPayload {
   billLists: EWayBillBillData[];
 }
 
+export const EWAY_BILL_STATUTORY_THRESHOLD = 50000;
+
 export function formatEWayDate(isoDate: string): string {
   if (!isoDate) return '';
-  const [y, m, d] = isoDate.split('-');
+  const clean = isoDate.split('T')[0];
+  const [y, m, d] = clean.split('-');
   return `${d}/${m}/${y}`;
+}
+
+/**
+ * Validates Indian vehicle registration format (e.g. MH01AB1234 or DL01A1234).
+ */
+export function isValidVehicleNumber(vehNo?: string): boolean {
+  if (!vehNo) return false;
+  const cleaned = vehNo.replace(/\s+/g, '').toUpperCase();
+  return /^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/.test(cleaned);
+}
+
+function extractPincode(addressStr?: string, defaultPin: number = 400001): number {
+  if (!addressStr) return defaultPin;
+  const match = addressStr.match(/\b([1-9][0-9]{5})\b/);
+  if (match && match[1]) {
+    const pin = parseInt(match[1], 10);
+    if (!isNaN(pin)) return pin;
+  }
+  return defaultPin;
+}
+
+function extractLocation(addressStr?: string, defaultLoc: string = 'City'): string {
+  if (!addressStr) return defaultLoc;
+  const parts = addressStr.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const candidate = parts[parts.length - 1].replace(/\b[1-9][0-9]{5}\b/g, '').trim();
+    if (candidate.length >= 2) return candidate.substring(0, 50);
+  }
+  if (parts.length > 0) {
+    return parts[0].substring(0, 50);
+  }
+  return defaultLoc;
 }
 
 export function generateEWayBillJson(
@@ -83,18 +118,28 @@ export function generateEWayBillJson(
   const fromStateCodeNum = parseInt(company.stateCode, 10) || 27;
   const toStateCodeNum = parseInt(invoice.partyStateCode || invoice.placeOfSupplyStateCode || company.stateCode, 10) || fromStateCodeNum;
 
+  const fromPin = company.pincode
+    ? parseInt(company.pincode.replace(/\D/g, ''), 10) || extractPincode(company.address)
+    : extractPincode(company.address);
+  const fromPlace = company.city || extractLocation(company.address, 'City');
+
+  const toPin = invoice.partyPincode
+    ? parseInt(invoice.partyPincode.replace(/\D/g, ''), 10) || extractPincode(invoice.partyAddress)
+    : extractPincode(invoice.partyAddress);
+  const toPlace = extractLocation(invoice.partyAddress, 'City');
+
   const items: EWayBillJsonItem[] = invoice.items.map((it, idx) => ({
     itemNo: idx + 1,
     productName: it.name.substring(0, 50),
     productDesc: it.name.substring(0, 50),
-    hsnCode: parseInt(it.hsnSacCode || '999999', 10) || 999999,
+    hsnCode: parseInt((it.hsnSacCode || '999999').replace(/\D/g, ''), 10) || 999999,
     quantity: it.quantity,
     qtyUnit: it.unit || 'NOS',
     taxableAmount: Math.round(it.taxableAmount * 100) / 100,
     sgstRate: invoice.isIntraState ? it.gstRate / 2 : 0,
     cgstRate: invoice.isIntraState ? it.gstRate / 2 : 0,
     igstRate: invoice.isIntraState ? 0 : it.gstRate,
-    cessRate: 0,
+    cessRate: it.cessRate || 0,
     cessNonAdvol: 0,
   }));
 
@@ -110,16 +155,16 @@ export function generateEWayBillJson(
     fromTrdName: company.tradeName || company.businessName,
     fromAddr1: (company.address || 'Registered Office').substring(0, 50),
     fromAddr2: '',
-    fromPlace: 'City Center',
-    fromPincode: 400001,
+    fromPlace,
+    fromPincode: fromPin,
     actFromStateCode: fromStateCodeNum,
     fromStateCode: fromStateCodeNum,
     toGstin: invoice.partyGstin || 'URP',
     toTrdName: invoice.partyName.substring(0, 50),
     toAddr1: (invoice.partyAddress || 'Customer Address').substring(0, 50),
     toAddr2: '',
-    toPlace: 'Delivery Location',
-    toPincode: 400001,
+    toPlace,
+    toPincode: toPin,
     actToStateCode: toStateCodeNum,
     toStateCode: toStateCodeNum,
     totalValue: Math.round(invoice.totalTaxableAmount * 100) / 100,
@@ -133,7 +178,7 @@ export function generateEWayBillJson(
     transName: transportOptions.transporterName || '',
     transMode: transportOptions.transMode || '1',
     transDistance: transportOptions.transDistance || 50,
-    vehNo: transportOptions.vehicleNumber || 'MH01AB1234',
+    vehNo: transportOptions.vehicleNumber ? transportOptions.vehicleNumber.trim().toUpperCase() : undefined,
     vehType: transportOptions.vehicleType || 'R',
   };
 

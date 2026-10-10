@@ -4,6 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
+import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
@@ -595,7 +596,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       totalCgst: isGstActive ? calcSummary.totalCgst : 0,
       totalSgst: isGstActive ? calcSummary.totalSgst : 0,
       totalIgst: isGstActive ? calcSummary.totalIgst : 0,
-      totalCess: 0,
+      totalCess: isGstActive ? calcSummary.totalCess : 0,
       totalTax: isGstActive ? calcSummary.totalTax : 0,
       roundOff: calcSummary.roundOff,
       shippingAmount: additionalCharges > 0 ? additionalCharges : undefined,
@@ -610,6 +611,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    // Pre-Save GST Compliance Validation Gate
+    const gstCheck = validateSingleInvoice(newInvoice, company.stateCode, isGstActive);
+    if (!gstCheck.isValid && gstCheck.errors.length > 0) {
+      alert(`GST Compliance Alert:\n• ${gstCheck.errors.join('\n• ')}`);
+      return;
+    }
 
     onCompleteSale(newInvoice);
     audioService.playScanSuccess();

@@ -138,6 +138,20 @@ export function isDateInRange(dateStr: string, start?: string, end?: string): bo
   return true;
 }
 
+/**
+ * Calculates Indian Financial Year string in standard format "YYYY-YY" (e.g. "2026-27").
+ * Financial year begins on April 1 and ends on March 31.
+ */
+export function getFinancialYear(dateInput?: string | Date): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  const validDate = isNaN(d.getTime()) ? new Date() : d;
+  const month = validDate.getMonth() + 1; // 1-12
+  const year = validDate.getFullYear();
+  const startYear = month >= 4 ? year : year - 1;
+  const endYear = startYear + 1;
+  return `${startYear}-${String(endYear).slice(-2)}`;
+}
+
 export type LedgerSortOption =
   | 'NEWEST'
   | 'OLDEST'

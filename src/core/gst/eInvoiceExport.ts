@@ -81,20 +81,78 @@ export interface EInvoicePayload {
   };
 }
 
-export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice): EInvoicePayload {
-  const buyerState = invoice.partyStateCode || invoice.placeOfSupplyStateCode || company.stateCode;
+/**
+ * Extracts a 6-digit Indian PIN code from address string or returns a fallback.
+ */
+function extractPincode(addressStr?: string, defaultPin: number = 400001): number {
+  if (!addressStr) return defaultPin;
+  const match = addressStr.match(/\b([1-9][0-9]{5})\b/);
+  if (match && match[1]) {
+    const pin = parseInt(match[1], 10);
+    if (!isNaN(pin)) return pin;
+  }
+  return defaultPin;
+}
+
+/**
+ * Extracts city/location from address or falls back to state name / default.
+ */
+function extractLocation(addressStr?: string, defaultLoc: string = 'City'): string {
+  if (!addressStr) return defaultLoc;
+  const parts = addressStr.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    // Usually second-to-last or last part before pin is city
+    const candidate = parts[parts.length - 1].replace(/\b[1-9][0-9]{5}\b/g, '').trim();
+    if (candidate.length >= 2) return candidate.substring(0, 50);
+  }
+  if (parts.length > 0) {
+    return parts[0].substring(0, 50);
+  }
+  return defaultLoc;
+}
+
+export function generateEInvoiceJson(
+  company: CompanyProfile,
+  invoice: Invoice
+): EInvoicePayload {
   const isIntra = invoice.isIntraState;
+  const buyerState = invoice.placeOfSupplyStateCode || company.stateCode;
+
+  // Determine Supply Type
+  let supTyp = 'B2B';
+  if (invoice.invoiceType === 'EXPORT') {
+    supTyp = invoice.exportType === 'WOPAY' ? 'EXPWOP' : 'EXPWP';
+  } else if (invoice.supplyType) {
+    supTyp = invoice.supplyType;
+  }
+
+  // Determine Document Type: INV, CRN, DBN
+  let docTyp: 'INV' | 'CRN' | 'DBN' = 'INV';
+  if (invoice.invoiceType === 'CREDIT_NOTE') docTyp = 'CRN';
+  else if (invoice.invoiceType === 'DEBIT_NOTE') docTyp = 'DBN';
+
+  // Seller Details
+  const sellerPin = company.pincode
+    ? parseInt(company.pincode.replace(/\D/g, ''), 10) || extractPincode(company.address)
+    : extractPincode(company.address);
+  const sellerLoc = company.city || extractLocation(company.address, 'City');
+
+  // Buyer Details
+  const buyerPin = invoice.partyPincode
+    ? parseInt(invoice.partyPincode.replace(/\D/g, ''), 10) || extractPincode(invoice.partyAddress)
+    : extractPincode(invoice.partyAddress);
+  const buyerLoc = extractLocation(invoice.partyAddress, 'City');
 
   const itemList = invoice.items.map((it, idx) => {
-    const rate = it.gstRate;
-    const taxable = Math.round(it.taxableAmount * 100) / 100;
-    const cgst = isIntra ? Math.round((taxable * (rate / 2) / 100) * 100) / 100 : 0;
-    const sgst = isIntra ? Math.round((taxable * (rate / 2) / 100) * 100) / 100 : 0;
-    const igst = !isIntra ? Math.round((taxable * rate / 100) * 100) / 100 : 0;
     const grossTot = Math.round(it.quantity * it.unitPrice * 100) / 100;
-    const itemDisc = it.discountAmount != null
-      ? Math.round(it.discountAmount * 100) / 100
-      : Math.max(0, Math.round((grossTot - taxable) * 100) / 100);
+    const itemDisc = Math.round((it.discountAmount || 0) * 100) / 100;
+    const taxable = Math.round(it.taxableAmount * 100) / 100;
+    const rate = it.gstRate;
+
+    const cgst = isIntra ? Math.round(it.cgstAmount * 100) / 100 : 0;
+    const sgst = isIntra ? Math.round(it.sgstAmount * 100) / 100 : 0;
+    const igst = !isIntra ? Math.round(it.igstAmount * 100) / 100 : 0;
+    const cess = Math.round((it.cessAmount || 0) * 100) / 100;
 
     return {
       SlNo: String(idx + 1),
@@ -114,14 +172,14 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
       IgstAmt: igst,
       CgstAmt: cgst,
       SgstAmt: sgst,
-      CesRt: 0,
-      CesAmt: 0,
+      CesRt: it.cessRate || 0,
+      CesAmt: cess,
       CesNonAdvlAmt: 0,
       StateCesRt: 0,
       StateCesAmt: 0,
       StateCesNonAdvlAmt: 0,
       OthChrg: 0,
-      TotItemVal: Math.round((taxable + cgst + sgst + igst) * 100) / 100,
+      TotItemVal: Math.round((taxable + cgst + sgst + igst + cess) * 100) / 100,
     };
   });
 
@@ -129,13 +187,13 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
     Version: '1.1',
     TranDtls: {
       TaxSch: 'GST',
-      SupTyp: 'B2B',
-      RegRev: 'N',
+      SupTyp: supTyp,
+      RegRev: invoice.isRcm ? 'Y' : 'N',
       EcmGstin: null,
       IgstOnIntra: 'N',
     },
     DocDtls: {
-      Typ: 'INV',
+      Typ: docTyp,
       No: invoice.invoiceNumber,
       Dt: formatEWayDate(invoice.date),
     },
@@ -144,8 +202,8 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
       LglNm: company.businessName,
       TrdNm: company.tradeName || company.businessName,
       Addr1: (company.address || 'Registered Office').substring(0, 60),
-      Loc: 'City Center',
-      Pin: 400001,
+      Loc: sellerLoc,
+      Pin: sellerPin,
       Stcd: company.stateCode,
       Ph: company.phone,
       Em: company.email,
@@ -155,8 +213,8 @@ export function generateEInvoiceJson(company: CompanyProfile, invoice: Invoice):
       LglNm: invoice.partyName,
       Pos: buyerState,
       Addr1: (invoice.partyAddress || 'Buyer Office').substring(0, 60),
-      Loc: 'Delivery Location',
-      Pin: 400001,
+      Loc: buyerLoc,
+      Pin: buyerPin,
       Stcd: buyerState,
     },
     ItemList: itemList,

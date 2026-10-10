@@ -700,3 +700,74 @@ export function validateGstrPeriodData(
     errors,
   };
 }
+
+/**
+ * Validates a single sales invoice before saving to storage or completing checkout.
+ * Checks GSTIN format & checksum (for B2B), place of supply consistency, tax bifurcation,
+ * and line-item HSN/SAC digit rules.
+ */
+export function validateSingleInvoice(
+  invoice: Invoice,
+  companyStateCode: string = '27',
+  isGstActive: boolean = true
+): { isValid: boolean; errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!isGstActive) {
+    return { isValid: true, errors, warnings };
+  }
+
+  // 1. Check B2B GSTIN
+  if (invoice.invoiceType === 'B2B') {
+    if (!invoice.partyGstin || invoice.partyGstin.trim() === '') {
+      errors.push(`B2B Invoice ${invoice.invoiceNumber || ''} requires recipient GSTIN.`);
+    } else {
+      const gstinVal = validateGstin(invoice.partyGstin);
+      if (!gstinVal.isValid) {
+        errors.push(`Customer GSTIN "${invoice.partyGstin}" is invalid: ${gstinVal.error || 'Invalid format/checksum'}.`);
+      } else {
+        // POS state consistency check
+        const gstinState = invoice.partyGstin.substring(0, 2);
+        const pos = invoice.placeOfSupplyStateCode || invoice.partyStateCode;
+        if (pos && pos !== gstinState) {
+          warnings.push(`Place of supply state (${pos}) does not match customer registration state (${gstinState}).`);
+        }
+      }
+    }
+  }
+
+  // 2. Check Tax Bifurcation
+  const pos = invoice.placeOfSupplyStateCode || invoice.partyStateCode || companyStateCode;
+  const isIntra = pos === companyStateCode;
+  if (invoice.invoiceType !== 'EXPORT') {
+    if (isIntra) {
+      if ((invoice.totalIgst || 0) > 0) {
+        errors.push(`Intra-state supply (POS ${pos}) cannot charge IGST.`);
+      }
+      if (Math.abs((invoice.totalCgst || 0) - (invoice.totalSgst || 0)) > 0.05) {
+        errors.push('Intra-state CGST and SGST amounts must be equal.');
+      }
+    } else {
+      if ((invoice.totalCgst || 0) > 0 || (invoice.totalSgst || 0) > 0) {
+        errors.push(`Inter-state supply (POS ${pos}) must charge IGST instead of CGST/SGST.`);
+      }
+    }
+  }
+
+  // 3. Check Line-Item HSN/SAC codes
+  if (invoice.items && Array.isArray(invoice.items)) {
+    for (const item of invoice.items) {
+      const hsn = (item.hsnSacCode || item.hsnCode || '').trim();
+      if (hsn && !validateHsnSac(hsn)) {
+        errors.push(`Item "${item.name}" has invalid HSN/SAC code "${hsn}". Goods require 4, 6, or 8 digits; Services require 6 digits (99xxxx).`);
+      }
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}

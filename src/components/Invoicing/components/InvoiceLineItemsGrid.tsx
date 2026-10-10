@@ -13,6 +13,7 @@ export interface GridRow {
   discountPercent: number;
   discountAmount?: number;
   gstRate: number;
+  cessRate?: number;
 }
 
 export interface InvoiceLineItemsGridProps {

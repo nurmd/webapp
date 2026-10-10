@@ -1092,6 +1092,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
                   >
                     <option value={0}>0% (Exempt)</option>
+                    <option value={0.1}>0.1%</option>
+                    <option value={0.25}>0.25%</option>
+                    <option value={3}>3% (Gold/Precious)</option>
                     <option value={5}>5%</option>
                     <option value={12}>12%</option>
                     <option value={18}>18% (Standard)</option>

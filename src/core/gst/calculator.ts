@@ -12,12 +12,15 @@ export interface GstTaxBreakdown {
   totalAmount: number;
 }
 
+export const STATUTORY_GST_RATES = [0, 0.1, 0.25, 3, 5, 12, 18, 28] as const;
+export type StatutoryGstRate = (typeof STATUTORY_GST_RATES)[number];
+
 export interface InvoiceItemCalculationInput {
   quantity: number;
   unitPrice: number;
   discountPercent?: number;
   discountAmount?: number;
-  gstRate: number; // e.g. 5, 12, 18, 28
+  gstRate: number; // e.g. 0, 0.1, 0.25, 3, 5, 12, 18, 28
   cessPercent?: number;
   cessPerUnit?: number;
 }

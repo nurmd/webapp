@@ -8,7 +8,7 @@ import { formatThermalReceiptText } from '../../core/printer/escpos.ts';
 import { X, Printer, Share2, Receipt, FileText, Download, MoreVertical, Copy, QrCode } from 'lucide-react';
 import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
-import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
+import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
@@ -1376,6 +1376,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   <button
                     onClick={() => {
                       setShowMoreActions(false);
+                      if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
+                        const proceed = confirm(
+                          `Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`
+                        );
+                        if (!proceed) return;
+                      }
                       downloadEWayBillJson(company, invoice);
                     }}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"

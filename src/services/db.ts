@@ -21,7 +21,7 @@ import {
 } from '../core/inventory/stockEngine.ts';
 import { auditTrail } from './auditTrail.ts';
 import { rbac, UserRole } from './rbac.ts';
-
+import { getFinancialYear } from '../core/utils/dateFilters.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -1145,6 +1145,11 @@ class StorageService {
     );
     if (conflict) {
       throw new Error(`Invoice number "${invoice.invoiceNumber}" is already in use by invoice for ${conflict.partyName}. Invoices must have unique numbers.`);
+    }
+
+    // Enforce statutory financial year (e.g. 2026-27)
+    if (!invoice.financialYear) {
+      invoice.financialYear = getFinancialYear(invoice.date);
     }
 
     const idx = list.findIndex((inv) => inv.id === invoice.id);
