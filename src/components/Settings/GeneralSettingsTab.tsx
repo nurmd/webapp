@@ -2,6 +2,9 @@ import React from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { PouchSyncState } from '../../services/pouchdb.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
+import { DataSyncTab } from './tabs/DataSyncTab.tsx';
+import { BillingInvoicesTab } from './tabs/BillingInvoicesTab.tsx';
+import { AppPreferencesTab } from './tabs/AppPreferencesTab.tsx';
 
 export interface GeneralSettingsTabProps {
   isSyncingProfile: boolean;
@@ -87,188 +90,27 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
   handleToggleNegativeStock,
 }) => {
   return (
-    <>
-      {/* 2. Multi-Device Settings Synchronization Card (All Settings Except Printing) */}
-      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-secondary/30 flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary flex-shrink-0">
-              <span className={`material-symbols-outlined text-[22px] ${isSyncingProfile ? 'animate-spin' : ''}`}>
-                sync
-              </span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="font-headline-sm text-sm font-bold text-on-surface">
-                  Sync All Settings Across Devices
-                </span>
-                <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-              </div>
-              <span className="text-[11px] text-on-surface-variant truncate">
-                Last Synced: {lastProfileSyncTime} • All counter devices paired
-              </span>
-            </div>
-          </div>
+    <div className="flex flex-col gap-5">
+      {/* 1. Data & Multi-Device Cloud Sync */}
+      <DataSyncTab
+        isSyncingProfile={isSyncingProfile}
+        lastProfileSyncTime={lastProfileSyncTime}
+        handleSyncAllSettingsAcrossDevices={handleSyncAllSettingsAcrossDevices}
+        profileSyncNotice={profileSyncNotice}
+        setIsPairQrModalOpen={setIsPairQrModalOpen}
+        setIsImportProfileModalOpen={setIsImportProfileModalOpen}
+        syncState={syncState}
+        handleSyncNow={handleSyncNow}
+        isSyncStarting={isSyncStarting}
+        isSyncConfigOpen={isSyncConfigOpen}
+        setIsSyncConfigOpen={setIsSyncConfigOpen}
+        syncUrlInput={syncUrlInput}
+        setSyncUrlInput={setSyncUrlInput}
+        handleConnectSync={handleConnectSync}
+        handleStopSync={handleStopSync}
+      />
 
-          <button
-            type="button"
-            onClick={handleSyncAllSettingsAcrossDevices}
-            disabled={isSyncingProfile}
-            className="px-3.5 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <span className={`material-symbols-outlined text-[16px] ${isSyncingProfile ? 'animate-spin' : ''}`}>
-              sync
-            </span>
-            <span>{isSyncingProfile ? 'Syncing...' : 'Sync All Settings'}</span>
-          </button>
-        </div>
-
-        {/* Sync Scope Indicator: Everything synced except printing */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1 border-t border-outline-variant/15">
-          <div className="flex items-center gap-1.5 text-secondary font-medium">
-            <span className="material-symbols-outlined text-[15px]">check_circle</span>
-            <span>Synced: Profile, Bank, UPI, Taxes, Alerts &amp; Lock</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-outline font-medium">
-            <span className="material-symbols-outlined text-[15px]">lock</span>
-            <span>Local to Device: Thermal &amp; Printing Setup</span>
-          </div>
-        </div>
-
-        {profileSyncNotice && (
-          <div className="p-2.5 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-xs font-semibold flex items-center gap-2 animate-fade-in">
-            <span className="material-symbols-outlined text-[18px]">check_circle</span>
-            <span>{profileSyncNotice}</span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 pt-1 border-t border-outline-variant/15">
-          <button
-            type="button"
-            onClick={() => setIsPairQrModalOpen(true)}
-            className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-secondary">qr_code_2</span>
-            <span>Pair via QR</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsImportProfileModalOpen(true)}
-            className="flex-1 py-2 px-3 rounded-xl bg-surface-container text-on-surface text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px] text-secondary">download</span>
-            <span>Import Settings</span>
-          </button>
-        </div>
-      </section>
-
-      {/* 3. Store Data Protected / Sync Pulse Banner (Stitch Design) */}
-      <section className="bg-secondary-container/60 text-on-secondary-container rounded-2xl p-4 shadow-sm border border-secondary/20 flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm">
-              <span className="material-symbols-outlined text-[22px]">cloud_done</span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
-                Store Data Protected
-              </span>
-              <span className="text-[11px] text-on-secondary-container/80 truncate">
-                {(syncState.status === 'synced' || syncState.status === 'syncing')
-                  ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
-                  : '100% Offline-First IndexedDB Storage Ready'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button
-              type="button"
-              onClick={handleSyncNow}
-              className="px-3 py-1.5 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer"
-            >
-              {isSyncStarting ? 'Syncing...' : 'Sync Now'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSyncConfigOpen(!isSyncConfigOpen)}
-              className="w-8 h-8 rounded-xl bg-secondary/15 flex items-center justify-center text-on-secondary-container hover:bg-secondary/25 transition-colors cursor-pointer"
-              title="Configure Remote CouchDB URL"
-            >
-              <span className="material-symbols-outlined text-[18px]">tune</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Collapsible Sync Settings */}
-        {isSyncConfigOpen && (
-          <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2 animate-fade-in">
-            <label className="text-[11px] font-bold text-on-secondary-container">
-              Remote CouchDB / Cloudflare Tunnel URL:
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="https://admin:pass@sync.example.com/vyapar_store"
-                value={syncUrlInput}
-                onChange={(e) => setSyncUrlInput(e.target.value)}
-                className="flex-1 bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"
-              />
-              <button
-                type="button"
-                onClick={handleConnectSync}
-                className="px-3 py-2 bg-secondary text-on-secondary rounded-xl text-xs font-bold cursor-pointer"
-              >
-                Connect
-              </button>
-              {syncState.remoteUrl && (
-                <button
-                  type="button"
-                  onClick={handleStopSync}
-                  className="px-3 py-2 bg-error text-on-error rounded-xl text-xs font-bold cursor-pointer"
-                >
-                  Disconnect
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* 3. In-App OTA Update Channel Card */}
-      <section className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-secondary flex-shrink-0">
-            <span className="material-symbols-outlined text-[22px]">system_update</span>
-          </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-headline-sm text-sm font-bold text-on-surface">App Updates &amp; OTA</span>
-              <span className="bg-secondary text-on-secondary text-[10px] font-bold px-1.5 py-0.2 rounded-full">
-                v{CURRENT_APP_VERSION}
-              </span>
-            </div>
-            <span className="text-[11px] text-on-surface-variant truncate">
-              {updateStatusText || 'Automatic GitHub releases OTA channel'}
-            </span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleCheckForUpdates}
-          disabled={isUpdateChecking}
-          className="px-3.5 py-2 bg-surface-container text-on-surface hover:bg-surface-container-high rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex-shrink-0 flex items-center gap-1 active:scale-95"
-        >
-          <span className="material-symbols-outlined text-[16px]">
-            {isUpdateChecking ? 'progress_activity' : 'refresh'}
-          </span>
-          <span>{isUpdateChecking ? 'Checking...' : 'Check Update'}</span>
-        </button>
-      </section>
-
-      {/* GROUP 1: GST & Legal Tax Configuration */}
+      {/* 2. GST & Legal Tax Configuration */}
       <section id="gst-tax-config" className="flex flex-col gap-2.5 scroll-mt-20">
         <div className="px-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -282,7 +124,7 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
           </span>
         </div>
 
-        {/* 1. Master GST Billing Toggle Card */}
+        {/* Master GST Billing Toggle Card */}
         <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -311,7 +153,6 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
             </div>
           </div>
 
-          {/* Interactive Switch */}
           <button
             type="button"
             role="switch"
@@ -337,7 +178,7 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
           </div>
         )}
 
-        {/* 2. Business GSTIN & State Tax Registration Card */}
+        {/* Business GSTIN & State Tax Registration Card */}
         <div className={`bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex flex-col gap-3.5 ${
           !isGstActive ? 'opacity-65' : ''
         }`}>
@@ -423,11 +264,10 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
           </div>
         </div>
 
-        {/* 3. Items list: GST & Tax Rates, State & Place of Supply, E-Way Bill & E-Invoice */}
+        {/* Submodals: GST & Tax Rates, State & Place of Supply, E-Way Bill & E-Invoice */}
         <div className={`bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col ${
           !isGstActive ? 'opacity-65' : ''
         }`}>
-          {/* Item 1: GST & Tax Rates */}
           <button
             type="button"
             onClick={() => setActiveSubModal('tax_rates')}
@@ -456,7 +296,6 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
           </button>
 
-          {/* Item 2: State & Place of Supply */}
           <button
             type="button"
             onClick={() => setActiveSubModal('place_of_supply')}
@@ -483,7 +322,6 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
             <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
           </button>
 
-          {/* Item 3: E-Way Bill & E-Invoice */}
           <button
             type="button"
             onClick={() => setActiveSubModal('eway_bill')}
@@ -516,204 +354,45 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
         </div>
       </section>
 
-      {/* GROUP 2: Invoicing & Printing Setup (Stitch Design) */}
-      <section className="flex flex-col gap-2">
-        <div className="px-1">
-          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Billing &amp; Printing Setup
-          </h3>
-        </div>
+      {/* 3. Billing & Invoices Tab */}
+      <BillingInvoicesTab
+        profile={profile}
+        defaultPrintOption={defaultPrintOption}
+        handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
+        setIsQrModalOpen={() => {}}
+        setActiveSubModal={setActiveSubModal}
+      />
 
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
-          {/* Default Print Format Direct Toggle */}
-          <div className="w-full p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface-container-low transition-colors">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px]">print</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-label-md text-sm font-bold text-on-surface">Default Print Format</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
-                </div>
-                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                  Choose whether invoices open in A4 Laser or Thermal Slip by default
-                </div>
-              </div>
-            </div>
+      {/* 4. App Preferences Tab */}
+      <AppPreferencesTab
+        appLanguage={appLanguage}
+        setAppLanguage={setAppLanguage}
+        isAppLockEnabled={isAppLockEnabled}
+        setIsAppLockEnabled={setIsAppLockEnabled}
+        CURRENT_APP_VERSION={CURRENT_APP_VERSION}
+        updateStatusText={updateStatusText}
+        handleCheckForUpdates={handleCheckForUpdates}
+        isUpdateChecking={isUpdateChecking}
+        setActiveSubModal={setActiveSubModal}
+      />
 
-            <div className="flex items-center bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto flex-wrap">
-              {[
-                { id: 'A4', label: 'A4 Laser', icon: 'description' },
-                { id: 'Thermal-80mm', label: '3" (80mm)', icon: 'receipt_long' },
-                { id: 'Thermal-58mm', label: '2" (58mm)', icon: 'receipt' },
-              ].map((opt) => {
-                const isSelected =
-                  defaultPrintOption === opt.id ||
-                  (opt.id === 'A4' && (!defaultPrintOption || defaultPrintOption === 'None'));
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleDefaultPrintOptionChange(opt.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-secondary text-on-secondary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[15px]">{opt.icon}</span>
-                    <span>{opt.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Thermal Printing Themes & Details Modal */}
-          <button
-            type="button"
-            onClick={() => setActiveSubModal('printing')}
-            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">tune</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Invoice Themes &amp; Thermal Printing Details</div>
-              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                Current Default: {defaultPrintOption === 'Thermal-58mm' ? '2-Inch (58mm) Thermal' : defaultPrintOption === 'Thermal-80mm' ? '3-Inch (80mm) Thermal' : 'Standard A4 Laser'}
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-          </button>
-
-          {/* Invoice Series Numbering */}
-          <button
-            type="button"
-            onClick={() => setActiveSubModal('prefix_series')}
-            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">pin</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Prefix &amp; Invoice Series</div>
-              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                Prefix: {profile.invoicePrefix || 'INV-2024-'} • Retail POS &amp; Tax Bills
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-          </button>
-
-          {/* Automated WhatsApp */}
-          <button
-            type="button"
-            onClick={() => setActiveSubModal('whatsapp_alerts')}
-            className="w-full p-4 flex items-center gap-3.5 text-left hover:bg-surface-container-low transition-colors cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-secondary flex-shrink-0">
-              <span className="material-symbols-outlined text-[22px]">chat</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-label-md text-sm font-bold text-on-surface">Automated WhatsApp &amp; SMS Alerts</div>
-              <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
-                Instant bill PDF share • Dynamic UPI Payment Reminders
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-          </button>
-        </div>
-      </section>
-
-      {/* GROUP 5: Device, Language & App Lock (Stitch Design) */}
-      <section className="flex flex-col gap-2">
-        <div className="px-1">
-          <h3 className="font-label-sm text-xs uppercase tracking-wider text-on-surface-variant font-bold">
-            Device, Privacy &amp; Preferences
-          </h3>
-        </div>
-
-        <div className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
-          {/* Language Selector */}
+      {/* 5. Inventory Stock & Buy Price Global Controls */}
+      <section className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 flex flex-col">
+        {handleToggleNegativeStock && (
           <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
             <div className="flex items-center gap-3.5 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px]">translate</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-label-md text-sm font-bold text-on-surface">App Language</div>
-                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">{appLanguage}</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {(['English (India)', 'हिंदी (Hindi)'] as const).map((lang) => (
-                <button
-                  key={lang}
-                  type="button"
-                  onClick={() => setAppLanguage(lang)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    appLanguage === lang
-                      ? 'bg-secondary text-on-secondary shadow-sm'
-                      : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                  }`}
-                >
-                  {lang.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Allow Negative Stock Toggle */}
-          {handleToggleNegativeStock && (
-            <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-                  <span className="material-symbols-outlined text-[22px]">production_quantity_limits</span>
-                </div>
-                <div className="flex-1 min-w-0 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-label-md text-sm font-bold text-on-surface">Allow Negative Stock</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Inventory Policy</span>
-                  </div>
-                  <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                    {allowNegativeStock
-                      ? 'Allowed: Invoices can be created when stock is zero, tracking negative balances.'
-                      : 'Blocked: Stock clamped to 0 and cannot drop below zero.'}
-                  </div>
-                </div>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={allowNegativeStock}
-                  onChange={(e) => handleToggleNegativeStock(e.target.checked)}
-                  className="sr-only peer"
-                  aria-label="Toggle Allow Negative Stock"
-                />
-                <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
-              </label>
-            </div>
-          )}
-
-          {/* Buy Price Global Show / Hidden Privacy Toggle */}
-          <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px]">
-                  {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
-                </span>
+                <span className="material-symbols-outlined text-[22px]">production_quantity_limits</span>
               </div>
               <div className="flex-1 min-w-0 pr-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-label-md text-sm font-bold text-on-surface">Show Buy / Purchase Prices</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
+                  <span className="font-label-md text-sm font-bold text-on-surface">Allow Negative Stock</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Inventory Policy</span>
                 </div>
                 <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                  {showBuyPricesGlobally
-                    ? 'Visible: Show purchase rates and valuation on this device'
-                    : 'Hidden (***): Mask purchase rates to protect costs on this device'}
+                  {allowNegativeStock
+                    ? 'Allowed: Invoices can be created when stock is zero, tracking negative balances.'
+                    : 'Blocked: Stock clamped to 0 and cannot drop below zero.'}
                 </div>
               </div>
             </div>
@@ -721,40 +400,47 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
             <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
               <input
                 type="checkbox"
-                checked={showBuyPricesGlobally}
-                onChange={(e) => handleToggleBuyPriceVisibility(e.target.checked)}
+                checked={allowNegativeStock}
+                onChange={(e) => handleToggleNegativeStock(e.target.checked)}
                 className="sr-only peer"
+                aria-label="Toggle Allow Negative Stock"
               />
               <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
             </label>
           </div>
+        )}
 
-          {/* Biometric / PIN Lock Toggle */}
-          <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px]">fingerprint</span>
+        <div className="w-full p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">
+                {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0 pr-2">
+              <div className="flex items-center gap-2">
+                <span className="font-label-md text-sm font-bold text-on-surface">Show Buy / Purchase Prices</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">Device Only</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-label-md text-sm font-bold text-on-surface">App Lock &amp; 4-Digit PIN</div>
-                <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                  Protect invoice deletions &amp; role switching with PIN
-                </div>
+              <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                {showBuyPricesGlobally
+                  ? 'Visible: Show purchase rates and valuation on this device'
+                  : 'Hidden (***): Mask purchase rates to protect costs on this device'}
               </div>
             </div>
-
-            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-              <input
-                type="checkbox"
-                checked={isAppLockEnabled}
-                onChange={(e) => setIsAppLockEnabled(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
-            </label>
           </div>
+
+          <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={showBuyPricesGlobally}
+              onChange={(e) => handleToggleBuyPriceVisibility(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface-container-lowest after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+          </label>
         </div>
       </section>
-    </>
+    </div>
   );
 };
