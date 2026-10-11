@@ -53,7 +53,9 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     companyAddress: thermalSettings.showAddress ? company.address : '',
     gstin: thermalSettings.showGstin ? company.gstin : '',
     phone: thermalSettings.showPhone ? company.phone : '',
-    receiptTitle: thermalSettings.receiptTitle,
+    receiptTitle: company.isCompositionScheme
+      ? (!thermalSettings.receiptTitle || thermalSettings.receiptTitle === 'TAX INVOICE' || thermalSettings.receiptTitle === 'RETAIL INVOICE' ? 'Bill of Supply' : thermalSettings.receiptTitle)
+      : thermalSettings.receiptTitle,
     invoiceNo: invoice.invoiceNumber,
     date: invoice.date,
     customerName: invoice.partyName,
@@ -66,9 +68,9 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     })),
     taxableAmount: invoice.totalTaxableAmount,
     totalDiscount: thermalSettings.showItemDiscount ? invoice.totalDiscount : 0,
-    cgstAmount: thermalSettings.showTaxBreakdown ? invoice.totalCgst : 0,
-    sgstAmount: thermalSettings.showTaxBreakdown ? invoice.totalSgst : 0,
-    igstAmount: thermalSettings.showTaxBreakdown ? invoice.totalIgst : 0,
+    cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalCgst : 0,
+    sgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalSgst : 0,
+    igstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalIgst : 0,
     shippingAmount: invoice.shippingAmount,
     roundOff: invoice.roundOff,
     grandTotal: invoice.grandTotal,
@@ -78,6 +80,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     paymentSplits: invoice.paymentSplits,
     upiId: thermalSettings.showUpiQr ? company.upiId : undefined,
     terms: thermalSettings.greetingText || company.termsAndConditions,
+    isCompositionScheme: Boolean(company.isCompositionScheme),
   };
 
   const previewText = formatThermalReceiptText(receiptData, width, {

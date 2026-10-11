@@ -113,7 +113,7 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
                 <span className="text-on-surface-variant font-medium">Taxpayer Status</span>
                 <span className="font-bold flex items-center gap-1 text-secondary">
                   <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-                  Active • Regular
+                  {profile.isCompositionScheme ? 'Active • Composition Scheme' : 'Active • Regular'}
                 </span>
               </div>
             </>
@@ -174,7 +174,7 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
               </h3>
             </div>
             <span className={`font-label-sm text-[11px] font-bold ${isGstActive ? 'text-secondary' : 'text-on-surface-variant'}`}>
-              {isGstActive ? 'GST Mode: Regular' : 'GST Mode: Disabled'}
+              {isGstActive ? (profile.isCompositionScheme ? 'GST Mode: Composition Scheme' : 'GST Mode: Regular') : 'GST Mode: Disabled'}
             </span>
           </div>
 
@@ -212,7 +212,7 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
               type="button"
               role="switch"
               aria-checked={isGstActive}
-              onClick={() => handleToggleGst()}
+              onClick={() => handleToggleGst && handleToggleGst()}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 cursor-pointer ${
                 isGstActive ? 'bg-secondary' : 'bg-surface-container-highest'
               }`}
@@ -225,6 +225,66 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
               />
             </button>
           </div>
+
+          {/* Composition Scheme Toggle Card (Section 10) */}
+          {isGstActive && (
+            <div className="bg-surface-container-lowest rounded-2xl p-4 shadow-sm border border-outline-variant/30 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                  profile.isCompositionScheme ? 'bg-secondary/15 text-secondary' : 'bg-surface-container text-on-surface-variant'
+                }`}>
+                  <span className="material-symbols-outlined text-[22px]">domain_verification</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-label-md text-sm font-bold text-on-surface">Composition Scheme (Section 10)</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      profile.isCompositionScheme
+                        ? 'bg-secondary-container text-on-secondary-container'
+                        : 'bg-surface-container-high text-on-surface-variant'
+                    }`}>
+                      {profile.isCompositionScheme ? 'Composition Dealer' : 'Regular Taxpayer'}
+                    </span>
+                  </div>
+                  <p className="font-body-sm text-xs text-on-surface-variant mt-0.5 leading-relaxed">
+                    {profile.isCompositionScheme
+                      ? 'Issues "Bill of Supply" instead of "Tax Invoice". GST collection is barred; tax rate columns and breakdown tables are suppressed on bills.'
+                      : 'Standard GST tax invoice with CGST/SGST/IGST breakdown and recipient ITC eligibility.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Interactive Switch */}
+              <button
+                type="button"
+                role="switch"
+                aria-label="Toggle Composition Scheme"
+                aria-checked={Boolean(profile.isCompositionScheme)}
+                onClick={() => {
+                  const updated: CompanyProfile = {
+                    ...profile,
+                    isCompositionScheme: !profile.isCompositionScheme,
+                  };
+                  if (setProfile) setProfile(updated);
+                  if (onSave) onSave(updated);
+                  if (setSavedNotice) {
+                    setSavedNotice(true);
+                    setTimeout(() => setSavedNotice(false), 2000);
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 cursor-pointer ${
+                  profile.isCompositionScheme ? 'bg-secondary' : 'bg-surface-container-highest'
+                }`}
+                title={profile.isCompositionScheme ? 'Click to switch to Regular Taxpayer' : 'Click to enable Composition Scheme'}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-surface-container-lowest shadow-sm transition-transform ${
+                    profile.isCompositionScheme ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
 
           {!isGstActive && (
             <div className="px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs flex items-center gap-2">
@@ -247,7 +307,7 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
               </div>
               {isGstActive && (
                 <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold">
-                  Regular Taxpayer
+                  {profile.isCompositionScheme ? 'Composition Dealer' : 'Regular Taxpayer'}
                 </span>
               )}
             </div>

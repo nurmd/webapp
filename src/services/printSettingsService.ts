@@ -169,3 +169,25 @@ export const printSettingsService = {
     return defaults;
   },
 };
+
+/**
+ * Resolves the statutory document title based on company composition status and GSTIN presence.
+ * Composition dealers (Section 10) are statutorily required to issue a "Bill of Supply".
+ */
+export function resolveReceiptTitle(
+  configuredTitle: string | undefined,
+  isCompositionScheme?: boolean,
+  hasGstin?: boolean
+): string {
+  const trimmed = configuredTitle?.trim();
+  if (isCompositionScheme) {
+    if (!trimmed || trimmed.toUpperCase() === 'TAX INVOICE' || trimmed.toUpperCase() === 'RETAIL INVOICE') {
+      return 'Bill of Supply';
+    }
+    return trimmed;
+  }
+  if (!trimmed || trimmed === '') {
+    return hasGstin ? 'TAX INVOICE' : 'RETAIL INVOICE';
+  }
+  return trimmed;
+}

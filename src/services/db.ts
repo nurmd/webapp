@@ -73,6 +73,7 @@ const DEFAULT_COMPANY: CompanyProfile = {
   termsAndConditions: '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction.',
   invoicePrefix: 'INV-',
   isGstEnabled: true,
+  isCompositionScheme: false,
 };
 
 const DEFAULT_PARTIES: Party[] = [];

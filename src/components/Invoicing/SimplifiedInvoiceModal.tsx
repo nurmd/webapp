@@ -74,8 +74,13 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <h3 className="font-bold text-sm text-on-surface truncate">
-                  Invoice #{invoice.invoiceNumber}
+                  {company.isCompositionScheme ? `Bill of Supply #${invoice.invoiceNumber}` : `Invoice #${invoice.invoiceNumber}`}
                 </h3>
+                {company.isCompositionScheme && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+                    Composition
+                  </span>
+                )}
                 <span
                   className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
                     isPaid
@@ -139,7 +144,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
                         <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
                           {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
                           {isGstActive && item.hsnSacCode && <span>•</span>}
-                          {isGstActive && <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>}
+                          {isGstActive && !company.isCompositionScheme && <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>}
                         </div>
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
@@ -171,7 +176,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
         {/* Financial Breakdown */}
         <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-          {isGstActive && (
+          {isGstActive && !company.isCompositionScheme && (
             <>
               <div className="flex justify-between text-on-surface-variant text-[11px]">
                 <span>Taxable Amount</span>

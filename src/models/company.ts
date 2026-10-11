@@ -20,4 +20,5 @@ export interface CompanyProfile {
   invoicePrefix?: string;
   logoUrl?: string;
   isGstEnabled?: boolean;
+  isCompositionScheme?: boolean;
 }

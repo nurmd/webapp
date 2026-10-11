@@ -29,6 +29,7 @@ export interface ThermalReceiptData {
   upiId?: string;
   terms?: string;
   stateName?: string;
+  isCompositionScheme?: boolean;
 }
 
 /**
@@ -63,8 +64,12 @@ export function formatThermalReceiptText(
   if (data.gstin) lines.push(padCenter(`GSTIN: ${data.gstin}`, width));
   if (data.phone) lines.push(padCenter(`Ph: ${data.phone}`, width));
 
-  // Dynamic receipt title honoring custom configuration
-  const title = (data.receiptTitle && data.receiptTitle.trim())
+  // Dynamic receipt title honoring custom configuration and composition scheme
+  const title = (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
+    ? data.receiptTitle.trim().toUpperCase()
+    : data.isCompositionScheme
+    ? 'BILL OF SUPPLY'
+    : (data.receiptTitle && data.receiptTitle.trim())
     ? data.receiptTitle.trim().toUpperCase()
     : data.gstin ? 'TAX INVOICE' : 'RETAIL INVOICE';
   lines.push(padCenter(title, width));
@@ -112,13 +117,15 @@ export function formatThermalReceiptText(
   lines.push(line);
 
   // Totals & Taxes
-  lines.push(padRow(data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  lines.push(padRow(data.isCompositionScheme ? 'Subtotal:' : data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
   if (data.totalDiscount && data.totalDiscount > 0) {
     lines.push(padRow('Discount:', `-Rs. ${data.totalDiscount.toFixed(2)}`, width));
   }
-  if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
-  if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
-  if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+  if (!data.isCompositionScheme) {
+    if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
+    if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
+    if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+  }
   if (data.shippingAmount && data.shippingAmount > 0) {
     lines.push(padRow('Shipping:', `+Rs. ${data.shippingAmount.toFixed(2)}`, width));
   }

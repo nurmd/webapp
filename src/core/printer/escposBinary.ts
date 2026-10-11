@@ -155,7 +155,11 @@ export function buildThermalReceiptBinary(
     builder.line(`Ph: ${data.phone}`);
   }
 
-  const title = (data.receiptTitle && data.receiptTitle.trim())
+  const title = (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
+    ? data.receiptTitle.trim().toUpperCase()
+    : data.isCompositionScheme
+    ? 'BILL OF SUPPLY'
+    : (data.receiptTitle && data.receiptTitle.trim())
     ? data.receiptTitle.trim().toUpperCase()
     : data.gstin ? 'TAX INVOICE' : 'RETAIL INVOICE';
   builder.bold(true).line(title).bold(false);
@@ -207,15 +211,17 @@ export function buildThermalReceiptBinary(
   builder.line('-'.repeat(width));
 
   // Totals
-  builder.line(padRow('Taxable Amount:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
-  if (data.cgstAmount > 0) {
-    builder.line(padRow('CGST Total:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
-  }
-  if (data.sgstAmount > 0) {
-    builder.line(padRow('SGST Total:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
-  }
-  if (data.igstAmount > 0) {
-    builder.line(padRow('IGST Total:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+  builder.line(padRow(data.isCompositionScheme ? 'Subtotal:' : 'Taxable Amount:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  if (!data.isCompositionScheme) {
+    if (data.cgstAmount > 0) {
+      builder.line(padRow('CGST Total:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
+    }
+    if (data.sgstAmount > 0) {
+      builder.line(padRow('SGST Total:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
+    }
+    if (data.igstAmount > 0) {
+      builder.line(padRow('IGST Total:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+    }
   }
 
   builder.line('='.repeat(width));

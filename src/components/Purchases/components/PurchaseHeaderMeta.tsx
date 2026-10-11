@@ -108,11 +108,28 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
                 )}
                 {supplierStateCode && <span>· State: {supplierStateCode}</span>}
               </div>
+              {selectedSupplier?.isComposition && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span
+                    data-testid="purchase-composition-badge"
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                  >
+                    <span className="material-symbols-outlined text-[11px]">warning</span>
+                    Composition Dealer — ITC Ineligible
+                  </span>
+                </div>
+              )}
             </div>
           </button>
 
           {selectedSupplier && (
             <div className="flex items-center gap-1 shrink-0">
+              {selectedSupplier.isComposition && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/60">
+                  <span className="material-symbols-outlined text-[12px]">warning</span>
+                  Composition Dealer — ITC Ineligible
+                </span>
+              )}
               {(selectedSupplier.currentBalance || 0) < 0 ? (
                 <span className="text-[10px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-300/60">
                   Payable: {formatINR(Math.abs(selectedSupplier.currentBalance || 0))}

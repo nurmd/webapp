@@ -39,6 +39,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const [openingBalance, setOpeningBalance] = useState<string>('');
   const [openingBalanceType, setOpeningBalanceType] = useState<BalanceType>(initialType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
   const [openingBalanceDate, setOpeningBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [isComposition, setIsComposition] = useState(false);
+  const [gstinError, setGstinError] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingParty) {
@@ -53,6 +55,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setShippingAddress(editingParty.shippingAddress || '');
       setHasSeparateShipping(!!editingParty.shippingAddress && editingParty.shippingAddress !== editingParty.billingAddress);
       setCreditLimit(editingParty.creditLimit ? editingParty.creditLimit.toString() : '');
+      setIsComposition(Boolean(editingParty.isComposition));
+      setGstinError(null);
 
       const hasExplicit = typeof editingParty.openingBalance === 'number';
       const rawOpening = hasExplicit ? editingParty.openingBalance! : 0;
@@ -80,6 +84,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setOpeningBalance('');
       setOpeningBalanceType(initialType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
       setOpeningBalanceDate(new Date().toISOString().split('T')[0]);
+      setIsComposition(false);
+      setGstinError(null);
     }
   }, [editingParty, initialType, isOpen]);
 
@@ -88,6 +94,9 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const handleGstinInputChange = (val: string) => {
     const uppercaseVal = val.toUpperCase().trim();
     setGstin(uppercaseVal);
+    if (gstinError) {
+      setGstinError(null);
+    }
 
     const detectedState = extractStateCodeFromGstin(uppercaseVal);
     if (detectedState) {
@@ -130,6 +139,12 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    const cleanGstin = gstin.trim().toUpperCase();
+    if (cleanGstin && !isValidGstin(cleanGstin)) {
+      setGstinError('Invalid GSTIN format. Expected 15-character alphanumeric GSTIN (e.g. 27ABCDE1234F1Z5).');
+      return;
+    }
+
     const numCreditLimit = creditLimit.trim() ? parseFloat(creditLimit) : undefined;
     const numOpening = openingBalance.trim() ? Math.abs(parseFloat(openingBalance)) : 0;
     const newSignedOpening = numOpening > 0 ? (openingBalanceType === 'TO_RECEIVE' ? numOpening : -numOpening) : 0;
@@ -155,7 +170,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       type,
       phone: phone.trim() || '9999999999',
       email: email.trim() || undefined,
-      gstin: gstin.trim().toUpperCase() || undefined,
+      gstin: cleanGstin || undefined,
+      isComposition: isComposition ? true : undefined,
       pan: pan.trim().toUpperCase() || undefined,
       stateCode: stateCode.trim(),
       billingAddress: address.trim() || 'Local Counter',
@@ -293,10 +309,10 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
                   {gstin && (
                     <span
                       className={`text-[10px] font-bold ${
-                        isValidGstin(gstin) ? 'text-secondary' : 'text-outline'
+                        isValidGstin(gstin) ? 'text-secondary' : 'text-error'
                       }`}
                     >
-                      {isValidGstin(gstin) ? '✓ Valid Format' : '15 characters expected'}
+                      {isValidGstin(gstin) ? '✓ Valid Format' : '⚠️ Invalid GSTIN'}
                     </span>
                   )}
                 </div>
@@ -306,8 +322,18 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
                   placeholder="15-digit GSTIN"
                   value={gstin}
                   onChange={(e) => handleGstinInputChange(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                  className={`w-full px-3 py-2 rounded-xl border ${
+                    gstinError || (gstin.trim() && !isValidGstin(gstin.trim()))
+                      ? 'border-error text-error focus:ring-2 focus:ring-error/40'
+                      : 'border-outline-variant focus:ring-secondary/40'
+                  } bg-surface text-on-surface text-sm font-mono uppercase focus:outline-none focus:ring-2`}
                 />
+                {gstinError && (
+                  <div className="text-[11px] text-error font-bold mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">error</span>
+                    <span>{gstinError}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -327,6 +353,31 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
               </select>
             </div>
           </div>
+
+          {/* Composition Dealer Checkbox (P2-F) */}
+          {isGstActive && (
+            <div className="p-2.5 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 flex items-center justify-between">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isComposition}
+                  onChange={(e) => setIsComposition(e.target.checked)}
+                  className="w-4 h-4 rounded text-secondary focus:ring-secondary/40 cursor-pointer"
+                />
+                <div>
+                  <span className="font-semibold text-on-surface text-xs block">Composition Dealer</span>
+                  <span className="text-[10px] text-on-surface-variant">
+                    Party is enrolled under GST Composition Scheme (ITC Ineligible)
+                  </span>
+                </div>
+              </label>
+              {isComposition && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                  Composition
+                </span>
+              )}
+            </div>
+          )}
 
           {/* PAN & Credit Limit */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

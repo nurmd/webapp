@@ -31,6 +31,12 @@ export interface InvoiceHeaderMetaProps {
   onInvoiceTypeChange?: (type: InvoiceType | null) => void;
   isRcm?: boolean;
   onRcmChange?: (isRcm: boolean) => void;
+
+  // New optional props for P2-E
+  shippingAddress?: string;
+  shippingPincode?: string;
+  onShippingAddressChange?: (address: string) => void;
+  onShippingPincodeChange?: (pincode: string) => void;
 }
 
 function formatDateDisplay(dateStr: string): string {
@@ -68,7 +74,14 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   onInvoiceTypeChange,
   isRcm,
   onRcmChange,
+  shippingAddress,
+  shippingPincode,
+  onShippingAddressChange,
+  onShippingPincodeChange,
 }) => {
+  const [isShippingExpanded, setIsShippingExpanded] = React.useState<boolean>(() => {
+    return Boolean(shippingAddress || shippingPincode || initialInvoice?.shippingAddress || initialInvoice?.shippingPincode);
+  });
   return (
     <>
       {/* Fixed Top Shell Header */}
@@ -298,8 +311,81 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
               <span className="text-[10px] font-bold">{isRcm ? 'YES' : 'NO'}</span>
             </button>
           )}
+
+          {/* Shipping / Bill-to Ship-to Toggle Button */}
+          {(onShippingAddressChange || onShippingPincodeChange) && (
+            <button
+              type="button"
+              onClick={() => setIsShippingExpanded(!isShippingExpanded)}
+              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isShippingExpanded || shippingAddress || shippingPincode
+                  ? 'bg-secondary/15 text-secondary border-secondary/40 shadow-2xs'
+                  : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/20'
+              }`}
+              title="Configure separate Shipping Address & Pincode (Bill to / Ship to)"
+            >
+              <span className="material-symbols-outlined text-[13px]">local_shipping</span>
+              <span className="hidden sm:inline">Ship-to:</span>
+              <span className="font-bold">
+                {shippingPincode || (shippingAddress ? 'Custom' : 'Same as Bill')}
+              </span>
+              <span className="material-symbols-outlined text-[12px]">
+                {isShippingExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Expandable Bill-to Ship-to Panel */}
+      {isShippingExpanded && (onShippingAddressChange || onShippingPincodeChange) && (
+        <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col md:flex-row gap-3 text-xs animate-fade-in">
+          <div className="flex-1 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">local_shipping</span>
+                Shipping Address (Consignee / Ship-to)
+              </label>
+              {selectedParty?.billingAddress && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onShippingAddressChange?.(selectedParty.billingAddress);
+                    if (selectedParty.pincode) {
+                      onShippingPincodeChange?.(selectedParty.pincode);
+                    }
+                  }}
+                  className="text-[10px] font-semibold text-secondary hover:underline cursor-pointer"
+                >
+                  Copy from Billing Address
+                </button>
+              )}
+            </div>
+            <input
+              type="text"
+              value={shippingAddress || ''}
+              onChange={(e) => onShippingAddressChange?.(e.target.value)}
+              placeholder={selectedParty?.billingAddress || 'Enter destination delivery address (leave blank if same as billing)'}
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+            />
+          </div>
+
+          <div className="w-full md:w-44 flex flex-col gap-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+              <span className="material-symbols-outlined text-[13px] text-secondary">pin_drop</span>
+              Shipping Pincode
+            </label>
+            <input
+              type="text"
+              maxLength={6}
+              value={shippingPincode || ''}
+              onChange={(e) => onShippingPincodeChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="6-digit PIN"
+              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Conflicting Invoice Alert Banner */}
       {(currentConflict || invoiceConflictError) && (

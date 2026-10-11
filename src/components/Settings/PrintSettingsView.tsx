@@ -246,7 +246,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                     type="text"
                     value={a4.invoiceTitle}
                     onChange={(e) => handleA4Change('invoiceTitle', e.target.value)}
-                    placeholder="TAX INVOICE"
+                    placeholder={company.isCompositionScheme ? "BILL OF SUPPLY" : "TAX INVOICE"}
                     className="w-full h-10 px-3 rounded-xl bg-surface-container border border-outline-variant/30 text-xs font-bold text-on-surface focus:outline-none focus:border-secondary"
                   />
                 </div>
@@ -563,17 +563,23 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                       {a4.defaultCopyLabel.split(' ')[0]}
                     </span>
                     <h5 className="font-black text-xs uppercase text-slate-900 mt-0.5">
-                      {a4.invoiceTitle}
+                      {company.isCompositionScheme && a4.invoiceTitle === 'TAX INVOICE'
+                        ? 'BILL OF SUPPLY'
+                        : a4.invoiceTitle}
                     </h5>
                   </div>
                 </div>
 
                 {/* Subtitle */}
-                {a4.invoiceSubtitle && (
+                {company.isCompositionScheme ? (
+                  <p className="text-[8px] text-slate-500 text-center italic">
+                    Composition taxable person, not eligible to collect tax on supplies
+                  </p>
+                ) : a4.invoiceSubtitle ? (
                   <p className="text-[8px] text-slate-500 text-center italic">
                     {a4.invoiceSubtitle}
                   </p>
-                )}
+                ) : null}
 
                 {/* Sample Items Table */}
                 <table className="w-full border-collapse border border-slate-400 text-[9px]">
@@ -759,7 +765,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                     type="text"
                     value={thermal.receiptTitle}
                     onChange={(e) => handleThermalChange('receiptTitle', e.target.value)}
-                    placeholder="TAX INVOICE"
+                    placeholder={company.isCompositionScheme ? "BILL OF SUPPLY" : "TAX INVOICE"}
                     className="w-full h-10 px-3 rounded-xl bg-surface-container border border-outline-variant/30 text-xs font-bold text-on-surface focus:outline-none focus:border-secondary"
                   />
                 </div>
@@ -952,7 +958,9 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                     <p className="text-[9px] font-bold text-slate-800">GSTIN: {company.gstin}</p>
                   )}
                   <span className="inline-block mt-0.5 px-1.5 py-0.2 text-[8px] font-black uppercase border border-slate-300 rounded bg-slate-50">
-                    {thermal.receiptTitle}
+                    {company.isCompositionScheme && thermal.receiptTitle === 'TAX INVOICE'
+                      ? 'BILL OF SUPPLY'
+                      : thermal.receiptTitle}
                   </span>
                 </div>
 

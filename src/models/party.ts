@@ -9,6 +9,7 @@ export interface Party {
   phone: string;
   email?: string;
   gstin?: string;
+  isComposition?: boolean;
   pan?: string;
   stateCode: string;
   billingAddress: string;

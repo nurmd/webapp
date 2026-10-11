@@ -13,7 +13,13 @@ export function getWhatsAppShareUrl(invoice: Invoice, company: CompanyProfile, p
   const cleanPhone = (partyPhone || '').replace(/\D/g, '');
   const phone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   
-  const text = `*Tax Invoice from ${company.tradeName || company.businessName}*
+  const docTitle = company.isCompositionScheme
+    ? 'Bill of Supply'
+    : company.isGstEnabled !== false
+    ? 'Tax Invoice'
+    : 'Invoice';
+
+  const text = `*${docTitle} from ${company.tradeName || company.businessName}*
 ------------------------------
 *Invoice No:* ${invoice.invoiceNumber}
 *Date:* ${invoice.date}

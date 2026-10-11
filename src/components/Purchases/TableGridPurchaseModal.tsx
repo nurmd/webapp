@@ -77,6 +77,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     setSuppliers((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
     setSelectedSupplier(newParty);
     setSupplierStateCode(newParty.stateCode);
+    if (newParty.isComposition) {
+      setItcEligibility('INELIGIBLE_OTHERS');
+    }
     setIsAddPartyModalOpen(false);
     setIsPartyModalOpen(false);
     onPartyCreated?.(newParty);
@@ -602,6 +605,29 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
           />
 
+          {/* Composition Dealer Warning Alert Banner */}
+          {selectedSupplier?.isComposition && (
+            <div
+              data-testid="purchase-composition-warning-banner"
+              className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between gap-2"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[18px] text-amber-600 dark:text-amber-400 flex-shrink-0">
+                  warning
+                </span>
+                <div className="min-w-0">
+                  <span className="font-bold block">Composition Dealer — ITC Ineligible</span>
+                  <span className="text-[11px] block text-on-surface-variant truncate">
+                    {selectedSupplier.name} is registered under the GST Composition Scheme. Inward supplies from composition dealers cannot claim Input Tax Credit (ITC).
+                  </span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30 shrink-0">
+                ITC Blocked
+              </span>
+            </div>
+          )}
+
           <PurchaseLineItemsGrid
             rows={rows}
             calcItems={calcSummary.items}
@@ -662,6 +688,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
           onSelectParty={(p) => {
             setSelectedSupplier(p);
             setSupplierStateCode(p.stateCode);
+            if (p.isComposition) {
+              setItcEligibility('INELIGIBLE_OTHERS');
+            }
             setIsPartyModalOpen(false);
           }}
           onClose={() => setIsPartyModalOpen(false)}
