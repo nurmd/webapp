@@ -163,10 +163,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           ? (taxableAmount * gstRate) / 100
           : 0;
 
+      const utgstAmount =
+        line.utgstAmount !== undefined && line.utgstAmount !== null
+          ? Number(line.utgstAmount)
+          : 0;
+
       const totalAmount =
         line.totalAmount !== undefined && line.totalAmount !== null
           ? Number(line.totalAmount)
-          : taxableAmount + cgstAmount + sgstAmount + igstAmount;
+          : taxableAmount + cgstAmount + sgstAmount + utgstAmount + igstAmount;
 
       return {
         id: line.id || line.itemId || `line-${idx}`,
@@ -181,6 +186,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         gstRate,
         cgstAmount,
         sgstAmount,
+        utgstAmount,
         igstAmount,
         totalAmount,
       };
@@ -251,6 +257,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return isGst ? (invoice.totalSgst || itemsList.reduce((s, i) => s + i.sgstAmount, 0)) : 0;
   }, [isGst, invoice.totalSgst, itemsList]);
 
+  const totalUtgst = useMemo(() => {
+    return isGst ? (invoice.totalUtgst || itemsList.reduce((s, i) => s + (i.utgstAmount || 0), 0)) : 0;
+  }, [isGst, invoice.totalUtgst, itemsList]);
+
   const totalIgst = useMemo(() => {
     return isGst ? (invoice.totalIgst || itemsList.reduce((s, i) => s + i.igstAmount, 0)) : 0;
   }, [isGst, invoice.totalIgst, itemsList]);
@@ -258,7 +268,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const resolvedGrandTotal =
     invoice.grandTotal || itemsList.reduce((sum, item) => sum + item.totalAmount, 0);
   const resolvedTotalTax =
-    invoice.totalTax || totalCgst + totalSgst + totalIgst;
+    invoice.totalTax || totalCgst + totalSgst + totalUtgst + totalIgst;
 
   const wordsTotal = invoice.amountInWords || amountInWords(resolvedGrandTotal);
   const wordsTax = amountInWords(resolvedTotalTax);
@@ -285,7 +295,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       taxableAmount: totalTaxable,
       totalDiscount: invoice.totalDiscount,
       cgstAmount: totalCgst,
-      sgstAmount: totalSgst,
+      sgstAmount: totalUtgst > 0 ? totalUtgst : totalSgst,
       igstAmount: totalIgst,
       shippingAmount: invoice.shippingAmount,
       roundOff: invoice.roundOff,
@@ -531,12 +541,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                   )}
 
-                  {totalSgst > 0 && (
+                  {totalUtgst > 0 ? (
+                    <div className="flex justify-between text-slate-600">
+                      <span>UTGST:</span>
+                      <span>₹{totalUtgst.toFixed(2)}</span>
+                    </div>
+                  ) : totalSgst > 0 ? (
                     <div className="flex justify-between text-slate-600">
                       <span>SGST:</span>
                       <span>₹{totalSgst.toFixed(2)}</span>
                     </div>
-                  )}
+                  ) : null}
 
                   {totalIgst > 0 && (
                     <div className="flex justify-between text-slate-600">
@@ -610,9 +625,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <div className="text-[10px] font-bold text-slate-700 uppercase tracking-tight text-left">
                   {isGst ? (
                     <>
-                      <span>Reverse Charge: <strong>NO</strong></span>
+                      <span>Reverse Charge: <strong>{invoice.isRcm ? 'YES' : 'NO'}</strong></span>
                       {invoice.isIntraState ? (
-                        <span className="block text-[9px] text-slate-500">Tax Payable: CGST + SGST</span>
+                        <span className="block text-[9px] text-slate-500">
+                          Tax Payable: {invoice.isUtgst || totalUtgst > 0 ? 'CGST + UTGST' : 'CGST + SGST'}
+                        </span>
                       ) : (
                         <span className="block text-[9px] text-slate-500">Tax Payable: IGST</span>
                       )}
@@ -953,18 +970,33 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                             {totalCgst.toFixed(2)}
                           </td>
                         </tr>
-                        <tr className="bg-slate-50/40">
-                          <td className="border-r border-slate-300"></td>
-                          <td
-                            colSpan={isGst ? 8 : 6}
-                            className="py-1.5 px-3 font-bold text-slate-800 border-r border-slate-300 text-right"
-                          >
-                            State GST (SGST) Output
-                          </td>
-                          <td className="py-1.5 px-3 text-right font-bold text-slate-900 font-tabular-data">
-                            {totalSgst.toFixed(2)}
-                          </td>
-                        </tr>
+                        {totalUtgst > 0 ? (
+                          <tr className="bg-slate-50/40">
+                            <td className="border-r border-slate-300"></td>
+                            <td
+                              colSpan={isGst ? 8 : 6}
+                              className="py-1.5 px-3 font-bold text-slate-800 border-r border-slate-300 text-right"
+                            >
+                              Union Territory GST (UTGST) Output
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-bold text-slate-900 font-tabular-data">
+                              {totalUtgst.toFixed(2)}
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr className="bg-slate-50/40">
+                            <td className="border-r border-slate-300"></td>
+                            <td
+                              colSpan={isGst ? 8 : 6}
+                              className="py-1.5 px-3 font-bold text-slate-800 border-r border-slate-300 text-right"
+                            >
+                              State GST (SGST) Output
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-bold text-slate-900 font-tabular-data">
+                              {totalSgst.toFixed(2)}
+                            </td>
+                          </tr>
+                        )}
                       </>
                     )}
 

@@ -4,6 +4,8 @@ export interface GstTaxBreakdown {
   cgstAmount: number;
   sgstRate: number;
   sgstAmount: number;
+  utgstRate?: number;
+  utgstAmount?: number;
   igstRate: number;
   igstAmount: number;
   cessRate: number;
@@ -14,6 +16,24 @@ export interface GstTaxBreakdown {
 
 export const STATUTORY_GST_RATES = [0, 0.1, 0.25, 3, 5, 12, 18, 28] as const;
 export type StatutoryGstRate = (typeof STATUTORY_GST_RATES)[number];
+
+export const UTGST_STATE_CODES: ReadonlySet<string> = new Set<string>([
+  '04', // Chandigarh
+  '25', // Daman and Diu (legacy)
+  '26', // Dadra and Nagar Haveli and Daman and Diu
+  '31', // Lakshadweep
+  '34', // Puducherry
+  '35', // Andaman and Nicobar Islands
+  '38', // Ladakh
+  '97', // Other Territory
+]);
+
+export function isUtgstState(stateCode?: string): boolean {
+  if (!stateCode) return false;
+  const trimmed = stateCode.trim();
+  const normalized = trimmed.length === 1 ? trimmed.padStart(2, '0') : trimmed;
+  return UTGST_STATE_CODES.has(normalized);
+}
 
 export interface InvoiceItemCalculationInput {
   quantity: number;
@@ -37,6 +57,8 @@ export interface InvoiceCalculationSummary {
   totalTaxableAmount: number;
   totalCgst: number;
   totalSgst: number;
+  totalUtgst?: number;
+  isUtgst?: boolean;
   totalIgst: number;
   totalCess: number;
   totalTax: number;
@@ -54,17 +76,20 @@ export interface InvoiceCalculationSummary {
  * 2. Applies flat discount amount or percentage discount.
  * 3. Taxable Amount = Gross Amount - Discount Amount.
  * 4. Tax bifurcation:
- *    - Intra-State (Same State): CGST (50% of GST rate) + SGST (50% of GST rate).
- *    - Inter-State (Different State): IGST (100% of GST rate).
+ *    - Intra-State (Non-UT State): CGST (50% of GST rate) + SGST (50% of GST rate).
+ *    - Intra-State (Union Territory): CGST (50% of GST rate) + UTGST (50% of GST rate), SGST = 0.
+ *    - Inter-State (Different State/UT): IGST (100% of GST rate).
  * 5. Applies Compensation Cess (percentage of taxable value and/or fixed per-unit cess).
  * 
  * @param input - Item input details including quantity, unit price, discounts, and GST/Cess rates.
  * @param isIntraState - True if Supplier State matches Recipient Place of Supply (POS).
- * @returns Fully calculated item with breakdown of CGST, SGST, IGST, Cess, total tax, and total amount.
+ * @param isUtOrPos - Boolean indicating UT supply or state code string (e.g. '04', '35').
+ * @returns Fully calculated item with breakdown of CGST, SGST/UTGST, IGST, Cess, total tax, and total amount.
  */
 export function calculateItemGst(
   input: InvoiceItemCalculationInput,
-  isIntraState: boolean
+  isIntraState: boolean,
+  isUtOrPos: boolean | string = false
 ): CalculatedItem {
   const grossAmount = Number((input.quantity * input.unitPrice).toFixed(2));
 
@@ -76,19 +101,33 @@ export function calculateItemGst(
   }
 
   const taxableAmount = Math.max(0, Number((grossAmount - discount).toFixed(2)));
+  const isUt = typeof isUtOrPos === 'string' ? isUtgstState(isUtOrPos) : Boolean(isUtOrPos);
 
   let cgstRate = 0;
   let cgstAmount = 0;
   let sgstRate = 0;
   let sgstAmount = 0;
+  let utgstRate = 0;
+  let utgstAmount = 0;
   let igstRate = 0;
   let igstAmount = 0;
 
   if (isIntraState) {
-    cgstRate = input.gstRate / 2;
-    sgstRate = input.gstRate / 2;
-    cgstAmount = Number(((taxableAmount * cgstRate) / 100).toFixed(2));
-    sgstAmount = Number(((taxableAmount * sgstRate) / 100).toFixed(2));
+    if (isUt) {
+      cgstRate = input.gstRate / 2;
+      utgstRate = input.gstRate / 2;
+      sgstRate = 0;
+      cgstAmount = Number(((taxableAmount * cgstRate) / 100).toFixed(2));
+      utgstAmount = Number(((taxableAmount * utgstRate) / 100).toFixed(2));
+      sgstAmount = 0;
+    } else {
+      cgstRate = input.gstRate / 2;
+      sgstRate = input.gstRate / 2;
+      utgstRate = 0;
+      cgstAmount = Number(((taxableAmount * cgstRate) / 100).toFixed(2));
+      sgstAmount = Number(((taxableAmount * sgstRate) / 100).toFixed(2));
+      utgstAmount = 0;
+    }
   } else {
     igstRate = input.gstRate;
     igstAmount = Number(((taxableAmount * igstRate) / 100).toFixed(2));
@@ -98,7 +137,7 @@ export function calculateItemGst(
   const cessPerUnit = input.cessPerUnit || 0;
   const cessAmount = Number((((taxableAmount * cessPercent) / 100) + (input.quantity * cessPerUnit)).toFixed(2));
 
-  const totalTax = Number((cgstAmount + sgstAmount + igstAmount + cessAmount).toFixed(2));
+  const totalTax = Number((cgstAmount + sgstAmount + utgstAmount + igstAmount + cessAmount).toFixed(2));
   const totalAmount = Number((taxableAmount + totalTax).toFixed(2));
 
   return {
@@ -109,6 +148,8 @@ export function calculateItemGst(
     cgstAmount,
     sgstRate,
     sgstAmount,
+    utgstRate,
+    utgstAmount,
     igstRate,
     igstAmount,
     cessRate: cessPercent,
@@ -123,9 +164,10 @@ export function calculateItemGst(
  * 
  * Rules:
  * 1. Automatically determines Intra vs Inter-State supply based on 2-digit GST state codes.
- * 2. Maps every item through `calculateItemGst`.
- * 3. Aggregates gross, discounts, taxable value, CGST, SGST, IGST, and cess.
- * 4. Applies mathematical rounding to the nearest Indian Rupee (₹), computing explicit roundOff delta.
+ * 2. Recognizes Union Territory intra-supplies and splits tax into CGST + UTGST.
+ * 3. Maps every item through `calculateItemGst`.
+ * 4. Aggregates gross, discounts, taxable value, CGST, SGST, UTGST, IGST, and cess.
+ * 5. Applies mathematical rounding to the nearest Indian Rupee (₹), computing explicit roundOff delta.
  * 
  * @param supplierStateCode - Two-digit GST state code of supplier (e.g. '27' for Maharashtra).
  * @param placeOfSupplyStateCode - Two-digit GST state code of recipient POS (e.g. '24' for Gujarat).
@@ -138,14 +180,16 @@ export function calculateInvoice(
   items: InvoiceItemCalculationInput[]
 ): InvoiceCalculationSummary {
   const isIntraState = supplierStateCode === placeOfSupplyStateCode;
+  const isUt = isIntraState && isUtgstState(placeOfSupplyStateCode);
 
-  const calculatedItems = items.map((item) => calculateItemGst(item, isIntraState));
+  const calculatedItems = items.map((item) => calculateItemGst(item, isIntraState, isUt));
 
   let totalGrossAmount = 0;
   let totalDiscount = 0;
   let totalTaxableAmount = 0;
   let totalCgst = 0;
   let totalSgst = 0;
+  let totalUtgst = 0;
   let totalIgst = 0;
   let totalCess = 0;
 
@@ -155,6 +199,7 @@ export function calculateInvoice(
     totalTaxableAmount += item.taxableAmount;
     totalCgst += item.cgstAmount;
     totalSgst += item.sgstAmount;
+    totalUtgst += item.utgstAmount || 0;
     totalIgst += item.igstAmount;
     totalCess += item.cessAmount;
   }
@@ -164,10 +209,11 @@ export function calculateInvoice(
   totalTaxableAmount = Number(totalTaxableAmount.toFixed(2));
   totalCgst = Number(totalCgst.toFixed(2));
   totalSgst = Number(totalSgst.toFixed(2));
+  totalUtgst = Number(totalUtgst.toFixed(2));
   totalIgst = Number(totalIgst.toFixed(2));
   totalCess = Number(totalCess.toFixed(2));
 
-  const totalTax = Number((totalCgst + totalSgst + totalIgst + totalCess).toFixed(2));
+  const totalTax = Number((totalCgst + totalSgst + totalUtgst + totalIgst + totalCess).toFixed(2));
   const netAmount = Number((totalTaxableAmount + totalTax).toFixed(2));
 
   // Mathematical rounding to nearest rupee
@@ -181,6 +227,8 @@ export function calculateInvoice(
     totalTaxableAmount,
     totalCgst,
     totalSgst,
+    totalUtgst,
+    isUtgst: totalUtgst > 0,
     totalIgst,
     totalCess,
     totalTax,
@@ -190,3 +238,6 @@ export function calculateInvoice(
     isIntraState,
   };
 }
+
+export const calculateInvoiceTotals = calculateInvoice;
+

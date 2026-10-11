@@ -28,6 +28,7 @@ export interface PurchaseItemEntry {
   gstRate: number;
   cgstAmount: number;
   sgstAmount: number;
+  utgstAmount?: number;
   igstAmount: number;
   cessRate?: number;
   cessAmount: number;
@@ -58,6 +59,8 @@ export interface PurchaseBill {
   totalTaxableAmount: number;
   totalCgst: number;
   totalSgst: number;
+  totalUtgst?: number;
+  isUtgst?: boolean;
   totalIgst: number;
   totalCess: number;
   totalTax: number;

@@ -150,7 +150,7 @@ export function generateEInvoiceJson(
     const rate = it.gstRate;
 
     const cgst = isIntra ? Math.round(it.cgstAmount * 100) / 100 : 0;
-    const sgst = isIntra ? Math.round(it.sgstAmount * 100) / 100 : 0;
+    const sgst = isIntra ? Math.round(((it.sgstAmount || 0) + (it.utgstAmount || 0)) * 100) / 100 : 0;
     const igst = !isIntra ? Math.round(it.igstAmount * 100) / 100 : 0;
     const cess = Math.round((it.cessAmount || 0) * 100) / 100;
 
@@ -221,7 +221,7 @@ export function generateEInvoiceJson(
     ValDtls: {
       AssVal: Math.round(invoice.totalTaxableAmount * 100) / 100,
       CgstVal: Math.round(invoice.totalCgst * 100) / 100,
-      SgstVal: Math.round(invoice.totalSgst * 100) / 100,
+      SgstVal: Math.round(((invoice.totalSgst || 0) + (invoice.totalUtgst || 0)) * 100) / 100,
       IgstVal: Math.round(invoice.totalIgst * 100) / 100,
       CesVal: Math.round(invoice.totalCess * 100) / 100,
       StCesVal: 0,

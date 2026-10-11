@@ -553,7 +553,8 @@ export function validateGstrPeriodData(
             remediation: 'Bifurcate tax into CGST and SGST',
           });
         }
-        if (Math.abs((inv.totalCgst || 0) - (inv.totalSgst || 0)) > 0.05) {
+        const stateOrUtTax = (inv.totalSgst || 0) + (inv.totalUtgst || 0);
+        if (Math.abs((inv.totalCgst || 0) - stateOrUtTax) > 0.05) {
           errors.push({
             id: `ERR_TAX_ASYM_${inv.id || docNum}`,
             documentType: docType,
@@ -567,7 +568,7 @@ export function validateGstrPeriodData(
         }
       } else {
         // Inter-state
-        if ((inv.totalCgst || 0) > 0 || (inv.totalSgst || 0) > 0) {
+        if ((inv.totalCgst || 0) > 0 || (inv.totalSgst || 0) > 0 || (inv.totalUtgst || 0) > 0) {
           errors.push({
             id: `ERR_TAX_BIF_${inv.id || docNum}`,
             documentType: docType,
@@ -643,7 +644,8 @@ export function validateGstrPeriodData(
           remediation: 'Split tax into CGST and SGST for intra-state purchases.',
         });
       }
-      if (Math.abs((pur.totalCgst || 0) - (pur.totalSgst || 0)) > 0.05) {
+      const purStateOrUt = (pur.totalSgst || 0) + (pur.totalUtgst || 0);
+      if (Math.abs((pur.totalCgst || 0) - purStateOrUt) > 0.05) {
         errors.push({
           id: `ERR_PUR_TAX_ASYM_${pur.id || purDocNum}`,
           documentType: 'PURCHASE',
@@ -656,7 +658,7 @@ export function validateGstrPeriodData(
         });
       }
     } else {
-      if ((pur.totalCgst || 0) > 0 || (pur.totalSgst || 0) > 0) {
+      if ((pur.totalCgst || 0) > 0 || (pur.totalSgst || 0) > 0 || (pur.totalUtgst || 0) > 0) {
         errors.push({
           id: `ERR_PUR_TAX_BIF_${pur.id || purDocNum}`,
           documentType: 'PURCHASE',
@@ -745,11 +747,12 @@ export function validateSingleInvoice(
       if ((invoice.totalIgst || 0) > 0) {
         errors.push(`Intra-state supply (POS ${pos}) cannot charge IGST.`);
       }
-      if (Math.abs((invoice.totalCgst || 0) - (invoice.totalSgst || 0)) > 0.05) {
+      const stateOrUtTax = (invoice.totalSgst || 0) + (invoice.totalUtgst || 0);
+      if (Math.abs((invoice.totalCgst || 0) - stateOrUtTax) > 0.05) {
         errors.push('Intra-state CGST and SGST amounts must be equal.');
       }
     } else {
-      if ((invoice.totalCgst || 0) > 0 || (invoice.totalSgst || 0) > 0) {
+      if ((invoice.totalCgst || 0) > 0 || (invoice.totalSgst || 0) > 0 || (invoice.totalUtgst || 0) > 0) {
         errors.push(`Inter-state supply (POS ${pos}) must charge IGST instead of CGST/SGST.`);
       }
     }

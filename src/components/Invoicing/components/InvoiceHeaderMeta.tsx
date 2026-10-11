@@ -1,6 +1,6 @@
 import React from 'react';
 import { Party } from '../../../models/party.ts';
-import { Invoice } from '../../../models/invoice.ts';
+import { Invoice, InvoiceType } from '../../../models/invoice.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { suggestNextUniqueInvoiceNumber } from '../../../core/utils/invoiceNumber.ts';
 
@@ -23,6 +23,14 @@ export interface InvoiceHeaderMetaProps {
   onOpenInvoiceNumberModal: () => void;
   onOpenDueDateModal: () => void;
   onAutoFixConflict: (newNumber: string) => void;
+
+  // New optional props for P2-C and P2-D
+  invoiceType?: InvoiceType;
+  autoDetectedInvoiceType?: InvoiceType;
+  isManualTypeOverride?: boolean;
+  onInvoiceTypeChange?: (type: InvoiceType | null) => void;
+  isRcm?: boolean;
+  onRcmChange?: (isRcm: boolean) => void;
 }
 
 function formatDateDisplay(dateStr: string): string {
@@ -54,6 +62,12 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   onOpenInvoiceNumberModal,
   onOpenDueDateModal,
   onAutoFixConflict,
+  invoiceType,
+  autoDetectedInvoiceType,
+  isManualTypeOverride,
+  onInvoiceTypeChange,
+  isRcm,
+  onRcmChange,
 }) => {
   return (
     <>
@@ -222,6 +236,67 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
               <span>GST</span>
               <span className="text-[10px] font-mono opacity-80">({posStateCode})</span>
             </div>
+          )}
+
+          {/* Invoice Type Selector Dropdown */}
+          {onInvoiceTypeChange && (
+            <div className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors border border-outline-variant/20">
+              <span className="text-[9px] uppercase font-bold text-outline">Type:</span>
+              <select
+                aria-label="Invoice Type"
+                value={isManualTypeOverride ? (invoiceType || '') : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onInvoiceTypeChange(val ? (val as InvoiceType) : null);
+                }}
+                className="bg-transparent font-bold text-xs text-on-surface outline-none cursor-pointer"
+                title="Invoice classification under GST"
+              >
+                <option value="" className="bg-surface text-on-surface">
+                  Auto ({autoDetectedInvoiceType || 'B2CS'})
+                </option>
+                <option value="B2B" className="bg-surface text-on-surface">Regular / B2B</option>
+                <option value="B2CS" className="bg-surface text-on-surface">B2C Small</option>
+                <option value="B2CL" className="bg-surface text-on-surface">B2C Large (&gt; ₹2.5L)</option>
+                <option value="EXPORT" className="bg-surface text-on-surface">Export</option>
+                <option value="SEZ" className="bg-surface text-on-surface">SEZ Supply</option>
+                <option value="CREDIT_NOTE" className="bg-surface text-on-surface">Credit Note</option>
+                <option value="DEBIT_NOTE" className="bg-surface text-on-surface">Debit Note</option>
+              </select>
+              {isManualTypeOverride && (
+                <span className="text-[9px] font-bold text-secondary uppercase bg-secondary/10 px-1 py-0.5 rounded">
+                  Manual
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* RCM (Reverse Charge Mechanism) Toggle */}
+          {isGstActive && onRcmChange && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(isRcm)}
+              onClick={() => onRcmChange(!isRcm)}
+              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+                isRcm
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40 shadow-2xs'
+                  : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/20'
+              }`}
+              title={
+                isRcm
+                  ? 'Reverse Charge Mechanism is ACTIVE: Tax payable by recipient under Sec 9(3)/9(4)'
+                  : 'Reverse Charge Mechanism is INACTIVE (Forward Charge)'
+              }
+            >
+              <span className="text-[9px] uppercase font-bold text-outline">RCM</span>
+              <span
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  isRcm ? 'bg-amber-500 shadow-xs' : 'bg-outline-variant/60'
+                }`}
+              />
+              <span className="text-[10px] font-bold">{isRcm ? 'YES' : 'NO'}</span>
+            </button>
           )}
         </div>
       </div>

@@ -5,6 +5,7 @@ export type InvoiceType =
   | 'B2CS'          // B2C Small (Inter-state <= 2.5 Lakhs or Intra-state any amount)
   | 'B2CL'          // B2C Large (Inter-state invoice > 2.5 Lakhs to unregistered)
   | 'EXPORT'        // Export with or without IGST payment
+  | 'SEZ'           // Special Economic Zone supply
   | 'ESTIMATE'      // Non-tax quotation / estimate
   | 'DELIVERY_CHALLAN'
   | 'CREDIT_NOTE'   // Credit note issued to customer (GSTR-1 Table 9B CDNR/CDNUR)
@@ -37,6 +38,7 @@ export interface InvoiceItemEntry {
   gstRate: number;
   cgstAmount: number;
   sgstAmount: number;
+  utgstAmount?: number;
   igstAmount: number;
   cessRate?: number;                  // Optional Cess rate percentage
   cessAmount: number;
@@ -69,6 +71,8 @@ export interface Invoice {
   totalTaxableAmount: number;
   totalCgst: number;
   totalSgst: number;
+  totalUtgst?: number;
+  isUtgst?: boolean;
   totalIgst: number;
   totalCess: number;
   totalTax: number;

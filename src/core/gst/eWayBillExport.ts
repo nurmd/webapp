@@ -169,7 +169,7 @@ export function generateEWayBillJson(
     toStateCode: toStateCodeNum,
     totalValue: Math.round(invoice.totalTaxableAmount * 100) / 100,
     cgstValue: Math.round(invoice.totalCgst * 100) / 100,
-    sgstValue: Math.round(invoice.totalSgst * 100) / 100,
+    sgstValue: Math.round(((invoice.totalSgst || 0) + (invoice.totalUtgst || 0)) * 100) / 100,
     igstValue: Math.round(invoice.totalIgst * 100) / 100,
     cessValue: Math.round(invoice.totalCess * 100) / 100,
     totInvValue: Math.round(invoice.grandTotal * 100) / 100,

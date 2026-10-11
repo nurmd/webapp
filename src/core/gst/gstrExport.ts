@@ -197,7 +197,7 @@ export function generateGstr1Json(
   });
 
   // Statutory Document Filtering
-  const b2bInvoices = periodInvoices.filter((i) => !i.isCancelled && i.invoiceType === 'B2B' && i.partyGstin);
+  const b2bInvoices = periodInvoices.filter((i) => !i.isCancelled && (i.invoiceType === 'B2B' || i.invoiceType === 'SEZ') && i.partyGstin);
 
   // Table 5 B2CL: Inter-state unregistered invoices where grandTotal strictly exceeds ₹2,50,000.00
   const b2clInvoices = periodInvoices.filter(
@@ -206,6 +206,7 @@ export function generateGstr1Json(
       (i.invoiceType === 'B2CL' ||
         (!i.partyGstin &&
           i.invoiceType !== 'EXPORT' &&
+          i.invoiceType !== 'SEZ' &&
           i.invoiceType !== 'CREDIT_NOTE' &&
           i.invoiceType !== 'DEBIT_NOTE' &&
           !i.isIntraState &&
@@ -219,6 +220,7 @@ export function generateGstr1Json(
       (i.invoiceType === 'B2CS' ||
         (!i.partyGstin &&
           i.invoiceType !== 'EXPORT' &&
+          i.invoiceType !== 'SEZ' &&
           i.invoiceType !== 'CREDIT_NOTE' &&
           i.invoiceType !== 'DEBIT_NOTE' &&
           (i.isIntraState || i.grandTotal <= 250000)))
@@ -247,7 +249,7 @@ export function generateGstr1Json(
         txval: Math.round(item.taxableAmount * 100) / 100,
         iamt: Math.round(item.igstAmount * 100) / 100,
         camt: Math.round(item.cgstAmount * 100) / 100,
-        samt: Math.round(item.sgstAmount * 100) / 100,
+        samt: Math.round(((item.sgstAmount || 0) + (item.utgstAmount || 0)) * 100) / 100,
         csamt: Math.round((item.cessAmount || 0) * 100) / 100,
       },
     }));
@@ -258,7 +260,7 @@ export function generateGstr1Json(
       val: Math.round(inv.grandTotal * 100) / 100,
       pos: inv.placeOfSupplyStateCode || company.stateCode,
       rchrg: inv.isRcm ? 'Y' : 'N',
-      inv_typ: 'R',
+      inv_typ: inv.invoiceType === 'SEZ' ? 'SEWP' : 'R',
       itms,
     });
   });
@@ -317,7 +319,7 @@ export function generateGstr1Json(
       b2csMap[key].txval += item.taxableAmount;
       b2csMap[key].iamt += item.igstAmount;
       b2csMap[key].camt += item.cgstAmount;
-      b2csMap[key].samt += item.sgstAmount;
+      b2csMap[key].samt += (item.sgstAmount || 0) + (item.utgstAmount || 0);
       b2csMap[key].csamt += item.cessAmount || 0;
     });
   });
@@ -334,7 +336,7 @@ export function generateGstr1Json(
           b2csMap[key].txval += factor * item.taxableAmount;
           b2csMap[key].iamt += factor * item.igstAmount;
           b2csMap[key].camt += factor * item.cgstAmount;
-          b2csMap[key].samt += factor * item.sgstAmount;
+          b2csMap[key].samt += factor * ((item.sgstAmount || 0) + (item.utgstAmount || 0));
           b2csMap[key].csamt += factor * (item.cessAmount || 0);
         }
       });
@@ -377,7 +379,7 @@ export function generateGstr1Json(
             txval: Math.round(it.taxableAmount * 100) / 100,
             iamt: Math.round(it.igstAmount * 100) / 100,
             camt: Math.round(it.cgstAmount * 100) / 100,
-            samt: Math.round(it.sgstAmount * 100) / 100,
+            samt: Math.round(((it.sgstAmount || 0) + (it.utgstAmount || 0)) * 100) / 100,
             csamt: Math.round((it.cessAmount || 0) * 100) / 100,
           },
         })),
@@ -469,7 +471,7 @@ export function generateGstr1Json(
       hsnMap[key].txval += factor * item.taxableAmount;
       hsnMap[key].iamt += factor * item.igstAmount;
       hsnMap[key].camt += factor * item.cgstAmount;
-      hsnMap[key].samt += factor * item.sgstAmount;
+      hsnMap[key].samt += factor * ((item.sgstAmount || 0) + (item.utgstAmount || 0));
       hsnMap[key].csamt += factor * (item.cessAmount || 0);
     });
   });

@@ -7,6 +7,7 @@ export interface DocumentTotalsSummaryProps {
   totalTax: number;
   totalCgst: number;
   totalSgst: number;
+  totalUtgst?: number;
   totalIgst: number;
   totalTaxableAmount: number;
   isIntraState: boolean;
@@ -31,6 +32,7 @@ export const DocumentTotalsSummary: React.FC<DocumentTotalsSummaryProps> = ({
   totalTax,
   totalCgst,
   totalSgst,
+  totalUtgst,
   totalIgst,
   totalTaxableAmount,
   isIntraState,
@@ -82,7 +84,13 @@ export const DocumentTotalsSummary: React.FC<DocumentTotalsSummaryProps> = ({
                 onClick={onToggleTaxDetails}
                 className="flex items-center gap-1 text-left hover:text-on-surface cursor-pointer"
               >
-                <span>{isIntraState ? 'Taxes (CGST + SGST)' : 'Taxes (IGST)'}</span>
+                <span>
+                  {isIntraState
+                    ? (totalUtgst && totalUtgst > 0)
+                      ? 'Taxes (CGST + UTGST)'
+                      : 'Taxes (CGST + SGST)'
+                    : 'Taxes (IGST)'}
+                </span>
                 <span className="material-symbols-outlined text-[13px] text-outline">info</span>
               </button>
               <span className="font-tabular-data font-semibold text-on-surface">
@@ -98,10 +106,17 @@ export const DocumentTotalsSummary: React.FC<DocumentTotalsSummaryProps> = ({
                       <span>Central GST (CGST)</span>
                       <span className="font-tabular-data font-bold">{formatINR(totalCgst)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-on-surface-variant">
-                      <span>State GST (SGST)</span>
-                      <span className="font-tabular-data font-bold">{formatINR(totalSgst)}</span>
-                    </div>
+                    {totalUtgst && totalUtgst > 0 ? (
+                      <div className="flex items-center justify-between text-on-surface-variant">
+                        <span>Union Territory GST (UTGST)</span>
+                        <span className="font-tabular-data font-bold">{formatINR(totalUtgst)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between text-on-surface-variant">
+                        <span>State GST (SGST)</span>
+                        <span className="font-tabular-data font-bold">{formatINR(totalSgst)}</span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="flex items-center justify-between text-on-surface-variant">

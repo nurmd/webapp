@@ -444,6 +444,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         gstRate: isGstActive ? (r.gstRate || 0) : 0,
         cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
         sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
+        utgstAmount: isGstActive ? (calcItem?.utgstAmount || 0) : 0,
         igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
         cessAmount: 0,
         totalAmount: calcItem?.totalAmount || (r.quantity * r.unitPrice * (1 - (r.discountPercent || 0) / 100)),
@@ -487,6 +488,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       totalTaxableAmount: calcSummary.totalTaxableAmount,
       totalCgst: isGstActive ? calcSummary.totalCgst : 0,
       totalSgst: isGstActive ? calcSummary.totalSgst : 0,
+      totalUtgst: isGstActive ? (calcSummary.totalUtgst || 0) : 0,
+      isUtgst: isGstActive ? Boolean(calcSummary.isUtgst) : false,
       totalIgst: isGstActive ? calcSummary.totalIgst : 0,
       totalCess: 0,
       totalTax: isGstActive ? calcSummary.totalTax : 0,
@@ -615,6 +618,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             totalTax={calcSummary.totalTax}
             totalCgst={calcSummary.totalCgst}
             totalSgst={calcSummary.totalSgst}
+            totalUtgst={calcSummary.totalUtgst}
             totalIgst={calcSummary.totalIgst}
             totalTaxableAmount={calcSummary.totalTaxableAmount}
             isIntraState={calcSummary.isIntraState}

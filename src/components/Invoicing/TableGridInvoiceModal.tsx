@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
-import { Invoice, InvoiceItemEntry, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
+import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
@@ -160,6 +160,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const isGstActive = company.isGstEnabled !== false;
   const [posStateCode, setPosStateCode] = useState<string>(
     initialInvoice?.placeOfSupplyStateCode || selectedParty?.stateCode || company.stateCode
+  );
+
+  // Invoice Type manual override state (null defaults to auto-detected)
+  const [manualInvoiceType, setManualInvoiceType] = useState<InvoiceType | null>(
+    () => initialInvoice?.invoiceType || null
+  );
+
+  // Reverse Charge Mechanism (RCM) state
+  const [isRcm, setIsRcm] = useState<boolean>(
+    () => Boolean(initialInvoice?.isRcm)
   );
 
   // Overall Discount & Shipping
@@ -337,6 +347,19 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return Number((finalGrandTotal - preRound).toFixed(2));
   }, [calcSummary.netAmount, shippingAmount, finalGrandTotal]);
 
+  // Memoized auto-detected type: B2B if party has 15-char GSTIN, B2CL if inter-state unregistered > ₹2.5L, else B2CS
+  const autoDetectedInvoiceType = useMemo<InvoiceType>(() => {
+    if (!isGstActive) return 'B2CS';
+    const isB2B = Boolean(selectedParty?.gstin && selectedParty.gstin.trim().length === 15);
+    if (isB2B) return 'B2B';
+    if (!calcSummary.isIntraState && finalGrandTotal > 250000) {
+      return 'B2CL';
+    }
+    return 'B2CS';
+  }, [isGstActive, selectedParty?.gstin, calcSummary.isIntraState, finalGrandTotal]);
+
+  const effectiveInvoiceType = manualInvoiceType || autoDetectedInvoiceType;
+
   // Barcode scan handler
   const handleBarcodeScanned = (scannedCode: string) => {
     const code = scannedCode.trim().toLowerCase();
@@ -424,14 +447,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         gstRate: isGstActive ? (r.gstRate || 0) : 0,
         cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
         sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
+        utgstAmount: isGstActive ? (calcItem?.utgstAmount || 0) : 0,
         igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
         cessRate: isGstActive ? (Number(r.cessRate) || 0) : 0,
         cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
         totalAmount: calcItem?.totalAmount || 0,
       };
     });
-
-    const isB2B = Boolean(selectedParty?.gstin && selectedParty.gstin.length === 15);
 
     const hasPaymentOverride = paymentOverride !== undefined;
     const resolvedPaymentMode: PaymentMode = hasPaymentOverride
@@ -452,7 +474,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
       invoiceNumber: invoiceNumber.trim(),
-      invoiceType: isB2B && isGstActive ? 'B2B' : 'B2CS',
+      invoiceType: effectiveInvoiceType,
+      isRcm: isRcm,
       isGstInvoice: isGstActive,
       date: invoiceDate,
       dueDate: dueDate || undefined,
@@ -469,6 +492,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       totalTaxableAmount: calcSummary.totalTaxableAmount,
       totalCgst: isGstActive ? calcSummary.totalCgst : 0,
       totalSgst: isGstActive ? calcSummary.totalSgst : 0,
+      totalUtgst: isGstActive ? (calcSummary.totalUtgst || 0) : 0,
+      isUtgst: isGstActive ? Boolean(calcSummary.isUtgst) : false,
       totalIgst: isGstActive ? calcSummary.totalIgst : 0,
       totalCess: isGstActive ? calcSummary.totalCess : 0,
       totalTax: isGstActive ? calcSummary.totalTax : 0,
@@ -611,6 +636,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             currentConflict={currentConflict || null}
             invoiceConflictError={invoiceConflictError}
             allInvoices={allInvoices}
+            invoiceType={effectiveInvoiceType}
+            autoDetectedInvoiceType={autoDetectedInvoiceType}
+            isManualTypeOverride={Boolean(manualInvoiceType)}
+            onInvoiceTypeChange={(val) => setManualInvoiceType(val)}
+            isRcm={isRcm}
+            onRcmChange={setIsRcm}
             onSelectPartyClick={() => setIsPartyModalOpen(true)}
             onClearParty={() => setSelectedParty(null)}
             onAddPartyClick={() => setIsAddPartyModalOpen(true)}
@@ -637,6 +668,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             totalTax={calcSummary.totalTax}
             totalCgst={calcSummary.totalCgst}
             totalSgst={calcSummary.totalSgst}
+            totalUtgst={calcSummary.totalUtgst}
             totalIgst={calcSummary.totalIgst}
             totalTaxableAmount={calcSummary.totalTaxableAmount}
             isIntraState={calcSummary.isIntraState}
