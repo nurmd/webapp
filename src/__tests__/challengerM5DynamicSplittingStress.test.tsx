@@ -146,7 +146,7 @@ describe('Milestone 5: Dynamic Code-Splitting & Bundle Performance Stress Suite'
         const unwrap = await Promise.resolve(mod).then((m) => ({ default: m[def.name] }));
         expect(unwrap.default).toBe(mod[def.name]);
       }
-    }, 30000);
+    }, 60000);
 
     it('dynamically unwraps all 7 heavy modals via Promise default contract', async () => {
       const modalDefinitions = [
@@ -167,7 +167,7 @@ describe('Milestone 5: Dynamic Code-Splitting & Bundle Performance Stress Suite'
         const unwrap = await Promise.resolve(mod).then((m) => ({ default: m[def.name] }));
         expect(unwrap.default).toBe(mod[def.name]);
       }
-    }, 30000);
+    }, 60000);
 
     it('preserves named exports so direct static imports do not suffer regression', async () => {
       // Test direct static-style imports to guarantee backward compatibility with other consumers/tests

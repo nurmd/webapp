@@ -1037,6 +1037,12 @@ export function refComputeGstr3bSummary(
       sec17_5.cgst += pur.totalCgst;
       sec17_5.sgst += pur.totalSgst;
       sec17_5.cess += pur.totalCess;
+    } else if (pur.itcEligibility === 'INELIGIBLE_OTHERS') {
+      otherIneligible.taxable += pur.totalTaxableAmount;
+      otherIneligible.igst += pur.totalIgst;
+      otherIneligible.cgst += pur.totalCgst;
+      otherIneligible.sgst += pur.totalSgst;
+      otherIneligible.cess += pur.totalCess;
     } else if (pur.isRcm) {
       rcmItc.taxable += pur.totalTaxableAmount;
       rcmItc.igst += pur.totalIgst;
@@ -1065,6 +1071,9 @@ export function refComputeGstr3bSummary(
     if (exp.itcEligibility === 'INELIGIBLE_17_5') {
       sec17_5.cgst += exp.taxAmount / 2;
       sec17_5.sgst += exp.taxAmount / 2;
+    } else if (exp.itcEligibility === 'INELIGIBLE_OTHERS') {
+      otherIneligible.cgst += exp.taxAmount / 2;
+      otherIneligible.sgst += exp.taxAmount / 2;
     }
   }
 

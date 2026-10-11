@@ -87,7 +87,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
               GSTIN: <strong className="font-mono text-on-surface">{bill.supplierGstin || 'Unregistered'}</strong>
             </span>
             <span>
-              ITC: <strong className="text-on-surface">{bill.itcEligibility === 'INELIGIBLE_17_5' ? 'Blocked' : 'Eligible'}</strong>
+              ITC: <strong className="text-on-surface">{bill.itcEligibility === 'INELIGIBLE_17_5' || bill.itcEligibility === 'INELIGIBLE_OTHERS' ? 'Blocked' : 'Eligible'}</strong>
             </span>
           </div>
         )}

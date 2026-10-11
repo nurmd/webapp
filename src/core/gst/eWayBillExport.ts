@@ -1,5 +1,6 @@
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
+import { GST_STATES } from './stateCodes.ts';
 
 export interface EWayBillJsonItem {
   itemNo: number;
@@ -103,6 +104,150 @@ export function extractLocation(addressStr?: string, defaultLoc: string = 'City'
   return defaultLoc;
 }
 
+/**
+ * Maps postal PIN code prefix to 2-digit Indian GST State Code (as integer).
+ * Follows India Post Postal Circles and statutory GST state codes.
+ */
+export function getStateCodeFromPincode(pincode?: number | string): number | undefined {
+  if (!pincode) return undefined;
+  const pinStr = String(pincode).replace(/\D/g, '');
+  if (pinStr.length < 2) return undefined;
+
+  // Specific 3-digit sub-circle overrides
+  if (pinStr.length >= 3) {
+    const p3 = parseInt(pinStr.substring(0, 3), 10);
+    if (p3 === 403) return 30; // Goa (403xxx)
+    if (p3 === 605) return 34; // Puducherry (605xxx)
+    if (p3 === 744) return 35; // Andaman & Nicobar (744xxx)
+    if (p3 === 682) return 31; // Lakshadweep (682xxx - Kavaratti / islands)
+    if (p3 === 737) return 11; // Sikkim (737xxx)
+    if (p3 === 194) return 38; // Ladakh (194xxx)
+    if (p3 === 396) return 26; // Dadra & Nagar Haveli and Daman & Diu (396210 / 396193)
+    if ([246, 247, 248, 249, 262, 263].includes(p3)) return 5; // Uttarakhand (Dehradun 248, Haridwar 249, Nainital 263)
+    if ([790, 791, 792].includes(p3)) return 12; // Arunachal Pradesh
+    if ([793, 794].includes(p3)) return 17; // Meghalaya
+    if (p3 === 795) return 14; // Manipur
+    if (p3 === 796) return 15; // Mizoram
+    if ([797, 798].includes(p3)) return 13; // Nagaland
+    if (p3 === 799) return 16; // Tripura
+    if ((p3 >= 814 && p3 <= 816) || (p3 >= 825 && p3 <= 835)) return 20; // Jharkhand
+  }
+
+  // 2-digit circle mappings
+  const p2 = parseInt(pinStr.substring(0, 2), 10);
+  switch (p2) {
+    case 11:
+      return 7; // Delhi
+    case 12:
+    case 13:
+      return 6; // Haryana
+    case 14:
+    case 15:
+      return 3; // Punjab
+    case 16:
+      return 4; // Chandigarh
+    case 17:
+      return 2; // Himachal Pradesh
+    case 18:
+    case 19:
+      return 1; // Jammu and Kashmir
+    case 20:
+    case 21:
+    case 22:
+    case 23:
+    case 24:
+    case 25:
+    case 26:
+    case 27:
+    case 28:
+      return 9; // Uttar Pradesh
+    case 30:
+    case 31:
+    case 32:
+    case 33:
+    case 34:
+      return 8; // Rajasthan
+    case 36:
+    case 37:
+    case 38:
+    case 39:
+      return 24; // Gujarat
+    case 40:
+    case 41:
+    case 42:
+    case 43:
+    case 44:
+      return 27; // Maharashtra
+    case 45:
+    case 46:
+    case 47:
+    case 48:
+      return 23; // Madhya Pradesh
+    case 49:
+      return 22; // Chhattisgarh
+    case 50:
+      return 36; // Telangana
+    case 51:
+    case 52:
+    case 53:
+      return 37; // Andhra Pradesh
+    case 56:
+    case 57:
+    case 58:
+    case 59:
+      return 29; // Karnataka
+    case 60:
+    case 61:
+    case 62:
+    case 63:
+    case 64:
+      return 33; // Tamil Nadu
+    case 67:
+    case 68:
+    case 69:
+      return 32; // Kerala
+    case 70:
+    case 71:
+    case 72:
+    case 73:
+    case 74:
+      return 19; // West Bengal
+    case 75:
+    case 76:
+    case 77:
+      return 21; // Odisha
+    case 78:
+      return 18; // Assam
+    case 80:
+    case 81:
+    case 82:
+    case 83:
+    case 84:
+    case 85:
+      return 10; // Bihar
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Extracts 2-digit Indian GST State Code from an address string by matching state names.
+ */
+export function getStateCodeFromAddress(addressStr?: string): number | undefined {
+  if (!addressStr) return undefined;
+  const upper = addressStr.toUpperCase();
+  const stateEntries = Object.values(GST_STATES).sort((a, b) => b.name.length - a.name.length);
+  for (const st of stateEntries) {
+    const escaped = st.name.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    if (regex.test(upper)) {
+      const code = parseInt(st.code, 10);
+      if (!isNaN(code)) return code;
+    }
+  }
+  return undefined;
+}
+
 export interface EWayBillTransportOptions {
   transDistance?: number;
   transporterId?: string;
@@ -170,6 +315,16 @@ export function generateEWayBillJson(
     cessNonAdvol: 0,
   }));
 
+  // Destination state (actToStateCode) under NIC e-Way Bill Rule 138:
+  // For Bill to - Ship to (transType '2') or when shipping destination details are provided,
+  // actToStateCode must reflect the actual delivery state (derived from shipping pincode/address).
+  let resolvedActToStateCode = toStateCodeNum;
+  if (resolvedTransType === '2' || isShippingDifferent || invoice.shippingPincode || invoice.shippingAddress) {
+    const pinDerived = getStateCodeFromPincode(toPin);
+    const addrDerived = getStateCodeFromAddress(invoice.shippingAddress);
+    resolvedActToStateCode = pinDerived || addrDerived || toStateCodeNum;
+  }
+
   const billEntry: EWayBillBillData = {
     userGstin: company.gstin,
     supplyType: 'O',
@@ -192,7 +347,7 @@ export function generateEWayBillJson(
     toAddr2: '',
     toPlace,
     toPincode: toPin,
-    actToStateCode: toStateCodeNum,
+    actToStateCode: resolvedActToStateCode,
     toStateCode: toStateCodeNum,
     totalValue: Math.round(invoice.totalTaxableAmount * 100) / 100,
     cgstValue: Math.round(invoice.totalCgst * 100) / 100,

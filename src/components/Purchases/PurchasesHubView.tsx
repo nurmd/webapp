@@ -69,7 +69,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   const unpaidPurchases = dateFilteredPurchases.filter((p) => p.paymentStatus !== 'PAID');
   const totalToPay = unpaidPurchases.reduce((s, p) => s + (p.balanceAmount || p.grandTotal), 0);
   const totalItcClaimable = dateFilteredPurchases
-    .filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5')
+    .filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS')
     .reduce((s, p) => s + p.totalTax, 0);
 
   // 2. Search & Status Filter

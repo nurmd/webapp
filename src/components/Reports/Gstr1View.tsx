@@ -69,11 +69,16 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
   const outwardIgst = invoices.reduce((s, i) => s + i.totalIgst, 0);
   const outwardTotalTax = outwardCgst + outwardSgst + outwardIgst;
 
-  const eligiblePurchases = purchases.filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5');
+  const eligiblePurchases = purchases.filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS');
   const itcCgst = eligiblePurchases.reduce((s, p) => s + p.totalCgst, 0);
   const itcSgst = eligiblePurchases.reduce((s, p) => s + p.totalSgst, 0);
   const itcIgst = eligiblePurchases.reduce((s, p) => s + p.totalIgst, 0);
   const totalItc = itcCgst + itcSgst + itcIgst;
+
+  const ineligible175Purchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_17_5');
+  const ineligibleOthersPurchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_OTHERS');
+  const totalIneligible175 = ineligible175Purchases.reduce((s, p) => s + p.totalTax, 0);
+  const totalIneligibleOthers = ineligibleOthersPurchases.reduce((s, p) => s + p.totalTax, 0);
 
   const netCgstPayable = Math.max(0, outwardCgst - itcCgst);
   const netSgstPayable = Math.max(0, outwardSgst - itcSgst);
@@ -497,6 +502,27 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
               </tbody>
             </table>
           </div>
+
+          {/* Table 4(D) Ineligible ITC Breakdown */}
+          {(totalIneligible175 > 0 || totalIneligibleOthers > 0) && (
+            <div style={{ backgroundColor: '#162035', borderRadius: '8px', border: '1px solid #273754', padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.75rem' }}>
+                Table 4(D) Ineligible Input Tax Credit (ITC)
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                <div style={{ backgroundColor: '#0a0f1d', padding: '1rem', borderRadius: '6px', border: '1px solid #1d2a42' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>Table 4(D)(1) As per Section 17(5) (Blocked)</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#ef4444', marginTop: '0.25rem' }}>{formatINR(totalIneligible175)}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>{ineligible175Purchases.length} blocked purchase(s)</div>
+                </div>
+                <div style={{ backgroundColor: '#0a0f1d', padding: '1rem', borderRadius: '6px', border: '1px solid #1d2a42' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>Table 4(D)(2) Ineligible Others (Composition & Exempt)</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f59e0b', marginTop: '0.25rem' }}>{formatINR(totalIneligibleOthers)}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>{ineligibleOthersPurchases.length} composition / ineligible purchase(s)</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
