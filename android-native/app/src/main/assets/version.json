@@ -1,15 +1,15 @@
 {
   "version": "1.1.27",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-11T04:46:06.520Z",
+  "buildTime": "2026-10-11T04:54:51.357Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "hide party topbar on scroll, eliminate balance card padding, and dynamic OTA release notes (v1.1.27)",
     "v1.1.26 - detach topbar from main working screen area with independent scroll containment",
     "v1.1.25 - fix mobile card transition jitter with decoupled overlay and hysteresis",
     "v1.1.24 - responsive party details and Phase 2 GST features",
     "responsive two-column party view for tablet and animated floating compact card for mobile",
-    "add composition scheme, shipping address, and strict party validation",
-    "add UTGST support, invoice type selector, and RCM toggle UI"
+    "add composition scheme, shipping address, and strict party validation"
   ]
 }
