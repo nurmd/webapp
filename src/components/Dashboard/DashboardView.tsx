@@ -858,13 +858,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Filter Pills Bar: Type Filters & Payment Status Filters (R2) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
             {/* Entity Type Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-[11px] sm:text-xs font-bold">
               <button
                 onClick={() => setTxTypeFilter('ALL')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'ALL'
                     ? 'bg-surface-container-lowest text-on-surface shadow-xs border border-outline-variant/40'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -876,7 +876,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('SALES')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'SALES'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -888,7 +888,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('PURCHASES')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'PURCHASES'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -900,7 +900,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('VOUCHERS')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'VOUCHERS'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -912,7 +912,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('EXPENSES')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'EXPENSES'
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -924,7 +924,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('VOUCHERS_EXPENSES')}
                 type="button"
-                className={`min-h-[44px] px-3.5 rounded-xl whitespace-nowrap transition-colors cursor-pointer flex items-center justify-center active:scale-95 ${
+                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
                   txTypeFilter === 'VOUCHERS_EXPENSES'
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -935,11 +935,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Payment Settlement Status Filter Pills */}
-            <div className="flex items-center gap-1 bg-surface-container-low rounded-xl p-1 border border-outline-variant/30 text-xs font-bold flex-shrink-0 self-start sm:self-auto">
+            <div className="flex items-center gap-0.5 bg-surface-container-low rounded-full p-0.5 border border-outline-variant/30 text-[11px] font-bold flex-shrink-0 self-start sm:self-auto">
               <button
                 onClick={() => setTxStatusFilter('ALL')}
                 type="button"
-                className={`min-h-[44px] px-3 rounded-lg text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'ALL'
                     ? 'bg-surface-container-lowest text-on-surface shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -950,7 +950,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxStatusFilter('UNPAID')}
                 type="button"
-                className={`min-h-[44px] px-3 rounded-lg text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'UNPAID'
                     ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -961,7 +961,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxStatusFilter('PAID')}
                 type="button"
-                className={`min-h-[44px] px-3 rounded-lg text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'PAID'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'

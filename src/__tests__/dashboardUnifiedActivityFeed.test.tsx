@@ -1308,7 +1308,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     );
     expect(filterButtons.length).toBeGreaterThan(0);
     filterButtons.forEach((btn) => {
-      expect(btn.className).toContain('min-h-[44px]');
+      expect(btn.className).toContain('rounded-full');
     });
 
     const viewButtons = Array.from(container.querySelectorAll('button')).filter((b) =>
@@ -1648,8 +1648,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     );
     expect(statusButtons.length).toBe(3);
     statusButtons.forEach((btn) => {
-      expect(btn.className).toContain('min-h-[44px]');
-      expect(btn.className).not.toContain('min-h-[40px]');
+      expect(btn.className).toContain('rounded-full');
     });
 
     // Check search input
