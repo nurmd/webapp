@@ -80,6 +80,13 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     }
   }, [initialStatusFilter]);
 
+  useEffect(() => {
+    const mainEl = document.getElementById('main-content-scroll');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [selectedPartyForLedger]);
+
   // System back navigation handling
   useBackNavigation(() => {
     if (isModalOpen) {

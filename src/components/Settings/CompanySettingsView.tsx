@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Store,
   Receipt,
@@ -230,6 +230,15 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     window.addEventListener('switch_settings_tab', handleSwitch);
     return () => window.removeEventListener('switch_settings_tab', handleSwitch);
   }, []);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const isAnySettingsModalOpen =
     isEditModalOpen ||
@@ -330,7 +339,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
     setIsSyncStarting(true);
     pouch.startSync(syncUrlInput.trim());
-    setTimeout(() => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
       setIsSyncStarting(false);
       setIsSyncConfigOpen(false);
     }, 800);
@@ -626,7 +636,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           data-testid="settings-content-pane"
         >
           {/* Mobile Back Button Navigation Bar */}
-          <div className="md:hidden flex items-center justify-between pb-3 mb-3 border-b border-outline-variant/20 sticky top-[72px] z-30 bg-surface/95 backdrop-blur-md pt-1">
+          <div className="md:hidden flex items-center justify-between pb-3 mb-3 border-b border-outline-variant/20 sticky top-0 z-30 bg-surface/95 backdrop-blur-md pt-1">
             <button
               type="button"
               data-testid="mobile-back-btn"

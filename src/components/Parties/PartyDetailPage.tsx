@@ -97,6 +97,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const mainEl = document.getElementById('main-content-scroll');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+    setIsScrolled(false);
+  }, [party.id]);
+
   const {
     isCustomer,
     totalBilled,

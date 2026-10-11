@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from './services/db.ts';
 import { pouch } from './services/pouchdb.ts';
 import { CompanyProfile } from './models/company.ts';
@@ -783,6 +783,13 @@ export const App: React.FC = () => {
       refreshData();
     }
   };
+
+  useEffect(() => {
+    const mainEl = document.getElementById('main-content-scroll');
+    if (mainEl) {
+      mainEl.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   const handleSelectTab = (tab: AppTab) => {
     if (!rbac.canAccessTab(tab, activeUser.role)) {

@@ -187,7 +187,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
       </section>
 
       {/* TOP TOGGLE: SEPARATED BY TOP TOGGLE FOR A4 AND THERMAL */}
-      <div className="flex bg-surface-container-low rounded-2xl p-1.5 gap-1.5 border border-outline-variant/20 shadow-xs sticky top-16 z-30 backdrop-blur-md">
+      <div className="flex bg-surface-container-low rounded-2xl p-1.5 gap-1.5 border border-outline-variant/20 shadow-xs sticky top-0 z-30 backdrop-blur-md">
         <button
           type="button"
           onClick={() => setActiveFormatTab('A4')}
