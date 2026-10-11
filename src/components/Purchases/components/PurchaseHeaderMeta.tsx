@@ -39,7 +39,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
   return (
     <>
       {/* Fixed Top Shell Header */}
-      <header className="fixed top-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-xs border-b border-outline-variant/30 pt-safe">
+      <header className="fixed top-0 left-0 right-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-xs border-b border-outline-variant/30 pt-safe">
         <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button

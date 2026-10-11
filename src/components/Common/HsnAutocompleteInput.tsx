@@ -41,16 +41,18 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
     setSelectedIndex(-1);
   }, [value]);
 
-  // Handle outside clicks to close dropdown
+  // Handle outside clicks to close dropdown (both mouse click and mobile touch)
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
 
@@ -128,7 +130,7 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
         <ul
           id={`${inputId}-listbox`}
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1 max-h-60 overflow-y-auto rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-xl py-1 text-xs"
+          className="absolute z-50 left-0 min-w-[280px] sm:min-w-[340px] max-w-[90vw] mt-1 max-h-60 overflow-y-auto rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl py-1 text-xs"
         >
           {suggestions.map((item, idx) => {
             const isSelected = idx === selectedIndex;

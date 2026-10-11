@@ -18,9 +18,15 @@ import {
   GENESIS_PREVIOUS_HASH,
 } from '../../services/auditTrail.ts';
 
+import { FinancialBalanceAuditorPanel } from './FinancialBalanceAuditorPanel.tsx';
+import { InventoryStockAuditorPanel } from './InventoryStockAuditorPanel.tsx';
+
+export type AuditTab = 'mca_trail' | 'party_balance' | 'inventory_stock';
+
 export interface AuditLogViewProps {
   onClose?: () => void;
   documentIdFilter?: string;
+  initialAuditTab?: AuditTab;
 }
 
 interface DiffRow {
@@ -79,9 +85,27 @@ const ACTION_COLORS: Record<AuditActionType, { bg: string; text: string; border:
   SETTINGS_UPDATE: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Settings Updated' },
 };
 
-export const AuditLogView: React.FC<AuditLogViewProps> = ({ onClose, documentIdFilter }) => {
+export const AuditLogView: React.FC<AuditLogViewProps> = ({
+  onClose,
+  documentIdFilter,
+  initialAuditTab = 'mca_trail',
+}) => {
+  const [activeTab, setActiveTab] = useState<AuditTab>(initialAuditTab);
   const [records, setRecords] = useState<AuditRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const handleSwitchAuditTab = (e: any) => {
+      if (e.detail && typeof e.detail === 'string') {
+        const t = e.detail;
+        if (t === 'mca_trail' || t === 'party_balance' || t === 'inventory_stock') {
+          setActiveTab(t);
+        }
+      }
+    };
+    window.addEventListener('switch_audit_tab', handleSwitchAuditTab);
+    return () => window.removeEventListener('switch_audit_tab', handleSwitchAuditTab);
+  }, []);
 
   // Live Verification
   const [isVerifying, setIsVerifying] = useState(false);
@@ -249,6 +273,61 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ onClose, documentIdF
         </div>
       )}
 
+      {/* Top Audit Navigation Switcher */}
+      <div className="bg-surface-container-low p-1.5 rounded-2xl border border-outline-variant/30 flex items-center gap-1.5 shadow-xs overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setActiveTab('mca_trail')}
+          className={`flex-1 min-w-[130px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'mca_trail'
+              ? 'bg-surface text-on-surface shadow-xs border border-outline-variant/40'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface/50'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] text-primary">verified_user</span>
+          <span>MCA Audit Trail</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('party_balance')}
+          className={`flex-1 min-w-[150px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'party_balance'
+              ? 'bg-surface text-on-surface shadow-xs border border-outline-variant/40'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface/50'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] text-secondary">account_balance_wallet</span>
+          <span>Party Balance Auditor</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('inventory_stock')}
+          className={`flex-1 min-w-[150px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'inventory_stock'
+              ? 'bg-surface text-on-surface shadow-xs border border-outline-variant/40'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface/50'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[18px] text-amber-500">inventory_2</span>
+          <span>Inventory Stock Auditor</span>
+        </button>
+      </div>
+
+      {/* Tab Panel 2: Party Balance Auditor */}
+      {activeTab === 'party_balance' && (
+        <FinancialBalanceAuditorPanel onRefreshParent={loadData} />
+      )}
+
+      {/* Tab Panel 3: Inventory Stock Auditor */}
+      {activeTab === 'inventory_stock' && (
+        <InventoryStockAuditorPanel onRefreshParent={loadData} />
+      )}
+
+      {/* Tab Panel 1: MCA Statutory Audit Trail */}
+      {activeTab === 'mca_trail' && (
+        <>
       {/* Header & Verification Status Card */}
       <div className="bg-surface-container-low rounded-2xl p-5 border border-outline-variant/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -738,6 +817,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ onClose, documentIdF
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

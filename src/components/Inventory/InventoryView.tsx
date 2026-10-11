@@ -652,6 +652,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </button>
 
             <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'security_audit' }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('switch_audit_tab', { detail: 'inventory_stock' }));
+                }, 60);
+              }}
+              className="px-3 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1 bg-surface-container-lowest text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 border border-amber-500/30 cursor-pointer transition-colors"
+              title="Open Inventory Stock Auditor"
+            >
+              <span className="material-symbols-outlined text-[15px]">inventory_2</span>
+              <span>Audit Stock</span>
+            </button>
+
+            <button
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
                 filterStockStatus === 'LOW_STOCK'
                   ? 'bg-primary text-on-primary'

@@ -205,8 +205,12 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}`,
     });
     db.saveVoucher(voucher);
-
     db.saveInvoice(updated);
+
+    if (paymentModalInvoice.partyId) {
+      db.recalculatePartyBalance(paymentModalInvoice.partyId);
+    }
+
     setPaymentModalInvoice(null);
     setPaymentAmount(0);
     setSplitCash('');
@@ -578,11 +582,16 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                     type="number"
                     required
                     min="1"
-                    max={paymentModalInvoice.balanceAmount}
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
+                  {paymentAmount > paymentModalInvoice.balanceAmount && (
+                    <p className="mt-1.5 text-[11px] font-bold text-secondary flex items-center gap-1 bg-secondary/10 px-2 py-1 rounded-lg">
+                      <span className="material-symbols-outlined text-[15px]">account_balance_wallet</span>
+                      <span>Excess {formatINR(paymentAmount - paymentModalInvoice.balanceAmount)} will be credited as customer advance</span>
+                    </p>
+                  )}
                 </div>
               ) : (
                 /* Split Allocation Box */

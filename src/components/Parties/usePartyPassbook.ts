@@ -133,7 +133,7 @@ export function usePartyPassbook({
 
       if (isPartyVoucher) {
         const isDupe = rawEntries.some(
-          (e) => e.docNumber === v.voucherNumber || (v.referenceNo && e.docNumber.includes(v.referenceNo))
+          (e) => e.docNumber === v.voucherNumber || e.rawId === v.id
         );
         if (!isDupe) {
           const cashLines = v.entries.filter((e) => e.accountId === 'ACC_CASH' && (e.debit > 0 || e.credit > 0));

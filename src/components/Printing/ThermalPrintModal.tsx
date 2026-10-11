@@ -306,9 +306,9 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
               </div>
             ) : (
               <div
-                className={`bg-[#fcfbf9] p-3 rounded-xl border border-outline-variant/30 font-mono ${
+                className={`bg-amber-50/90 dark:bg-amber-100/95 p-3.5 rounded-xl border border-amber-200/80 dark:border-amber-300 font-mono ${
                   width === 32 ? 'text-[11px]' : 'text-[10px]'
-                } leading-tight text-neutral-900 shadow-inner overflow-x-auto whitespace-pre`}
+                } leading-relaxed text-slate-950 shadow-md overflow-x-auto whitespace-pre select-text font-bold`}
               >
                 {previewText}
               </div>
