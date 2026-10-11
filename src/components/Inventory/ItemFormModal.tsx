@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
+import { HsnItem } from '../../core/gst/hsnCatalog';
 
 export interface ItemFormModalProps {
   isOpen: boolean;
@@ -233,12 +235,18 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
                     HSN / SAC Code
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 100630"
+                  <HsnAutocompleteInput
                     value={hsn}
-                    onChange={(e) => setHsn(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                    onChange={(val) => setHsn(val)}
+                    onSelectHsn={(item: HsnItem) => {
+                      setHsn(item.code);
+                      setGstRate(item.gstRate);
+                      if (item.category === 'Services') {
+                        setItemType('SERVICE');
+                        setUnit('HOURS');
+                      }
+                    }}
+                    placeholder="e.g. 1006 or Rice"
                   />
                 </div>
               )}

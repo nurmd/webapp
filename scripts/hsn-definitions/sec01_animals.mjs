@@ -1,0 +1,343 @@
+import { entry } from './utils.mjs';
+
+export function getSection1Items() {
+  const items = [];
+
+  // Chapter 01: Live Animals (Rates: 0% mostly for livestock, 5% for horses/breeding)
+  const ch01 = [
+    // 0101 Live horses, asses, mules
+    ['01012100', 'Live horses: Pure-bred breeding animals', 0],
+    ['01012910', 'Live horses: Race horses', 12],
+    ['01012990', 'Live horses: Other horses for sports and recreation', 12],
+    ['01013000', 'Live asses', 0],
+    ['01019000', 'Live mules and hinnies', 0],
+    // 0102 Live bovine animals
+    ['01022110', 'Live bovine animals: Pure-bred breeding bulls', 0],
+    ['01022120', 'Live bovine animals: Pure-bred breeding cows', 0],
+    ['01022910', 'Live bovine animals: Calves', 0],
+    ['01022990', 'Live bovine animals: Other cattle', 0],
+    ['01023100', 'Live buffaloes: Pure-bred breeding animals', 0],
+    ['01023900', 'Live buffaloes: Other buffaloes and water buffaloes', 0],
+    ['01029010', 'Live oxen and working cattle', 0],
+    ['01029090', 'Other live bovine animals', 0],
+    // 0103 Live swine
+    ['01031000', 'Live swine: Pure-bred breeding animals', 0],
+    ['01039100', 'Live swine: Weighing less than 50 kg', 0],
+    ['01039200', 'Live swine: Weighing 50 kg or more', 0],
+    // 0104 Live sheep and goats
+    ['01041010', 'Live sheep: Pure-bred breeding sheep and rams', 0],
+    ['01041090', 'Live sheep: Other sheep and lambs', 0],
+    ['01042000', 'Live goats and kids', 0],
+    // 0105 Live poultry (fowls of Gallus domesticus, ducks, geese, turkeys)
+    ['01051100', 'Live fowls of Gallus domesticus: Weighing not more than 185 g', 0],
+    ['01051200', 'Live turkeys: Weighing not more than 185 g', 0],
+    ['01051300', 'Live ducks: Weighing not more than 185 g', 0],
+    ['01051400', 'Live geese: Weighing not more than 185 g', 0],
+    ['01051500', 'Live guinea fowls: Weighing not more than 185 g', 0],
+    ['01059400', 'Live fowls of Gallus domesticus: Weighing more than 185 g', 0],
+    ['01059900', 'Other live poultry: Ducks, geese, turkeys, guinea fowls', 0],
+    // 0106 Other live animals
+    ['01061100', 'Live primates (monkeys, apes, lemurs)', 0],
+    ['01061200', 'Live whales, dolphins, purpoises, manatees and dugongs', 0],
+    ['01061300', 'Live camels and other camelids (Camelidae)', 0],
+    ['01061400', 'Live rabbits and hares', 0],
+    ['01061900', 'Other live mammals: Dogs, cats, ferrets', 0],
+    ['01062000', 'Live reptiles (snakes, turtles, tortoises, alligators, lizards)', 0],
+    ['01063100', 'Live birds of prey (falcons, hawks, eagles, owls)', 0],
+    ['01063200', 'Live psittaciformes (parrots, parakeets, macaws, cockatoos)', 0],
+    ['01063300', 'Live ostriches, emus and cassowaries', 0],
+    ['01063900', 'Other live birds (canaries, finches, pigeons)', 0],
+    ['01064100', 'Live honey bees and bumble bees for pollination', 0],
+    ['01064900', 'Other live insects (silkworms, ladybugs)', 0],
+    ['01069000', 'Other live animals (frogs, laboratory animals)', 0],
+  ];
+
+  for (const [c, d, r] of ch01) items.push(entry(c, d, r));
+
+  // Chapter 02: Meat and Edible Meat Offal (0% fresh, 5% pre-packaged/frozen)
+  const ch02 = [
+    // 0201 Bovine meat, fresh or chilled
+    ['02011000', 'Carcasses and half-carcasses of bovine animals, fresh or chilled', 0],
+    ['02012000', 'Other cuts of bovine meat with bone in, fresh or chilled', 0],
+    ['02013000', 'Boneless cuts of bovine meat, fresh or chilled', 0],
+    // 0202 Bovine meat, frozen
+    ['02021000', 'Carcasses and half-carcasses of bovine animals, frozen', 5],
+    ['02022000', 'Cuts of bovine meat with bone in, frozen', 5],
+    ['02023000', 'Boneless meat of bovine animals, frozen', 5],
+    // 0203 Swine meat, fresh, chilled or frozen
+    ['02031100', 'Carcasses and half-carcasses of swine, fresh or chilled', 0],
+    ['02031200', 'Hams, shoulders and cuts thereof, with bone in, fresh or chilled', 0],
+    ['02031900', 'Other pork meat, fresh or chilled', 0],
+    ['02032100', 'Carcasses and half-carcasses of swine, frozen', 5],
+    ['02032200', 'Hams, shoulders and cuts thereof of swine, frozen', 5],
+    ['02032900', 'Other meat of swine, frozen', 5],
+    // 0204 Sheep or goat meat
+    ['02041000', 'Carcasses and half-carcasses of lamb, fresh or chilled', 0],
+    ['02042100', 'Carcasses and half-carcasses of sheep, fresh or chilled', 0],
+    ['02042200', 'Other cuts of sheep meat with bone in, fresh or chilled', 0],
+    ['02042300', 'Boneless sheep mutton, fresh or chilled', 0],
+    ['02043000', 'Carcasses and half-carcasses of lamb, frozen', 5],
+    ['02044100', 'Carcasses and half-carcasses of sheep, frozen', 5],
+    ['02044200', 'Other cuts of sheep with bone in, frozen', 5],
+    ['02044300', 'Boneless cuts of sheep, frozen', 5],
+    ['02045000', 'Meat of goats (chevon/cabrito), fresh, chilled or frozen', 0],
+    // 0206 Edible offal
+    ['02061000', 'Edible offal of bovine animals, fresh or chilled (livers, kidneys, tongue)', 0],
+    ['02062100', 'Bovine tongues, frozen', 5],
+    ['02062200', 'Bovine livers, frozen', 5],
+    ['02062900', 'Other bovine edible offal, frozen', 5],
+    ['02063000', 'Edible offal of swine, fresh or chilled', 0],
+    ['02064100', 'Livers of swine, frozen', 5],
+    ['02064900', 'Other edible offal of swine, frozen', 5],
+    ['02068000', 'Edible offal of sheep, goats, horses, fresh or chilled', 0],
+    ['02069000', 'Edible offal of sheep, goats, horses, frozen', 5],
+    // 0207 Poultry meat
+    ['02071100', 'Meat of fowls of Gallus domesticus: Not cut in pieces, fresh or chilled', 0],
+    ['02071200', 'Meat of fowls of Gallus domesticus: Not cut in pieces, frozen', 5],
+    ['02071300', 'Cuts and offal of fowls of Gallus domesticus, fresh or chilled', 0],
+    ['02071400', 'Cuts and offal of fowls of Gallus domesticus, frozen (chicken wings, drumsticks, breasts)', 5],
+    ['02072400', 'Meat of turkeys: Not cut in pieces, fresh or chilled', 0],
+    ['02072500', 'Meat of turkeys: Not cut in pieces, frozen', 5],
+    ['02072600', 'Cuts and offal of turkeys, fresh or chilled', 0],
+    ['02072700', 'Cuts and offal of turkeys, frozen', 5],
+    ['02074100', 'Meat of ducks: Not cut in pieces, fresh or chilled', 0],
+    ['02074200', 'Meat of ducks: Not cut in pieces, frozen', 5],
+    ['02074300', 'Fatty livers of ducks, fresh or chilled (foie gras)', 12],
+    ['02074400', 'Other cuts and offal of ducks, fresh or chilled', 0],
+    ['02074500', 'Other cuts and offal of ducks, frozen', 5],
+    ['02075100', 'Meat of geese: Not cut in pieces, fresh or chilled', 0],
+    ['02075200', 'Meat of geese: Not cut in pieces, frozen', 5],
+    ['02075300', 'Fatty livers of geese, fresh or chilled', 12],
+    ['02076000', 'Meat, cuts and offal of guinea fowls, fresh, chilled or frozen', 5],
+    // 0208 Other meat
+    ['02081000', 'Meat of rabbits or hares, fresh, chilled or frozen', 0],
+    ['02083000', 'Meat of primates, fresh, chilled or frozen', 5],
+    ['02084000', 'Meat of whales, dolphins and manatees', 5],
+    ['02085000', 'Meat of reptiles (crocodiles, turtles, snakes)', 5],
+    ['02086000', 'Meat of camels and other camelids', 0],
+    ['02089000', 'Other meat: Quail meat, venison, frog legs', 5],
+    // 0209 Pig fat / poultry fat
+    ['02091000', 'Pig fat, free of lean meat, not rendered or extracted, fresh or chilled', 5],
+    ['02099000', 'Poultry fat, not rendered or extracted, fresh, chilled or frozen', 5],
+    // 0210 Salted, dried or smoked meat
+    ['02101100', 'Hams, shoulders and cuts thereof, with bone in, salted, dried or smoked', 12],
+    ['02101200', 'Bellies (streaky) and cuts thereof, salted, dried or smoked (bacon)', 12],
+    ['02101900', 'Other meat of swine, salted, in brine, dried or smoked', 12],
+    ['02102000', 'Meat of bovine animals, salted, in brine, dried or smoked', 12],
+    ['02109100', 'Meat and offal of primates, salted, dried or smoked', 12],
+    ['02109200', 'Meat and offal of whales, dolphins, salted, dried or smoked', 12],
+    ['02109300', 'Meat and offal of reptiles, salted, dried or smoked', 12],
+    ['02109900', 'Other salted, dried or smoked meat, edible flours and meals of meat', 12],
+  ];
+
+  for (const [c, d, r] of ch02) items.push(entry(c, d, r));
+
+  // Chapter 03: Fish, Crustaceans, Molluscs
+  const ch03 = [
+    ['03011100', 'Ornamental freshwater live fish for aquariums', 5],
+    ['03011900', 'Other ornamental marine live fish', 5],
+    ['03019100', 'Live trout (Salmo trutta, Oncorhynchus mykiss)', 0],
+    ['03019200', 'Live eels (Anguilla species)', 0],
+    ['03019300', 'Live carp (Cyprinus carpio, Carassius carassius, Ctenopharyngodon)', 0],
+    ['03019400', 'Live Atlantic and Pacific bluefin tunas', 0],
+    ['03019500', 'Live southern bluefin tunas', 0],
+    ['03019900', 'Other live marine and freshwater fish (rohu, catla, mrigal, hilsa)', 0],
+    ['03021100', 'Trout, fresh or chilled', 0],
+    ['03021300', 'Pacific salmon, fresh or chilled', 0],
+    ['03021400', 'Atlantic salmon and Danube salmon, fresh or chilled', 0],
+    ['03022100', 'Halibut, fresh or chilled', 0],
+    ['03022200', 'Plaice, fresh or chilled', 0],
+    ['03022300', 'Sole, fresh or chilled', 0],
+    ['03023100', 'Albacore or longfinned tunas, fresh or chilled', 0],
+    ['03023200', 'Yellowfin tunas, fresh or chilled', 0],
+    ['03023300', 'Skipjack or stripe-bellied bonito, fresh or chilled', 0],
+    ['03024100', 'Herrings, fresh or chilled', 0],
+    ['03024200', 'Anchovies, fresh or chilled', 0],
+    ['03024300', 'Sardines, sardinella and brisling or sprats, fresh or chilled', 0],
+    ['03024400', 'Mackerel (Scomber scombrus, Scomber australasicus), fresh or chilled', 0],
+    ['03025100', 'Cod (Gadus morhua), fresh or chilled', 0],
+    ['03027100', 'Tilapias (Oreochromis species), fresh or chilled', 0],
+    ['03027200', 'Catfish (Pangasius, Silurus, Clarias, Ictalurus), fresh or chilled', 0],
+    ['03028100', 'Dogfish and other sharks, fresh or chilled', 0],
+    ['03028200', 'Rays and skates, fresh or chilled', 0],
+    ['03028910', 'Hilsa (Tenualosa ilisha), fresh or chilled', 0],
+    ['03028920', 'Seer (Scomberomorus species), fresh or chilled (surmai)', 0],
+    ['03028930', 'Pomfret (black, white, silver), fresh or chilled', 0],
+    ['03028990', 'Other marine fish, fresh or chilled', 0],
+    // Frozen fish 0303
+    ['03031100', 'Sockeye salmon (red salmon), frozen', 5],
+    ['03031200', 'Other Pacific salmon, frozen', 5],
+    ['03032300', 'Tilapias, frozen', 5],
+    ['03032400', 'Catfish, frozen', 5],
+    ['03034100', 'Albacore or longfinned tunas, frozen', 5],
+    ['03034200', 'Yellowfin tunas, frozen', 5],
+    ['03035100', 'Herrings, frozen', 5],
+    ['03035300', 'Sardines and sardinella, frozen', 5],
+    ['03035400', 'Mackerel, frozen', 5],
+    ['03036300', 'Cod, frozen', 5],
+    ['03038100', 'Dogfish and other sharks, frozen', 5],
+    ['03038910', 'Frozen pomfret', 5],
+    ['03038920', 'Frozen hilsa', 5],
+    ['03038990', 'Other frozen marine fish', 5],
+    // Fish fillets and minced fish 0304
+    ['03043100', 'Fresh or chilled fillets of tilapia', 5],
+    ['03043200', 'Fresh or chilled fillets of catfish', 5],
+    ['03044100', 'Fresh or chilled fillets of Pacific salmon', 5],
+    ['03044400', 'Fresh or chilled fillets of cod and haddock', 5],
+    ['03046100', 'Frozen fillets of tilapia', 5],
+    ['03046200', 'Frozen fillets of catfish (Basa fillets)', 5],
+    ['03047100', 'Frozen fillets of cod', 5],
+    ['03048100', 'Frozen fillets of salmon', 5],
+    ['03048700', 'Frozen fillets of tuna', 5],
+    ['03049900', 'Other frozen fish meat and surimi mince', 5],
+    // Dried, salted or smoked fish 0305
+    ['03051000', 'Flours, meals and pellets of fish fit for human consumption', 5],
+    ['03052000', 'Livers, roes and milt of fish, dried, smoked, salted or in brine', 12],
+    ['03053100', 'Fish fillets, dried, salted or in brine: Tilapias, catfish, carp', 5],
+    ['03054100', 'Pacific salmon, Atlantic salmon and Danube salmon, smoked', 12],
+    ['03054200', 'Herrings, smoked', 12],
+    ['03054300', 'Trout, smoked', 12],
+    ['03055100', 'Cod, dried, whether or not salted (stockfish)', 5],
+    ['03055910', 'Bombay duck, dried (Harpadon nehereus)', 5],
+    ['03055990', 'Other dried marine fish and ribbonfish', 5],
+    ['03056100', 'Herrings, salted or in brine', 5],
+    ['03056300', 'Anchovies, salted or in brine', 5],
+    // Crustaceans 0306
+    ['03061100', 'Rock lobster and other sea crawfish, frozen', 5],
+    ['03061200', 'Lobsters (Homarus species), frozen', 5],
+    ['03061400', 'Crabs, frozen (mud crabs, blue crabs, king crabs)', 5],
+    ['03061600', 'Cold-water shrimps and prawns, frozen', 5],
+    ['03061711', 'Vannamei shrimp (Litopenaeus vannamei), frozen', 5],
+    ['03061719', 'Black tiger shrimp (Penaeus monodon), frozen', 5],
+    ['03061790', 'Other marine prawns and shrimps, frozen', 5],
+    ['03063100', 'Rock lobster and sea crawfish, live, fresh or chilled', 0],
+    ['03063200', 'Lobsters, live, fresh or chilled', 0],
+    ['03063300', 'Crabs, live, fresh or chilled', 0],
+    ['03063500', 'Cold-water shrimps and prawns, live, fresh or chilled', 0],
+    ['03063610', 'Tiger prawns, live or fresh', 0],
+    ['03063690', 'Other freshwater prawns and scampi (Macrobrachium rosenbergii), live or fresh', 0],
+    // Molluscs 0307
+    ['03071100', 'Oysters, live, fresh or chilled', 0],
+    ['03071200', 'Oysters, frozen', 5],
+    ['03072100', 'Scallops, live, fresh or chilled', 0],
+    ['03072200', 'Scallops, frozen', 5],
+    ['03073100', 'Mussels (Mytilus species, Perna species), live, fresh or chilled', 0],
+    ['03073200', 'Mussels, frozen', 5],
+    ['03074200', 'Cuttlefish and squid, live, fresh or chilled', 0],
+    ['03074310', 'Squid tubes and rings, frozen', 5],
+    ['03074390', 'Cuttlefish and squid, frozen', 5],
+    ['03075100', 'Octopus, live, fresh or chilled', 0],
+    ['03075200', 'Octopus, frozen', 5],
+    ['03076000', 'Snails, other than sea snails, live, fresh, chilled or frozen', 0],
+    ['03077100', 'Clams, cockles and ark shells, live, fresh or chilled', 0],
+    ['03077200', 'Clams, cockles and ark shells, frozen', 5],
+    ['03078100', 'Abalone, live, fresh or chilled', 0],
+    ['03079100', 'Other molluscs, live, fresh or chilled', 0],
+    ['03079200', 'Other molluscs, frozen', 5],
+    // Aquatic invertebrates 0308
+    ['03081100', 'Sea cucumbers (Stichopus japonicus, Holothuroidea), live, fresh or chilled', 0],
+    ['03081200', 'Sea cucumbers, frozen', 5],
+    ['03082100', 'Sea urchins (Strongylocentrotus species), live, fresh or chilled', 0],
+    ['03082200', 'Sea urchins, frozen', 5],
+    ['03083000', 'Jellyfish (Rhopilema species), live, fresh, chilled or frozen', 0],
+    ['03089000', 'Other aquatic invertebrates, fresh, chilled or frozen', 5],
+  ];
+
+  for (const [c, d, r] of ch03) items.push(entry(c, d, r));
+
+  // Chapter 04: Dairy Produce; Birds' Eggs; Natural Honey; Edible Products of Animal Origin
+  const ch04 = [
+    ['04011000', 'Milk and cream, not concentrated nor containing added sugar: Fat content not exceeding 1%', 0],
+    ['04012000', 'Milk and cream, not concentrated: Fat content exceeding 1% but not exceeding 6% (toned milk, standardized milk)', 0],
+    ['04014000', 'Milk and cream, not concentrated: Fat content exceeding 6% but not exceeding 10% (full cream milk)', 0],
+    ['04015000', 'Milk and cream, not concentrated: Fat content exceeding 10% (dairy cream)', 5],
+    // 0402 Milk concentrated or with sugar (Milk powder, condensed milk)
+    ['04021010', 'Skimmed milk powder (SMP) in pre-packaged containers', 5],
+    ['04021020', 'Milk food for babies and infant milk formula', 5],
+    ['04021090', 'Other concentrated milk powder in solid form', 5],
+    ['04022100', 'Whole milk powder, not containing added sugar or sweetening matter', 5],
+    ['04022910', 'Sweetened condensed milk in hermetically sealed cans', 12],
+    ['04022990', 'Other concentrated whole milk or cream with added sweetening matter', 12],
+    ['04029110', 'Condensed milk, unsweetened (evaporated milk)', 12],
+    ['04029920', 'Sterilised concentrated milk', 5],
+    // 0403 Yogurt, buttermilk, curd, lassi
+    ['04031000', 'Yogurt, whether or not flavored or containing added fruit or cocoa', 5],
+    ['04039010', 'Curd and dahi, pre-packaged and branded', 5],
+    ['04039020', 'Butter milk and chhas, flavored or sweetened', 5],
+    ['04039030', 'Lassi, pre-packaged and unit-labeled', 5],
+    ['04039090', 'Fermented or acidified milk, sour cream and kefir', 5],
+    // 0404 Whey
+    ['04041010', 'Whey, concentrated or containing added sugar, for industrial use', 5],
+    ['04041020', 'Whey protein concentrate (WPC)', 18],
+    ['04041090', 'Other products consisting of natural milk constituents', 5],
+    ['04049000', 'Other edible whey products', 5],
+    // 0405 Butter, dairy spreads, ghee
+    ['04051000', 'Butter, pasteurised or salted table butter', 12],
+    ['04052000', 'Dairy spreads and low-fat butter blends', 12],
+    ['04059010', 'Ghee and clarified butter', 12],
+    ['04059020', 'Butter oil and anhydrous milk fat', 12],
+    ['04059090', 'Other fats and oils derived from milk', 12],
+    // 0406 Cheese and paneer
+    ['04061000', 'Fresh cheese (including whey cheese), not cured, and curd; Paneer (cottage cheese)', 5],
+    ['04062000', 'Grated or powdered cheese of all kinds (parmesan, cheddar)', 12],
+    ['04063000', 'Processed cheese, not grated or powdered (cheese slices, cheese cubes, cheese spreads)', 12],
+    ['04064000', 'Blue-veined cheese and other cheese containing veins produced by Penicillium roqueforti', 12],
+    ['04069000', 'Other hard and semi-hard cheeses (gouda, edam, mozzarella, brie, camembert)', 12],
+    // 0407 Birds' eggs in shell
+    ['04071100', 'Fertilised eggs for incubation: Of fowls of the species Gallus domesticus', 0],
+    ['04071900', 'Fertilised eggs for incubation: Other birds (duck eggs, turkey eggs)', 0],
+    ['04072100', 'Fresh eggs in shell of fowls of Gallus domesticus (poultry eggs, table eggs)', 0],
+    ['04072900', 'Other fresh eggs in shell (quail eggs, duck eggs)', 0],
+    ['04079000', 'Preserved or cooked birds eggs in shell', 5],
+    // 0408 Birds' eggs, not in shell, egg yolks
+    ['04081100', 'Egg yolks, dried (egg yolk powder)', 5],
+    ['04081900', 'Other egg yolks, liquid or frozen', 5],
+    ['04089100', 'Whole birds eggs not in shell, dried (whole egg powder, albumen powder)', 5],
+    ['04089900', 'Liquid whole eggs and pasteurized egg white', 5],
+    // 0409 Natural honey
+    ['04090000', 'Natural pure bee honey, unadulterated in raw or retail packaging', 5],
+    // 0410 Edible products of animal origin
+    ['04100010', 'Edible birds nests (swiftlet nests)', 18],
+    ['04100020', 'Royal jelly and bee pollen', 12],
+    ['04100090', 'Other edible animal products not elsewhere specified or included', 5],
+  ];
+
+  for (const [c, d, r] of ch04) items.push(entry(c, d, r));
+
+  // Chapter 05: Other Products of Animal Origin Not Elsewhere Specified
+  const ch05 = [
+    ['05010010', 'Human hair, unworked, whether or not washed or scoured', 0],
+    ['05010020', 'Human hair waste and clippings', 0],
+    ['05021010', 'Pigs, hogs or boars bristles and hair', 5],
+    ['05021020', 'Badger hair and other brush-making hair', 5],
+    ['05029000', 'Waste of pig or boar bristles and brush hair', 5],
+    ['05040010', 'Guts, bladders and stomachs of animals: Guts of sheep or lamb for sausage casings', 5],
+    ['05040020', 'Guts of swine and bovine animals for edible casings', 5],
+    ['05040039', 'Animal bladders and stomachs, fresh, chilled, frozen, salted or dried', 5],
+    ['05051010', 'Feathers of a kind used for stuffing; down of ducks or geese', 5],
+    ['05051090', 'Feathers and down, cleaned, disinfected or treated for preservation', 5],
+    ['05059010', 'Skins and other parts of birds with feathers or down, unworked', 5],
+    ['05059020', 'Powder and waste of feathers or parts of feathers', 5],
+    ['05061011', 'Bones and horn-cores, ossein and bones treated with acid for gelatin manufacture', 5],
+    ['05061019', 'Crushed bones and bone meal for fertilizer or feed', 5],
+    ['05069010', 'Bone grists and unworked animal bone waste', 5],
+    ['05071010', 'Ivory, unworked or simply prepared, ivory powder and waste', 18],
+    ['05079010', 'Tortoise-shell, unworked or simply prepared', 18],
+    ['05079020', 'Whalebone and whalebone hair', 18],
+    ['05079030', 'Horns, antlers, hooves, nails, claws and beaks of animals', 5],
+    ['05080010', 'Coral and similar materials, unworked or simply prepared', 5],
+    ['05080020', 'Shells of molluscs, crustaceans or echinoderms and cuttle-bone, unworked', 5],
+    ['05100010', 'Ambergris, castoreum, civet and musk; Cantharides', 12],
+    ['05100020', 'Bile, whether or not dried; Glands and other animal substances for organo-therapeutic uses', 12],
+    ['05100090', 'Snake venom and scorpion venom for antivenin serum preparation', 5],
+    ['05111000', 'Bovine semen for artificial insemination', 0],
+    ['05119110', 'Fish waste and fish offal for feed processing', 5],
+    ['05119120', 'Silkworm pupae and cocoon waste', 0],
+    ['05119911', 'Animal semen, other than bovine (equine, ovine, caprine)', 0],
+    ['05119999', 'Other animal products unfit for human consumption', 5],
+  ];
+
+  for (const [c, d, r] of ch05) items.push(entry(c, d, r));
+
+  return items;
+}

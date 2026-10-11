@@ -3,6 +3,8 @@ import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
+import { HsnItem } from '../../core/gst/hsnCatalog';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -761,6 +763,47 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
+          {/* 3b. HSN / SAC Code & Statutory GST Rate */}
+          {isGstActive && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                  <span>HSN / SAC Code</span>
+                </label>
+                <HsnAutocompleteInput
+                  value={hsnSacCode}
+                  onChange={(val) => setHsnSacCode(val)}
+                  onSelectHsn={(item: HsnItem) => {
+                    setHsnSacCode(item.code);
+                    setGstRate(item.gstRate);
+                  }}
+                  placeholder="e.g. 8471 or Laptop"
+                  className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-mono text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                  <span>GST Tax Rate</span>
+                </label>
+                <select
+                  value={gstRate}
+                  onChange={(e) => setGstRate(Number(e.target.value))}
+                  className={`w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
+                >
+                  <option value={0}>0% (Exempt)</option>
+                  <option value={0.1}>0.1%</option>
+                  <option value={0.25}>0.25%</option>
+                  <option value={3}>3% (Gold/Precious)</option>
+                  <option value={5}>5%</option>
+                  <option value={12}>12%</option>
+                  <option value={18}>18% (Standard)</option>
+                  <option value={28}>28%</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* 4. Price & MRP */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -1109,12 +1152,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
                     HSN / SAC Code
                   </label>
-                  <input
-                    type="text"
+                  <HsnAutocompleteInput
                     value={newItemHsn}
-                    onChange={(e) => setNewItemHsn(e.target.value)}
+                    onChange={(val) => setNewItemHsn(val)}
+                    onSelectHsn={(item: HsnItem) => {
+                      setNewItemHsn(item.code);
+                      setNewGstRate(item.gstRate);
+                    }}
                     placeholder="e.g. 8471"
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-mono text-on-surface border border-outline-variant/30 outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-mono text-on-surface border border-outline-variant/30 outline-none h-[36px]"
                   />
                 </div>
 

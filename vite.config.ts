@@ -25,6 +25,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('hsnData') || id.includes('hsnCatalog')) {
+            return 'vendor-hsn';
+          }
           if (id.includes('node_modules')) {
             if (
               id.includes('/react/') ||
