@@ -1,15 +1,15 @@
 {
   "version": "1.1.28",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-11T10:49:57.602Z",
+  "buildTime": "2026-10-11T11:00:33.148Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "allow negative stock balances without forced zero clamping",
     "bump app version to v1.1.28 with verified APK & release notes",
     "improve modal viewport ergonomics, dynamic HSN positioning, and inventory contrast",
     "add financial balance auditor, inventory stock auditor, and overpayment ledger fixes",
     "expand offline HSN & SAC catalog to 5,172 codes with fast search, autocomplete, and full test suite",
-    "lock root viewport, isolate company header, and reset scroll to top on view open",
-    "persist learned invariants for detached shell, sticky anchors, dynamic OTA notes, and build flow"
+    "lock root viewport, isolate company header, and reset scroll to top on view open"
   ]
 }

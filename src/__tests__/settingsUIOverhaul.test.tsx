@@ -616,4 +616,36 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
 
     expect(cycles).toEqual([]);
   });
+
+  // TC-SET-23: Cross-Device Sync - Negative Stock Setting Syncs across Devices
+  it('TC-SET-23: negative stock setting syncs via PouchDB incoming change and BroadcastChannel', async () => {
+    // Start with negative stock disabled
+    db.setAllowNegativeStock(false);
+    expect(db.getAllowNegativeStock()).toBe(false);
+
+    // 1. Simulate incoming PouchDB remote sync change from another device enabling negative stock
+    db.applyIncomingChange({
+      id: 'settings:app_settings',
+      deleted: false,
+      doc: {
+        _id: 'settings:app_settings',
+        allowNegativeStock: true,
+      },
+    });
+
+    expect(db.getAllowNegativeStock()).toBe(true);
+
+    // 2. Simulate incoming BroadcastChannel sync event disabling negative stock
+    db.applyIncomingChange({
+      id: 'settings:app_settings',
+      deleted: false,
+      doc: {
+        _id: 'settings:app_settings',
+        allowNegativeStock: false,
+      },
+    });
+
+    expect(db.getAllowNegativeStock()).toBe(false);
+  });
 });
+

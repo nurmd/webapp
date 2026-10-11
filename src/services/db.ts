@@ -135,6 +135,12 @@ class StorageService {
             const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = event.data.settings;
             const current = this.getSettings();
             this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+            if (typeof syncable.allowNegativeStock === 'boolean') {
+              try {
+                localStorage.setItem('gst_allow_negative_stock', syncable.allowNegativeStock.toString());
+                window.dispatchEvent(new CustomEvent('gst_negative_stock_change', { detail: { allow: syncable.allowNegativeStock } }));
+              } catch {}
+            }
             if (syncable.company) {
               this.set(STORAGE_KEYS.COMPANY, syncable.company);
             }
@@ -581,6 +587,12 @@ class StorageService {
         const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = cleanEntity as any;
         const current = this.getSettings();
         this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+        if (typeof syncable.allowNegativeStock === 'boolean') {
+          try {
+            localStorage.setItem('gst_allow_negative_stock', syncable.allowNegativeStock.toString());
+            window.dispatchEvent(new CustomEvent('gst_negative_stock_change', { detail: { allow: syncable.allowNegativeStock } }));
+          } catch {}
+        }
         if (syncable.company) {
           this.set(STORAGE_KEYS.COMPANY, syncable.company);
         }
@@ -686,6 +698,12 @@ class StorageService {
         const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = remoteSettings[0] as any;
         const current = this.getSettings();
         this.set(STORAGE_KEYS.SETTINGS, { ...current, ...syncable });
+        if (typeof syncable.allowNegativeStock === 'boolean') {
+          try {
+            localStorage.setItem('gst_allow_negative_stock', syncable.allowNegativeStock.toString());
+            window.dispatchEvent(new CustomEvent('gst_negative_stock_change', { detail: { allow: syncable.allowNegativeStock } }));
+          } catch {}
+        }
         if (syncable.company) {
           this.set(STORAGE_KEYS.COMPANY, syncable.company);
         }

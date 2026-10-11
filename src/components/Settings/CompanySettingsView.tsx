@@ -206,10 +206,27 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     setTimeout(() => setSavedNotice(false), 2000);
   };
 
-  // Inventory Negative Stock Preference
   const [allowNegativeStock, setAllowNegativeStock] = useState<boolean>(() => {
     return db.getAllowNegativeStock();
   });
+
+  useEffect(() => {
+    const handleNegStockChange = (e: any) => {
+      if (typeof e.detail?.allow === 'boolean') {
+        setAllowNegativeStock(e.detail.allow);
+      } else {
+        setAllowNegativeStock(db.getAllowNegativeStock());
+      }
+    };
+    window.addEventListener('gst_negative_stock_change', handleNegStockChange);
+    const unsub = db.subscribe(() => {
+      setAllowNegativeStock(db.getAllowNegativeStock());
+    });
+    return () => {
+      window.removeEventListener('gst_negative_stock_change', handleNegStockChange);
+      unsub();
+    };
+  }, []);
 
   const handleToggleNegativeStock = (enabled: boolean) => {
     setAllowNegativeStock(enabled);
@@ -388,6 +405,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       isGstEnabled: updatedStatus,
       appLanguage,
       isAppLockEnabled,
+      allowNegativeStock,
     });
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 3000);
@@ -402,6 +420,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         isGstEnabled: isGstActive,
         appLanguage,
         isAppLockEnabled,
+        allowNegativeStock,
       });
       setLastProfileSyncTime(res.lastSyncedAt);
       setProfileSyncNotice('All settings synced with all devices! (Printing settings preserved locally)');
@@ -493,6 +512,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       isGstEnabled: profile.isGstEnabled ?? true,
       appLanguage,
       isAppLockEnabled,
+      allowNegativeStock,
     });
     setSavedNotice(true);
     setIsEditModalOpen(false);
