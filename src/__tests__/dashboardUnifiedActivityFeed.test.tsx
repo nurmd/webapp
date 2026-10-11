@@ -1656,4 +1656,60 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     const searchInput = container.querySelector('input[placeholder*="Search reference"]') as HTMLInputElement;
     expect(searchInput.className).toContain('min-h-[44px]');
   });
+
+  it('smaller screen UX: provides \\/ chevron button to expand action icons per transaction card and toggles expanded state', () => {
+    const handleViewInvoice = vi.fn();
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          vouchers={mockVouchers}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={handleViewInvoice}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    // Find all expand chevron buttons
+    const expandButtons = Array.from(
+      container.querySelectorAll('button[data-testid^="expand-actions-"]')
+    ) as HTMLButtonElement[];
+
+    expect(expandButtons.length).toBeGreaterThan(0);
+
+    const firstExpandBtn = expandButtons[0];
+    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Expand action icons');
+    expect(firstExpandBtn.textContent).toContain('expand_more');
+
+    // Click to expand
+    act(() => {
+      firstExpandBtn.click();
+    });
+
+    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('true');
+    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Collapse action icons');
+    expect(firstExpandBtn.querySelector('span')?.className).toContain('rotate-180');
+
+    // Ensure clicking the expand toggle does not inadvertently trigger onViewInvoice (stopPropagation)
+    expect(handleViewInvoice).not.toHaveBeenCalled();
+
+    // Click again to collapse
+    act(() => {
+      firstExpandBtn.click();
+    });
+
+    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Expand action icons');
+    expect(firstExpandBtn.querySelector('span')?.className).not.toContain('rotate-180');
+  });
 });
+

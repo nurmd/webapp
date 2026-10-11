@@ -471,6 +471,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const PAGE_SIZE = 50;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
+  // Expand / collapse action icons on smaller screens
+  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandCard = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setExpandedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [searchQuery, txTypeFilter, txStatusFilter]);
@@ -1022,16 +1038,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
                   : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
 
+              const isExpanded = expandedCardIds.has(item.id);
+
               return (
                 <div
                   key={item.id}
                   onClick={() => handleCardClick(item)}
-                  style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 115px' }}
-                  className="p-3 sm:p-3.5 flex flex-col justify-between gap-2.5 hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-all md:rounded-2xl md:border md:border-outline-variant/20 md:hover:border-secondary/40 shadow-xs group"
+                  style={{
+                    contentVisibility: 'auto',
+                    containIntrinsicSize: isExpanded ? '1px 115px' : '1px 68px',
+                  }}
+                  className="p-2.5 sm:p-3 md:p-3.5 flex flex-col justify-between gap-2 sm:gap-2.5 hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-all md:rounded-2xl md:border md:border-outline-variant/20 md:hover:border-secondary/40 shadow-xs group"
                 >
-                  {/* Top Header: Flow Badge ("Money In" / "Money Out") & Date */}
+                  {/* Top Header: Flow Badge ("Money In" / "Money Out") & Date + Expand Chevron */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {/* Entity Type Badge */}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass}`}>
                         {item.typeLabel}
@@ -1052,23 +1073,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
                     </div>
 
-                    <span className="text-[11px] text-on-surface-variant font-medium flex-shrink-0">
-                      {formatDate(item.date) || '—'}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-[11px] text-on-surface-variant font-medium">
+                        {formatDate(item.date) || '—'}
+                      </span>
+
+                      {/* Expand / Collapse Chevron Toggle for smaller screens (hidden on md+) */}
+                      <button
+                        type="button"
+                        onClick={(e) => toggleExpandCard(e, item.id)}
+                        data-testid={`expand-actions-${item.id}`}
+                        className={`md:hidden min-w-[32px] min-h-[32px] w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                          isExpanded
+                            ? 'bg-secondary/15 text-secondary'
+                            : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface'
+                        }`}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? 'Collapse action icons' : 'Expand action icons'}
+                        title={isExpanded ? 'Collapse action icons' : 'Expand action icons'}
+                      >
+                        <span
+                          className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180 text-secondary font-bold' : ''
+                          }`}
+                        >
+                          expand_more
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Main Details Row */}
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     {/* Left: Icon & Title/Party/Doc info */}
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
                           isMoneyIn
                             ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
                             : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
                         }`}
                       >
-                        <span className="material-symbols-outlined text-[18px]">
+                        <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
                           {item.type === 'SALE'
                             ? 'receipt_long'
                             : item.type === 'PURCHASE'
@@ -1136,8 +1182,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Bottom: 1-Tap Inline Fast Action Controls (R3) */}
-                  <div className="flex items-center justify-between pt-2 border-t border-outline-variant/15 text-xs">
+                  {/* Bottom: 1-Tap Inline Fast Action Controls (R3) - Collapsible on smaller screens */}
+                  <div
+                    className={`${
+                      isExpanded ? 'flex' : 'hidden md:flex'
+                    } items-center justify-between pt-2 border-t border-outline-variant/15 text-xs transition-all gap-1.5 flex-wrap sm:flex-nowrap`}
+                  >
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       {/* 1-Tap View Details */}
                       <button
