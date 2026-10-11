@@ -274,12 +274,13 @@ export function generateEWayBillJson(
   // Destination address, pincode, and place: prioritize shipping details (Bill-to Ship-to)
   const effectiveShippingPin = invoice.shippingPincode?.replace(/\D/g, '');
   const effectivePartyPin = invoice.partyPincode?.replace(/\D/g, '');
+  const shippingAddressEmbeddedPin = extractPincode(invoice.shippingAddress, 0);
 
   const toPin = effectiveShippingPin
     ? parseInt(effectiveShippingPin, 10) || extractPincode(invoice.shippingAddress || invoice.partyAddress)
-    : effectivePartyPin
+    : shippingAddressEmbeddedPin || (effectivePartyPin
     ? parseInt(effectivePartyPin, 10) || extractPincode(invoice.partyAddress)
-    : extractPincode(invoice.shippingAddress || invoice.partyAddress);
+    : extractPincode(invoice.shippingAddress || invoice.partyAddress));
 
   const effectiveConsigneeAddress = (invoice.shippingAddress || invoice.partyAddress || 'Customer Address').trim();
   const toPlace = extractLocation(invoice.shippingAddress || invoice.partyAddress, 'City');
@@ -320,7 +321,10 @@ export function generateEWayBillJson(
   // actToStateCode must reflect the actual delivery state (derived from shipping pincode/address).
   let resolvedActToStateCode = toStateCodeNum;
   if (resolvedTransType === '2' || isShippingDifferent || invoice.shippingPincode || invoice.shippingAddress) {
-    const pinDerived = getStateCodeFromPincode(toPin);
+    const shippingPin = effectiveShippingPin
+      ? parseInt(effectiveShippingPin, 10)
+      : (shippingAddressEmbeddedPin || undefined);
+    const pinDerived = shippingPin ? getStateCodeFromPincode(shippingPin) : undefined;
     const addrDerived = getStateCodeFromAddress(invoice.shippingAddress);
     resolvedActToStateCode = pinDerived || addrDerived || toStateCodeNum;
   }

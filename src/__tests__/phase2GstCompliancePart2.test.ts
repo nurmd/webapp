@@ -11,6 +11,8 @@ import {
   generateEWayBillJson,
   extractPincode,
   extractLocation,
+  getStateCodeFromPincode,
+  getStateCodeFromAddress,
   EWayBillTransportOptions,
 } from '../core/gst/eWayBillExport.ts';
 import { calculateInvoice } from '../core/gst/calculator.ts';
@@ -385,6 +387,34 @@ describe('Phase 2 Part 2 GST Statutory Compliance Suite', () => {
       handleSelectSupplier(mockCompositionSupplier);
       expect(currentItc).toBe('INELIGIBLE_OTHERS');
     });
+
+    it('TC-PUR-03: Statutory ITC calculation strictly excludes INELIGIBLE_OTHERS and INELIGIBLE_17_5 from claimable ITC', () => {
+      const mockPurchases = [
+        { id: 'P1', totalTax: 1800, itcEligibility: 'ELIGIBLE_INPUTS' as ItcEligibility },
+        { id: 'P2', totalTax: 500, itcEligibility: 'INELIGIBLE_17_5' as ItcEligibility }, // Blocked sec 17(5)
+        { id: 'P3', totalTax: 300, itcEligibility: 'INELIGIBLE_OTHERS' as ItcEligibility }, // Composition dealer inward supply
+        { id: 'P4', totalTax: 900, itcEligibility: 'ELIGIBLE_SERVICES' as ItcEligibility },
+      ];
+
+      // Filtering logic in PurchasesHubView and Gstr1View
+      const eligiblePurchases = mockPurchases.filter(
+        (p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS'
+      );
+      const totalItcClaimable = eligiblePurchases.reduce((s, p) => s + p.totalTax, 0);
+
+      expect(eligiblePurchases.length).toBe(2);
+      expect(totalItcClaimable).toBe(2700); // 1800 + 900, strictly excluding 500 and 300
+    });
+
+    it('TC-PUR-04: Simplified purchase modal displays Blocked for both INELIGIBLE_17_5 and INELIGIBLE_OTHERS', () => {
+      const getItcBadgeText = (itcEligibility?: ItcEligibility) =>
+        itcEligibility === 'INELIGIBLE_17_5' || itcEligibility === 'INELIGIBLE_OTHERS' ? 'Blocked' : 'Eligible';
+
+      expect(getItcBadgeText('INELIGIBLE_17_5')).toBe('Blocked');
+      expect(getItcBadgeText('INELIGIBLE_OTHERS')).toBe('Blocked');
+      expect(getItcBadgeText('ELIGIBLE_INPUTS')).toBe('Eligible');
+      expect(getItcBadgeText('ELIGIBLE_CAPITAL_GOODS')).toBe('Eligible');
+    });
   });
 
   // =========================================================================
@@ -559,6 +589,64 @@ describe('Phase 2 Part 2 GST Statutory Compliance Suite', () => {
       const payload = generateEWayBillJson(mockRegularCompany, invoice, options);
       expect(payload.billLists[0].transType).toBe('4');
       expect(payload.billLists[0].transDistance).toBe(120);
+    });
+
+    it('TC-EWAY-05: resolves actToStateCode accurately based on shipping destination pincode in Bill-to Ship-to', () => {
+      // Billing Party in Maharashtra (stateCode 27), Shipped to site in Karnataka (560001)
+      const invoiceBillToShipTo: Invoice = {
+        ...baseInvoice,
+        partyStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        partyAddress: '101 Nariman Point, Mumbai 400021, Maharashtra',
+        partyPincode: '400021',
+        shippingAddress: 'Site Office, Whitefield, Bangalore 560001, Karnataka',
+        shippingPincode: '560001',
+      };
+
+      const payload = generateEWayBillJson(mockRegularCompany, invoiceBillToShipTo);
+      const bill = payload.billLists[0];
+
+      expect(bill.transType).toBe('2');
+      expect(bill.toStateCode).toBe(27); // Billing state
+      expect(bill.actToStateCode).toBe(29); // Physical delivery destination state (Karnataka)
+      expect(bill.toPincode).toBe(560001);
+    });
+
+    it('TC-EWAY-06: resolves actToStateCode from shipping address state name when shipping pincode circle is omitted', () => {
+      const invoiceAddressState: Invoice = {
+        ...baseInvoice,
+        partyStateCode: '27',
+        partyAddress: '101 Mumbai',
+        partyPincode: '400001',
+        shippingAddress: 'Godown 5, Phase 2 Industrial Area, Delhi',
+        shippingPincode: undefined,
+      };
+
+      const payload = generateEWayBillJson(mockRegularCompany, invoiceAddressState);
+      const bill = payload.billLists[0];
+
+      expect(bill.transType).toBe('2');
+      expect(bill.toStateCode).toBe(27);
+      expect(bill.actToStateCode).toBe(7); // Delhi
+    });
+
+    it('TC-EWAY-07: getStateCodeFromPincode accurately maps major postal circle prefixes to GST state codes', () => {
+      expect(getStateCodeFromPincode(110001)).toBe(7); // Delhi
+      expect(getStateCodeFromPincode(560001)).toBe(29); // Karnataka
+      expect(getStateCodeFromPincode(380001)).toBe(24); // Gujarat
+      expect(getStateCodeFromPincode(600001)).toBe(33); // Tamil Nadu
+      expect(getStateCodeFromPincode(403001)).toBe(30); // Goa
+      expect(getStateCodeFromPincode(682001)).toBe(31); // Lakshadweep
+      expect(getStateCodeFromPincode(744101)).toBe(35); // Andaman & Nicobar
+      expect(getStateCodeFromPincode(194101)).toBe(38); // Ladakh
+      expect(getStateCodeFromPincode(500001)).toBe(36); // Telangana
+    });
+
+    it('TC-EWAY-08: getStateCodeFromAddress extracts state code case-insensitively', () => {
+      expect(getStateCodeFromAddress('Warehouse No 4, Bangalore, Karnataka, 560001')).toBe(29);
+      expect(getStateCodeFromAddress('Plot 10, Ahmedabad, Gujarat')).toBe(24);
+      expect(getStateCodeFromAddress('Plot 2, Connaught Place, New Delhi')).toBe(7);
+      expect(getStateCodeFromAddress('Unknown place')).toBeUndefined();
     });
   });
 

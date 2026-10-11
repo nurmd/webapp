@@ -67,9 +67,21 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      const offset = window.scrollY || document.documentElement.scrollTop;
-      setIsScrolled(offset > 30);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const y = window.scrollY || document.documentElement.scrollTop;
+          // Hysteresis: activates at > 80px, deactivates only when scrolling back to < 40px
+          setIsScrolled((prev) => {
+            if (!prev && y > 80) return true;
+            if (prev && y < 40) return false;
+            return prev;
+          });
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -284,93 +296,79 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Main Responsive Content Container */}
-      <main className="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
-        {/* Mobile Floating Card (Compacts upon scroll to just party name and balance with smooth animation) */}
-        <div
-          className={`md:hidden sticky top-[48px] sm:top-[52px] z-20 transition-all duration-300 ease-in-out ${
-            isScrolled
-              ? 'py-2 px-3.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-outline-variant/30 shadow-md my-0.5'
-              : 'bg-transparent mb-0.5'
-          }`}
-        >
-          {/* Compact View: Just Party Name & Balance */}
-          <div
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className={`transition-all duration-300 ease-in-out cursor-pointer ${
-              isScrolled
-                ? 'opacity-100 max-h-12 scale-100 pointer-events-auto'
-                : 'opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden'
-            }`}
-            title="Tap to scroll to top"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
-                    isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
-                  }`}
-                >
-                  {party.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-xs font-bold text-on-surface truncate">
-                    {party.name}
-                  </h2>
-                  <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
-                    {isCustomer ? 'Customer' : 'Supplier'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span
-                  className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                    isReceivable
-                      ? 'bg-error/10 text-error'
-                      : isPayable
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                      : 'bg-secondary/10 text-secondary'
-                  }`}
-                >
-                  {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
-                </span>
-                <span
-                  className={`font-currency-display-mobile text-xs font-black ${
-                    isReceivable
-                      ? 'text-error'
-                      : isPayable
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-secondary'
-                  }`}
-                >
-                  {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
-                </span>
-              </div>
+      {/* Mobile Floating Compact Card (fixed overlay that slides in upon scroll, zero layout shift) */}
+      <aside
+        aria-label="Sticky Party Summary"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`md:hidden fixed top-[46px] sm:top-[50px] left-2.5 right-2.5 z-20 transition-all duration-250 ease-out transform cursor-pointer ${
+          isScrolled
+            ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
+            : '-translate-y-3 opacity-0 scale-95 pointer-events-none'
+        } py-2 px-3.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-secondary/30`}
+        title="Tap to scroll to top"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
+                isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
+              }`}
+            >
+              {party.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xs font-bold text-on-surface truncate">
+                {party.name}
+              </h2>
+              <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
+                {isCustomer ? 'Customer' : 'Supplier'}
+              </span>
             </div>
           </div>
 
-          {/* Full Expanded Card on Mobile (visible when not scrolled) */}
-          <div
-            className={`transition-all duration-300 ease-in-out ${
-              !isScrolled
-                ? 'opacity-100 max-h-[1000px] scale-100 pointer-events-auto'
-                : 'opacity-0 max-h-0 scale-98 pointer-events-none overflow-hidden'
-            }`}
-          >
-            <PartyInfoCard
-              party={party}
-              company={company}
-              liveNetBalance={liveNetBalance}
-              isReceivable={isReceivable}
-              isPayable={isPayable}
-              totalBilled={totalBilled}
-              totalPaid={totalPaid}
-              showPartyDetails={showPartyDetails}
-              setShowPartyDetails={setShowPartyDetails}
-              onEditParty={onEditParty}
-            />
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span
+              className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                isReceivable
+                  ? 'bg-error/10 text-error'
+                  : isPayable
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  : 'bg-secondary/10 text-secondary'
+              }`}
+            >
+              {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
+            </span>
+            <span
+              className={`font-currency-display-mobile text-xs font-black ${
+                isReceivable
+                  ? 'text-error'
+                  : isPayable
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-secondary'
+              }`}
+            >
+              {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
+            </span>
           </div>
+        </div>
+      </aside>
+
+      {/* 2. Main Responsive Content Container */}
+      <main className="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
+        {/* Full Expanded Card on Mobile (in natural page flow, never collapses its height -> 0 layout shift!) */}
+        <div className="md:hidden">
+          <PartyInfoCard
+            party={party}
+            company={company}
+            liveNetBalance={liveNetBalance}
+            isReceivable={isReceivable}
+            isPayable={isPayable}
+            totalBilled={totalBilled}
+            totalPaid={totalPaid}
+            showPartyDetails={showPartyDetails}
+            setShowPartyDetails={setShowPartyDetails}
+            onEditParty={onEditParty}
+          />
         </div>
 
         {/* Responsive Layout: Two-Column on Tablet/Wide, Single-Column on Mobile */}
