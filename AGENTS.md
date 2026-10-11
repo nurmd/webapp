@@ -79,3 +79,40 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 - The workspace maintains [CODEBASE_GUIDE.md](./CODEBASE_GUIDE.md) as the single source of truth for teamwork multi-agent teams, reviewers, and developers.
 - Whenever adding new domain engines, persistence keys, major components, or modifying architecture, agents must update `CODEBASE_GUIDE.md` alongside code changes to keep the guide current and prevent context drift.
 
+---
+
+## 11. Detached Topbar & Independent Scroll Containment
+- The application shell (`App.tsx`) enforces a detached topbar architecture:
+  - Root container: `h-screen h-[100dvh] overflow-hidden flex flex-row`.
+  - Global `<Header />`: `flex-shrink-0 z-30` outside the scroll hierarchy.
+  - Scroll container: `<main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain">`.
+- All scroll listeners (e.g. scroll-to-top, hysteresis sticky headers) must attach to `document.getElementById('main-content-scroll')` with passive event listeners and `requestAnimationFrame`.
+- This strictly prevents subview elements from being trapped or rendered behind the topbar during scrolling.
+
+---
+
+## 12. Floating Overlay Headers & Zero-Height Anchors
+- Any floating, compact, or sticky headers that dynamically toggle on scroll must be wrapped in a zero-height anchor container:
+  ```tsx
+  <div className="sticky top-1.5 z-30 h-0 overflow-visible pointer-events-none px-2.5">
+    <aside className="pointer-events-auto ...">...</aside>
+  </div>
+  ```
+- This prevents ghost whitespace and layout shifts above content cards in the normal document flow.
+- When the primary header slides out on scroll (`-translate-y-full opacity-0`), the replacement compact card must provide an `arrow_back` navigation button so users can navigate back at any scroll position.
+- Scroll toggles must use hysteresis (e.g. activate at `y > 80px`, deactivate at `y < 40px`) to prevent edge jitter.
+
+---
+
+## 13. Dynamic OTA Release Notes Invariant
+- Never commit hardcoded fallback release notes strings in `updateService.ts` or `AppUpdateModal.tsx`.
+- Release notes must be dynamically derived via `fetchDynamicReleaseNotes()` from `public/version.json`, recent GitHub commit subjects, or local build metadata.
+- `scripts/build-apk.sh` must invoke `scripts/generate-version.sh` before `npm run build` to keep `public/version.json` in sync with git history.
+
+---
+
+## 14. Code-Split Asset Parity & APK Build Sequencing
+- `challenger2M5ApkPackageStress.test.ts` validates that all code-split `.js` chunks in `dist/assets/` match the contents of `dist-android/GSTBilling-Vyapar.apk`.
+- Whenever modifying frontend code that changes Vite chunk hashes, run `./scripts/build-apk.sh` before running `npm test`.
+
+

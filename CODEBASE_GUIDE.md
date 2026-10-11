@@ -146,18 +146,44 @@ The `StorageService` class (`db`) is the unified database facade:
   - Each purchase transaction row links to `purchaseId` and opens the purchase bill preview.
 - **`ItemFormModal.tsx`**: Add/Edit item modal. Displays a real-time warning banner if the typed name already exists in the catalog (excluding the current item in edit mode).
 
+### C. Parties & Ledger Architecture (`PartyDetailPage.tsx`)
+- **Responsive Layout**:
+  - **Tablet & Wide (`md:` and above)**: Split into non-scrolling Left Column (fixed Party Info Card, Record Payment, New Invoice / New Bill) and Right Column (Transaction Ledger table).
+  - **Mobile (`< md`)**:
+    - Full Party Info Card in natural document flow.
+    - Sticky party name topbar automatically slides out of view on scroll (`-translate-y-full opacity-0 pointer-events-none`).
+    - Floating compact card (with back button, party avatar, name, and live balance) slides down into `top-1.5` (`z-30`) to replace the topbar.
+    - Zero-height anchor wrapper (`h-0 overflow-visible pointer-events-none`) prevents ghost vertical spacing above the balance card.
+    - Scroll hysteresis: activates at `scrollTop > 80px`, deactivates only when scrolling back to `< 40px`.
+    - Bound to `#main-content-scroll` scroll events.
+
+### D. Settings Hub & Overhaul (`CompanySettingsView.tsx`)
+- Responsive split-pane Hub with vertical navigation sidebar on desktop (`md:`) and stacked view on mobile:
+  1. Business Profile (Company details, GST & Tax compliance, Composition scheme toggle)
+  2. Billing & Invoices (Prefixes, numbering, payment QR, default print format)
+  3. Inventory & Items (Negative stock allow toggle, buy price visibility)
+  4. Hardware & Printing (Thermal 58mm/80mm, margins, auto-cut)
+  5. App Preferences (Language, theme, app lock, OTA updates)
+  6. Data & Sync (Cloud sync, multi-device pairing, import/export)
+  7. Security & Audit (Immutable SHA-256 MCA audit trail)
+
 ---
 
-## 6. Dynamic Code Splitting & Performance Architecture
+## 6. App Shell & Detached Scroll Architecture
 
-To maintain instant boot times and meet APK memory constraints:
-- **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
-  ```typescript
-  const TableGridInvoiceModal = React.lazy(() =>
-    import('./components/Invoicing/TableGridInvoiceModal.tsx').then((m) => ({ default: m.TableGridInvoiceModal }))
-  );
-  ```
-- **Entry Chunk Ceiling**: Main bundle (`index.js`) must strictly remain under **450 kB** uncompressed. Zero-CLS Suspense fallback skeletons are rendered during chunk loads.
+To prevent sticky headers and modal backdrops from scrolling behind the topbar:
+- **Detached Shell in `App.tsx`**:
+  - Root container: `h-screen h-[100dvh] overflow-hidden flex flex-row`.
+  - Global `<Header />`: Fixed outside the scroll hierarchy (`flex-shrink-0 z-30`).
+  - Scroll container: `<main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">`.
+- **Dynamic Code Splitting & Performance Architecture**:
+  - **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
+    ```typescript
+    const TableGridInvoiceModal = React.lazy(() =>
+      import('./components/Invoicing/TableGridInvoiceModal.tsx').then((m) => ({ default: m.TableGridInvoiceModal }))
+    );
+    ```
+  - **Entry Chunk Ceiling**: Main bundle (`index.js`) must strictly remain under **450 kB** uncompressed. Zero-CLS Suspense fallback skeletons are rendered during chunk loads.
 
 ---
 
@@ -189,11 +215,13 @@ npm run build
 ## 8. Release & Deployment Pipeline
 
 Refer to [`.agents/skills/vyapar-release/SKILL.md`](file:///data/data/com.termux/files/home/gst-billing-app/.agents/skills/vyapar-release/SKILL.md) for detailed execution:
-1. Bump version in `package.json` (e.g. `1.1.16`).
+1. Bump version in `package.json` (e.g. `1.1.27`).
 2. Update `challenger2M5ApkPackageStress.test.ts` versionCode (`X*10000 + Y*100 + Z`).
-3. Run `bash scripts/generate-version.sh`.
-4. Run `bash scripts/build-apk.sh` (produces signed `dist-android/GSTBilling-Vyapar.apk`).
-5. Run `bash scripts/package-pwa.sh` (produces `dist-pwa/vyapar-pwa.tar.gz`).
-6. Run `npm test && npx tsc --noEmit`.
+3. Run `./scripts/generate-version.sh` (extracts recent git commit subjects into `public/version.json`).
+4. Run `./scripts/build-apk.sh` (produces signed `dist-android/GSTBilling-Vyapar.apk` and mirrors to `~/storage/downloads/`).
+5. Run `./scripts/package-pwa.sh` (produces `dist-pwa/vyapar-pwa.tar.gz`).
+6. Run `npx tsc --noEmit && npm test` (all 25 suites must pass 100% green).
+   > **Note**: Building the APK before testing ensures that all Vite code-split chunks in `dist/assets/` match the packaged APK archive for `challenger2M5ApkPackageStress.test.ts`.
 7. Git commit, tag `vX.Y.Z`, push `master` and tag.
-8. Upload release assets via `gh release`.
+8. Upload release assets via `gh release upload`.
+
