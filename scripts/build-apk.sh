@@ -14,6 +14,7 @@ cd "$APP_DIR"
 
 # 1. Build Web Assets
 echo "[1/6] Building production web assets with Vite..."
+./scripts/generate-version.sh || true
 npm run build
 
 # 2. Copy Web Assets to Android assets directory (strictly separating PWA and Android)

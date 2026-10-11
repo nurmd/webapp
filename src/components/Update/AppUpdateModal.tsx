@@ -25,6 +25,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
   const cancelDownloadRef = useRef<(() => void) | null>(null);
   const [activeRelease, setActiveRelease] = useState<AppReleaseInfo | null>(releaseInfo || null);
+  const [dynamicNotes, setDynamicNotes] = useState<string[]>([]);
 
   useEffect(() => {
     if (releaseInfo) {
@@ -37,6 +38,19 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
       }).catch(() => {});
     }
   }, [isOpen, releaseInfo]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const targetVer = activeRelease?.version || releaseInfo?.version || CURRENT_APP_VERSION;
+      updateService.fetchDynamicReleaseNotes(updateService.getGitHubRepo(), targetVer)
+        .then((notes) => {
+          if (notes && notes.length > 0) {
+            setDynamicNotes(notes);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, activeRelease?.version, releaseInfo?.version]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -55,19 +69,25 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
   if (!isOpen) return null;
 
-  const info: AppReleaseInfo = activeRelease || {
-    version: CURRENT_APP_VERSION,
-    versionCode: 10035,
-    releaseDate: new Date().toISOString().split('T')[0],
-    releaseTitle: `Vyapar PRO v${CURRENT_APP_VERSION}`,
-    releaseNotes: [
-      'Clean Clutter-Free POS Billing Counter with fixed item table scroll',
-      'Instant PWA auto-update from GitHub repository',
-      'Optimized thermal receipt printing and dynamic UPI QR modal'
-    ],
-    apkUrl: 'https://github.com/nurmd/webapp/releases/latest',
-    apkSize: isPwa ? 'PWA Web' : '20.2 MB',
-    isPwa,
+  const resolvedNotes = (activeRelease?.releaseNotes && activeRelease.releaseNotes.length > 0)
+    ? activeRelease.releaseNotes
+    : (dynamicNotes.length > 0 ? dynamicNotes : [
+        `Vyapar Books PRO v${activeRelease?.version || CURRENT_APP_VERSION} release updates`,
+        'Performance enhancements and stability updates'
+      ]);
+
+  const info: AppReleaseInfo = {
+    ...(activeRelease || {
+      version: CURRENT_APP_VERSION,
+      versionCode: 10035,
+      releaseDate: new Date().toISOString().split('T')[0],
+      releaseTitle: `Vyapar PRO v${CURRENT_APP_VERSION}`,
+      apkUrl: 'https://github.com/nurmd/webapp/releases/latest',
+      apkSize: isPwa ? 'PWA Web' : '20.2 MB',
+      isPwa,
+      releaseNotes: resolvedNotes,
+    }),
+    releaseNotes: resolvedNotes,
   };
 
   const handleApplyPwaUpdate = async () => {

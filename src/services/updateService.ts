@@ -226,6 +226,15 @@ class UpdateService {
               parsedSha256 = shaMatch[1].toLowerCase();
             } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
               notes.push(trimmed.replace(/^[-*•]\s+/, '').replace(/\*\*/g, ''));
+            } else if (
+              trimmed &&
+              !trimmed.toLowerCase().includes('full changelog') &&
+              !trimmed.startsWith('http') &&
+              !trimmed.startsWith('#') &&
+              !trimmed.startsWith('---') &&
+              !trimmed.toLowerCase().startsWith('compare/')
+            ) {
+              notes.push(trimmed.replace(/\*\*/g, ''));
             }
           }
         }
@@ -243,16 +252,16 @@ class UpdateService {
         const defaultRawApkUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`;
         const defaultRawShaUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`;
 
+        const dynamicNotes = notes.length > 0 
+          ? notes 
+          : await this.fetchDynamicReleaseNotes(repo, cleanVersion);
+
         const releaseInfo: AppReleaseInfo = {
           version: cleanVersion,
           versionCode: this.calculateVersionCode(cleanVersion),
           releaseDate: data.published_at ? data.published_at.split('T')[0] : new Date().toISOString().split('T')[0],
           releaseTitle: data.name || `Vyapar PRO v${cleanVersion}`,
-          releaseNotes: notes.length > 0 ? notes : [
-            'Enhanced Clean POS Billing with fixed table layout and customer selector',
-            'Full PWA offline support with instant background synchronization',
-            'Thermal receipt printing (58mm/80mm) and Dynamic UPI QR codes',
-          ],
+          releaseNotes: dynamicNotes,
           apkUrl: apkAsset?.browser_download_url || defaultRawApkUrl,
           apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '1.1 MB'),
           sha256: parsedSha256,
@@ -294,17 +303,14 @@ class UpdateService {
           }
         } catch (_e) {}
 
+        const dynamicNotes = await this.fetchDynamicReleaseNotes(repo, githubVersion, commitMsg);
+
         const releaseInfo: AppReleaseInfo = {
           version: githubVersion,
           versionCode: this.calculateVersionCode(githubVersion),
           releaseDate: new Date().toISOString().split('T')[0],
           releaseTitle: `Vyapar PRO v${githubVersion} (GitHub Master)`,
-          releaseNotes: [
-            commitMsg,
-            'Clean Clutter-Free POS Billing Counter with fixed item table scroll',
-            'Installable Offline-First PWA for Debian Linux Server',
-            'Automatic GitHub deployment pipeline with Service Worker hot-reload'
-          ],
+          releaseNotes: dynamicNotes,
           apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
           apkSize: isPwa ? 'Web PWA' : '1.1 MB',
           sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
@@ -329,15 +335,18 @@ class UpdateService {
         if (localVersionRes.ok) {
           const vData = await localVersionRes.json();
           if (vData.version && this.isNewer(vData.version, CURRENT_APP_VERSION)) {
+            const dynamicNotes = Array.isArray(vData.releaseNotes) && vData.releaseNotes.length > 0
+              ? vData.releaseNotes
+              : [
+                  `Vyapar Books update v${vData.version} deployed`,
+                  'Click Update to refresh application cache'
+                ];
             const releaseInfo: AppReleaseInfo = {
               version: vData.version,
               versionCode: this.calculateVersionCode(vData.version),
               releaseDate: vData.buildTime ? vData.buildTime.split('T')[0] : new Date().toISOString().split('T')[0],
               releaseTitle: `Vyapar PRO v${vData.version}`,
-              releaseNotes: [
-                'New PWA build deployed on server',
-                'Click Update to refresh application cache'
-              ],
+              releaseNotes: dynamicNotes,
               apkUrl: '',
               apkSize: 'Web PWA',
               isPwa: true,
@@ -379,6 +388,83 @@ class UpdateService {
       if (l < c) return false;
     }
     return false;
+  }
+
+  /**
+   * Dynamically retrieves release notes from multiple reliable sources:
+   * 1. Remote public/version.json on GitHub master
+   * 2. GitHub Commits API (recent commit messages)
+   * 3. Local /version.json
+   */
+  public async fetchDynamicReleaseNotes(
+    repo: string,
+    targetVersion?: string,
+    fallbackCommitMsg?: string
+  ): Promise<string[]> {
+    // 1. Try remote public/version.json
+    try {
+      const rawVersionUrl = `https://raw.githubusercontent.com/${repo}/master/public/version.json?t=${Date.now()}`;
+      const res = await fetch(rawVersionUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.releaseNotes) && data.releaseNotes.length > 0) {
+          return data.releaseNotes;
+        }
+      }
+    } catch (_e) {}
+
+    // 2. Try GitHub Commits API
+    try {
+      const commitsUrl = `https://api.github.com/repos/${repo}/commits?per_page=8`;
+      const res = await fetch(commitsUrl, {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+      if (res.ok) {
+        const commits = await res.json();
+        if (Array.isArray(commits)) {
+          const notes: string[] = [];
+          for (const item of commits) {
+            const rawMsg = item?.commit?.message?.split('\n')[0]?.trim();
+            if (
+              rawMsg &&
+              !rawMsg.startsWith('Merge') &&
+              !rawMsg.startsWith('bump') &&
+              !rawMsg.toLowerCase().includes('subagent') &&
+              !rawMsg.toLowerCase().includes('wip')
+            ) {
+              const cleaned = rawMsg.replace(/^[a-z]+(\([a-z0-9_-]+\))?:\s*/i, '').trim();
+              if (cleaned && !notes.includes(cleaned)) {
+                notes.push(cleaned);
+              }
+            }
+            if (notes.length >= 6) break;
+          }
+          if (notes.length > 0) return notes;
+        }
+      }
+    } catch (_e) {}
+
+    // 3. Try Local version.json (if in browser)
+    if (typeof window !== 'undefined') {
+      try {
+        const localRes = await fetch(`./version.json?t=${Date.now()}`);
+        if (localRes.ok) {
+          const vData = await localRes.json();
+          if (Array.isArray(vData.releaseNotes) && vData.releaseNotes.length > 0) {
+            return vData.releaseNotes;
+          }
+        }
+      } catch (_e) {}
+    }
+
+    // 4. Fallback commit message or version-specific text
+    if (fallbackCommitMsg && fallbackCommitMsg.trim()) {
+      return [fallbackCommitMsg.trim()];
+    }
+
+    return [
+      `Version ${targetVersion || CURRENT_APP_VERSION} includes performance enhancements, bug fixes, and stability updates.`
+    ];
   }
 
   public calculateVersionCode(versionStr: string): number {

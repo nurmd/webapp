@@ -221,8 +221,14 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
   return (
     <div className="min-h-screen bg-surface flex flex-col animate-fade-in pb-8">
-      {/* 1. Mobile-Optimized Sticky Top Navigation */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 px-3 py-2 sm:px-6 sm:py-3 shadow-xs">
+      {/* 1. Mobile-Optimized Sticky Top Navigation (slides out on scroll) */}
+      <header
+        className={`sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 px-3 py-2 sm:px-6 sm:py-3 shadow-xs transition-all duration-300 ease-in-out ${
+          isScrolled
+            ? '-translate-y-full opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto'
+            : 'translate-y-0 opacity-100 pointer-events-auto'
+        }`}
+      >
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           {/* Back button & Party Identity */}
           <div className="flex items-center gap-2 min-w-0">
@@ -306,69 +312,83 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       </header>
 
-      {/* Mobile Floating Compact Card (sticky overlay inside main working area, zero layout shift) */}
-      <aside
-        aria-label="Sticky Party Summary"
-        onClick={() => {
-          const mainEl = document.getElementById('main-content-scroll');
-          if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        className={`md:hidden sticky top-[46px] sm:top-[48px] z-20 mx-2.5 transition-all duration-250 ease-out transform cursor-pointer ${
-          isScrolled
-            ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
-            : '-translate-y-3 opacity-0 scale-95 pointer-events-none'
-        } py-2 px-3.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-secondary/30`}
-        title="Tap to scroll to top"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
-                isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
-              }`}
-            >
-              {party.name.charAt(0).toUpperCase()}
+      {/* Mobile Floating Compact Card (zero-height sticky anchor: seamlessly replaces topbar on scroll) */}
+      <div className="md:hidden sticky top-1.5 sm:top-2 z-30 h-0 overflow-visible pointer-events-none px-2.5">
+        <aside
+          aria-label="Sticky Party Summary"
+          onClick={() => {
+            const mainEl = document.getElementById('main-content-scroll');
+            if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`transition-all duration-250 ease-out transform cursor-pointer ${
+            isScrolled
+              ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
+              : '-translate-y-6 opacity-0 scale-95 pointer-events-none'
+          } py-2 px-3 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-secondary/30`}
+          title="Tap to scroll to top"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBack();
+                }}
+                className="p-1 -ml-1 rounded-xl text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
+                title="Back to Parties"
+              >
+                <span className="material-symbols-outlined text-[19px]">arrow_back</span>
+              </button>
+
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
+                  isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
+                }`}
+              >
+                {party.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xs font-bold text-on-surface truncate">
+                  {party.name}
+                </h2>
+                <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
+                  {isCustomer ? 'Customer' : 'Supplier'}
+                </span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xs font-bold text-on-surface truncate">
-                {party.name}
-              </h2>
-              <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
-                {isCustomer ? 'Customer' : 'Supplier'}
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span
+                className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                  isReceivable
+                    ? 'bg-error/10 text-error'
+                    : isPayable
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    : 'bg-secondary/10 text-secondary'
+                }`}
+              >
+                {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
+              </span>
+              <span
+                className={`font-currency-display-mobile text-xs font-black ${
+                  isReceivable
+                    ? 'text-error'
+                    : isPayable
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-secondary'
+                }`}
+              >
+                {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
               </span>
             </div>
           </div>
-
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <span
-              className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
-                isReceivable
-                  ? 'bg-error/10 text-error'
-                  : isPayable
-                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                  : 'bg-secondary/10 text-secondary'
-              }`}
-            >
-              {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
-            </span>
-            <span
-              className={`font-currency-display-mobile text-xs font-black ${
-                isReceivable
-                  ? 'text-error'
-                  : isPayable
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-secondary'
-              }`}
-            >
-              {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
-            </span>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      </div>
 
       {/* 2. Main Responsive Content Container */}
-      <main className="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
+      <main className="max-w-7xl w-full mx-auto px-2.5 pt-1.5 pb-4 sm:px-4 sm:pt-2 sm:pb-6 md:px-6 md:pt-3 md:pb-8 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
         {/* Full Expanded Card on Mobile (in natural page flow, never collapses its height -> 0 layout shift!) */}
         <div className="md:hidden">
           <PartyInfoCard
