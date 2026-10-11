@@ -33,6 +33,20 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<HsnItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
+
+  // Dynamically calculate whether dropdown should anchor left or right based on viewport bounds
+  useEffect(() => {
+    if (isOpen && containerRef.current && typeof window !== 'undefined') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360;
+      if (rect.right + 120 > viewportWidth || rect.left > viewportWidth / 2) {
+        setDropdownAlign('right');
+      } else {
+        setDropdownAlign('left');
+      }
+    }
+  }, [isOpen]);
 
   // Update suggestions whenever value changes
   useEffect(() => {
@@ -130,7 +144,9 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
         <ul
           id={`${inputId}-listbox`}
           role="listbox"
-          className="absolute z-50 left-0 min-w-[280px] sm:min-w-[340px] max-w-[90vw] mt-1 max-h-60 overflow-y-auto rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl py-1 text-xs"
+          className={`absolute z-50 ${
+            dropdownAlign === 'right' ? 'right-0' : 'left-0'
+          } min-w-[260px] sm:min-w-[340px] max-w-[calc(100vw-1.5rem)] mt-1 max-h-60 overflow-y-auto rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl py-1 text-xs`}
         >
           {suggestions.map((item, idx) => {
             const isSelected = idx === selectedIndex;

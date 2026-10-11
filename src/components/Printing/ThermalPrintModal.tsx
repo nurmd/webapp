@@ -305,12 +305,16 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div
-                className={`bg-amber-50/90 dark:bg-amber-100/95 p-3.5 rounded-xl border border-amber-200/80 dark:border-amber-300 font-mono ${
-                  width === 32 ? 'text-[11px]' : 'text-[10px]'
-                } leading-relaxed text-slate-950 shadow-md overflow-x-auto whitespace-pre select-text font-bold`}
-              >
-                {previewText}
+              <div className="flex justify-center p-2 bg-surface-container-low/60 rounded-2xl border border-outline-variant/20">
+                <div
+                  className={`w-full ${
+                    width === 32 ? 'max-w-[320px]' : 'max-w-[420px]'
+                  } bg-[#fefdfb] text-slate-950 p-3.5 sm:p-4 rounded-xl border border-stone-300 shadow-md font-mono ${
+                    width === 32 ? 'text-[11px]' : 'text-[10px]'
+                  } leading-relaxed overflow-x-auto whitespace-pre select-text font-bold transition-all`}
+                >
+                  {previewText}
+                </div>
               </div>
             )}
           </div>

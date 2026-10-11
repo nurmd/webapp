@@ -53,9 +53,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-2.5 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col max-h-[90vh] overflow-hidden">
+        {/* Sticky Header */}
+        <div className="flex items-center justify-between border-b border-outline-variant/20 p-3 sm:p-4 flex-shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             {onDeleteInvoice ? (
               <button
@@ -108,7 +108,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           </button>
         </div>
 
-        {/* Compact Customer Details */}
+        {/* Scrollable Content Body */}
+        <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-2.5">
+          {/* Compact Customer Details */}
         {isGstActive && (
           <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
             <span>
@@ -247,9 +249,10 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             </div>
           )}
         </div>
+        </div>
 
-        {/* Bottom Actions Bar */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-outline-variant/20">
+        {/* Bottom Actions Bar (Sticky Action Dock) */}
+        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0">
           {/* Print Button */}
           {(onPrintInvoice || onOpenFullA4Preview) && (
             <button

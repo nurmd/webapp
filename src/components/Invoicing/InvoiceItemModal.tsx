@@ -568,8 +568,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSaveAndClose} className="p-4 overflow-y-auto flex flex-col gap-3.5 flex-1">
+        {/* Form with Scrollable Inputs and Sticky Action Dock */}
+        <form onSubmit={handleSaveAndClose} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-4 overflow-y-auto flex flex-col gap-3.5 flex-1">
           {/* 1. Item Name with Integrated Search Dropdown */}
           <div className="relative flex flex-col gap-1">
             <div className="flex items-center justify-between">
@@ -954,8 +955,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             )}
           </div>
 
-          {/* Modal Footer Controls */}
-          <div className="pt-2 flex items-center justify-between gap-2">
+          </div>
+
+          {/* Sticky Modal Footer Controls */}
+          <div className="p-3 sm:p-4 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0 flex items-center justify-between gap-2">
             {isEditing && onDeleteItem && (
               <button
                 type="button"

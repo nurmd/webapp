@@ -64,12 +64,12 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
 
           {/* Available Stock Badge */}
           <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 whitespace-nowrap ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold flex-shrink-0 whitespace-nowrap shadow-2xs ${
               isOut
-                ? 'bg-error/10 text-error'
+                ? 'bg-error/15 text-error border border-error/30'
                 : isLow
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : 'bg-secondary/10 text-secondary'
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30'
             }`}
           >
             <span
@@ -78,7 +78,7 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
                   ? 'bg-error'
                   : isLow
                   ? 'bg-amber-500 animate-pulse'
-                  : 'bg-secondary'
+                  : 'bg-emerald-600 dark:bg-emerald-400'
               }`}
             />
             <span>
@@ -92,11 +92,11 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
         </div>
 
         {/* Bottom Row: Pricing (Sale left, Buy justified right) */}
-        <div className="flex items-center justify-between gap-2 mt-1 text-xs text-on-surface-variant">
+        <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
           {/* Sale Price */}
-          <div className="inline-flex items-baseline gap-1">
-            <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Sale:</span>
-            <span className="font-headline-sm text-xs sm:text-body-md font-bold text-on-surface">
+          <div className="inline-flex items-baseline gap-1.5">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Sale:</span>
+            <span className="font-headline-sm text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
               {formatINR(item.salePrice)}
             </span>
           </div>
@@ -105,14 +105,14 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
           <button
             type="button"
             onClick={onToggleBuyPrice}
-            className="inline-flex items-center justify-end gap-1 cursor-pointer hover:opacity-80 active:scale-95 transition-all text-right ml-auto bg-transparent border-0 p-0"
+            className="inline-flex items-center justify-end gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-right ml-auto bg-slate-100/80 dark:bg-slate-800/60 px-2 py-0.5 rounded-md border border-black/[0.04] dark:border-white/[0.06]"
             title={isBuyPriceVisible ? 'Click to hide purchase price' : 'Click to view purchase price'}
           >
-            <span className="text-outline text-[10px] font-label-sm uppercase font-semibold">Buy:</span>
-            <span className="font-tabular-data text-xs font-semibold text-on-surface-variant font-mono tracking-wider">
-              {isBuyPriceVisible ? formatINR(item.purchasePrice) : '***'}
+            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Buy:</span>
+            <span className="font-tabular-data text-xs font-bold text-slate-600 dark:text-slate-300 font-mono tracking-wider">
+              {isBuyPriceVisible ? formatINR(item.purchasePrice) : '•••'}
             </span>
-            <span className="material-symbols-outlined text-[14px] text-outline ml-0.5">
+            <span className="material-symbols-outlined text-[13px] text-slate-400 ml-0.5">
               {isBuyPriceVisible ? 'visibility' : 'visibility_off'}
             </span>
           </button>
