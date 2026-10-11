@@ -136,9 +136,11 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     initialBill?.supplierStateCode || selectedSupplier?.stateCode || company.stateCode
   );
 
-  const [itcEligibility, setItcEligibility] = useState<ItcEligibility>(
-    initialBill?.itcEligibility || 'ELIGIBLE_INPUTS'
-  );
+  const [itcEligibility, setItcEligibility] = useState<ItcEligibility>(() => {
+    if (initialBill?.itcEligibility) return initialBill.itcEligibility;
+    if (initialSupplier?.isComposition) return 'INELIGIBLE_OTHERS';
+    return 'ELIGIBLE_INPUTS';
+  });
 
   // Dedicated Add/Edit item modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);

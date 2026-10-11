@@ -85,6 +85,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
     setSelectedParty(newParty);
     setPosStateCode(newParty.stateCode);
+    if (!shippingAddress && newParty.shippingAddress) {
+      setShippingAddress(newParty.shippingAddress);
+    }
+    if (!shippingPincode && newParty.pincode) {
+      setShippingPincode(newParty.pincode);
+    }
     setIsAddPartyModalOpen(false);
     setIsPartyModalOpen(false);
     onPartyCreated?.(newParty);
@@ -175,6 +181,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Overall Discount & Shipping
   const [overallDiscountPercent, setOverallDiscountPercent] = useState<number>(0);
   const [shippingAmount, setShippingAmount] = useState<number>(initialInvoice?.shippingAmount || 0);
+  const [shippingAddress, setShippingAddress] = useState<string>(() => initialInvoice?.shippingAddress || '');
+  const [shippingPincode, setShippingPincode] = useState<string>(() => initialInvoice?.shippingPincode || '');
   const [isExtraDiscountModalOpen, setIsExtraDiscountModalOpen] = useState(false);
 
   // Scanner modal
@@ -483,6 +491,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       partyName: selectedParty?.name || 'Cash Counter Customer',
       partyGstin: isGstActive ? selectedParty?.gstin : undefined,
       partyAddress: selectedParty?.billingAddress || 'Local Counter',
+      partyPincode: selectedParty?.pincode,
+      shippingAddress: shippingAddress.trim() || undefined,
+      shippingPincode: shippingPincode.trim() || undefined,
       partyStateCode: posStateCode,
       placeOfSupplyStateCode: posStateCode,
       isIntraState: calcSummary.isIntraState,
@@ -642,8 +653,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             onInvoiceTypeChange={(val) => setManualInvoiceType(val)}
             isRcm={isRcm}
             onRcmChange={setIsRcm}
+            shippingAddress={shippingAddress}
+            shippingPincode={shippingPincode}
+            onShippingAddressChange={setShippingAddress}
+            onShippingPincodeChange={setShippingPincode}
             onSelectPartyClick={() => setIsPartyModalOpen(true)}
-            onClearParty={() => setSelectedParty(null)}
+            onClearParty={() => {
+              setSelectedParty(null);
+              setShippingAddress('');
+              setShippingPincode('');
+            }}
             onAddPartyClick={() => setIsAddPartyModalOpen(true)}
             onOpenInvoiceNumberModal={() => setIsInvoiceNumberModalOpen(true)}
             onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
@@ -706,6 +725,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             const fresh = (p.id ? db.getParties().find((item) => item.id === p.id) : null) || p;
             setSelectedParty(fresh);
             setPosStateCode(fresh.stateCode);
+            if (!shippingAddress && fresh.shippingAddress) {
+              setShippingAddress(fresh.shippingAddress);
+            }
+            if (!shippingPincode && fresh.pincode) {
+              setShippingPincode(fresh.pincode);
+            }
             setIsPartyModalOpen(false);
           }}
           onClose={() => setIsPartyModalOpen(false)}

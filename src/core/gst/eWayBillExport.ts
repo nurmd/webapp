@@ -80,7 +80,7 @@ export function isValidVehicleNumber(vehNo?: string): boolean {
   return /^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/.test(cleaned);
 }
 
-function extractPincode(addressStr?: string, defaultPin: number = 400001): number {
+export function extractPincode(addressStr?: string, defaultPin: number = 400001): number {
   if (!addressStr) return defaultPin;
   const match = addressStr.match(/\b([1-9][0-9]{5})\b/);
   if (match && match[1]) {
@@ -90,7 +90,7 @@ function extractPincode(addressStr?: string, defaultPin: number = 400001): numbe
   return defaultPin;
 }
 
-function extractLocation(addressStr?: string, defaultLoc: string = 'City'): string {
+export function extractLocation(addressStr?: string, defaultLoc: string = 'City'): string {
   if (!addressStr) return defaultLoc;
   const parts = addressStr.split(',').map((p) => p.trim()).filter(Boolean);
   if (parts.length >= 2) {
@@ -103,17 +103,20 @@ function extractLocation(addressStr?: string, defaultLoc: string = 'City'): stri
   return defaultLoc;
 }
 
+export interface EWayBillTransportOptions {
+  transDistance?: number;
+  transporterId?: string;
+  transporterName?: string;
+  vehicleNumber?: string;
+  vehicleType?: 'R' | 'O';
+  transMode?: '1' | '2' | '3' | '4';
+  transType?: '1' | '2' | '3' | '4';
+}
+
 export function generateEWayBillJson(
   company: CompanyProfile,
   invoice: Invoice,
-  transportOptions: {
-    transDistance?: number;
-    transporterId?: string;
-    transporterName?: string;
-    vehicleNumber?: string;
-    vehicleType?: 'R' | 'O';
-    transMode?: '1' | '2' | '3' | '4';
-  } = {}
+  transportOptions: EWayBillTransportOptions = {}
 ): EWayBillBulkPayload {
   const fromStateCodeNum = parseInt(company.stateCode, 10) || 27;
   const toStateCodeNum = parseInt(invoice.partyStateCode || invoice.placeOfSupplyStateCode || company.stateCode, 10) || fromStateCodeNum;
@@ -123,10 +126,34 @@ export function generateEWayBillJson(
     : extractPincode(company.address);
   const fromPlace = company.city || extractLocation(company.address, 'City');
 
-  const toPin = invoice.partyPincode
-    ? parseInt(invoice.partyPincode.replace(/\D/g, ''), 10) || extractPincode(invoice.partyAddress)
-    : extractPincode(invoice.partyAddress);
-  const toPlace = extractLocation(invoice.partyAddress, 'City');
+  // Destination address, pincode, and place: prioritize shipping details (Bill-to Ship-to)
+  const effectiveShippingPin = invoice.shippingPincode?.replace(/\D/g, '');
+  const effectivePartyPin = invoice.partyPincode?.replace(/\D/g, '');
+
+  const toPin = effectiveShippingPin
+    ? parseInt(effectiveShippingPin, 10) || extractPincode(invoice.shippingAddress || invoice.partyAddress)
+    : effectivePartyPin
+    ? parseInt(effectivePartyPin, 10) || extractPincode(invoice.partyAddress)
+    : extractPincode(invoice.shippingAddress || invoice.partyAddress);
+
+  const effectiveConsigneeAddress = (invoice.shippingAddress || invoice.partyAddress || 'Customer Address').trim();
+  const toPlace = extractLocation(invoice.shippingAddress || invoice.partyAddress, 'City');
+
+  // Determine transType: '2' (Bill to - Ship to) if shipping address or pincode is specified and differs from billing details
+  const shippingAddrTrimmed = invoice.shippingAddress?.trim();
+  const partyAddrTrimmed = invoice.partyAddress?.trim();
+  const shippingPinTrimmed = invoice.shippingPincode?.trim();
+  const partyPinTrimmed = invoice.partyPincode?.trim();
+
+  const isShippingDifferent = Boolean(
+    (shippingAddrTrimmed && shippingAddrTrimmed !== partyAddrTrimmed) ||
+    (shippingPinTrimmed && shippingPinTrimmed !== partyPinTrimmed) ||
+    (shippingAddrTrimmed && !partyAddrTrimmed) ||
+    (shippingPinTrimmed && !partyPinTrimmed)
+  );
+
+  const resolvedTransType: '1' | '2' | '3' | '4' =
+    transportOptions.transType || (isShippingDifferent ? '2' : '1');
 
   const items: EWayBillJsonItem[] = invoice.items.map((it, idx) => ({
     itemNo: idx + 1,
@@ -150,7 +177,7 @@ export function generateEWayBillJson(
     docType: 'INV',
     docNo: invoice.invoiceNumber,
     docDate: formatEWayDate(invoice.date),
-    transType: '1',
+    transType: resolvedTransType,
     fromGstin: company.gstin,
     fromTrdName: company.tradeName || company.businessName,
     fromAddr1: (company.address || 'Registered Office').substring(0, 50),
@@ -161,7 +188,7 @@ export function generateEWayBillJson(
     fromStateCode: fromStateCodeNum,
     toGstin: invoice.partyGstin || 'URP',
     toTrdName: invoice.partyName.substring(0, 50),
-    toAddr1: (invoice.partyAddress || 'Customer Address').substring(0, 50),
+    toAddr1: effectiveConsigneeAddress.substring(0, 50),
     toAddr2: '',
     toPlace,
     toPincode: toPin,
@@ -191,7 +218,7 @@ export function generateEWayBillJson(
 export function downloadEWayBillJson(
   company: CompanyProfile,
   invoice: Invoice,
-  transportOptions?: any
+  transportOptions?: EWayBillTransportOptions
 ): void {
   const payload = generateEWayBillJson(company, invoice, transportOptions);
   const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));

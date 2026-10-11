@@ -11,7 +11,7 @@ import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
-import { printSettingsService } from '../../services/printSettingsService.ts';
+import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -281,7 +281,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       companyAddress: thermalSettings.showAddress ? company.address : '',
       gstin: (thermalSettings.showGstin && isGst) ? company.gstin : '',
       phone: thermalSettings.showPhone ? company.phone : '',
-      receiptTitle: thermalSettings.receiptTitle,
+      receiptTitle: resolveReceiptTitle(thermalSettings.receiptTitle, company.isCompositionScheme, Boolean(company.gstin)),
       invoiceNo: invoice.invoiceNumber,
       date: formatDate(invoice.date),
       customerName: invoice.partyName,
@@ -307,6 +307,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       upiId: company.upiId,
       terms: company.termsAndConditions,
       stateName: sellerStateObj?.name,
+      isCompositionScheme: company.isCompositionScheme,
     },
     thermalWidth
   );

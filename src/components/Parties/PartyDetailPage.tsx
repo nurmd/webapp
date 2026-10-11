@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
@@ -63,6 +64,16 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<PassbookEntry | null>(null);
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const offset = window.scrollY || document.documentElement.scrollTop;
+      setIsScrolled(offset > 30);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const {
     isCustomer,
@@ -273,110 +284,207 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       </header>
 
-      {/* 2. Simplified Mobile & Tablet Content Container */}
+      {/* 2. Main Responsive Content Container */}
       <main className="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3.5">
-        {/* Streamlined Passbook Balance Card & Info Drawer */}
-        <PartyInfoCard
-          party={party}
-          company={company}
-          liveNetBalance={liveNetBalance}
-          isReceivable={isReceivable}
-          isPayable={isPayable}
-          totalBilled={totalBilled}
-          totalPaid={totalPaid}
-          showPartyDetails={showPartyDetails}
-          setShowPartyDetails={setShowPartyDetails}
-          onEditParty={onEditParty}
-        />
+        {/* Mobile Floating Card (Compacts upon scroll to just party name and balance with smooth animation) */}
+        <div
+          className={`md:hidden sticky top-[48px] sm:top-[52px] z-20 transition-all duration-300 ease-in-out ${
+            isScrolled
+              ? 'py-2 px-3.5 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-outline-variant/30 shadow-md my-0.5'
+              : 'bg-transparent mb-0.5'
+          }`}
+        >
+          {/* Compact View: Just Party Name & Balance */}
+          <div
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className={`transition-all duration-300 ease-in-out cursor-pointer ${
+              isScrolled
+                ? 'opacity-100 max-h-12 scale-100 pointer-events-auto'
+                : 'opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden'
+            }`}
+            title="Tap to scroll to top"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
+                    isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
+                  }`}
+                >
+                  {party.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xs font-bold text-on-surface truncate">
+                    {party.name}
+                  </h2>
+                  <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
+                    {isCustomer ? 'Customer' : 'Supplier'}
+                  </span>
+                </div>
+              </div>
 
-        {/* Quick Actions Bar */}
-        <section className="flex items-center gap-2">
-          {/* Record Payment */}
-          <button
-            type="button"
-            onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
-              isPaymentOpen
-                ? 'bg-secondary text-on-secondary'
-                : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span
+                  className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
+                    isReceivable
+                      ? 'bg-error/10 text-error'
+                      : isPayable
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      : 'bg-secondary/10 text-secondary'
+                  }`}
+                >
+                  {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
+                </span>
+                <span
+                  className={`font-currency-display-mobile text-xs font-black ${
+                    isReceivable
+                      ? 'text-error'
+                      : isPayable
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-secondary'
+                  }`}
+                >
+                  {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Expanded Card on Mobile (visible when not scrolled) */}
+          <div
+            className={`transition-all duration-300 ease-in-out ${
+              !isScrolled
+                ? 'opacity-100 max-h-[1000px] scale-100 pointer-events-auto'
+                : 'opacity-0 max-h-0 scale-98 pointer-events-none overflow-hidden'
             }`}
           >
-            <span className="material-symbols-outlined text-[17px]">
-              {isPaymentOpen ? 'close' : 'payments'}
-            </span>
-            <span>{isPaymentOpen ? 'Close Payment' : 'Record Payment'}</span>
-          </button>
+            <PartyInfoCard
+              party={party}
+              company={company}
+              liveNetBalance={liveNetBalance}
+              isReceivable={isReceivable}
+              isPayable={isPayable}
+              totalBilled={totalBilled}
+              totalPaid={totalPaid}
+              showPartyDetails={showPartyDetails}
+              setShowPartyDetails={setShowPartyDetails}
+              onEditParty={onEditParty}
+            />
+          </div>
+        </div>
 
-          {/* Action: New Invoice for Customer, New Bill for Supplier */}
-          {isCustomer ? (
-            onCreateInvoice && (
+        {/* Responsive Layout: Two-Column on Tablet/Wide, Single-Column on Mobile */}
+        <div className="flex flex-col md:flex-row md:items-start md:gap-6 flex-1">
+          {/* Left Column (Tablet & Wide View: Non-scrolling Party Details + Payment + New Invoice) */}
+          <div className="w-full md:w-[360px] lg:w-[400px] flex-shrink-0 md:sticky md:top-20 md:self-start md:max-h-[calc(100vh-6rem)] md:overflow-y-auto no-scrollbar flex flex-col gap-2.5 sm:gap-3.5">
+            {/* Desktop / Tablet Full Party Info Card */}
+            <div className="hidden md:block">
+              <PartyInfoCard
+                party={party}
+                company={company}
+                liveNetBalance={liveNetBalance}
+                isReceivable={isReceivable}
+                isPayable={isPayable}
+                totalBilled={totalBilled}
+                totalPaid={totalPaid}
+                showPartyDetails={showPartyDetails}
+                setShowPartyDetails={setShowPartyDetails}
+                onEditParty={onEditParty}
+              />
+            </div>
+
+            {/* Quick Actions Bar (Payment & New Invoice / Bill) */}
+            <section className="flex items-center gap-2">
+              {/* Record Payment */}
               <button
                 type="button"
-                onClick={() => onCreateInvoice(party)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                title="Create new sales invoice for this customer"
+                onClick={() => setIsPaymentOpen(!isPaymentOpen)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
+                  isPaymentOpen
+                    ? 'bg-secondary text-on-secondary'
+                    : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
+                }`}
               >
-                <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-                <span>New Invoice</span>
+                <span className="material-symbols-outlined text-[17px]">
+                  {isPaymentOpen ? 'close' : 'payments'}
+                </span>
+                <span>{isPaymentOpen ? 'Close Payment' : 'Record Payment'}</span>
               </button>
-            )
-          ) : (
-            onCreatePurchase ? (
+
+              {/* Action: New Invoice for Customer, New Bill for Supplier */}
+              {isCustomer ? (
+                onCreateInvoice && (
+                  <button
+                    type="button"
+                    onClick={() => onCreateInvoice(party)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                    title="Create new sales invoice for this customer"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+                    <span>New Invoice</span>
+                  </button>
+                )
+              ) : (
+                onCreatePurchase ? (
+                  <button
+                    type="button"
+                    onClick={() => onCreatePurchase(party)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                    title="Create new purchase bill from this supplier"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
+                    <span>New Bill</span>
+                  </button>
+                ) : onCreateInvoice && (
+                  <button
+                    type="button"
+                    onClick={() => onCreateInvoice(party)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
+                    title="Create new sales invoice"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">receipt_long</span>
+                    <span>New Invoice</span>
+                  </button>
+                )
+              )}
+
+              {/* Print Statement */}
               <button
                 type="button"
-                onClick={() => onCreatePurchase(party)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                title="Create new purchase bill from this supplier"
+                onClick={handlePrintStatement}
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
+                title="Print Ledger Statement"
               >
-                <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
-                <span>New Bill</span>
+                <span className="material-symbols-outlined text-[18px]">print</span>
               </button>
-            ) : onCreateInvoice && (
-              <button
-                type="button"
-                onClick={() => onCreateInvoice(party)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                title="Create new sales invoice"
-              >
-                <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-                <span>New Invoice</span>
-              </button>
-            )
-          )}
+            </section>
 
-          {/* Print Statement */}
-          <button
-            type="button"
-            onClick={handlePrintStatement}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
-            title="Print Ledger Statement"
-          >
-            <span className="material-symbols-outlined text-[18px]">print</span>
-          </button>
-        </section>
+            {/* Collapsible Record Payment Drawer */}
+            <RecordPaymentModal
+              isOpen={isPaymentOpen}
+              onClose={() => setIsPaymentOpen(false)}
+              party={party}
+              liveNetBalance={liveNetBalance}
+              isCustomer={isCustomer}
+              onRecordPayment={onRecordPayment}
+              onRefresh={onRefresh}
+            />
+          </div>
 
-        {/* Collapsible Record Payment Drawer */}
-        <RecordPaymentModal
-          isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          party={party}
-          liveNetBalance={liveNetBalance}
-          isCustomer={isCustomer}
-          onRecordPayment={onRecordPayment}
-          onRefresh={onRefresh}
-        />
-
-        {/* Passbook Ledger Section */}
-        <PartyPassbookTable
-          filteredPassbook={filteredPassbook}
-          txnFilter={txnFilter}
-          setTxnFilter={setTxnFilter}
-          txnSortOrder={txnSortOrder}
-          setTxnSortOrder={setTxnSortOrder}
-          searchTxn={searchTxn}
-          setSearchTxn={setSearchTxn}
-          onTransactionClick={handleTransactionClick}
-        />
+          {/* Right Column: Transaction Ledger */}
+          <div className="w-full flex-1 min-w-0 mt-1 md:mt-0 flex flex-col gap-2.5 sm:gap-3.5">
+            <PartyPassbookTable
+              filteredPassbook={filteredPassbook}
+              txnFilter={txnFilter}
+              setTxnFilter={setTxnFilter}
+              txnSortOrder={txnSortOrder}
+              setTxnSortOrder={setTxnSortOrder}
+              searchTxn={searchTxn}
+              setSearchTxn={setSearchTxn}
+              onTransactionClick={handleTransactionClick}
+            />
+          </div>
+        </div>
       </main>
 
       {/* Edit Ledger Item Modal */}

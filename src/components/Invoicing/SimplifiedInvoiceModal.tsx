@@ -120,6 +120,18 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           </div>
         )}
 
+        {/* Ship-to Destination Summary */}
+        {(invoice.shippingAddress || invoice.shippingPincode) && (
+          <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant bg-surface-container-low/60 px-2.5 py-1.5 rounded-xl">
+            <span className="material-symbols-outlined text-[14px] text-secondary">local_shipping</span>
+            <span className="font-semibold text-outline uppercase text-[10px]">Ship-to:</span>
+            <span className="truncate text-on-surface font-medium">
+              {invoice.shippingAddress || 'Consignee Address'}
+              {invoice.shippingPincode ? ` (${invoice.shippingPincode})` : ''}
+            </span>
+          </div>
+        )}
+
         {/* Purchased Items Table View */}
         <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
           <div className="max-h-48 overflow-y-auto overflow-x-hidden">
