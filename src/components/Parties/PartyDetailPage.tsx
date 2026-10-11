@@ -71,7 +71,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          const y = window.scrollY || document.documentElement.scrollTop;
+          const mainEl = document.getElementById('main-content-scroll');
+          const y = mainEl ? mainEl.scrollTop : (window.scrollY || document.documentElement.scrollTop);
           // Hysteresis: activates at > 80px, deactivates only when scrolling back to < 40px
           setIsScrolled((prev) => {
             if (!prev && y > 80) return true;
@@ -83,8 +84,17 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         ticking = true;
       }
     };
+
+    const mainEl = document.getElementById('main-content-scroll');
+    if (mainEl) {
+      mainEl.addEventListener('scroll', handleScroll, { passive: true });
+    }
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    return () => {
+      if (mainEl) mainEl.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   const {
@@ -296,11 +306,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         </div>
       </header>
 
-      {/* Mobile Floating Compact Card (fixed overlay that slides in upon scroll, zero layout shift) */}
+      {/* Mobile Floating Compact Card (sticky overlay inside main working area, zero layout shift) */}
       <aside
         aria-label="Sticky Party Summary"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`md:hidden fixed top-[46px] sm:top-[50px] left-2.5 right-2.5 z-20 transition-all duration-250 ease-out transform cursor-pointer ${
+        onClick={() => {
+          const mainEl = document.getElementById('main-content-scroll');
+          if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        className={`md:hidden sticky top-[46px] sm:top-[48px] z-20 mx-2.5 transition-all duration-250 ease-out transform cursor-pointer ${
           isScrolled
             ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
             : '-translate-y-3 opacity-0 scale-95 pointer-events-none'

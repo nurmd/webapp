@@ -793,7 +793,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased flex flex-row selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+    <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
       {/* Tablet / Desktop Persistent Sidebar Navigation */}
       <TabletSidebar
         activeTab={activeTab}
@@ -811,18 +811,20 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Top App Header */}
-        <Header
-          company={company}
-          activeUser={activeUser}
-          onOpenDrawer={() => setIsDrawerOpen(true)}
-          onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
-          onSearchClick={() => handleSelectTab('menu')}
-          onBarcodeClick={() => handleSelectTab('pos')}
-          onProfileClick={() => setIsRoleSwitchOpen(true)}
-          hasUpdate={hasUpdate}
-        />
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Top App Header - Detached & Pinned at Top */}
+        <div className="flex-shrink-0 z-30">
+          <Header
+            company={company}
+            activeUser={activeUser}
+            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
+            onSearchClick={() => handleSelectTab('menu')}
+            onBarcodeClick={() => handleSelectTab('pos')}
+            onProfileClick={() => setIsRoleSwitchOpen(true)}
+            hasUpdate={hasUpdate}
+          />
+        </div>
 
         {/* Slide-out Navigation Drawer (Mobile) */}
         <Drawer
@@ -839,8 +841,8 @@ export const App: React.FC = () => {
           isCheckingUpdate={isCheckingUpdate}
         />
 
-        {/* Main Scrollable View Area with safe-area padding */}
-        <main className="flex-1 w-full pb-24 md:pb-8">
+        {/* Main Working Screen Area - Rendered strictly below topbar with independent scroll containment */}
+        <main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">
           <React.Suspense fallback={<ViewLoadingSkeleton />}>
         {activeTab === 'dashboard' && (
           <DashboardView
