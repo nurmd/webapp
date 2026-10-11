@@ -37,7 +37,22 @@ export function formatINR(amount: number, showSymbol = true, decimalPlaces?: num
  * Formats date into DD/MM/YYYY or readable string
  */
 export function formatDate(dateString: string | Date): string {
-  const d = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  if (!dateString) return '';
+  if (dateString instanceof Date) {
+    if (isNaN(dateString.getTime())) return '';
+    const day = String(dateString.getDate()).padStart(2, '0');
+    const month = String(dateString.getMonth() + 1).padStart(2, '0');
+    const year = dateString.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  if (typeof dateString === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString.trim())) {
+    const parts = dateString.trim().split('/');
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2];
+    return `${day}/${month}/${year}`;
+  }
+  const d = new Date(dateString);
   if (isNaN(d.getTime())) return '';
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');

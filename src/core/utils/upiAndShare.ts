@@ -53,3 +53,43 @@ Thank you!`;
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
+
+/**
+ * Safely opens an external URL (such as WhatsApp web/app link) in a new window or current tab.
+ * Defends against popup blockers and sandbox/webview restrictions by falling back to
+ * a simulated link click or direct location navigation if window.open returns null or throws.
+ */
+export function safeOpenExternalUrl(url: string, target: string = '_blank'): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const win = window.open ? window.open(url, target) : null;
+    // When popup blockers block window.open, it returns null or undefined.
+    // In such cases, fallback to a simulated anchor click to trigger the protocol handler/intent.
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = target;
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } catch (_e) {
+    // If window.open throws (e.g. strict security policy or sandboxed iframe without allow-popups)
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = target;
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      try {
+        window.location.assign(url);
+      } catch {
+        // Fallback for restricted environments
+      }
+    }
+  }
+}

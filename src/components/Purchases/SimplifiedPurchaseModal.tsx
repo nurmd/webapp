@@ -74,7 +74,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+            className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -219,12 +219,27 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
 
         {/* Bottom Actions Bar (Sticky Action Dock) */}
         <div className="flex items-center justify-end gap-2 p-3 sm:p-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0">
+          {/* Print Bill Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.print) {
+                window.print();
+              }
+            }}
+            className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+            title="Print Purchase Bill"
+          >
+            <span className="material-symbols-outlined text-[16px]">print</span>
+            <span>Print</span>
+          </button>
+
           {/* Delete Bill Button */}
           {onDeletePurchase && (
             <button
               type="button"
               onClick={handleDelete}
-              className="py-2 px-3 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+              className="min-h-[44px] py-2 px-3.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors active:scale-95"
               title="Delete Purchase Bill"
             >
               <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -240,7 +255,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
                 onClose();
                 onEditPurchase(bill);
               }}
-              className="py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
+              className="min-h-[44px] py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
               title="Edit Purchase Bill"
             >
               <span className="material-symbols-outlined text-[16px]">edit</span>

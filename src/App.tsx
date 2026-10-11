@@ -855,6 +855,9 @@ export const App: React.FC = () => {
           <DashboardView
             company={company}
             invoices={invoices}
+            purchases={purchases}
+            vouchers={vouchers}
+            expenses={expenses}
             items={activeItems}
             parties={parties}
             onNewInvoice={() => {
@@ -863,6 +866,11 @@ export const App: React.FC = () => {
             }}
             onQuickPos={() => setActiveTab('pos')}
             onViewInvoice={setPreviewInvoice}
+            onPrintInvoice={setPrintInvoice}
+            onEditInvoice={handleEditInvoice}
+            onEditPurchase={handleEditPurchase}
+            onRecordPartyPayment={handleRecordPartyPayment}
+            onRefresh={refreshData}
             onNavigateTab={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
           />
