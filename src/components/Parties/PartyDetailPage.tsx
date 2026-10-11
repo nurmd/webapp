@@ -7,6 +7,7 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { calculateStockDecrement } from '../../core/inventory/stockEngine.ts';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { usePartyPassbook, PassbookEntry } from './usePartyPassbook.ts';
@@ -204,12 +205,13 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     if (!window.confirm(`Delete Purchase Bill #${bill.billNumber}? This will revert any stock added by this bill.`)) return;
 
     // Rollback stock
+    const allowNegativeStock = db.getAllowNegativeStock();
     const allItems = db.getItems();
     for (const line of bill.items) {
       if (line.itemId) {
         const itm = allItems.find((i) => i.id === line.itemId);
         if (itm) {
-          itm.currentStock = Math.max(0, itm.currentStock - line.quantity);
+          itm.currentStock = calculateStockDecrement(itm.currentStock, line.quantity, allowNegativeStock);
           db.saveItem(itm);
         }
       }

@@ -838,6 +838,13 @@ class StorageService {
       if (stored !== null) {
         return stored === 'true';
       }
+      const rawSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (rawSettings) {
+        const parsed = JSON.parse(rawSettings);
+        if (typeof parsed?.allowNegativeStock === 'boolean') {
+          return parsed.allowNegativeStock;
+        }
+      }
       return false;
     } catch {
       return false;

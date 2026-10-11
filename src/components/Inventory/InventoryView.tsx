@@ -212,7 +212,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       }
 
       if (txnCount === 0 || totalPurchased === 0) return false;
-      const netStock = Math.max(0, totalPurchased + totalAdjusted - totalSold);
+      const allowNegative = db.getAllowNegativeStock();
+      const rawNet = totalPurchased + totalAdjusted - totalSold;
+      const netStock = allowNegative ? rawNet : Math.max(0, rawNet);
       return item.currentStock > netStock;
     });
   }, [items, allInvoices, allPurchases, allAdjustments]);
@@ -227,6 +229,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       return;
     }
 
+    const allowNegative = db.getAllowNegativeStock();
     let count = 0;
     for (const item of itemsWithDiscrepancy) {
       let totalSold = 0;
@@ -260,7 +263,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         }
       }
 
-      const netStock = Math.max(0, totalPurchased + totalAdjusted - totalSold);
+      const rawNet = totalPurchased + totalAdjusted - totalSold;
+      const netStock = allowNegative ? rawNet : Math.max(0, rawNet);
       const updated: InventoryItem = {
         ...item,
         currentStock: netStock,

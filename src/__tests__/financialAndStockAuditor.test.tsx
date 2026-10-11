@@ -556,5 +556,102 @@ describe('Financial Balance and Inventory Stock Auditors', () => {
       const reportAfter = auditAllItemStock();
       expect(reportAfter.discrepantItemsCount).toBe(0);
     });
+
+    it('TC-AUD-STOCK-04: Reconciles oversold negative stock without resetting to 0 when allowNegativeStock is true', async () => {
+      // Clear items and transactions for test isolation
+      testStorage.setItem('gst_items', JSON.stringify([]));
+      testStorage.setItem('gst_purchases', JSON.stringify([]));
+      testStorage.setItem('gst_invoices', JSON.stringify([]));
+      testStorage.setItem('gst_stock_adjustments', JSON.stringify([]));
+
+      // Enable negative stock
+      db.setAllowNegativeStock(true);
+
+      const item: InventoryItem = {
+        id: 'ITM-OVERSOLD-01',
+        name: 'Oversold Stock Item',
+        hsnSacCode: '844332',
+        category: 'Hardware',
+        unit: 'PCS',
+        salePrice: 100,
+        purchasePrice: 60,
+        gstRate: 18,
+        currentStock: 0,
+        minStockAlert: 5,
+        createdAt: '2026-01-01T10:00:00.000Z',
+        updatedAt: '2026-01-01T10:00:00.000Z',
+      };
+      db.saveItem(item);
+
+      // Sell 15 items when initial stock is 0
+      const invoice: Invoice = {
+        id: 'INV-NEG-001',
+        invoiceNumber: 'INV-NEG-001',
+        invoiceType: 'B2CS',
+        partyId: 'CUST-001',
+        partyName: 'Customer Oversold',
+        partyAddress: 'Market',
+        partyStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        date: '2026-01-02',
+        dueDate: '2026-01-15',
+        items: [
+          {
+            itemId: item.id,
+            name: item.name,
+            hsnSacCode: '844332',
+            quantity: 15,
+            unit: 'PCS',
+            unitPrice: 100,
+            taxableAmount: 1500,
+            gstRate: 18,
+            cgstAmount: 135,
+            sgstAmount: 135,
+            igstAmount: 0,
+            cessAmount: 0,
+            total: 1770,
+            totalAmount: 1770,
+          },
+        ],
+        totalGrossAmount: 1500,
+        totalDiscount: 0,
+        totalTaxableAmount: 1500,
+        totalCgst: 135,
+        totalSgst: 135,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 270,
+        roundOff: 0,
+        grandTotal: 1770,
+        amountInWords: 'One Thousand Seven Hundred Seventy Only',
+        paymentMode: 'CASH',
+        paymentStatus: 'PAID',
+        paidAmount: 1770,
+        balanceAmount: 0,
+        createdAt: '2026-01-02T10:00:00.000Z',
+        updatedAt: '2026-01-02T10:00:00.000Z',
+      };
+      db.saveInvoice(invoice);
+
+      // Tamper item stock to 0 to simulate discrepancy
+      const itemsList = db.getItems();
+      const idx = itemsList.findIndex((i) => i.id === item.id);
+      itemsList[idx].currentStock = 0;
+      testStorage.setItem('gst_items', JSON.stringify(itemsList));
+
+      const reportBefore = auditAllItemStock();
+      expect(reportBefore.discrepantItemsCount).toBe(1);
+
+      const reconcileResult = await reconcileItemStock(reportBefore);
+      expect(reconcileResult.reconciledCount).toBe(1);
+
+      // Stock should reconcile to -15, not clamped to 0
+      const updatedItem = db.getItems().find((i) => i.id === item.id);
+      expect(updatedItem?.currentStock).toBe(-15);
+
+      const reportAfter = auditAllItemStock();
+      expect(reportAfter.discrepantItemsCount).toBe(0);
+    });
   });
 });

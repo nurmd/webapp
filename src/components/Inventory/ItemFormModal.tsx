@@ -373,9 +373,17 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                   </label>
                   <input
                     type="number"
-                    value={currentStock || ''}
+                    value={currentStock === 0 ? '0' : currentStock}
                     onFocus={(e) => e.target.select()}
-                    onChange={(e) => setCurrentStock(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || val === '-') {
+                        setCurrentStock(val as unknown as number);
+                      } else {
+                        const parsed = parseFloat(val);
+                        setCurrentStock(isNaN(parsed) ? 0 : parsed);
+                      }
+                    }}
                     className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary"
                   />
                 </div>

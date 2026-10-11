@@ -267,10 +267,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
 
   if (!item) return null;
 
-  const netTxnStock = Math.max(
-    0,
-    itemTxnSummary.totalPurchasedQty + itemTxnSummary.totalAdjustedQty - itemTxnSummary.totalSoldQty
-  );
+  const allowNegative = db.getAllowNegativeStock();
+  const rawTxnStock =
+    itemTxnSummary.totalPurchasedQty + itemTxnSummary.totalAdjustedQty - itemTxnSummary.totalSoldQty;
+  const netTxnStock = allowNegative ? rawTxnStock : Math.max(0, rawTxnStock);
   const hasTxnDiscrepancy =
     itemTxnSummary.totalPurchasedQty > 0 &&
     itemTxnSummary.totalTransactions > 0 &&

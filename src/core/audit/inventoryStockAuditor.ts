@@ -187,11 +187,13 @@ export async function reconcileItemStock(
   const reconciledItems: string[] = [];
   let adjustmentsCreated = 0;
 
+  const allowNegativeStock = db.getAllowNegativeStock();
+
   for (const disc of activeReport.discrepancies) {
     const idx = currentItems.findIndex((i) => i.id === disc.itemId);
     if (idx >= 0) {
       const item = currentItems[idx];
-      const targetStock = Math.max(0, disc.computedStock);
+      const targetStock = allowNegativeStock ? disc.computedStock : Math.max(0, disc.computedStock);
         // Update item currentStock directly to match ground truth
         const updatedItem = {
           ...item,
