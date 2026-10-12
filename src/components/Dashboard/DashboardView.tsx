@@ -1148,9 +1148,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
 
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap justify-end">
-                        {/* Settlement Status Pill */}
+                        {/* Cash-Flow Indicator Badge (R1) - Left */}
                         <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                          className={`h-5 px-1.5 rounded-full inline-flex items-center gap-0.5 text-[10px] font-bold leading-none whitespace-nowrap ${
+                            isMoneyIn
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[11px] leading-none">
+                            {isMoneyIn ? 'south_west' : 'north_east'}
+                          </span>
+                          <span className="leading-none">{isMoneyIn ? 'Money In' : 'Money Out'}</span>
+                        </span>
+
+                        {/* Settlement Status Pill - Right */}
+                        <span
+                          className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap ${
                             isPaid
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                               : isPartial
@@ -1158,25 +1172,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
                           }`}
                         >
-                          {item.paymentStatus}
-                        </span>
-
-                        {/* Cash-Flow Indicator Badge (R1) */}
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${
-                            isMoneyIn
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-500/20'
-                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-500/20'
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[12px]">
-                            {isMoneyIn ? 'south_west' : 'north_east'}
-                          </span>
-                          <span>{isMoneyIn ? 'Money In' : 'Money Out'}</span>
+                          <span className="leading-none">{item.paymentStatus}</span>
                         </span>
 
                         {hasBalance && item.balanceAmount && (
-                          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap leading-none">
                             Due: {formatINR(item.balanceAmount)}
                           </span>
                         )}
