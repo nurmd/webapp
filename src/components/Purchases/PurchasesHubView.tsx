@@ -349,24 +349,23 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                 onClick={() => setSelectedBillForPreview(bill)}
                 className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-orange-500/40 active:scale-[0.99] transition-all cursor-pointer"
               >
-                {/* Line 1: Supplier Name & Bill # (left) | Grand Total (right) */}
+                {/* Line 1: Supplier Name (left) | Grand Total (right) */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                      {bill.supplierName}
-                    </span>
-                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded">
-                      #{bill.billNumber}
-                    </span>
-                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-on-surface truncate flex-1 min-w-0">
+                    {bill.supplierName}
+                  </span>
                   <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(bill.grandTotal)}
                   </span>
                 </div>
 
-                {/* Line 2: Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
+                {/* Line 2: Bill #, Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
+                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded">
+                      #{bill.billNumber}
+                    </span>
+                    <span>•</span>
                     <span>{formatDate(bill.date)}</span>
                     <span>•</span>
                     <span className="truncate">{bill.items?.length || 0} {bill.items?.length === 1 ? 'item' : 'items'}</span>

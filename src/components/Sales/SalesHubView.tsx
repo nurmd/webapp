@@ -441,24 +441,23 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 onClick={() => onViewInvoice(inv)}
                 className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-secondary/40 active:scale-[0.99] transition-all cursor-pointer"
               >
-                {/* Line 1: Party Name & Invoice # (left) | Grand Total (right) */}
+                {/* Line 1: Party Name (left) | Grand Total (right) */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                      {inv.partyName || 'Cash Customer'}
-                    </span>
-                    <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded">
-                      #{inv.invoiceNumber}
-                    </span>
-                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-on-surface truncate flex-1 min-w-0">
+                    {inv.partyName || 'Cash Customer'}
+                  </span>
                   <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(inv.grandTotal)}
                   </span>
                 </div>
 
-                {/* Line 2: Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
+                {/* Line 2: Invoice #, Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
+                    <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded">
+                      #{inv.invoiceNumber}
+                    </span>
+                    <span>•</span>
                     <span>{formatDate(inv.date)}</span>
                     <span>•</span>
                     <span className="truncate">{inv.items?.length || 0} {inv.items?.length === 1 ? 'item' : 'items'}</span>

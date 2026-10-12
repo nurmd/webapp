@@ -1050,26 +1050,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   }}
                   className="p-2.5 sm:p-3 md:p-3.5 flex flex-col justify-between gap-2 sm:gap-2.5 hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-all md:rounded-2xl md:border md:border-outline-variant/20 md:hover:border-secondary/40 shadow-xs group"
                 >
-                  {/* Top Header: Flow Badge ("Money In" / "Money Out") & Date + Expand Chevron */}
+                  {/* Top Header: Entity Type Badge & Date + Expand Chevron */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       {/* Entity Type Badge */}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass}`}>
                         {item.typeLabel}
-                      </span>
-
-                      {/* Cash-Flow Indicator Badge (R1) */}
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
-                          isMoneyIn
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[13px]">
-                          {isMoneyIn ? 'south_west' : 'north_east'}
-                        </span>
-                        <span>{isMoneyIn ? 'Money In' : 'Money Out'}</span>
                       </span>
                     </div>
 
@@ -1161,7 +1147,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {isMoneyIn ? '+' : '-'} {formatINR(item.amount)}
                       </span>
 
-                      <div className="flex items-center gap-1 mt-0.5">
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap justify-end">
+                        {/* Settlement Status Pill */}
                         <span
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
                             isPaid
@@ -1173,6 +1160,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         >
                           {item.paymentStatus}
                         </span>
+
+                        {/* Cash-Flow Indicator Badge (R1) */}
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 whitespace-nowrap ${
+                            isMoneyIn
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-500/20'
+                              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-500/20'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[12px]">
+                            {isMoneyIn ? 'south_west' : 'north_east'}
+                          </span>
+                          <span>{isMoneyIn ? 'Money In' : 'Money Out'}</span>
+                        </span>
+
                         {hasBalance && item.balanceAmount && (
                           <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                             Due: {formatINR(item.balanceAmount)}

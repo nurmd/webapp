@@ -1,15 +1,15 @@
 {
-  "version": "1.1.32",
+  "version": "1.1.33",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-11T17:25:59.701Z",
+  "buildTime": "2026-10-12T02:56:40.268Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "sleek compact filter pills and collapsible card icons for smaller screens",
+    "sleek compact filter pills with rounded-full styling for smaller screens",
     "compact transaction cards with collapsible \\/ expand icons for smaller screens",
+    "bump app version to v1.1.30 with verified APK & release notes",
     "unified business activity timeline with live search, filters, and fast actions",
     "bump app version to v1.1.29 with verified APK & release notes",
-    "synchronize negative stock preference across devices in real-time",
-    "allow negative stock balances without forced zero clamping"
+    "synchronize negative stock preference across devices in real-time"
   ]
 }
