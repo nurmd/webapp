@@ -451,13 +451,16 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   </span>
                 </div>
 
-                {/* Line 2: Invoice #, Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
+                {/* Line 2 (Middle): Invoice # */}
+                <div className="flex items-center gap-1.5 -mt-0.5">
+                  <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono">
+                    #{inv.invoiceNumber}
+                  </span>
+                </div>
+
+                {/* Line 3: Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
-                    <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded">
-                      #{inv.invoiceNumber}
-                    </span>
-                    <span>•</span>
                     <span>{formatDate(inv.date)}</span>
                     <span>•</span>
                     <span className="truncate">{inv.items?.length || 0} {inv.items?.length === 1 ? 'item' : 'items'}</span>

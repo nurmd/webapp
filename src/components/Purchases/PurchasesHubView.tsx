@@ -359,13 +359,16 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                   </span>
                 </div>
 
-                {/* Line 2: Bill #, Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
+                {/* Line 2 (Middle): Bill # */}
+                <div className="flex items-center gap-1.5 -mt-0.5">
+                  <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded font-mono">
+                    #{bill.billNumber}
+                  </span>
+                </div>
+
+                {/* Line 3: Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
-                    <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded">
-                      #{bill.billNumber}
-                    </span>
-                    <span>•</span>
                     <span>{formatDate(bill.date)}</span>
                     <span>•</span>
                     <span className="truncate">{bill.items?.length || 0} {bill.items?.length === 1 ? 'item' : 'items'}</span>
