@@ -104,10 +104,24 @@ function showExitToast() {
   }
 }
 
+export type RootBackHandler = () => boolean | void;
+
+let globalRootBackHandler: RootBackHandler | undefined;
+
 // Expose global system back handler for Android native WebView container
 if (typeof window !== 'undefined') {
   (window as any).__handleAndroidBack = () => {
-    return triggerBack();
+    const handled = triggerBack();
+    if (handled) {
+      return true;
+    }
+    if (globalRootBackHandler) {
+      const rootHandled = globalRootBackHandler();
+      if (rootHandled !== false) {
+        return true;
+      }
+    }
+    return false;
   };
 }
 
@@ -115,7 +129,10 @@ if (typeof window !== 'undefined') {
  * Global initialization of system back button listeners.
  * Handles Capacitor native Android hardware back button and web fallback.
  */
-export function initBackNavigation(onRootBack?: () => void) {
+export function initBackNavigation(onRootBack?: RootBackHandler) {
+  if (onRootBack) {
+    globalRootBackHandler = onRootBack;
+  }
   if (isInitialized) return;
   isInitialized = true;
 
@@ -124,24 +141,26 @@ export function initBackNavigation(onRootBack?: () => void) {
     App.addListener('backButton', () => {
       const handled = triggerBack();
       if (!handled) {
-        if (onRootBack) {
-          onRootBack();
-        } else {
-          const now = Date.now();
-          if (now - lastBackPressTime < 2000) {
-            try {
-              if ((window as any).AndroidBridge?.exitApp) {
-                (window as any).AndroidBridge.exitApp();
-              } else {
-                App.exitApp();
-              }
-            } catch {
+        if (globalRootBackHandler) {
+          const rootHandled = globalRootBackHandler();
+          if (rootHandled !== false) {
+            return;
+          }
+        }
+        const now = Date.now();
+        if (now - lastBackPressTime < 2000) {
+          try {
+            if ((window as any).AndroidBridge?.exitApp) {
+              (window as any).AndroidBridge.exitApp();
+            } else {
               App.exitApp();
             }
-          } else {
-            lastBackPressTime = now;
-            showExitToast();
+          } catch {
+            App.exitApp();
           }
+        } else {
+          lastBackPressTime = now;
+          showExitToast();
         }
       }
     });
@@ -153,8 +172,8 @@ export function initBackNavigation(onRootBack?: () => void) {
   document.addEventListener('backbutton', (e) => {
     e.preventDefault();
     const handled = triggerBack();
-    if (!handled && onRootBack) {
-      onRootBack();
+    if (!handled && globalRootBackHandler) {
+      globalRootBackHandler();
     }
   });
 
@@ -165,10 +184,29 @@ export function initBackNavigation(onRootBack?: () => void) {
       return;
     }
     const handled = triggerBack();
-    if (!handled && onRootBack) {
-      onRootBack();
+    if (!handled && globalRootBackHandler) {
+      globalRootBackHandler();
     }
   });
+}
+
+/**
+ * Triggers the complete system back navigation flow:
+ * 1. Closes topmost active modal/overlay
+ * 2. If no modal is active, delegates to root handler (e.g. return to dashboard)
+ * Returns true if handled, false otherwise.
+ */
+export function handleSystemBack(): boolean {
+  if (typeof window !== 'undefined' && typeof (window as any).__handleAndroidBack === 'function') {
+    return (window as any).__handleAndroidBack();
+  }
+  const handled = triggerBack();
+  if (handled) return true;
+  if (globalRootBackHandler) {
+    const rootHandled = globalRootBackHandler();
+    if (rootHandled !== false) return true;
+  }
+  return false;
 }
 
 /**

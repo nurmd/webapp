@@ -1,15 +1,15 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-16T08:15:42.449Z",
+  "buildTime": "2026-10-16T09:02:59.575Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "full functional multi-document prefix settings & remove redundant party sort pill",
+    "v1.2.0 with customer selector loop sorting & native backup enhancements",
     "show small sort icon in customer selector without text pill to prevent vertical overflow",
     "party customer selector loop sort by recent transaction, name, and amount (v1.1.39)",
     "add Android storage permissions, file chooser, and native DB backup storage (v1.1.38)",
-    "bump app version to v1.1.37 with verified APK & release notes",
-    "remove sales hub link from business activity timeline header",
-    "remove audit buttons from parties and items views (audits centralized under Security & Audit tab)"
+    "bump app version to v1.1.37 with verified APK & release notes"
   ]
 }

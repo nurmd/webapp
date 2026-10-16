@@ -222,7 +222,9 @@ export const App: React.FC = () => {
     initBackNavigation(() => {
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');
+        return true;
       }
+      return false;
     });
   }, []);
 

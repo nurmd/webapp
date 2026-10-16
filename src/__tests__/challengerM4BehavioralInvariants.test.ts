@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { registerBackHandler, triggerBack } from '../core/utils/backNavigation.ts';
+import { registerBackHandler, triggerBack, initBackNavigation } from '../core/utils/backNavigation.ts';
 import { audioService } from '../services/barcodeService.ts';
 import { formatSplitNotes, parseSplitsFromInvoice, parseSplitsFromPurchase } from '../core/accounting/paymentSplitUtils.ts';
 import { Invoice } from '../models/invoice.ts';
@@ -131,6 +131,60 @@ describe('Challenger M4 Empirical Verification: Behavioral Invariants', () => {
       // Ensure that after unregistering drawer, activeTab remains purchases and drawer is closed
       expect(activeTab).toBe('purchases');
       expect(isDrawerOpen).toBe(false);
+    });
+
+    it('delegates __handleAndroidBack to rootBackHandler when no modal is open', () => {
+      let currentTab = 'parties';
+      initBackNavigation(() => {
+        if (currentTab !== 'dashboard') {
+          currentTab = 'dashboard';
+          return true;
+        }
+        return false;
+      });
+
+      // 1. In parties tab with no modal open, Android back should switch tab to dashboard
+      const handled = (window as any).__handleAndroidBack();
+      expect(handled).toBe(true);
+      expect(currentTab).toBe('dashboard');
+
+      // 2. On dashboard, Android back should return false so native double-back exit triggers
+      const handledRoot = (window as any).__handleAndroidBack();
+      expect(handledRoot).toBe(false);
+    });
+
+    it('__handleAndroidBack dismisses active modal first before triggering root fallback', () => {
+      let currentTab = 'sales';
+      let isModalOpen = true;
+
+      initBackNavigation(() => {
+        if (currentTab !== 'dashboard') {
+          currentTab = 'dashboard';
+          return true;
+        }
+        return false;
+      });
+
+      const unregModal = registerBackHandler(() => {
+        isModalOpen = false;
+        return true;
+      }, 10);
+
+      // 1st back: closes the modal, does not change current tab
+      const handledModal = (window as any).__handleAndroidBack();
+      expect(handledModal).toBe(true);
+      expect(isModalOpen).toBe(false);
+      expect(currentTab).toBe('sales');
+      unregModal();
+
+      // 2nd back: switches from sales to dashboard
+      const handledTab = (window as any).__handleAndroidBack();
+      expect(handledTab).toBe(true);
+      expect(currentTab).toBe('dashboard');
+
+      // 3rd back: on dashboard, returns false for Android exit
+      const handledExit = (window as any).__handleAndroidBack();
+      expect(handledExit).toBe(false);
     });
   });
 
