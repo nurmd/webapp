@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { db } from '../../../services/db.ts';
 import {
   DatabaseBackupBundle,
@@ -42,6 +42,45 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStepText, setRestoreStepText] = useState('');
   const [restoreSuccessNotice, setRestoreSuccessNotice] = useState<string | null>(null);
+
+  // Android Storage Permission Management
+  const isAndroidBridge = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
+  const [hasStoragePerm, setHasStoragePerm] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.hasStoragePermission) {
+      try {
+        return (window as any).AndroidBridge.hasStoragePermission();
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    (window as any).onStoragePermissionResult = (status: string) => {
+      if (status === 'GRANTED') {
+        setHasStoragePerm(true);
+        showAppToast('Storage permission granted!');
+      } else {
+        setHasStoragePerm(false);
+        showAppToast('Storage permission denied');
+      }
+    };
+    return () => {
+      delete (window as any).onStoragePermissionResult;
+    };
+  }, []);
+
+  const handleRequestStoragePermission = () => {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.requestStoragePermission) {
+      try {
+        (window as any).AndroidBridge.requestStoragePermission();
+      } catch {
+        showAppToast('Failed to open storage settings');
+      }
+    }
+  };
 
   // Live database snapshot for Backup view
   const liveBackup = useMemo(() => {
@@ -87,6 +126,9 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
 
   // Explicit Browse File Handler supporting Modern Web File System Access API + Fallback
   const handleBrowseFiles = async () => {
+    if (isAndroidBridge && !hasStoragePerm) {
+      handleRequestStoragePermission();
+    }
     if (typeof window !== 'undefined' && 'showOpenFilePicker' in window) {
       try {
         const [handle] = await (window as any).showOpenFilePicker({
@@ -149,7 +191,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     }
   };
 
-  // "Save To..." Handler (File System Access API Save Dialog)
+  // "Save To..." Handler (AndroidBridge Storage or File System Access API Save Dialog)
   const handleSaveToLocation = async () => {
     setIsExporting(true);
     setExportProgress(15);
@@ -164,7 +206,22 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
       setExportStepText('Verifying data integrity & FNV-1a checksum...');
       await new Promise((r) => setTimeout(r, 200));
 
-      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      if (isAndroidBridge && (window as any).AndroidBridge?.saveBackupToStorage) {
+        if (!hasStoragePerm) {
+          handleRequestStoragePermission();
+        }
+        setExportProgress(75);
+        setExportStepText('Saving backup to device storage (Downloads/GSTBilling)...');
+        const res = (window as any).AndroidBridge.saveBackupToStorage(filename, jsonStr);
+        if (res && res.startsWith('SUCCESS')) {
+          setExportProgress(100);
+          setExportStepText('Backup saved to device storage!');
+          setLastExportedFilename(filename);
+          showAppToast(`Backup saved: ${filename}`);
+        } else {
+          throw new Error(res || 'Failed to save to device storage');
+        }
+      } else if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
         setExportProgress(75);
         setExportStepText('Choose folder to save backup file...');
 
@@ -223,12 +280,33 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
       await new Promise((r) => setTimeout(r, 150));
       setExportProgress(60);
       setExportStepText('Generating JSON backup bundle...');
-      const res = db.downloadDatabaseBackup(liveBackup || undefined);
 
-      setExportProgress(100);
-      setExportStepText('Download initiated!');
-      setLastExportedFilename(res.filename);
-      showAppToast(`Backup downloaded: ${res.filename}`);
+      const bundle = liveBackup || db.createDatabaseBackup();
+      const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
+      const jsonStr = JSON.stringify(bundle, null, 2);
+
+      if (isAndroidBridge && (window as any).AndroidBridge?.saveBackupToStorage) {
+        if (!hasStoragePerm) {
+          handleRequestStoragePermission();
+        }
+        setExportProgress(85);
+        setExportStepText('Saving backup to Downloads...');
+        const res = (window as any).AndroidBridge.saveBackupToStorage(filename, jsonStr);
+        if (res && res.startsWith('SUCCESS')) {
+          setExportProgress(100);
+          setExportStepText('Backup saved to Downloads!');
+          setLastExportedFilename(filename);
+          showAppToast(`Backup saved: ${filename}`);
+        } else {
+          throw new Error(res || 'Failed to save to Downloads');
+        }
+      } else {
+        const res = db.downloadDatabaseBackup(bundle);
+        setExportProgress(100);
+        setExportStepText('Download initiated!');
+        setLastExportedFilename(res.filename);
+        showAppToast(`Backup downloaded: ${res.filename}`);
+      }
     } catch (err: any) {
       showAppToast(`Backup download failed: ${err?.message || 'Unknown error'}`);
     } finally {
@@ -377,6 +455,46 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-5 overflow-y-auto flex flex-col gap-4">
+          {/* Android Storage Permission Banner */}
+          {isAndroidBridge && !hasStoragePerm && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
+              <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-300 font-medium">
+                <span className="material-symbols-outlined text-[22px] text-amber-600 dark:text-amber-400">folder_special</span>
+                <div>
+                  <div className="font-bold">Storage Permission Required</div>
+                  <div className="text-[11px] text-on-surface-variant">
+                    Allow storage access to directly save and restore database backups from device storage.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleRequestStoragePermission}
+                className="self-end sm:self-center py-2 px-3.5 rounded-xl bg-amber-600 text-white font-bold text-xs shadow-sm hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">security</span>
+                <span>Grant Permission</span>
+              </button>
+            </div>
+          )}
+
+          {isAndroidBridge && hasStoragePerm && (
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
+                <span>Device Storage Access Active (Downloads/GSTBilling)</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRequestStoragePermission}
+                className="text-[11px] text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer"
+                title="Manage storage permission in device settings"
+              >
+                Manage
+              </button>
+            </div>
+          )}
+
           {activeTab === 'BACKUP' ? (
             /* --- CREATE BACKUP TAB --- */
             <div className="flex flex-col gap-4">

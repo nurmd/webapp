@@ -3,13 +3,16 @@ package com.gstbilling.pos
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -30,6 +33,12 @@ class MainActivity : Activity() {
 
     private lateinit var webView: WebView
     private var vibrator: Vibrator? = null
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+
+    companion object {
+        const val FILE_CHOOSER_REQUEST_CODE = 2001
+        const val STORAGE_PERMISSION_REQUEST_CODE = 102
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +81,17 @@ class MainActivity : Activity() {
         setupWebView()
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
         
+        // Request Storage permissions for Android 6.0+ (API 23+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val storagePermissions = arrayOf(
+                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ).filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+            if (storagePermissions.isNotEmpty()) {
+                requestPermissions(storagePermissions.toTypedArray(), STORAGE_PERMISSION_REQUEST_CODE)
+            }
+        }
+
         // Request Bluetooth permissions for Android 12+
         if (Build.VERSION.SDK_INT >= 31) {
             val permissions = arrayOf<String>(
@@ -177,6 +197,15 @@ class MainActivity : Activity() {
             }
         }
 
+        webView.setDownloadListener { url, _, _, _, _ ->
+            if (url != null && !url.startsWith("blob:") && !url.startsWith("data:")) {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(intent)
+                } catch (_: Exception) {}
+            }
+        }
+
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
                 if (consoleMessage != null) {
@@ -184,9 +213,65 @@ class MainActivity : Activity() {
                 }
                 return super.onConsoleMessage(consoleMessage)
             }
+
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                fileUploadCallback?.onReceiveValue(null)
+                fileUploadCallback = filePathCallback
+
+                val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+
+                try {
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE)
+                    return true
+                } catch (e: Exception) {
+                    fileUploadCallback?.onReceiveValue(null)
+                    fileUploadCallback = null
+                    return false
+                }
+            }
         }
 
         webView.addJavascriptInterface(AndroidBridge(this, webView, vibrator), "AndroidBridge")
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (fileUploadCallback != null) {
+                val results: Array<Uri>? = if (resultCode == Activity.RESULT_OK && data != null) {
+                    val dataString = data.dataString
+                    val clipData = data.clipData
+                    if (clipData != null) {
+                        val count = clipData.itemCount
+                        Array(count) { i -> clipData.getItemAt(i).uri }
+                    } else if (dataString != null) {
+                        arrayOf(Uri.parse(dataString))
+                    } else {
+                        null
+                    }
+                } else {
+                    null
+                }
+                fileUploadCallback?.onReceiveValue(results)
+                fileUploadCallback = null
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
+            val allGranted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            val status = if (allGranted) "GRANTED" else "DENIED"
+            webView.evaluateJavascript("window.onStoragePermissionResult && window.onStoragePermissionResult('$status');", null)
+        }
     }
 
     private var lastBackPressTime: Long = 0
@@ -252,6 +337,96 @@ class AndroidBridge(
     fun showToast(msg: String) {
         (context as? Activity)?.runOnUiThread {
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    @JavascriptInterface
+    fun hasStoragePermission(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                var isManager = false
+                try {
+                    val method = Environment::class.java.getMethod("isExternalStorageManager")
+                    isManager = method.invoke(null) as? Boolean ?: false
+                } catch (_: Exception) {}
+                isManager || context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                read && write
+            } else {
+                true
+            }
+        } catch (_: Exception) {
+            true
+        }
+    }
+
+    @JavascriptInterface
+    fun requestStoragePermission() {
+        (context as? Activity)?.let { act ->
+            act.runOnUiThread {
+                try {
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        try {
+                            val intent = Intent("android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION").apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val intent = Intent("android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        act.requestPermissions(
+                            arrayOf(
+                                android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            ),
+                            MainActivity.STORAGE_PERMISSION_REQUEST_CODE
+                        )
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Could not open storage permission settings", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun saveBackupToStorage(filename: String, jsonContent: String): String {
+        return try {
+            val safeName = if (filename.endsWith(".json")) filename else "$filename.json"
+            val targetFile = try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val vyaparDir = File(downloadsDir, "GSTBilling")
+                if (!vyaparDir.exists()) vyaparDir.mkdirs()
+                val f = File(vyaparDir, safeName)
+                f.writeText(jsonContent, Charsets.UTF_8)
+                f
+            } catch (_: Exception) {
+                val appDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+                val f = File(appDir, safeName)
+                f.writeText(jsonContent, Charsets.UTF_8)
+                f
+            }
+
+            try {
+                MediaScannerConnection.scanFile(context, arrayOf(targetFile.absolutePath), arrayOf("application/json"), null)
+            } catch (_: Exception) {}
+
+            (context as? Activity)?.runOnUiThread {
+                Toast.makeText(context, "Database backup saved: ${targetFile.name}", Toast.LENGTH_LONG).show()
+            }
+            "SUCCESS:${targetFile.absolutePath}"
+        } catch (e: Exception) {
+            (context as? Activity)?.runOnUiThread {
+                Toast.makeText(context, "Failed to save backup: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            "ERROR:${e.message}"
         }
     }
 

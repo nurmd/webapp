@@ -1799,7 +1799,13 @@ class StorageService {
     const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
     const jsonStr = JSON.stringify(bundle, null, 2);
 
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.saveBackupToStorage) {
+      try {
+        (window as any).AndroidBridge.saveBackupToStorage(filename, jsonStr);
+      } catch (err) {
+        console.warn('AndroidBridge saveBackupToStorage error:', err);
+      }
+    } else if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
