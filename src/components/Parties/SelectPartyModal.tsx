@@ -195,7 +195,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
             <button
               type="button"
               onClick={handleCustomerClick}
-              className={`flex-1 py-1.5 px-space-sm rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1 ${
                 filterType === 'CUSTOMER'
                   ? 'bg-surface-container-lowest text-secondary shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -208,18 +208,18 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
             >
               <span>Customers ({customersCount})</span>
               {filterType === 'CUSTOMER' && (
-                <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-secondary/15 text-secondary font-semibold">
-                  <span className="material-symbols-outlined text-[11px]">
-                    {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-                  </span>
-                  <span>{sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}</span>
+                <span
+                  className="material-symbols-outlined text-[13px] text-secondary shrink-0"
+                  title={`Sort: ${sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
+                >
+                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
                 </span>
               )}
             </button>
             <button
               type="button"
               onClick={handleSupplierClick}
-              className={`flex-1 py-1.5 px-space-sm rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1 ${
                 filterType === 'SUPPLIER'
                   ? 'bg-surface-container-lowest text-primary shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -232,11 +232,11 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
             >
               <span>Suppliers ({suppliersCount})</span>
               {filterType === 'SUPPLIER' && (
-                <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-primary/15 text-primary font-semibold">
-                  <span className="material-symbols-outlined text-[11px]">
-                    {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-                  </span>
-                  <span>{sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}</span>
+                <span
+                  className="material-symbols-outlined text-[13px] text-primary shrink-0"
+                  title={`Sort: ${sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
+                >
+                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
                 </span>
               )}
             </button>
@@ -278,12 +278,12 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
               type="button"
               onClick={filterType === 'CUSTOMER' ? handleCustomerClick : handleSupplierClick}
               className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-xs shadow-sm transition-all cursor-pointer bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
-              title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+              title={`Click to cycle sort: ${sortMode === 'RECENT' ? 'Recent Transactions' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
             >
               <span className="material-symbols-outlined text-[13px]">
                 {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
               </span>
-              <span>
+              <span className="hidden sm:inline">
                 {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
               </span>
             </button>

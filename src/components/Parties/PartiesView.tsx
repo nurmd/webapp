@@ -396,7 +396,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={handleCustomersClick}
-            className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
+            className={`flex-1 min-h-[40px] py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'CUSTOMERS'
                 ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
@@ -413,13 +413,11 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               {customers.length}
             </span>
             {activeSegment === 'CUSTOMERS' && (
-              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-secondary/15 text-secondary font-semibold transition-all">
-                <span className="material-symbols-outlined text-[12px]">
-                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-                </span>
-                <span>
-                  {sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}
-                </span>
+              <span
+                className="material-symbols-outlined text-[14px] text-secondary shrink-0"
+                title={`Sort: ${sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
+              >
+                {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
               </span>
             )}
           </button>
@@ -427,7 +425,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={handleSuppliersClick}
-            className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
+            className={`flex-1 min-h-[40px] py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 whitespace-nowrap transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'SUPPLIERS'
                 ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
@@ -444,13 +442,11 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               {suppliers.length}
             </span>
             {activeSegment === 'SUPPLIERS' && (
-              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary font-semibold transition-all">
-                <span className="material-symbols-outlined text-[12px]">
-                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-                </span>
-                <span>
-                  {sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}
-                </span>
+              <span
+                className="material-symbols-outlined text-[14px] text-primary shrink-0"
+                title={`Sort: ${sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
+              >
+                {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
               </span>
             )}
           </button>
@@ -533,13 +529,13 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={activeSegment === 'CUSTOMERS' ? handleCustomersClick : handleSuppliersClick}
-            className="min-h-[36px] sm:min-h-[38px] px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
-            title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+            className="min-h-[36px] sm:min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
+            title={`Click to cycle sort: ${sortMode === 'RECENT' ? 'Recent Transactions' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
           >
             <span className="material-symbols-outlined text-[15px]">
               {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
             </span>
-            <span>
+            <span className="hidden sm:inline">
               {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
             </span>
           </button>

@@ -370,12 +370,12 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                 type="button"
                 onClick={handleCycleSort}
                 className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-xs transition-all cursor-pointer bg-surface-container-low text-secondary hover:bg-secondary/15 border border-secondary/30 active:scale-95"
-                title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+                title={`Click to cycle sort: ${sortMode === 'RECENT' ? 'Recent Transactions' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
               >
                 <span className="material-symbols-outlined text-[13px]">
                   {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
                 </span>
-                <span>
+                <span className="hidden sm:inline">
                   {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
                 </span>
               </button>
