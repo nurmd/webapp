@@ -269,14 +269,6 @@ export const App: React.FC = () => {
     return true;
   }, isUpdateModalOpen, 25);
 
-  useBackNavigation(() => {
-    if (activeTab !== 'dashboard') {
-      setActiveTab('dashboard');
-      return true;
-    }
-    return false;
-  }, activeTab !== 'dashboard', 0);
-
   React.useEffect(() => {
     // Listen for reactive DB data updates (from local writes, remote CouchDB/PouchDB, or multi-tab BroadcastChannel)
     const unsub = db.subscribe(() => {

@@ -1,15 +1,15 @@
 {
   "version": "1.1.36",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-16T05:54:34.429Z",
+  "buildTime": "2026-10-16T06:07:48.995Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "offline database backup & restore, decimal precision, payment discounts, and compliance (v1.1.36)",
     "create dedicated middle line for invoice/bill number in transaction cards (v1.1.35)",
     "normalize pill dimensions between money in/out and payment status, positioning money in/out to the left (v1.1.34)",
     "relocate ledger invoice numbers below party name and move dashboard flow tag to bottom-right status area (v1.1.33)",
     "sleek compact filter pills with rounded-full styling for smaller screens",
-    "compact transaction cards with collapsible \\/ expand icons for smaller screens",
-    "bump app version to v1.1.30 with verified APK & release notes"
+    "compact transaction cards with collapsible \\/ expand icons for smaller screens"
   ]
 }

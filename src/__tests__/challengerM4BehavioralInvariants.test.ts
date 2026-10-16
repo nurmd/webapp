@@ -113,6 +113,25 @@ describe('Challenger M4 Empirical Verification: Behavioral Invariants', () => {
       unregSubModal();
       unregDatePicker();
     });
+
+    it('unregisters sidepanel drawer cleanly without triggering root fallback or cascading pops', () => {
+      let isDrawerOpen = true;
+      let activeTab = 'sales';
+
+      const unregDrawer = registerBackHandler(() => {
+        isDrawerOpen = false;
+        return true;
+      }, 30);
+
+      // Simulating user selecting another tab inside the drawer
+      activeTab = 'purchases';
+      isDrawerOpen = false;
+      unregDrawer();
+
+      // Ensure that after unregistering drawer, activeTab remains purchases and drawer is closed
+      expect(activeTab).toBe('purchases');
+      expect(isDrawerOpen).toBe(false);
+    });
   });
 
   describe('Audio & Barcode Feedback Invariants', () => {

@@ -4,6 +4,7 @@ import { App } from '@capacitor/app';
 export type BackHandler = () => boolean | void;
 
 export interface StackEntry {
+  id: string;
   handler: BackHandler;
   priority: number;
   timestamp: number;
@@ -14,13 +15,16 @@ const backHandlerStack: StackEntry[] = [];
 
 let isInitialized = false;
 let lastBackPressTime = 0;
+let ignorePopstateCount = 0;
 
 /**
  * Registers a back handler onto the stack.
  * Returns an unsubscribe function.
  */
 export function registerBackHandler(handler: BackHandler, priority: number = 0): () => void {
+  const entryId = `bh_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const entry: StackEntry = {
+    id: entryId,
     handler,
     priority,
     timestamp: Date.now(),
@@ -29,22 +33,33 @@ export function registerBackHandler(handler: BackHandler, priority: number = 0):
 
   const isCustomAndroid = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
   let pushedHistory = false;
-  if (!isCustomAndroid && typeof window !== 'undefined' && window.history) {
+  // Only push history state for overlays and modals (priority > 0) to prevent tab pollution
+  if (!isCustomAndroid && typeof window !== 'undefined' && window.history && priority > 0) {
     try {
-      window.history.pushState({ backHandler: true }, '');
+      window.history.pushState({ backHandlerId: entryId }, '');
       pushedHistory = true;
     } catch {}
   }
 
   return () => {
-    const idx = backHandlerStack.indexOf(entry);
+    const idx = backHandlerStack.findIndex((e) => e.id === entryId);
     if (idx !== -1) {
       backHandlerStack.splice(idx, 1);
     }
-    if (pushedHistory && window.history.state?.backHandler) {
+    // Only pop history if this specific handler's state is currently at the top of browser history
+    if (pushedHistory && typeof window !== 'undefined' && window.history?.state?.backHandlerId === entryId) {
       try {
+        ignorePopstateCount++;
         window.history.back();
-      } catch {}
+        // Fallback safety in case the browser does not emit popstate
+        setTimeout(() => {
+          if (ignorePopstateCount > 0) {
+            ignorePopstateCount--;
+          }
+        }, 300);
+      } catch {
+        ignorePopstateCount = Math.max(0, ignorePopstateCount - 1);
+      }
     }
   };
 }
@@ -145,7 +160,14 @@ export function initBackNavigation(onRootBack?: () => void) {
 
   // 3. Browser history popstate fallback
   window.addEventListener('popstate', () => {
-    triggerBack();
+    if (ignorePopstateCount > 0) {
+      ignorePopstateCount--;
+      return;
+    }
+    const handled = triggerBack();
+    if (!handled && onRootBack) {
+      onRootBack();
+    }
   });
 }
 
