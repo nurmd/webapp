@@ -269,6 +269,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
               onClick={onClose}
               className="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer transition-colors"
               title="Close (Esc)"
+              aria-label="Close payment modal"
             >
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
@@ -430,6 +431,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       onClick={() => handleRemoveSplit(split.id)}
                       className="w-7 h-7 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error/10 cursor-pointer"
                       title="Remove tender"
+                      aria-label="Remove tender"
                     >
                       <span className="material-symbols-outlined text-[15px]">delete</span>
                     </button>

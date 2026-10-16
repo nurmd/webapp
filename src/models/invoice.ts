@@ -31,6 +31,7 @@ export interface InvoiceItemEntry {
   quantity: number;
   unitPrice: number;
   pricePerUnit?: number;              // Optional alias for unitPrice
+  rate?: number;                      // Optional alias for unitPrice
   mrp?: number;
   discountPercent?: number;
   discountAmount?: number;
@@ -54,6 +55,7 @@ export interface Invoice {
   dueDate?: string;
   partyId?: string;
   partyName: string;
+  partyPhone?: string;
   partyGstin?: string;
   partyAddress: string;
   partyStateCode: string;

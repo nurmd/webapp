@@ -12,6 +12,7 @@ import { ItemFormModal } from './ItemFormModal.tsx';
 import { ItemDetailSheet, ItemTransactionRecord, ItemTransactionType } from './ItemDetailSheet.tsx';
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export type { ItemTransactionType, ItemTransactionRecord };
 
@@ -64,6 +65,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>('STOCK_IN');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [previewPurchase, setPreviewPurchase] = useState<PurchaseBill | null>(null);
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const company = useMemo(() => db.getCompany(), []);
 
   const handleViewInvoice = (inv: Invoice) => {
@@ -219,16 +221,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     });
   }, [items, allInvoices, allPurchases, allAdjustments]);
 
-  const handleReconcileAllDiscrepancies = () => {
-    if (itemsWithDiscrepancy.length === 0) return;
-    if (
-      !window.confirm(
-        `Reconcile stock for ${itemsWithDiscrepancy.length} item(s) to match exact transaction history totals?\n\nThis will correct doubled stock back to accurate purchase/sales levels.`
-      )
-    ) {
-      return;
-    }
-
+  const executeReconcileAllDiscrepancies = () => {
     const allowNegative = db.getAllowNegativeStock();
     let count = 0;
     for (const item of itemsWithDiscrepancy) {
@@ -274,8 +267,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       onSaveItem(updated);
       count++;
     }
+  };
 
-    alert(`Successfully reconciled ${count} item(s) to match transaction records!`);
+  const handleReconcileAllDiscrepancies = () => {
+    if (itemsWithDiscrepancy.length === 0) return;
+    setIsReconcileModalOpen(true);
   };
 
   const handleReconcileItemStock = (item: InventoryItem, targetStock: number) => {
@@ -432,7 +428,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 onClick={() => {
                   setFilterStockStatus(filterStockStatus === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm transition-all cursor-pointer ${
+                className={`min-h-[36px] flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                   filterStockStatus === 'LOW_STOCK'
                     ? 'bg-secondary text-on-secondary shadow-sm'
                     : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
@@ -508,14 +504,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
           {/* Active Filter Chips Row (if any filter is active) */}
           {activeFilterCount > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
               <span className="text-[11px] text-outline font-semibold flex-shrink-0">Active:</span>
 
               {filterCategory !== 'ALL' && (
                 <button
                   type="button"
                   onClick={() => setFilterCategory('ALL')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-bold flex-shrink-0 cursor-pointer hover:bg-secondary/20 active:scale-95 border border-secondary/20"
                 >
                   <span>Category: {filterCategory}</span>
                   <span className="material-symbols-outlined text-[13px]">close</span>
@@ -526,7 +522,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setFilterStockStatus('ALL')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-bold flex-shrink-0 cursor-pointer hover:bg-secondary/20 active:scale-95 border border-secondary/20"
                 >
                   <span>
                     Stock:{' '}
@@ -544,7 +540,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setFilterCreatedTimeframe('ALL')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-bold flex-shrink-0 cursor-pointer hover:bg-secondary/20 active:scale-95 border border-secondary/20"
                 >
                   <span>
                     Created:{' '}
@@ -562,7 +558,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setSortOption('DEFAULT')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-secondary/20"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-bold flex-shrink-0 cursor-pointer hover:bg-secondary/20 active:scale-95 border border-secondary/20"
                 >
                   <span>
                     Sort:{' '}
@@ -586,7 +582,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowDisabled(false)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-semibold flex-shrink-0 cursor-pointer hover:bg-amber-500/25"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-bold flex-shrink-0 cursor-pointer hover:bg-amber-500/25 active:scale-95 border border-amber-500/20"
                 >
                   <span>Disabled items shown ({disabledItemsCount})</span>
                   <span className="material-symbols-outlined text-[13px]">close</span>
@@ -596,7 +592,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <button
                 type="button"
                 onClick={resetAllFilters}
-                className="text-[11px] text-error font-semibold hover:underline flex-shrink-0 cursor-pointer ml-1"
+                className="min-h-[36px] flex items-center px-2 text-xs text-error font-bold hover:underline cursor-pointer ml-1"
               >
                 Clear All
               </button>
@@ -847,6 +843,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           bill={previewPurchase}
           company={company}
           onClose={() => setPreviewPurchase(null)}
+        />
+      )}
+
+      {/* 7. Reconcile Stock Discrepancy Confirmation Modal */}
+      {isReconcileModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isReconcileModalOpen}
+          title="Reconcile Inventory Stock?"
+          recordName={`${itemsWithDiscrepancy.length} item(s) with discrepancy`}
+          description="Reconcile stock for items to match exact transaction history totals? This will correct stock levels back to accurate purchase and sales records."
+          confirmText="Reconcile Stock"
+          cancelText="Cancel"
+          onConfirm={executeReconcileAllDiscrepancies}
+          onClose={() => setIsReconcileModalOpen(false)}
         />
       )}
     </div>

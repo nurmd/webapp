@@ -30,6 +30,8 @@ import { rbac, UserProfile } from './services/rbac.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
+import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
+
 
 // Secondary Views (Dynamic Code-Splitting with named-export unwrapping)
 const BusinessReportsView = React.lazy(() =>
@@ -167,6 +169,20 @@ export const App: React.FC = () => {
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
+
+  // Declarative Confirm Delete Modal State
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    title: string;
+    description?: string;
+    recordName?: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    onConfirm: () => {},
+  });
 
   // Dedicated Party View Navigation State (Customers vs Suppliers & Status Filter)
   const [partiesSegment, setPartiesSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
@@ -469,13 +485,20 @@ export const App: React.FC = () => {
       return;
     }
     const inv = db.getInvoices().find((i) => i.id === id);
-    if (window.confirm('Delete this invoice?')) {
-      db.deleteInvoice(id);
-      if (inv?.partyId) {
-        db.recalculatePartyBalance(inv.partyId);
-      }
-      refreshData();
-    }
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Invoice?',
+      recordName: inv ? `Invoice #${inv.invoiceNumber}` : undefined,
+      description: 'Are you sure you want to delete this invoice? This will restore inventory stock and recalculate party balance.',
+      confirmText: 'Delete Invoice',
+      onConfirm: () => {
+        db.deleteInvoice(id);
+        if (inv?.partyId) {
+          db.recalculatePartyBalance(inv.partyId);
+        }
+        refreshData();
+      },
+    });
   };
 
   const handleDeletePurchase = (id: string) => {
@@ -485,13 +508,20 @@ export const App: React.FC = () => {
       return;
     }
     const bill = db.getPurchases().find((b) => b.id === id);
-    if (window.confirm('Delete this purchase bill?')) {
-      db.deletePurchase(id);
-      if (bill?.supplierId) {
-        db.recalculatePartyBalance(bill.supplierId);
-      }
-      refreshData();
-    }
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Purchase Bill?',
+      recordName: bill ? `Bill #${bill.billNumber}` : undefined,
+      description: 'Are you sure you want to delete this purchase bill? This will revert inventory stock and recalculate party balance.',
+      confirmText: 'Delete Purchase',
+      onConfirm: () => {
+        db.deletePurchase(id);
+        if (bill?.supplierId) {
+          db.recalculatePartyBalance(bill.supplierId);
+        }
+        refreshData();
+      },
+    });
   };
 
   const handleSaveExpense = (newExpense: Expense) => {
@@ -505,10 +535,18 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (window.confirm('Delete this expense voucher?')) {
-      db.deleteExpense(id);
-      refreshData();
-    }
+    const exp = db.getExpenses().find((e) => e.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Expense Voucher?',
+      recordName: exp ? `${exp.category}: ₹${exp.amount.toFixed(2)}` : undefined,
+      description: 'Are you sure you want to delete this expense voucher? This action cannot be undone.',
+      confirmText: 'Delete Expense',
+      onConfirm: () => {
+        db.deleteExpense(id);
+        refreshData();
+      },
+    });
   };
 
   const handleSaveParty = (party: Party) => {
@@ -522,12 +560,15 @@ export const App: React.FC = () => {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount: number = 0
   ) => {
     const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
+    const disc = Number((discount || 0).toFixed(2));
+    const totalSettled = Number((amount + disc).toFixed(2));
     const newBal = isPaymentIn
-      ? party.currentBalance - amount
-      : party.currentBalance + amount;
+      ? party.currentBalance - totalSettled
+      : party.currentBalance + totalSettled;
 
     const updatedParty: Party = {
       ...party,
@@ -538,21 +579,22 @@ export const App: React.FC = () => {
 
     const docId = Date.now().toString().slice(-6);
     if (isPaymentIn) {
-      // 1. Create Double-Entry Receipt Voucher with Split Support
+      // 1. Create Double-Entry Receipt Voucher with Split Support and Discount Allowed
       const voucher = createPaymentReceiptVoucher({
         receiptNumber: `RCPT-${docId}`,
         date: new Date().toISOString().split('T')[0],
         customerName: party.name,
         customerId: party.id,
         amount,
+        discount: disc,
         paymentMode,
         paymentSplits,
-        narration: notes || `Payment received from ${party.name}`,
+        narration: notes || `Payment received from ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
       });
       db.saveVoucher(voucher);
 
       // 2. FIFO settlement across unpaid invoices for this customer
-      let remaining = amount;
+      let remaining = totalSettled;
       const unpaidInvoices = db
         .getInvoices()
         .filter(
@@ -612,21 +654,22 @@ export const App: React.FC = () => {
         remaining -= settleAmt;
       }
     } else {
-      // 1. Create Double-Entry Payment Out Voucher with Split Support
+      // 1. Create Double-Entry Payment Out Voucher with Split Support and Discount Received
       const voucher = createPaymentOutVoucher({
         voucherNumber: `PYMT-${docId}`,
         date: new Date().toISOString().split('T')[0],
         supplierName: party.name,
         supplierId: party.id,
         amount,
+        discount: disc,
         paymentMode,
         paymentSplits,
-        narration: notes || `Payment disbursed to ${party.name}`,
+        narration: notes || `Payment disbursed to ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
       });
       db.saveVoucher(voucher);
 
       // 2. FIFO settlement across unpaid purchases for this supplier
-      let remaining = amount;
+      let remaining = totalSettled;
       const unpaidPurchases = db
         .getPurchases()
         .filter(
@@ -696,10 +739,18 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (window.confirm('Delete this party?')) {
-      db.deleteParty(id);
-      refreshData();
-    }
+    const party = db.getParties().find((p) => p.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Party Account?',
+      recordName: party ? party.name : undefined,
+      description: 'Are you sure you want to delete this party? This removes them from your active contacts list.',
+      confirmText: 'Delete Party',
+      onConfirm: () => {
+        db.deleteParty(id);
+        refreshData();
+      },
+    });
   };
 
   const activeItems = React.useMemo(() => getActiveItems(items), [items]);
@@ -729,10 +780,18 @@ export const App: React.FC = () => {
       showToast('Cannot delete: This item exists in bills. You can disable it instead.');
       return;
     }
-    if (window.confirm('Delete this inventory item?')) {
-      db.deleteItem(id);
-      refreshData();
-    }
+    const item = items.find((it) => it.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Inventory Item?',
+      recordName: item ? item.name : undefined,
+      description: 'Are you sure you want to delete this item? This action cannot be undone.',
+      confirmText: 'Delete Item',
+      onConfirm: () => {
+        db.deleteItem(id);
+        refreshData();
+      },
+    });
   };
 
   const handleSaveAdjustment = (adj: StockAdjustment) => {
@@ -761,10 +820,18 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (window.confirm('Delete this bank account?')) {
-      db.deleteBankAccount(id);
-      refreshData();
-    }
+    const acc = db.getBankAccounts().find((a) => a.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Bank Account?',
+      recordName: acc ? `${acc.accountName} (${acc.accountNumber})` : undefined,
+      description: 'Are you sure you want to delete this bank account? This action cannot be undone.',
+      confirmText: 'Delete Account',
+      onConfirm: () => {
+        db.deleteBankAccount(id);
+        refreshData();
+      },
+    });
   };
 
   const handleSaveCashBankTxn = (txn: CashBankTransaction) => {
@@ -778,10 +845,18 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (window.confirm('Delete this cash/bank transaction?')) {
-      db.deleteCashBankTransaction(id);
-      refreshData();
-    }
+    const txn = db.getCashBankTransactions().find((t) => t.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Cash/Bank Transaction?',
+      recordName: txn ? `${txn.type}: ₹${txn.amount.toFixed(2)}` : undefined,
+      description: 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      confirmText: 'Delete Transaction',
+      onConfirm: () => {
+        db.deleteCashBankTransaction(id);
+        refreshData();
+      },
+    });
   };
 
   useEffect(() => {
@@ -1136,6 +1211,17 @@ export const App: React.FC = () => {
           />
         </React.Suspense>
       )}
+
+      {/* Global Declarative Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteConfirmation.isOpen}
+        title={deleteConfirmation.title}
+        recordName={deleteConfirmation.recordName}
+        description={deleteConfirmation.description}
+        confirmText={deleteConfirmation.confirmText || 'Delete'}
+        onConfirm={deleteConfirmation.onConfirm}
+        onClose={() => setDeleteConfirmation((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* 4-Digit PIN Security Role Switch Modal */}
       {isRoleSwitchOpen && (

@@ -80,6 +80,8 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer"
+            title="Close"
+            aria-label="Close split payment modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

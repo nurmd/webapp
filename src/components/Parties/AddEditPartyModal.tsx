@@ -201,6 +201,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
             type="button"
             onClick={onClose}
             className="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer"
+            title="Close"
+            aria-label="Close party form"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

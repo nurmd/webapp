@@ -90,6 +90,7 @@ export const DevicePairModals: React.FC<DevicePairModalsProps> = ({
               <button
                 type="button"
                 onClick={() => setIsImportProfileModalOpen(false)}
+                aria-label="Close import modal"
                 className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>

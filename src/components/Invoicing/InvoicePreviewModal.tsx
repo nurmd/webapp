@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR, formatDate } from '../../core/utils/formatters.ts';
+import { formatINR, formatDate, formatQuantity } from '../../core/utils/formatters.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { getStateByCode } from '../../core/gst/stateCodes.ts';
 import { formatThermalReceiptText } from '../../core/printer/escpos.ts';
@@ -12,6 +12,7 @@ import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -28,6 +29,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   onClose,
   onEditInvoice,
 }) => {
+  const [showEwayThresholdWarning, setShowEwayThresholdWarning] = useState(false);
   const [viewMode, setViewMode] = useState<'A4' | 'THERMAL'>(() => {
     const defaultPrint = localStorage.getItem('defaultPrintOption');
     return (defaultPrint === 'Thermal-58mm' || defaultPrint === 'Thermal-80mm') ? 'THERMAL' : 'A4';
@@ -505,7 +507,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           )}
                         </td>
                         <td className="py-0.5 text-center font-medium text-slate-800">
-                          {item.quantity}
+                          {formatQuantity(item.quantity, 4)}
                         </td>
                         <td className="py-0.5 text-right font-medium text-slate-800">
                           {item.unitPrice.toFixed(0)}
@@ -943,7 +945,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           </td>
                         )}
                         <td className="py-2 px-2 text-right font-medium text-slate-900 border-r border-slate-300 font-tabular-data text-xs">
-                          {line.quantity}
+                          {formatQuantity(line.quantity, 4)}
                         </td>
                         <td className="py-2 px-2 text-center uppercase text-slate-600 border-r border-slate-300 text-xs">
                           {line.unit || 'PCS'}
@@ -1419,6 +1421,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 onClick={() => setShowMoreActions(!showMoreActions)}
                 className="h-7 sm:h-8 px-2 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center gap-1 text-on-surface-variant hover:text-on-surface text-xs font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
                 title="More Export Options"
+                aria-label="More export options"
               >
                 <MoreVertical size={14} />
                 <span className="hidden sm:inline">Export</span>
@@ -1430,10 +1433,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     onClick={() => {
                       setShowMoreActions(false);
                       if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
-                        const proceed = confirm(
-                          `Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`
-                        );
-                        if (!proceed) return;
+                        setShowEwayThresholdWarning(true);
+                        return;
                       }
                       downloadEWayBillJson(company, invoice);
                     }}
@@ -1508,6 +1509,20 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           invoice={invoice}
           company={company}
           onClose={() => setIsWhatsAppModalOpen(false)}
+        />
+      )}
+
+      {/* E-Way Bill Statutory Threshold Advisory Modal */}
+      {showEwayThresholdWarning && (
+        <ConfirmDeleteModal
+          isOpen={showEwayThresholdWarning}
+          title="Generate E-Way Bill JSON?"
+          recordName={`Invoice #${invoice.invoiceNumber}`}
+          description={`Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`}
+          confirmText="Generate JSON"
+          cancelText="Cancel"
+          onConfirm={() => downloadEWayBillJson(company, invoice)}
+          onClose={() => setShowEwayThresholdWarning(false)}
         />
       )}
     </div>

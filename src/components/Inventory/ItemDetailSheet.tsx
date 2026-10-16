@@ -4,7 +4,8 @@ import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
 import { db } from '../../services/db.ts';
 
@@ -68,6 +69,8 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   const [txnFilter, setTxnFilter] = useState<'ALL' | 'SALES' | 'PURCHASES' | 'ADJUSTMENTS'>('ALL');
   const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
   const [selectedPurchaseForPreview, setSelectedPurchaseForPreview] = useState<PurchaseBill | null>(null);
+  const [showDisablePromptModal, setShowDisablePromptModal] = useState(false);
+  const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
   const company = useMemo(() => db.getCompany(), []);
 
   const handleRowClick = (txn: ItemTransactionRecord) => {
@@ -293,7 +296,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                   ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   : 'bg-secondary-container text-on-secondary-container'
               }`}>
-                {item.currentStock} {item.unit}
+                {formatQuantity(item.currentStock, 4)} {item.unit}
               </span>
             </div>
             <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
@@ -306,6 +309,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close item details"
             className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
@@ -356,7 +360,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                   )}
                 </div>
                 <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate">
-                  Catalog: <strong className="text-on-surface">{item.currentStock}</strong> • Transactions: <strong className="text-on-surface">{netTxnStock} {item.unit}</strong>
+                  Catalog: <strong className="text-on-surface">{formatQuantity(item.currentStock, 4)}</strong> • Transactions: <strong className="text-on-surface">{formatQuantity(netTxnStock, 4)} {item.unit}</strong>
                 </span>
               </div>
             </div>
@@ -513,7 +517,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                       <span className={`text-xs font-bold font-tabular-data block ${
                         txn.isInward ? 'text-secondary' : 'text-error'
                       }`}>
-                        {txn.isInward ? '+' : '-'}{txn.quantity} {txn.unit}
+                        {txn.isInward ? '+' : '-'}{formatQuantity(txn.quantity, 4)} {txn.unit}
                       </span>
                       {txn.totalAmount !== undefined && (
                         <span className="text-[11px] text-on-surface-variant font-medium font-tabular-data block">
@@ -586,15 +590,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             type="button"
             onClick={() => {
               if (itemInBills) {
-                if (window.confirm('This item is referenced in existing bills and CANNOT be deleted to preserve financial records.\n\nWould you like to DISABLE this item instead to hide it from billing?')) {
-                  onToggleItemStatus(item);
-                }
+                setShowDisablePromptModal(true);
                 return;
               }
-              if (window.confirm(`Delete item "${item.name}"?`)) {
-                onDeleteItem(item.id);
-                onClose();
-              }
+              setShowDeleteItemModal(true);
             }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center active:scale-95 cursor-pointer transition-colors ${
               itemInBills
@@ -629,6 +628,36 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           bill={selectedPurchaseForPreview}
           company={company}
           onClose={() => setSelectedPurchaseForPreview(null)}
+        />
+      )}
+
+      {/* Disable Item Instead Modal */}
+      {showDisablePromptModal && item && (
+        <ConfirmDeleteModal
+          isOpen={showDisablePromptModal}
+          title="Disable Item Instead?"
+          recordName={item.name}
+          description="This item is referenced in existing bills and cannot be deleted to preserve financial records. Would you like to disable this item instead to hide it from billing?"
+          confirmText="Disable Item"
+          cancelText="Cancel"
+          onConfirm={() => onToggleItemStatus(item)}
+          onClose={() => setShowDisablePromptModal(false)}
+        />
+      )}
+
+      {/* Delete Item Confirmation Modal */}
+      {showDeleteItemModal && item && (
+        <ConfirmDeleteModal
+          isOpen={showDeleteItemModal}
+          title="Delete Inventory Item?"
+          recordName={item.name}
+          description={`Are you sure you want to delete item "${item.name}"? This action cannot be undone.`}
+          confirmText="Delete Item"
+          onConfirm={() => {
+            onDeleteItem(item.id);
+            onClose();
+          }}
+          onClose={() => setShowDeleteItemModal(false)}
         />
       )}
     </div>

@@ -6,6 +6,7 @@ import {
   PartyBalanceDiscrepancyRecord,
 } from '../../core/audit/financialBalanceAuditor.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface FinancialBalanceAuditorPanelProps {
   onRefreshParent?: () => void;
@@ -19,6 +20,7 @@ export const FinancialBalanceAuditorPanel: React.FC<FinancialBalanceAuditorPanel
   const [isReconciling, setIsReconciling] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | 'CUSTOMER' | 'SUPPLIER'>('ALL');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showReconcileConfirm, setShowReconcileConfirm] = useState(false);
 
   const runAudit = () => {
     setIsAuditing(true);
@@ -36,15 +38,8 @@ export const FinancialBalanceAuditorPanel: React.FC<FinancialBalanceAuditorPanel
     runAudit();
   }, []);
 
-  const handleReconcile = async () => {
+  const executeReconcile = async () => {
     if (!report || report.discrepantPartiesCount === 0) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to reconcile ${report.discrepantPartiesCount} party accounts? This will adjust recorded party balances to match authentic transaction ground truth and log an MCA Rule 3(1) audit entry.`
-      )
-    ) {
-      return;
-    }
 
     setIsReconciling(true);
     try {
@@ -55,10 +50,16 @@ export const FinancialBalanceAuditorPanel: React.FC<FinancialBalanceAuditorPanel
       runAudit();
       onRefreshParent?.();
     } catch (err: any) {
-      alert(`Reconciliation failed: ${err.message || err}`);
+      console.error('Reconciliation failed:', err);
+      setStatusMessage(`Reconciliation failed: ${err.message || err}`);
     } finally {
       setIsReconciling(false);
     }
+  };
+
+  const handleReconcile = () => {
+    if (!report || report.discrepantPartiesCount === 0) return;
+    setShowReconcileConfirm(true);
   };
 
   const filteredDiscrepancies = useMemo(() => {
@@ -261,6 +262,23 @@ export const FinancialBalanceAuditorPanel: React.FC<FinancialBalanceAuditorPanel
             ))}
           </div>
         </div>
+      )}
+
+      {/* Party Balance Reconciliation Confirmation Modal */}
+      {showReconcileConfirm && report && (
+        <ConfirmDeleteModal
+          isOpen={showReconcileConfirm}
+          title="Reconcile Party Balances?"
+          recordName={`${report.discrepantPartiesCount} party account(s) with discrepancy`}
+          description={`Are you sure you want to reconcile ${report.discrepantPartiesCount} party accounts? This will adjust recorded party balances to match authentic transaction ground truth and log an MCA Rule 3(1) audit entry.`}
+          confirmText="Reconcile Now"
+          cancelText="Cancel"
+          onConfirm={() => {
+            setShowReconcileConfirm(false);
+            executeReconcile();
+          }}
+          onClose={() => setShowReconcileConfirm(false)}
+        />
       )}
     </div>
   );

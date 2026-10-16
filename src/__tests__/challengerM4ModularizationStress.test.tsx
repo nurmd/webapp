@@ -84,15 +84,15 @@ import { Voucher } from '../core/accounting/voucherTypes.ts';
 describe('Milestone 4: Empirical Challenger Modularization & Stability Suite', () => {
   const dummyCompany: CompanyProfile = {
     id: 'comp_1',
-    businessName: 'Shree Ganesh Traders',
-    tradeName: 'Ganesh POS',
+    businessName: 'Enterprise Store',
+    tradeName: 'Enterprise POS',
     gstin: '27AABCU9603R1ZM',
     pan: 'AABCU9603R',
     pincode: '411037',
     stateCode: '27',
     address: '101 Market Yard, Pune',
     phone: '9876543210',
-    email: 'info@ganesh.com',
+    email: 'info@enterprisestore.com',
     isGstEnabled: true,
     invoicePrefix: 'INV-',
     bankName: 'HDFC Bank',

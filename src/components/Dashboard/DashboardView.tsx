@@ -16,7 +16,10 @@ import {
   DashboardRecordPaymentModal,
   DashboardPaymentTarget,
 } from './DashboardRecordPaymentModal.tsx';
+import { DateFilterModal } from '../Common/DateFilterModal.tsx';
+import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { db } from '../../services/db.ts';
+import { getOverdueDays } from '../../core/accounting/aging.ts';
 
 export type ActivityType = 'SALE' | 'PURCHASE' | 'VOUCHER' | 'EXPENSE';
 export type CashFlowDirection = 'IN' | 'OUT';
@@ -33,6 +36,7 @@ export interface ActivityTransaction {
   partyId?: string;
   identifier: string;
   date: string;
+  dueDate?: string;
   timestamp: number;
   amount: number;
   paidAmount?: number;
@@ -67,7 +71,8 @@ export interface DashboardViewProps {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => void;
   onRefresh?: () => void;
   onNavigateTab: (tab: AppTab) => void;
@@ -105,7 +110,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Filters & Search State
   const [txTypeFilter, setTxTypeFilter] = useState<TxTypeFilter>('ALL');
   const [txStatusFilter, setTxStatusFilter] = useState<TxStatusFilter>('ALL');
+  const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');
+  const [customStart, setCustomStart] = useState<string>('');
+  const [customEnd, setCustomEnd] = useState<string>('');
+  const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Active Date Filter Bounds
+  const dateRange = useMemo(() => {
+    return getDateFilterBounds(datePreset, customStart, customEnd);
+  }, [datePreset, customStart, customEnd]);
+
+  // Normalizes diverse date formats (YYYY-MM-DD, ISO, DD/MM/YYYY, timestamp) to YYYY-MM-DD
+  const toNormalizedDateStr = (dateStr?: string, timestamp?: number): string => {
+    if (dateStr) {
+      const trimmed = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+        return trimmed.slice(0, 10);
+      }
+      if (trimmed.includes('/')) {
+        const parts = trimmed.split('/');
+        if (parts.length === 3) {
+          const d = parts[0].padStart(2, '0');
+          const m = parts[1].padStart(2, '0');
+          const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+          return `${y}-${m}-${d}`;
+        }
+      }
+    }
+    if (timestamp && timestamp > 0) {
+      const d = new Date(timestamp);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    return '';
+  };
 
   // Modals for Contextual In-Dashboard Actions
   const [selectedPurchaseForModal, setSelectedPurchaseForModal] = useState<PurchaseBill | null>(null);
@@ -174,6 +213,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         partyId: inv.partyId,
         identifier: inv.invoiceNumber || '',
         date: inv.date || '',
+        dueDate: inv.dueDate,
         timestamp: parseDateToTimestamp(inv.date, inv.createdAt),
         amount: inv.grandTotal || 0,
         paidAmount: inv.paidAmount,
@@ -205,6 +245,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         partyId: pur.supplierId,
         identifier: pur.billNumber || '',
         date: pur.date || '',
+        dueDate: pur.dueDate,
         timestamp: parseDateToTimestamp(pur.date, pur.createdAt),
         amount: pur.grandTotal || 0,
         paidAmount: pur.paidAmount,
@@ -365,9 +406,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [allActivities]);
 
-  // 2. Real-Time Search & Type / Status Filtering (R2)
+  // 2. Real-Time Search & Type / Status / Date Filtering (R2)
   const filteredActivities = useMemo(() => {
     return allActivities.filter((item) => {
+      // 0. Date Range Filter
+      if (dateRange.start || dateRange.end) {
+        const itemYmd = toNormalizedDateStr(item.date, item.timestamp);
+        if (!isDateInRange(itemYmd, dateRange.start, dateRange.end)) {
+          return false;
+        }
+      }
+
       // A. Type Filter
       if (txTypeFilter === 'SALES' && item.type !== 'SALE') return false;
       if (txTypeFilter === 'PURCHASES' && item.type !== 'PURCHASE') return false;
@@ -465,7 +514,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       return true;
     });
-  }, [allActivities, txTypeFilter, txStatusFilter, searchQuery]);
+  }, [allActivities, dateRange, txTypeFilter, txStatusFilter, searchQuery]);
 
   // Progressive batching for large datasets (preserves visual containment and prevents UI lag)
   const PAGE_SIZE = 50;
@@ -489,7 +538,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [searchQuery, txTypeFilter, txStatusFilter]);
+  }, [searchQuery, txTypeFilter, txStatusFilter, datePreset, customStart, customEnd]);
 
   const visibleActivities = useMemo(() => {
     return filteredActivities.slice(0, visibleCount);
@@ -807,10 +856,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 4. Unified Multi-Entity Business Activity Timeline (R1, R2, R3) */}
-      <section className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden flex flex-col">
-        {/* Header Bar */}
-        <div className="p-3.5 sm:p-4 border-b border-outline-variant/20 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+      <section className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 flex flex-col">
+        {/* Sticky Timeline Filter Header */}
+        <div className="sticky top-0 z-10 bg-surface/95 dark:bg-surface/95 backdrop-blur-md p-3.5 sm:p-4 border-b border-outline-variant/20 rounded-t-2xl flex flex-col gap-2.5 sm:gap-3 shadow-xs">
+          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] text-secondary">history</span>
               <span className="font-bold text-sm sm:text-base text-on-surface">
@@ -822,6 +871,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Date Range Selector Pill Button */}
+              <button
+                type="button"
+                onClick={() => setIsDateModalOpen(true)}
+                className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border shadow-xs active:scale-95 ${
+                  datePreset !== 'ALL_TIME'
+                    ? 'bg-secondary text-on-secondary border-secondary'
+                    : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-low hover:text-on-surface'
+                }`}
+                title="Filter timeline by date range"
+                aria-label="Filter timeline by date range"
+              >
+                <span className="material-symbols-outlined text-[16px]">calendar_month</span>
+                <span className="truncate max-w-[120px] sm:max-w-[170px]">{dateRange.label}</span>
+                {datePreset !== 'ALL_TIME' ? (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDatePreset('ALL_TIME');
+                      setCustomStart('');
+                      setCustomEnd('');
+                    }}
+                    className="material-symbols-outlined text-[14px] hover:text-error ml-0.5"
+                    title="Reset to All Time"
+                    aria-label="Reset date filter"
+                  >
+                    close
+                  </span>
+                ) : (
+                  <span className="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => onNavigateTab('sales')}
@@ -851,20 +933,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => setSearchQuery('')}
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl"
                 title="Clear search"
+                aria-label="Clear search"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             )}
           </div>
 
+          {/* Date Range Preset Quick Pills Strip */}
+          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
+            <span className="text-[10px] uppercase font-bold text-outline mr-0.5 flex-shrink-0 hidden sm:inline">
+              Period:
+            </span>
+            {[
+              { preset: 'ALL_TIME' as DatePreset, label: 'All Time' },
+              { preset: 'TODAY' as DatePreset, label: 'Today' },
+              { preset: 'THIS_WEEK' as DatePreset, label: 'This Week' },
+              { preset: 'THIS_MONTH' as DatePreset, label: 'This Month' },
+              { preset: 'CUSTOM' as DatePreset, label: datePreset === 'CUSTOM' ? dateRange.label : 'Custom...' },
+            ].map(({ preset, label }) => {
+              const isActive = datePreset === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    if (preset === 'CUSTOM') {
+                      setIsDateModalOpen(true);
+                    } else {
+                      const bounds = getDateFilterBounds(preset);
+                      setDatePreset(preset);
+                      setCustomStart(bounds.start);
+                      setCustomEnd(bounds.end);
+                    }
+                  }}
+                  className={`min-h-[36px] px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
+                    isActive
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Filter Pills Bar: Type Filters & Payment Status Filters (R2) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
-            {/* Entity Type Filter Pills */}
-            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-[11px] sm:text-xs font-bold">
+            {/* Entity Type Filter Pills (Harmonized to min-h-[36px]) */}
+            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
               <button
                 onClick={() => setTxTypeFilter('ALL')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'ALL'
                     ? 'bg-surface-container-lowest text-on-surface shadow-xs border border-outline-variant/40'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -876,7 +998,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('SALES')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'SALES'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -888,7 +1010,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('PURCHASES')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'PURCHASES'
                     ? 'bg-orange-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -900,7 +1022,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('VOUCHERS')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'VOUCHERS'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -912,7 +1034,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('EXPENSES')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'EXPENSES'
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -924,7 +1046,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxTypeFilter('VOUCHERS_EXPENSES')}
                 type="button"
-                className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-[11px] sm:text-xs font-bold ${
+                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
                   txTypeFilter === 'VOUCHERS_EXPENSES'
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
@@ -934,12 +1056,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
             </div>
 
-            {/* Payment Settlement Status Filter Pills */}
-            <div className="flex items-center gap-0.5 bg-surface-container-low rounded-full p-0.5 border border-outline-variant/30 text-[11px] font-bold flex-shrink-0 self-start sm:self-auto">
+            {/* Payment Settlement Status Filter Pills (Harmonized to min-h-[36px]) */}
+            <div className="flex items-center gap-0.5 bg-surface-container-low rounded-full p-0.5 border border-outline-variant/30 text-xs font-bold flex-shrink-0 self-start sm:self-auto">
               <button
                 onClick={() => setTxStatusFilter('ALL')}
                 type="button"
-                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'ALL'
                     ? 'bg-surface-container-lowest text-on-surface shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -950,7 +1072,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxStatusFilter('UNPAID')}
                 type="button"
-                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'UNPAID'
                     ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -961,7 +1083,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 onClick={() => setTxStatusFilter('PAID')}
                 type="button"
-                className={`h-6.5 sm:h-7 px-2.5 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
+                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
                   txStatusFilter === 'PAID'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -998,11 +1120,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Clear Search Filter
                   </button>
                 )}
-                {allActivities.length > 0 && (txTypeFilter !== 'ALL' || txStatusFilter !== 'ALL') && (
+                {allActivities.length > 0 && (txTypeFilter !== 'ALL' || txStatusFilter !== 'ALL' || datePreset !== 'ALL_TIME') && (
                   <button
                     onClick={() => {
                       setTxTypeFilter('ALL');
                       setTxStatusFilter('ALL');
+                      setDatePreset('ALL_TIME');
+                      setCustomStart('');
+                      setCustomEnd('');
                     }}
                     type="button"
                     className="min-h-[44px] px-4 rounded-xl bg-surface-container-low text-secondary font-bold text-xs cursor-pointer hover:bg-surface-container flex items-center justify-center active:scale-95"
@@ -1052,11 +1177,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 >
                   {/* Top Header: Entity Type Badge & Date + Expand Chevron */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                       {/* Entity Type Badge */}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass}`}>
                         {item.typeLabel}
                       </span>
+
+                      {/* Overdue Badge when dueDate is in the past and balanceAmount > 0 */}
+                      {(() => {
+                        const overdueDays =
+                          item.dueDate && (item.balanceAmount || 0) > 0.01 && item.paymentStatus !== 'PAID'
+                            ? getOverdueDays(item.dueDate)
+                            : 0;
+                        if (overdueDays <= 0) return null;
+                        return (
+                          <span
+                            data-testid="overdue-badge"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
+                          >
+                            <span className="material-symbols-outlined text-[11px]">schedule</span>
+                            <span>{overdueDays} days overdue</span>
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -1069,7 +1212,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         type="button"
                         onClick={(e) => toggleExpandCard(e, item.id)}
                         data-testid={`expand-actions-${item.id}`}
-                        className={`md:hidden min-w-[32px] min-h-[32px] w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
+                        className={`md:hidden min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
                           isExpanded
                             ? 'bg-secondary/15 text-secondary'
                             : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface'
@@ -1148,21 +1291,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
 
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap justify-end">
-                        {/* Cash-Flow Indicator Badge (R1) - Left */}
-                        <span
-                          className={`h-5 px-1.5 rounded-full inline-flex items-center gap-0.5 text-[10px] font-bold leading-none whitespace-nowrap ${
-                            isMoneyIn
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                          }`}
-                        >
-                          <span className="material-symbols-outlined text-[11px] leading-none">
-                            {isMoneyIn ? 'south_west' : 'north_east'}
-                          </span>
-                          <span className="leading-none">{isMoneyIn ? 'Money In' : 'Money Out'}</span>
-                        </span>
-
-                        {/* Settlement Status Pill - Right */}
+                        {/* Settlement Status Pill */}
                         <span
                           className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap ${
                             isPaid
@@ -1211,6 +1340,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         onClick={(e) => handleShareClick(e, item)}
                         className="min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer text-xs"
                         title="Share Receipt"
+                        aria-label="Share receipt"
                       >
                         <span className="material-symbols-outlined text-[16px]">share</span>
                         <span className="hidden sm:inline">Share</span>
@@ -1221,6 +1351,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         onClick={(e) => handlePrintClick(e, item)}
                         className="min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer text-xs"
                         title="Print Receipt"
+                        aria-label="Print receipt"
                       >
                         <span className="material-symbols-outlined text-[16px]">print</span>
                         <span className="hidden sm:inline">Print</span>
@@ -1334,6 +1465,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onRefresh={onRefresh}
         />
       )}
+      {/* 5. Date Filter Modal */}
+      <DateFilterModal
+        isOpen={isDateModalOpen}
+        activePreset={datePreset}
+        customStartDate={customStart}
+        customEndDate={customEnd}
+        onClose={() => setIsDateModalOpen(false)}
+        onSelectRange={(preset, start, end) => {
+          setDatePreset(preset);
+          setCustomStart(start || '');
+          setCustomEnd(end || '');
+        }}
+        accentColor="secondary"
+      />
     </div>
   );
 };

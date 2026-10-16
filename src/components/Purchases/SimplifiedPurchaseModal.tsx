@@ -1,8 +1,9 @@
 import React from 'react';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface SimplifiedPurchaseModalProps {
   bill: PurchaseBill | null;
@@ -19,6 +20,8 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
   onEditPurchase,
   onDeletePurchase,
 }) => {
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+
   // System hardware back navigation (priority 25: closes preview before underlying screens)
   useBackNavigation(() => {
     onClose();
@@ -33,10 +36,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
 
   const handleDelete = () => {
     if (!onDeletePurchase) return;
-    if (window.confirm(`Are you sure you want to delete Purchase Bill #${bill.billNumber}?`)) {
-      onDeletePurchase(bill.id);
-      onClose();
-    }
+    setIsDeleteModalOpen(true);
   };
 
   return (
@@ -75,6 +75,8 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
             type="button"
             onClick={onClose}
             className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+            title="Close"
+            aria-label="Close purchase details"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -127,7 +129,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
                         <div className="font-mono font-medium text-on-surface truncate text-center">
-                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                          {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
                         </div>
                         <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
                           @ {formatINR(item.unitPrice)}
@@ -264,6 +266,22 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
           )}
         </div>
       </div>
+
+      {/* Delete Purchase Bill Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isDeleteModalOpen}
+          title="Delete Purchase Bill?"
+          recordName={`Bill #${bill.billNumber}`}
+          description="Are you sure you want to delete this purchase bill? This will revert any stock added by this bill."
+          confirmText="Delete Purchase"
+          onConfirm={() => {
+            onDeletePurchase?.(bill.id);
+            onClose();
+          }}
+          onClose={() => setIsDeleteModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

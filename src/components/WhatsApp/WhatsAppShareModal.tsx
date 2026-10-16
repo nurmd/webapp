@@ -57,6 +57,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close share modal"
             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>

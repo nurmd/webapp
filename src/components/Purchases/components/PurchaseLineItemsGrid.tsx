@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatINR } from '../../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
 
 export interface PurchaseGridRow {
   itemId: string;
@@ -52,7 +52,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
           </span>
           {rows.length > 0 && (
             <span className="text-xs text-on-surface-variant font-medium">
-              · {Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))} units total
+              · {formatQuantity(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0), 4)} units total
             </span>
           )}
         </div>
@@ -155,7 +155,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                         </td>
                       )}
                       <td className="py-2.5 px-3 text-center font-tabular-data font-bold text-on-surface">
-                        {row.quantity} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
+                        {formatQuantity(row.quantity, 4)} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
                         {formatINR(row.unitPrice)}
@@ -223,7 +223,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                   <div className="flex items-center justify-between text-[11px] text-on-surface-variant mt-2 pt-1.5 border-t border-outline-variant/10">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-on-surface">
-                        {row.quantity} {row.unit}
+                        {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
                       <span>×</span>
                       <span>{formatINR(row.unitPrice)}</span>

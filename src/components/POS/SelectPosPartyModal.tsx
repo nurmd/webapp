@@ -107,6 +107,8 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer"
+            title="Close"
+            aria-label="Close select customer modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -227,7 +229,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                   autoFocus
                 />
                 {search && (
-                  <button onClick={() => setSearch('')} className="text-outline hover:text-on-surface">
+                  <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="text-outline hover:text-on-surface">
                     <span className="material-symbols-outlined text-[16px]">close</span>
                   </button>
                 )}

@@ -9,7 +9,7 @@ import {
 
 describe('Phase 2 Task P2-H: Indian GST HSN/SAC Catalog & Autocomplete Suite', () => {
   const allItems = getAllHsnItems();
-  const STATUTORY_RATES = new Set([0, 0.1, 0.25, 3, 5, 12, 18, 28]);
+  const STATUTORY_RATES = new Set([0, 0.1, 0.25, 3, 5, 12, 18]);
 
   describe('1. Comprehensive Dataset Scale & Taxonomy Constraints', () => {
     it('contains strictly at least 5,000 authentic distinct Indian GST HSN/SAC items', () => {
@@ -76,13 +76,15 @@ describe('Phase 2 Task P2-H: Indian GST HSN/SAC Catalog & Autocomplete Suite', (
   });
 
   describe('2. Indian Statutory GST Rates Compliance', () => {
-    it('asserts every catalog item maps exclusively to one of the 8 statutory rates', () => {
+    it('asserts every catalog item maps exclusively to active statutory rates (28% discontinued)', () => {
       for (const item of allItems) {
         expect(
           STATUTORY_RATES.has(item.gstRate),
           `Invalid rate ${item.gstRate} for HSN ${item.code}`
         ).toBe(true);
       }
+      const discontinued28Items = allItems.filter((i) => i.gstRate === 28);
+      expect(discontinued28Items.length).toBe(0);
     });
 
     it('verifies representation of special rates (0.1%, 0.25%, 3%) in precious goods (Ch 71)', () => {

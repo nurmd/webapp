@@ -35,6 +35,8 @@ export const EditBusinessProfileModal: React.FC<EditBusinessProfileModalProps> =
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant cursor-pointer"
+            title="Close"
+            aria-label="Close edit profile"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

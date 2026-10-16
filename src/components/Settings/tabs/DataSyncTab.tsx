@@ -19,6 +19,7 @@ export interface DataSyncTabProps {
   handleStopSync: () => void;
   copiedSyncCode?: boolean;
   handleCopySyncCode?: () => void;
+  onOpenDatabaseBackup?: () => void;
 }
 
 export const DataSyncTab: React.FC<DataSyncTabProps> = ({
@@ -39,10 +40,54 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   handleStopSync,
   copiedSyncCode,
   handleCopySyncCode,
+  onOpenDatabaseBackup,
 }) => {
   return (
     <div className="flex flex-col gap-4">
-      {/* 1. Multi-Device Settings Synchronization Card */}
+      {/* 1. Full Database Backup & Restore Card */}
+      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[24px]">database</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-headline-sm text-sm font-bold text-on-surface truncate">
+                Full Database Backup &amp; Restore
+              </span>
+              <span className="text-[11px] text-on-surface-variant truncate">
+                Complete offline JSON snapshot of bills, products, parties &amp; accounting ledger
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenDatabaseBackup}
+            className="px-3.5 py-2 rounded-xl bg-secondary text-on-secondary font-label-md text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[16px]">cloud_download</span>
+            <span>Backup / Restore</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-2 border-t border-outline-variant/15 text-on-surface-variant">
+          <div className="flex items-center gap-1 text-secondary font-medium">
+            <span className="material-symbols-outlined text-[15px]">verified</span>
+            <span>100% Offline Snapshot</span>
+          </div>
+          <div className="flex items-center gap-1 text-secondary font-medium">
+            <span className="material-symbols-outlined text-[15px]">shield</span>
+            <span>Tamper-proof Checksum</span>
+          </div>
+          <div className="flex items-center gap-1 text-secondary font-medium">
+            <span className="material-symbols-outlined text-[15px]">sync_alt</span>
+            <span>Clean Overwrite &amp; Merge Modes</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Multi-Device Settings Synchronization Card */}
       <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-secondary/30 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

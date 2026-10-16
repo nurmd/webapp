@@ -5,6 +5,7 @@ import {
   StockAuditReport,
   StockDiscrepancyRecord,
 } from '../../core/audit/inventoryStockAuditor.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface InventoryStockAuditorPanelProps {
   onRefreshParent?: () => void;
@@ -18,6 +19,7 @@ export const InventoryStockAuditorPanel: React.FC<InventoryStockAuditorPanelProp
   const [isReconciling, setIsReconciling] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | 'VARIANCE' | 'NEGATIVE'>('ALL');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showReconcileConfirm, setShowReconcileConfirm] = useState(false);
 
   const runAudit = () => {
     setIsAuditing(true);
@@ -35,15 +37,8 @@ export const InventoryStockAuditorPanel: React.FC<InventoryStockAuditorPanelProp
     runAudit();
   }, []);
 
-  const handleReconcile = async () => {
+  const executeReconcile = async () => {
     if (!report || report.discrepantItemsCount === 0) return;
-    if (
-      !window.confirm(
-        `Are you sure you want to reconcile ${report.discrepantItemsCount} inventory item(s)? This will create automated correction adjustments to match purchase/sales transaction movements and log an immutable MCA Rule 3(1) audit record.`
-      )
-    ) {
-      return;
-    }
 
     setIsReconciling(true);
     try {
@@ -54,10 +49,16 @@ export const InventoryStockAuditorPanel: React.FC<InventoryStockAuditorPanelProp
       runAudit();
       onRefreshParent?.();
     } catch (err: any) {
-      alert(`Stock reconciliation failed: ${err.message || err}`);
+      console.error('Stock reconciliation failed:', err);
+      setStatusMessage(`Stock reconciliation failed: ${err.message || err}`);
     } finally {
       setIsReconciling(false);
     }
+  };
+
+  const handleReconcile = () => {
+    if (!report || report.discrepantItemsCount === 0) return;
+    setShowReconcileConfirm(true);
   };
 
   const filteredDiscrepancies = useMemo(() => {
@@ -262,6 +263,23 @@ export const InventoryStockAuditorPanel: React.FC<InventoryStockAuditorPanelProp
             ))}
           </div>
         </div>
+      )}
+
+      {/* Inventory Stock Reconciliation Confirmation Modal */}
+      {showReconcileConfirm && report && (
+        <ConfirmDeleteModal
+          isOpen={showReconcileConfirm}
+          title="Reconcile Inventory Stock?"
+          recordName={`${report.discrepantItemsCount} inventory item(s) with discrepancy`}
+          description={`Are you sure you want to reconcile ${report.discrepantItemsCount} inventory item(s)? This will create automated correction adjustments to match purchase/sales transaction movements and log an immutable MCA Rule 3(1) audit record.`}
+          confirmText="Reconcile Stock"
+          cancelText="Cancel"
+          onConfirm={() => {
+            setShowReconcileConfirm(false);
+            executeReconcile();
+          }}
+          onClose={() => setShowReconcileConfirm(false)}
+        />
       )}
     </div>
   );

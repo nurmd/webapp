@@ -131,9 +131,12 @@ export const RoleSwitchModal: React.FC<RoleSwitchModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isVerifying}
             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors disabled:opacity-50"
+            title="Close"
+            aria-label="Close role switch modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -269,6 +272,7 @@ export const RoleSwitchModal: React.FC<RoleSwitchModalProps> = ({
               type="button"
               disabled={isKeypadDisabled}
               onClick={handleBackspace}
+              aria-label="Backspace"
               className={`h-12 rounded-2xl bg-surface-container-low text-on-surface-variant transition-all flex items-center justify-center ${
                 isKeypadDisabled
                   ? 'opacity-50 pointer-events-none cursor-not-allowed'

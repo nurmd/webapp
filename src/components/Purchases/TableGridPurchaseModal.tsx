@@ -13,6 +13,7 @@ import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { roundQuantity } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { PurchaseHeaderMeta } from './components/PurchaseHeaderMeta.tsx';
 import { PurchaseLineItemsGrid, PurchaseGridRow } from './components/PurchaseLineItemsGrid.tsx';
@@ -142,6 +143,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     return 'ELIGIBLE_INPUTS';
   });
 
+  const [isRcm, setIsRcm] = useState<boolean>(() => Boolean(initialBill?.isRcm));
+
   // Dedicated Add/Edit item modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
@@ -162,7 +165,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       name: itemData.name,
       description: itemData.description,
       hsnSacCode: itemData.hsnSacCode,
-      quantity: itemData.quantity,
+      quantity: roundQuantity(itemData.quantity, 4),
       unit: itemData.unit,
       unitPrice: itemData.unitPrice,
       mrp: itemData.mrp,
@@ -487,7 +490,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       dueDate: dueDate || undefined,
       items: purchaseItems,
       itcEligibility,
-      isRcm: false,
+      isRcm: isRcm,
       totalGrossAmount: calcSummary.totalGrossAmount,
       totalDiscount: calcSummary.totalDiscount,
       totalTaxableAmount: calcSummary.totalTaxableAmount,
@@ -513,7 +516,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
     setIsSubmitting(true);
     onSave(newBill);
-  }, [rows, calcSummary, isGstActive, paymentSplits, autoPaymentStatus, balanceDue, initialBill, billNumber, selectedSupplier, supplierStateCode, company.stateCode, billDate, dueDate, itcEligibility, finalRoundOff, shippingAmount, finalGrandTotal, totalPaid, onSave]);
+  }, [rows, calcSummary, isGstActive, paymentSplits, autoPaymentStatus, balanceDue, initialBill, billNumber, selectedSupplier, supplierStateCode, company.stateCode, billDate, dueDate, itcEligibility, isRcm, finalRoundOff, shippingAmount, finalGrandTotal, totalPaid, onSave]);
 
   // Modals for editing dates/numbers
   const [isBillNoModalOpen, setIsBillNoModalOpen] = useState(false);
@@ -600,6 +603,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             supplierStateCode={supplierStateCode}
             itcEligibility={itcEligibility}
             isGstActive={isGstActive}
+            isRcm={isRcm}
+            onRcmChange={setIsRcm}
             onSelectSupplierClick={() => setIsPartyModalOpen(true)}
             onAddSupplierClick={() => setIsAddPartyModalOpen(true)}
             onClearSupplier={() => setSelectedSupplier(null)}
@@ -656,7 +661,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             onChangeShipping={setShippingAmount}
             isTaxDetailsOpen={isTaxDetailsOpen}
             onToggleTaxDetails={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))}
+            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(4))}
             finalGrandTotal={finalGrandTotal}
             accentColor="orange"
           />

@@ -7,6 +7,7 @@ import { db } from '../../services/db.ts';
 import { downloadEWayBillJson } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { createPaymentReceiptVoucher } from '../../core/accounting/ledger.ts';
+import { getOverdueDays } from '../../core/accounting/aging.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import {
   DatePreset,
@@ -42,6 +43,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [search, setSearch] = useState('');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
   const [splitCash, setSplitCash] = useState<string>('');
   const [splitUPI, setSplitUPI] = useState<string>('');
@@ -166,7 +168,9 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
     if (payAmt <= 0) return;
 
-    const newPaid = Math.min(paymentModalInvoice.grandTotal, paymentModalInvoice.paidAmount + payAmt);
+    const discAmt = Number(discountAmount || 0);
+    const totalSettled = Number((payAmt + discAmt).toFixed(2));
+    const newPaid = Math.min(paymentModalInvoice.grandTotal, paymentModalInvoice.paidAmount + totalSettled);
     const newBal = Math.max(0, paymentModalInvoice.grandTotal - newPaid);
 
     // Maintain updated payment splits
@@ -199,10 +203,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       customerName: paymentModalInvoice.partyName,
       customerId: paymentModalInvoice.partyId || 'ACC_CASH',
       amount: payAmt,
+      discount: discAmt,
       paymentMode: paymentMode,
       paymentSplits: splitsToAdd,
       referenceNo: paymentModalInvoice.invoiceNumber,
-      narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}`,
+      narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
     });
     db.saveVoucher(voucher);
     db.saveInvoice(updated);
@@ -213,6 +218,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
     setPaymentModalInvoice(null);
     setPaymentAmount(0);
+    setDiscountAmount(0);
     setSplitCash('');
     setSplitUPI('');
     setSplitBank('');
@@ -233,14 +239,15 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           <button
             type="button"
             onClick={() => setIsDateModalOpen(true)}
-            className={`h-7 flex items-center gap-1 px-2.5 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
+            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-xs text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
               datePreset !== 'ALL_TIME'
                 ? 'bg-secondary/15 text-secondary border-secondary/30'
                 : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
             }`}
             title="Filter by date range"
+            aria-label="Filter by date range"
           >
-            <span className="material-symbols-outlined text-[13px]">calendar_month</span>
+            <span className="material-symbols-outlined text-[15px]">calendar_month</span>
             <span className="truncate max-w-[100px] sm:max-w-[150px]">{dateRange.label}</span>
             {datePreset !== 'ALL_TIME' ? (
               <span
@@ -250,8 +257,9 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   setCustomStart('');
                   setCustomEnd('');
                 }}
-                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
+                className="material-symbols-outlined text-[13px] hover:text-error ml-0.5"
                 title="Reset to All Time"
+                aria-label="Reset date filter"
               >
                 close
               </span>
@@ -299,11 +307,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         {/* Row 3: Search + Sort Selector */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-[120px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-on-surface-variant text-[16px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
               search
             </span>
             <input
-              className="w-full h-7 pl-7 pr-6 bg-surface-container-lowest text-on-surface text-xs rounded-lg shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
+              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-on-surface text-xs sm:text-sm rounded-xl shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
               placeholder={company.isGstEnabled !== false ? "Search customer, bill, GSTIN..." : "Search customer, bill..."}
               type="text"
               value={search}
@@ -312,10 +320,12 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-1.5 top-1.5 text-outline hover:text-on-surface"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface cursor-pointer"
                 type="button"
+                title="Clear search"
+                aria-label="Clear search"
               >
-                <span className="material-symbols-outlined text-[13px]">close</span>
+                <span className="material-symbols-outlined text-[15px]">close</span>
               </button>
             )}
           </div>
@@ -325,10 +335,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="h-7 flex items-center gap-0.5 px-2 rounded-lg text-[11px] font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs"
+              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs active:scale-95"
               title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
+              aria-label="Sort sales ledger"
             >
-              <span className="material-symbols-outlined text-[14px] text-secondary">sort</span>
+              <span className="material-symbols-outlined text-[15px] text-secondary">sort</span>
               <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
             </button>
 
@@ -368,11 +379,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
           </div>
         </div>
 
-        {/* Row 4: Status Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        {/* Row 4: Status Filter Pills (Harmonized to min-h-[36px]) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
           <button
             onClick={() => setActiveTab('ALL')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'ALL'
                 ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
@@ -385,7 +396,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
           <button
             onClick={() => setActiveTab('UNPAID')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'UNPAID'
                 ? 'bg-error text-on-error shadow-xs'
                 : 'bg-surface-container-lowest text-error border border-outline-variant/25'
@@ -399,7 +410,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
           <button
             onClick={() => setActiveTab('PAID')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'PAID'
                 ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
@@ -413,7 +424,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
           <button
             onClick={() => setActiveTab('ESTIMATES')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
               activeTab === 'ESTIMATES'
                 ? 'bg-secondary text-on-secondary shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
@@ -428,8 +439,102 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       {/* Invoices List Feed (Slim Passbook Cards) */}
       <div className="px-margin-mobile md:px-0 mt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
         {sortedInvoices.length === 0 ? (
-          <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
-            No invoices found matching your criteria.
+          <div
+            data-testid="sales-hub-empty-state"
+            className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center gap-3 border border-outline-variant/20 shadow-xs animate-fade-in"
+          >
+            {invoices.length === 0 ? (
+              /* Case 1: Total Empty State - No invoices recorded yet */
+              <>
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-secondary/10 text-secondary flex items-center justify-center mb-1 shadow-inner ring-8 ring-secondary/5">
+                  <span className="material-symbols-outlined text-[36px] sm:text-[42px]">receipt_long</span>
+                </div>
+                <h3 className="text-base sm:text-lg font-extrabold text-on-surface tracking-tight">
+                  No Sales Bills Yet
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant max-w-sm mx-auto leading-relaxed">
+                  Create your first GST-compliant tax invoice or cash bill to start tracking sales, payments, and customer balances.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
+                  <button
+                    type="button"
+                    onClick={onOpenTableGridInvoice}
+                    className="min-h-[44px] px-5 py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                    aria-label="Create Sale Bill"
+                    data-testid="empty-create-bill-btn"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">add</span>
+                    <span>+ Create Sale Bill</span>
+                  </button>
+                  {onQuickPos && (
+                    <button
+                      type="button"
+                      onClick={onQuickPos}
+                      className="min-h-[44px] px-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs border border-outline-variant/30 hover:bg-surface-container active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                      aria-label="Quick POS Billing"
+                    >
+                      <span className="material-symbols-outlined text-[18px] text-secondary">point_of_sale</span>
+                      <span>Quick POS</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Case 2: Filter/Search Mismatch - Invoices exist but 0 matches */
+              <>
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-surface-container-low text-outline flex items-center justify-center mb-1">
+                  <span className="material-symbols-outlined text-[28px] sm:text-[32px]">filter_list_off</span>
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-on-surface">
+                  No Invoices Found
+                </h3>
+                <p className="text-xs text-on-surface-variant max-w-sm mx-auto leading-relaxed">
+                  {search
+                    ? `No invoices match "${search}" with current filters.`
+                    : activeTab !== 'ALL'
+                    ? `No ${activeTab.toLowerCase()} invoices found for this date range.`
+                    : 'No invoices found for the selected date range.'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="min-h-[40px] px-4 rounded-xl bg-surface-container-low text-secondary font-bold text-xs hover:bg-surface-container cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                      aria-label="Clear Search"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                      <span>Clear Search</span>
+                    </button>
+                  )}
+                  {(activeTab !== 'ALL' || datePreset !== 'ALL_TIME') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('ALL');
+                        setDatePreset('ALL_TIME');
+                        setCustomStart('');
+                        setCustomEnd('');
+                      }}
+                      className="min-h-[40px] px-4 rounded-xl bg-surface-container-low text-on-surface-variant font-bold text-xs hover:bg-surface-container cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                      aria-label="Reset Filters"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">refresh</span>
+                      <span>Reset Filters</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onOpenTableGridInvoice}
+                    className="min-h-[40px] px-4 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs hover:bg-secondary/90 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                    aria-label="Create Sale Bill"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    <span>+ Create Sale Bill</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           sortedInvoices.map((inv) => {
@@ -451,11 +556,29 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   </span>
                 </div>
 
-                {/* Line 2 (Middle): Invoice # */}
-                <div className="flex items-center gap-1.5 -mt-0.5">
+                {/* Line 2 (Middle): Invoice # & Overdue Badge */}
+                <div className="flex items-center gap-1.5 -mt-0.5 flex-wrap">
                   <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono">
                     #{inv.invoiceNumber}
                   </span>
+
+                  {/* Overdue Badge */}
+                  {(() => {
+                    const overdueDays =
+                      inv.dueDate && (inv.balanceAmount || 0) > 0.01 && inv.paymentStatus !== 'PAID'
+                        ? getOverdueDays(inv.dueDate)
+                        : 0;
+                    if (overdueDays <= 0) return null;
+                    return (
+                      <span
+                        data-testid="overdue-badge"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
+                      >
+                        <span className="material-symbols-outlined text-[10px]">schedule</span>
+                        <span>{overdueDays} days overdue</span>
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Line 3: Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
@@ -478,6 +601,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                             e.stopPropagation();
                             setPaymentModalInvoice(inv);
                             setPaymentAmount(inv.balanceAmount);
+                            setDiscountAmount(0);
                             setPaymentMode('CASH');
                             setSplitCash('');
                             setSplitUPI('');
@@ -722,6 +846,29 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   );
                 })()
               )}
+
+              {/* Discount Allowed Input */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-on-surface-variant">
+                    Discount Allowed (₹)
+                  </label>
+                  {discountAmount > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                      Total Settled: {formatINR(paymentAmount + discountAmount)}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={discountAmount || ''}
+                  onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface font-bold text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40 min-h-[36px]"
+                />
+              </div>
 
               <div className="flex justify-end gap-2 mt-2">
                 <button

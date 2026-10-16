@@ -408,7 +408,7 @@ export const CompanyProfileTab: React.FC<CompanyProfileTabProps> = ({
                 </div>
                 <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
                   {isGstActive
-                    ? 'Slab rates 0%, 0.1%, 0.25%, 3%, 5%, 12%, 18%, 28% • RCM & Cess Ready'
+                    ? 'Slab rates 0%, 0.1%, 0.25%, 3%, 5%, 12%, 18% • RCM & Cess Ready'
                     : 'Standard slabs dormant while GST is disabled'}
                 </div>
               </div>

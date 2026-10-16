@@ -150,14 +150,15 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           <button
             type="button"
             onClick={() => setIsDateModalOpen(true)}
-            className={`h-7 flex items-center gap-1 px-2.5 rounded-lg shadow-xs text-[11px] font-bold cursor-pointer border transition-all shrink-0 ${
+            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-xs text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
               datePreset !== 'ALL_TIME'
                 ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
                 : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
             }`}
             title="Filter by date range"
+            aria-label="Filter by date range"
           >
-            <span className="material-symbols-outlined text-[13px] text-orange-600 dark:text-orange-400">calendar_month</span>
+            <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">calendar_month</span>
             <span className="truncate max-w-[100px] sm:max-w-[150px]">{dateRange.label}</span>
             {datePreset !== 'ALL_TIME' ? (
               <span
@@ -167,8 +168,9 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                   setCustomStart('');
                   setCustomEnd('');
                 }}
-                className="material-symbols-outlined text-[12px] hover:text-error ml-0.5"
+                className="material-symbols-outlined text-[13px] hover:text-error ml-0.5"
                 title="Reset to All Time"
+                aria-label="Reset date filter"
               >
                 close
               </span>
@@ -216,11 +218,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         {/* Row 3: Search + Sort Selector */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-[120px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1.5 text-on-surface-variant text-[16px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
               search
             </span>
             <input
-              className="w-full h-7 pl-7 pr-6 bg-surface-container-lowest text-on-surface text-xs rounded-lg shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
+              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-on-surface text-xs sm:text-sm rounded-xl shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
               placeholder="Search bill, supplier..."
               type="text"
               value={search}
@@ -229,10 +231,12 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-1.5 top-1.5 text-outline hover:text-on-surface"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface cursor-pointer"
                 type="button"
+                title="Clear search"
+                aria-label="Clear search"
               >
-                <span className="material-symbols-outlined text-[13px]">close</span>
+                <span className="material-symbols-outlined text-[15px]">close</span>
               </button>
             )}
           </div>
@@ -242,10 +246,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="h-7 flex items-center gap-0.5 px-2 rounded-lg text-[11px] font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs"
+              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs active:scale-95"
               title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
+              aria-label="Sort purchases ledger"
             >
-              <span className="material-symbols-outlined text-[14px] text-orange-600 dark:text-orange-400">sort</span>
+              <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">sort</span>
               <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
             </button>
 
@@ -285,11 +290,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           </div>
         </div>
 
-        {/* Row 4: Status Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        {/* Row 4: Status Filter Pills (Harmonized to min-h-[36px]) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
           <button
             onClick={() => setFilterStatus('ALL')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'ALL'
                 ? 'bg-orange-600 text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
@@ -302,7 +307,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
           <button
             onClick={() => setFilterStatus('UNPAID')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'UNPAID'
                 ? 'bg-error text-on-error shadow-xs'
                 : 'bg-surface-container-lowest text-error border border-outline-variant/25'
@@ -316,7 +321,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
           <button
             onClick={() => setFilterStatus('PAID')}
-            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'PAID'
                 ? 'bg-orange-600 text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'

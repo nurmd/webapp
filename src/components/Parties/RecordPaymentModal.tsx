@@ -15,7 +15,8 @@ export interface RecordPaymentModalProps {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => void;
   onRefresh?: () => void;
 }
@@ -33,6 +34,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [paymentAmount, setPaymentAmount] = useState<string>(
     party.currentBalance !== 0 ? Math.abs(party.currentBalance).toString() : ''
   );
+  const [discountAmount, setDiscountAmount] = useState<string>('');
   const [paymentMode, setPaymentMode] = useState<string>('UPI');
   const [splitCash, setSplitCash] = useState<string>('');
   const [splitUPI, setSplitUPI] = useState<string>('');
@@ -46,6 +48,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     let amt = parseFloat(paymentAmount);
+    const disc = parseFloat(discountAmount) || 0;
     let splits: PaymentSplit[] | undefined = undefined;
 
     if (paymentMode === 'SPLIT') {
@@ -76,6 +79,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     const fullNotes = [
       paymentRef ? `Ref: ${paymentRef}` : '',
       splitDesc ? `Split (${splitDesc})` : '',
+      disc > 0 ? `Discount: ₹${disc.toFixed(2)}` : '',
       paymentNotes,
     ].filter(Boolean).join(' • ');
 
@@ -83,11 +87,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       party,
       amt,
       paymentMode,
-      fullNotes || `${paymentType === 'IN' ? 'Payment In' : 'Payment Out'} of ${formatINR(amt)} on ${paymentDate}`,
+      fullNotes || `${paymentType === 'IN' ? 'Payment In' : 'Payment Out'} of ${formatINR(amt)} on ${paymentDate}${disc > 0 ? ` (Discount: ${formatINR(disc)})` : ''}`,
       paymentType,
-      splits
+      splits,
+      disc
     );
     onClose();
+    setDiscountAmount('');
     setSplitCash('');
     setSplitUPI('');
     setSplitBank('');
@@ -114,6 +120,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           type="button"
           onClick={onClose}
           className="text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer"
+          title="Close"
+          aria-label="Close payment modal"
         >
           <span className="material-symbols-outlined text-[16px]">close</span>
         </button>
@@ -169,21 +177,57 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
       )}
 
-      {/* Amount & Mode */}
+      {/* Amount & Discount Inputs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="relative flex items-center">
-          <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
-          <input
-            type="number"
-            step="0.01"
-            required
-            placeholder="0.00"
-            value={paymentAmount}
-            onChange={(e) => setPaymentAmount(e.target.value)}
-            className="w-full pl-6 pr-2 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none"
-          />
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-on-surface-variant">Amount (₹)</label>
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
+            <input
+              type="number"
+              step="0.01"
+              required
+              placeholder="0.00"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              className="w-full pl-6 pr-2 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px]"
+            />
+          </div>
         </div>
 
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold text-on-surface-variant">
+            {paymentType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
+          </label>
+          <div className="relative flex items-center">
+            <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={discountAmount}
+              onChange={(e) => setDiscountAmount(e.target.value)}
+              className="w-full pl-6 pr-2 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Settlement summary banner when discount is present */}
+      {parseFloat(discountAmount) > 0 && (
+        <div className="flex items-center justify-between px-2.5 py-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+          <span className="flex items-center gap-1">
+            <span className="material-symbols-outlined text-[15px]">discount</span>
+            <span>Total Settled against Balance:</span>
+          </span>
+          <span>{formatINR((parseFloat(paymentAmount) || 0) + (parseFloat(discountAmount) || 0))}</span>
+        </div>
+      )}
+
+      {/* Payment Mode Selector */}
+      <div className="flex flex-col gap-1">
+        <label className="text-[10px] font-bold text-on-surface-variant">Payment Mode</label>
         <div className="grid grid-cols-4 gap-1">
           {['UPI', 'CASH', 'BANK', 'SPLIT'].map((m) => (
             <button
@@ -200,7 +244,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   }
                 }
               }}
-              className={`py-1.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all ${
+              className={`py-1.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all min-h-[36px] flex items-center justify-center ${
                 paymentMode === m
                   ? paymentType === 'IN'
                     ? 'bg-secondary text-on-secondary shadow-xs'

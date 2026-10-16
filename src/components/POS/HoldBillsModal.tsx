@@ -1,6 +1,7 @@
 import React from 'react';
 import { HeldBill } from './types.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 interface HoldBillsModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export const HoldBillsModal: React.FC<HoldBillsModalProps> = ({
   onClearAll,
   onClose,
 }) => {
+  const [showClearAllConfirm, setShowClearAllConfirm] = React.useState(false);
+
   if (!isOpen) return null;
 
   const formatTimeAgo = (isoString: string) => {
@@ -55,6 +58,8 @@ export const HoldBillsModal: React.FC<HoldBillsModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer"
+            title="Close"
+            aria-label="Close held bills modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -147,11 +152,7 @@ export const HoldBillsModal: React.FC<HoldBillsModalProps> = ({
           <div className="p-3 border-t border-outline-variant/20 flex items-center justify-between bg-surface-container-low/40">
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm('Discard all parked bills?')) {
-                  onClearAll();
-                }
-              }}
+              onClick={() => setShowClearAllConfirm(true)}
               className="text-xs text-error font-medium hover:underline cursor-pointer"
             >
               Clear All Held Bills
@@ -166,6 +167,22 @@ export const HoldBillsModal: React.FC<HoldBillsModalProps> = ({
           </div>
         )}
       </div>
+
+      {/* Discard All Parked Bills Confirmation Modal */}
+      {showClearAllConfirm && (
+        <ConfirmDeleteModal
+          isOpen={showClearAllConfirm}
+          title="Discard All Parked Bills?"
+          description={`Are you sure you want to discard all ${heldBills.length} parked bills? This cannot be undone.`}
+          confirmText="Discard All"
+          cancelText="Cancel"
+          onConfirm={() => {
+            onClearAll();
+            setShowClearAllConfirm(false);
+          }}
+          onClose={() => setShowClearAllConfirm(false)}
+        />
+      )}
     </div>
   );
 };

@@ -363,7 +363,7 @@ export function generateGstr1Json(
       const ctin = cn.partyGstin.trim().toUpperCase();
       if (!cdnrMap[ctin]) cdnrMap[ctin] = [];
       cdnrMap[ctin].push({
-        ntty: cn.noteType || 'C',
+        ntty: cn.noteType || (cn.invoiceType === 'DEBIT_NOTE' ? 'D' : 'C'),
         nt_num: cn.invoiceNumber,
         nt_dt: toGstrPortalDate(cn.date),
         p_gst: 'N',
@@ -387,7 +387,7 @@ export function generateGstr1Json(
     } else if (cn.grandTotal > 250000 && !cn.isIntraState) {
       cdnurList.push({
         typ: 'B2CL',
-        ntty: cn.noteType || 'C',
+        ntty: cn.noteType || (cn.invoiceType === 'DEBIT_NOTE' ? 'D' : 'C'),
         nt_num: cn.invoiceNumber,
         nt_dt: toGstrPortalDate(cn.date),
         p_gst: 'N',

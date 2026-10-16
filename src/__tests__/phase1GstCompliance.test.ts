@@ -26,8 +26,8 @@ const mockCompany: CompanyProfile = {
 
 describe('Phase 1 GST Statutory Compliance & Audit Remediation Suite', () => {
   describe('R1: Statutory GST Rate Slabs & CESS Calculation', () => {
-    it('supports all statutory rate slabs: 0%, 0.1%, 0.25%, 3%, 5%, 12%, 18%, 28%', () => {
-      expect(STATUTORY_GST_RATES).toEqual([0, 0.1, 0.25, 3, 5, 12, 18, 28]);
+    it('supports all active statutory rate slabs: 0%, 0.1%, 0.25%, 3%, 5%, 12%, 18% (28% discontinued)', () => {
+      expect(STATUTORY_GST_RATES).toEqual([0, 0.1, 0.25, 3, 5, 12, 18]);
     });
 
     it('calculates 0.1% rate with zero precision drift (Intra-state: 0.05% CGST + 0.05% SGST)', () => {

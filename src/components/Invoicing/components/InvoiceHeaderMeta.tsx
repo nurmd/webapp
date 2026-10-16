@@ -31,6 +31,7 @@ export interface InvoiceHeaderMetaProps {
   onInvoiceTypeChange?: (type: InvoiceType | null) => void;
   isRcm?: boolean;
   onRcmChange?: (isRcm: boolean) => void;
+  isCompositionScheme?: boolean;
 
   // New optional props for P2-E
   shippingAddress?: string;
@@ -74,6 +75,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   onInvoiceTypeChange,
   isRcm,
   onRcmChange,
+  isCompositionScheme,
   shippingAddress,
   shippingPincode,
   onShippingAddressChange,
@@ -103,12 +105,24 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
 
             <div className="flex items-center gap-2 min-w-0">
               <h1 className="font-bold text-sm sm:text-base text-on-surface truncate">
-                {initialInvoice ? `Edit Invoice #${invoiceNumber}` : `New Invoice`}
+                {isCompositionScheme
+                  ? initialInvoice
+                    ? `Edit Bill of Supply #${invoiceNumber}`
+                    : `New Bill of Supply`
+                  : initialInvoice
+                  ? `Edit Invoice #${invoiceNumber}`
+                  : `New Invoice`}
               </h1>
-              {isGstActive && (
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
-                  {isIntraState ? 'Intra-State GST' : 'Inter-State IGST'}
+              {isCompositionScheme ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/15 text-secondary border border-secondary/25">
+                  Composition Scheme
                 </span>
+              ) : (
+                isGstActive && (
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
+                    {isIntraState ? 'Intra-State GST' : 'Inter-State IGST'}
+                  </span>
+                )
               )}
             </div>
           </div>
@@ -177,6 +191,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
                   onClearParty();
                 }}
                 title="Clear customer (revert to Walk-in)"
+                aria-label="Clear customer"
                 className="w-6 h-6 rounded-md flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>
@@ -190,6 +205,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
             onClick={onAddPartyClick}
             className="px-2 py-1 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 active:scale-95"
             title="Add New Customer Directly"
+            aria-label="Add new customer"
           >
             <span className="material-symbols-outlined text-[15px]">person_add</span>
             <span className="hidden sm:inline">+ New</span>

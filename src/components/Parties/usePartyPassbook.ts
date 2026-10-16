@@ -138,7 +138,7 @@ export function usePartyPassbook({
         if (!isDupe) {
           const cashLines = v.entries.filter((e) => e.accountId === 'ACC_CASH' && (e.debit > 0 || e.credit > 0));
           const bankLines = v.entries.filter((e) => e.accountId === 'ACC_BANK' && (e.debit > 0 || e.credit > 0));
-          const isSplitVoucher = cashLines.length > 0 && bankLines.length > 0;
+          const isSplitVoucher = (cashLines.length + bankLines.length) > 1;
           const vMode = isSplitVoucher
             ? 'SPLIT'
             : cashLines.length > 0

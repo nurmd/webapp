@@ -30,7 +30,8 @@ export interface DashboardRecordPaymentModalProps {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => void;
   onRefresh?: () => void;
 }
@@ -41,6 +42,7 @@ const PAYMENT_MODES: { value: string; label: string; icon: string }[] = [
   { value: 'BANK_TRANSFER', label: 'Bank', icon: 'account_balance' },
   { value: 'CARD', label: 'Card', icon: 'credit_card' },
   { value: 'CHEQUE', label: 'Cheque', icon: 'receipt_long' },
+  { value: 'SPLIT', label: 'Split', icon: 'call_split' },
 ];
 
 export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalProps> = ({
@@ -57,7 +59,11 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
   }, isOpen && !!target, 25);
 
   const [amount, setAmount] = useState<string>('');
+  const [discount, setDiscount] = useState<string>('');
   const [paymentMode, setPaymentMode] = useState<string>('UPI');
+  const [splitCash, setSplitCash] = useState<string>('');
+  const [splitUPI, setSplitUPI] = useState<string>('');
+  const [splitBank, setSplitBank] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -65,8 +71,12 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
   useEffect(() => {
     if (target) {
       setAmount(target.balanceAmount > 0 ? target.balanceAmount.toString() : target.grandTotal.toString());
+      setDiscount('');
       setNotes(`Settlement for #${target.docNumber || ''}`);
       setValidationError(null);
+      setSplitCash('');
+      setSplitUPI('');
+      setSplitBank('');
     }
   }, [target]);
 
@@ -80,15 +90,40 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
     if (e) {
       e.preventDefault();
     }
-    const payAmt = parseFloat(amount);
-    if (isNaN(payAmt) || payAmt <= 0) {
-      setValidationError('Please enter a valid payment amount greater than zero.');
-      return;
+    let payAmt = parseFloat(amount);
+    const discAmt = parseFloat(discount) || 0;
+    let splits: PaymentSplit[] | undefined = undefined;
+
+    if (paymentMode === 'SPLIT') {
+      const c = parseFloat(splitCash) || 0;
+      const u = parseFloat(splitUPI) || 0;
+      const b = parseFloat(splitBank) || 0;
+      const totalSplit = Number((c + u + b).toFixed(2));
+      if (totalSplit <= 0) {
+        setValidationError('Please enter at least one split tender amount greater than zero.');
+        return;
+      }
+      payAmt = totalSplit;
+      splits = [
+        ...(c > 0 ? [{ id: `s-cash-${Date.now()}`, mode: 'CASH' as const, amount: c }] : []),
+        ...(u > 0 ? [{ id: `s-upi-${Date.now()}`, mode: 'UPI' as const, amount: u }] : []),
+        ...(b > 0 ? [{ id: `s-bank-${Date.now()}`, mode: 'BANK' as const, amount: b }] : []),
+      ];
+    } else {
+      if (isNaN(payAmt) || payAmt <= 0) {
+        setValidationError('Please enter a valid payment amount greater than zero.');
+        return;
+      }
     }
 
+    const totalSettled = Number((payAmt + discAmt).toFixed(2));
     const maxAllowed = (target.balanceAmount > 0 ? target.balanceAmount : target.grandTotal) || 0;
-    if (maxAllowed > 0 && payAmt > maxAllowed + 0.01) {
-      setValidationError(`Payment amount cannot exceed the pending balance of ${formatINR(maxAllowed)}.`);
+    if (maxAllowed > 0 && totalSettled > maxAllowed + 0.01) {
+      if (discAmt > 0) {
+        setValidationError(`Payment amount + discount (Total settlement ${formatINR(totalSettled)}) cannot exceed the pending balance of ${formatINR(maxAllowed)}.`);
+      } else {
+        setValidationError(`Payment amount cannot exceed the pending balance (${formatINR(maxAllowed)}).`);
+      }
       return;
     }
 
@@ -102,7 +137,7 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
         : activeParties.find((p) => p.name.toLowerCase() === (target.partyName || '').toLowerCase());
 
       if (party && onRecordPartyPayment) {
-        onRecordPartyPayment(party, payAmt, paymentMode, notes, isSale ? 'IN' : 'OUT');
+        onRecordPartyPayment(party, payAmt, paymentMode, notes, isSale ? 'IN' : 'OUT', splits, discAmt);
       } else {
         // Direct Settlement fallback in local DB
         const docId = Date.now().toString().slice(-6);
@@ -112,7 +147,7 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
           const inv = target.rawInvoice || db.getInvoices().find((i) => i.id === target.rawId);
           if (inv) {
             const currentPaid = inv.paidAmount || 0;
-            const newPaid = Math.min(inv.grandTotal, currentPaid + payAmt);
+            const newPaid = Math.min(inv.grandTotal, currentPaid + totalSettled);
             const newBal = Math.max(0, inv.grandTotal - newPaid);
             const isFullPaid = newBal <= 0.01;
 
@@ -124,11 +159,15 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
                 amount: currentPaid,
               });
             }
-            updatedSplits.push({
-              id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              mode: (paymentMode as any) || 'CASH',
-              amount: payAmt,
-            });
+            if (splits && splits.length > 0) {
+              splits.forEach((s) => updatedSplits.push({ ...s }));
+            } else {
+              updatedSplits.push({
+                id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                mode: (paymentMode as any) || 'CASH',
+                amount: payAmt,
+              });
+            }
             if (newBal > 0) {
               updatedSplits.push({
                 id: `split-bal-${Date.now()}`,
@@ -156,8 +195,10 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
               customerName: inv.partyName || 'Cash Customer',
               customerId: inv.partyId || 'ACC_CASH',
               amount: payAmt,
+              discount: discAmt,
               paymentMode,
-              narration: notes || `Payment received for Bill #${inv.invoiceNumber}`,
+              paymentSplits: splits && splits.length > 0 ? splits : undefined,
+              narration: notes || `Payment received for Bill #${inv.invoiceNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
             });
             db.saveVoucher(voucher);
 
@@ -169,7 +210,7 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
           const pur = target.rawPurchase || db.getPurchases().find((p) => p.id === target.rawId);
           if (pur) {
             const currentPaid = pur.paidAmount || 0;
-            const newPaid = Math.min(pur.grandTotal, currentPaid + payAmt);
+            const newPaid = Math.min(pur.grandTotal, currentPaid + totalSettled);
             const newBal = Math.max(0, pur.grandTotal - newPaid);
             const isFullPaid = newBal <= 0.01;
 
@@ -181,11 +222,15 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
                 amount: currentPaid,
               });
             }
-            updatedSplits.push({
-              id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              mode: (paymentMode as any) || 'CASH',
-              amount: payAmt,
-            });
+            if (splits && splits.length > 0) {
+              splits.forEach((s) => updatedSplits.push({ ...s }));
+            } else {
+              updatedSplits.push({
+                id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                mode: (paymentMode as any) || 'CASH',
+                amount: payAmt,
+              });
+            }
             if (newBal > 0) {
               updatedSplits.push({
                 id: `split-bal-${Date.now()}`,
@@ -213,8 +258,10 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
               supplierName: pur.supplierName,
               supplierId: pur.supplierId || 'ACC_CASH',
               amount: payAmt,
+              discount: discAmt,
               paymentMode,
-              narration: notes || `Payment made for Bill #${pur.billNumber}`,
+              paymentSplits: splits && splits.length > 0 ? splits : undefined,
+              narration: notes || `Payment made for Bill #${pur.billNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
             });
             db.saveVoucher(voucher);
 
@@ -273,6 +320,7 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
             onClick={onClose}
             className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer"
             title="Close"
+            aria-label="Close payment modal"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -339,17 +387,55 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
             )}
           </div>
 
+          {/* Discount Input */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-on-surface">
+                {isSale ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
+              </label>
+              {parseFloat(discount) > 0 && (
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                  Total Settled: {formatINR((parseFloat(amount) || 0) + (parseFloat(discount) || 0))}
+                </span>
+              )}
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-on-surface-variant">
+                ₹
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder="0.00"
+                className="w-full pl-8 pr-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface font-tabular-data font-bold text-sm focus:outline-hidden focus:border-secondary transition-all min-h-[36px]"
+              />
+            </div>
+          </div>
+
           {/* Payment Mode Selection */}
           <div>
             <label className="block text-xs font-bold text-on-surface mb-1.5">
               Payment Mode
             </label>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
               {PAYMENT_MODES.map((mode) => (
                 <button
                   key={mode.value}
                   type="button"
-                  onClick={() => setPaymentMode(mode.value)}
+                  onClick={() => {
+                    setPaymentMode(mode.value);
+                    if (mode.value === 'SPLIT') {
+                      const total = parseFloat(amount) || 0;
+                      if (total > 0 && !splitCash && !splitUPI && !splitBank) {
+                        if (paymentMode === 'CASH') setSplitCash(total.toString());
+                        else if (paymentMode === 'BANK_TRANSFER') setSplitBank(total.toString());
+                        else setSplitUPI(total.toString());
+                      }
+                    }
+                  }}
                   className={`min-h-[48px] flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer active:scale-95 ${
                     paymentMode === mode.value
                       ? 'border-secondary bg-secondary/10 text-secondary shadow-xs scale-102'
@@ -362,6 +448,134 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
               ))}
             </div>
           </div>
+
+          {/* Split Tender Allocation Box when SPLIT is selected */}
+          {paymentMode === 'SPLIT' && (() => {
+            const targetAmt = parseFloat(amount) || 0;
+            const c = parseFloat(splitCash) || 0;
+            const u = parseFloat(splitUPI) || 0;
+            const b = parseFloat(splitBank) || 0;
+            const allocated = Number((c + u + b).toFixed(2));
+            const remaining = targetAmt > 0 ? Number(Math.max(0, targetAmt - allocated).toFixed(2)) : 0;
+
+            return (
+              <div className="p-3 bg-surface-container-low/60 rounded-xl border border-secondary/30 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-on-surface flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px] text-secondary">call_split</span>
+                    <span>Split Breakdown</span>
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      targetAmt > 0 && allocated === targetAmt
+                        ? 'text-secondary'
+                        : targetAmt > 0 && allocated > targetAmt
+                        ? 'text-error'
+                        : 'text-amber-600'
+                    }`}
+                  >
+                    Allocated: {formatINR(allocated)} {targetAmt > 0 ? `/ ${formatINR(targetAmt)}` : ''}
+                    {remaining > 0 && ` (${formatINR(remaining)} left)`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {/* Cash */}
+                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[13px] text-emerald-600">payments</span>
+                        Cash
+                      </span>
+                      {remaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (c + remaining).toFixed(2);
+                            setSplitCash(parseFloat(next).toString());
+                          }}
+                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
+                        >
+                          + Fill
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={splitCash}
+                      onChange={(e) => setSplitCash(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
+                    />
+                  </div>
+
+                  {/* UPI */}
+                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[13px] text-sky-600">qr_code_scanner</span>
+                        UPI
+                      </span>
+                      {remaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (u + remaining).toFixed(2);
+                            setSplitUPI(parseFloat(next).toString());
+                          }}
+                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
+                        >
+                          + Fill
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={splitUPI}
+                      onChange={(e) => setSplitUPI(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
+                    />
+                  </div>
+
+                  {/* Bank */}
+                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
+                        <span className="material-symbols-outlined text-[13px] text-indigo-600">account_balance</span>
+                        Bank
+                      </span>
+                      {remaining > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = (b + remaining).toFixed(2);
+                            setSplitBank(parseFloat(next).toString());
+                          }}
+                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
+                        >
+                          + Fill
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={splitBank}
+                      onChange={(e) => setSplitBank(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Payment Notes */}
           <div>

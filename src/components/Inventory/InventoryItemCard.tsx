@@ -1,6 +1,6 @@
 import React from 'react';
 import { InventoryItem, isItemDisabled } from '../../models/item.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 
 export interface InventoryItemCardProps {
   item: InventoryItem;
@@ -85,8 +85,8 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
               {isOut
                 ? 'Out of stock'
                 : isLow
-                ? `${item.currentStock} ${item.unit} left`
-                : `${item.currentStock} ${item.unit}`}
+                ? `${formatQuantity(item.currentStock, 4)} ${item.unit} left`
+                : `${formatQuantity(item.currentStock, 4)} ${item.unit}`}
             </span>
           </span>
         </div>
@@ -95,8 +95,8 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
         <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
           {/* Sale Price */}
           <div className="inline-flex items-baseline gap-1.5">
-            <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Sale:</span>
-            <span className="font-headline-sm text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
+            <span className="text-[10px] font-extrabold uppercase text-on-surface-variant tracking-wider">Sale:</span>
+            <span className="font-headline-sm text-xs sm:text-sm font-extrabold text-on-surface">
               {formatINR(item.salePrice)}
             </span>
           </div>
@@ -105,14 +105,14 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
           <button
             type="button"
             onClick={onToggleBuyPrice}
-            className="inline-flex items-center justify-end gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-right ml-auto bg-slate-100/80 dark:bg-slate-800/60 px-2 py-0.5 rounded-md border border-black/[0.04] dark:border-white/[0.06]"
+            className="inline-flex items-center justify-end gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-right ml-auto bg-surface-container-low px-2 py-0.5 rounded-md border border-outline-variant/30"
             title={isBuyPriceVisible ? 'Click to hide purchase price' : 'Click to view purchase price'}
           >
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Buy:</span>
-            <span className="font-tabular-data text-xs font-bold text-slate-600 dark:text-slate-300 font-mono tracking-wider">
+            <span className="text-[10px] font-bold uppercase text-on-surface-variant tracking-wider">Buy:</span>
+            <span className="font-tabular-data text-xs font-bold text-on-surface font-mono tracking-wider">
               {isBuyPriceVisible ? formatINR(item.purchasePrice) : '•••'}
             </span>
-            <span className="material-symbols-outlined text-[13px] text-slate-400 ml-0.5">
+            <span className="material-symbols-outlined text-[13px] text-on-surface-variant ml-0.5">
               {isBuyPriceVisible ? 'visibility' : 'visibility_off'}
             </span>
           </button>

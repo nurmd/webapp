@@ -654,4 +654,82 @@ describe('Financial Balance and Inventory Stock Auditors', () => {
       expect(reportAfter.discrepantItemsCount).toBe(0);
     });
   });
+
+  describe('Reverse Charge Mechanism (RCM) Accounting Hooks', () => {
+    it('automatically generates paired journal voucher on RCM purchase and deletes it on bill deletion', () => {
+      const rcmBill: PurchaseBill = {
+        id: 'PUR-RCM-TEST-1',
+        billNumber: 'PB-RCM-001',
+        date: '2026-10-15',
+        supplierId: 'SUP-GTA',
+        supplierName: 'National Freight Logistics',
+        supplierAddress: 'Navi Mumbai',
+        supplierStateCode: '27',
+        placeOfSupplyStateCode: '27',
+        isIntraState: true,
+        items: [
+          {
+            name: 'Goods Transport Agency (GTA) Freight',
+            hsnSacCode: '996511',
+            unit: 'NOS',
+            quantity: 1,
+            unitPrice: 50000,
+            taxableAmount: 50000,
+            gstRate: 5,
+            cgstAmount: 1250,
+            sgstAmount: 1250,
+            igstAmount: 0,
+            cessAmount: 0,
+            totalAmount: 52500,
+          },
+        ],
+        itcEligibility: 'ELIGIBLE_SERVICES',
+        isRcm: true,
+        totalGrossAmount: 50000,
+        totalDiscount: 0,
+        totalTaxableAmount: 50000,
+        totalCgst: 1250,
+        totalSgst: 1250,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 2500,
+        roundOff: 0,
+        grandTotal: 52500,
+        paidAmount: 50000,
+        balanceAmount: 2500,
+        paymentMode: 'BANK',
+        paymentStatus: 'PARTIAL',
+        createdAt: '2026-10-15T10:00:00.000Z',
+        updatedAt: '2026-10-15T10:00:00.000Z',
+      };
+
+      // 1. Save RCM Purchase
+      db.savePurchase(rcmBill);
+
+      // Verify paired RCM voucher was generated
+      const vouchers = db.getVouchers();
+      const rcmVoucher = vouchers.find((v) => v.id === `VCH-RCM-${rcmBill.id}`);
+      expect(rcmVoucher).toBeDefined();
+      expect(rcmVoucher?.voucherType).toBe('JOURNAL');
+      expect(rcmVoucher?.totalAmount).toBe(2500);
+
+      const drCgst = rcmVoucher?.entries.find((e) => e.accountId === 'ACC_INPUT_CGST_RCM');
+      const crCgst = rcmVoucher?.entries.find((e) => e.accountId === 'ACC_OUTPUT_CGST_RCM');
+      expect(drCgst?.debit).toBe(1250);
+      expect(crCgst?.credit).toBe(1250);
+
+      // 2. Updating bill to non-RCM removes the paired RCM voucher
+      db.savePurchase({ ...rcmBill, isRcm: false });
+      const vouchersAfterNonRcm = db.getVouchers();
+      expect(vouchersAfterNonRcm.find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeUndefined();
+
+      // 3. Re-saving as RCM regenerates it
+      db.savePurchase(rcmBill);
+      expect(db.getVouchers().find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeDefined();
+
+      // 4. Deleting the purchase bill cleans up the paired RCM voucher
+      db.deletePurchase(rcmBill.id);
+      expect(db.getVouchers().find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeUndefined();
+    });
+  });
 });

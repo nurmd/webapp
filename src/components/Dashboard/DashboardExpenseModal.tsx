@@ -73,6 +73,7 @@ export const DashboardExpenseModal: React.FC<DashboardExpenseModalProps> = ({
             onClick={onClose}
             className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer"
             title="Close"
+            aria-label="Close expense details"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>

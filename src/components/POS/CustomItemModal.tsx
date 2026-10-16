@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
+import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 
 interface CustomItemModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedPrice = parseFloat(price);
-    const parsedQty = !qty.trim() ? 1 : parseFloat(qty);
+    const parsedQty = !qty.trim() ? 1 : roundQuantity(parseFloat(qty), 4);
     if (!name.trim() || isNaN(parsedPrice) || parsedPrice <= 0 || isNaN(parsedQty) || parsedQty <= 0) {
       return;
     }
@@ -63,6 +64,8 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer"
+            title="Close"
+            aria-label="Close custom item modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -111,10 +114,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
                 placeholder="1"
                 value={qty}
                 onChange={(e) => {
-                  const sanitized = e.target.value.replace(/[^0-9.]/g, '');
-                  const parts = sanitized.split('.');
-                  const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
-                  setQty(cleanVal);
+                  setQty(sanitizeQuantityInput(e.target.value, 4));
                 }}
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
               />
@@ -136,7 +136,6 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
                 <option value={5}>5% GST</option>
                 <option value={12}>12% GST</option>
                 <option value={18}>18% GST (Standard)</option>
-                <option value={28}>28% GST</option>
               </select>
             </div>
 

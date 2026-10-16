@@ -30,8 +30,11 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
             {activeSubModal.replace('_', ' ')}
           </h4>
           <button
+            type="button"
             onClick={() => setActiveSubModal(null)}
             className="w-7 h-7 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant cursor-pointer"
+            title="Close"
+            aria-label="Close settings dialog"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>
           </button>
@@ -52,8 +55,8 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
                 <li>0% (Exempt: Essential Food, Unbranded grains)</li>
                 <li>5% (Standard: Tea, Spices, Sugar, Edible Oils)</li>
                 <li>12% (Standard: Processed food, butter, ghee)</li>
-                <li>18% (Standard: Household goods, soap, stationery, electronics)</li>
-                <li>28% (Luxury &amp; Sin: Pan masala, premium goods)</li>
+                <li>18% (Standard: Household goods, soap, stationery, electronics, former 28% luxury items)</li>
+                <li className="text-on-surface-variant line-through opacity-60">28% (Discontinued)</li>
               </ul>
               <p className="text-secondary font-bold pt-1">
                 Reverse Charge Mechanism (RCM) and Compensation Cess can be toggled on per item.

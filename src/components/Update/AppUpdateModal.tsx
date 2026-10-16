@@ -190,8 +190,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
           </div>
           {status !== 'downloading' && status !== 'applying' && (
             <button
+              type="button"
               onClick={onClose}
               className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+              title="Close"
+              aria-label="Close app update modal"
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>

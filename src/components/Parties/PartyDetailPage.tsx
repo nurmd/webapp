@@ -15,6 +15,7 @@ import { PartyInfoCard } from './PartyInfoCard.tsx';
 import { RecordPaymentModal } from './RecordPaymentModal.tsx';
 import { VoucherEditorModal } from './VoucherEditorModal.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export type { PassbookEntry } from './usePartyPassbook.ts';
 
@@ -33,7 +34,8 @@ export interface PartyDetailPageProps {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -66,6 +68,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isDeletePartyConfirmOpen, setIsDeletePartyConfirmOpen] = useState(false);
+  const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null);
+  const [deletePurchaseTarget, setDeletePurchaseTarget] = useState<PurchaseBill | null>(null);
 
   useEffect(() => {
     let ticking = false;
@@ -158,9 +163,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   }, true, 15);
 
   const handleDelete = () => {
-    if (window.confirm(`Delete party "${party.name}"? This removes them from your active contacts list.`)) {
-      onDeleteParty?.(party.id);
-    }
+    setIsDeletePartyConfirmOpen(true);
   };
 
   const handleTransactionClick = (entry: PassbookEntry) => {
@@ -173,9 +176,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     }
   };
 
-  const handleDeleteInvoiceBill = (inv: Invoice) => {
-    if (!window.confirm(`Delete Invoice #${inv.invoiceNumber}? This will restore inventory stock.`)) return;
-
+  const executeDeleteInvoiceBill = (inv: Invoice) => {
     // Restore stock
     const allItems = db.getItems();
     for (const line of inv.items) {
@@ -201,9 +202,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     onRefresh?.();
   };
 
-  const handleDeletePurchaseBill = (bill: PurchaseBill) => {
-    if (!window.confirm(`Delete Purchase Bill #${bill.billNumber}? This will revert any stock added by this bill.`)) return;
+  const handleDeleteInvoiceBill = (inv: Invoice, skipConfirm?: boolean) => {
+    if (skipConfirm) {
+      executeDeleteInvoiceBill(inv);
+    } else {
+      setDeleteInvoiceTarget(inv);
+    }
+  };
 
+  const executeDeletePurchaseBill = (bill: PurchaseBill) => {
     // Rollback stock
     const allowNegativeStock = db.getAllowNegativeStock();
     const allItems = db.getItems();
@@ -230,6 +237,14 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     onRefresh?.();
   };
 
+  const handleDeletePurchaseBill = (bill: PurchaseBill, skipConfirm?: boolean) => {
+    if (skipConfirm) {
+      executeDeletePurchaseBill(bill);
+    } else {
+      setDeletePurchaseTarget(bill);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface flex flex-col animate-fade-in pb-8">
       {/* 1. Mobile-Optimized Sticky Top Navigation (slides out on scroll) */}
@@ -248,6 +263,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               onClick={onBack}
               className="p-1.5 -ml-1 rounded-xl text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center gap-1"
               title="Back to Parties"
+              aria-label="Back to parties"
             >
               <span className="material-symbols-outlined text-[22px]">arrow_back</span>
             </button>
@@ -296,6 +312,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               onClick={handleWhatsAppReminder}
               className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors"
               title="WhatsApp"
+              aria-label="Send WhatsApp message"
             >
               <span className="material-symbols-outlined text-[17px]">chat</span>
             </button>
@@ -305,6 +322,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               onClick={() => onEditParty(party)}
               className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
               title="Edit Profile"
+              aria-label="Edit party profile"
             >
               <span className="material-symbols-outlined text-[17px]">edit</span>
             </button>
@@ -315,6 +333,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 onClick={handleDelete}
                 className="w-8 h-8 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 flex items-center justify-center transition-colors cursor-pointer"
                 title="Delete Party"
+                aria-label="Delete party"
               >
                 <span className="material-symbols-outlined text-[17px]">delete</span>
               </button>
@@ -349,6 +368,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 }}
                 className="p-1 -ml-1 rounded-xl text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
                 title="Back to Parties"
+                aria-label="Back to parties"
               >
                 <span className="material-symbols-outlined text-[19px]">arrow_back</span>
               </button>
@@ -374,9 +394,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               <span
                 className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
                   isReceivable
-                    ? 'bg-error/10 text-error'
+                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                     : isPayable
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
                     : 'bg-secondary/10 text-secondary'
                 }`}
               >
@@ -385,9 +405,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               <span
                 className={`font-currency-display-mobile text-xs font-black ${
                   isReceivable
-                    ? 'text-error'
+                    ? 'text-emerald-700 dark:text-emerald-400'
                     : isPayable
-                    ? 'text-amber-600 dark:text-amber-400'
+                    ? 'text-rose-700 dark:text-rose-400'
                     : 'text-secondary'
                 }`}
               >
@@ -497,6 +517,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 onClick={handlePrintStatement}
                 className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
                 title="Print Ledger Statement"
+                aria-label="Print ledger statement"
               >
                 <span className="material-symbols-outlined text-[18px]">print</span>
               </button>
@@ -552,7 +573,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             setSelectedPurchaseBill(null);
             if (onEditPurchase) onEditPurchase(bill);
           }}
-          onDeletePurchase={() => handleDeletePurchaseBill(selectedPurchaseBill)}
+          onDeletePurchase={() => handleDeletePurchaseBill(selectedPurchaseBill, true)}
         />
       )}
 
@@ -566,11 +587,56 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             setSelectedInvoiceForView(null);
             if (onEditInvoice) onEditInvoice(inv);
           }}
-          onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView)}
+          onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView, true)}
           onOpenFullA4Preview={(inv) => {
             setSelectedInvoiceForView(null);
             if (onViewInvoice) onViewInvoice(inv);
           }}
+        />
+      )}
+
+      {/* Delete Party Confirmation Modal */}
+      {isDeletePartyConfirmOpen && (
+        <ConfirmDeleteModal
+          isOpen={isDeletePartyConfirmOpen}
+          title="Delete Party Account?"
+          recordName={party.name}
+          description="Are you sure you want to delete this party? This removes them from your active contacts list."
+          confirmText="Delete Party"
+          onConfirm={() => onDeleteParty?.(party.id)}
+          onClose={() => setIsDeletePartyConfirmOpen(false)}
+        />
+      )}
+
+      {/* Delete Invoice Confirmation Modal */}
+      {deleteInvoiceTarget && (
+        <ConfirmDeleteModal
+          isOpen={!!deleteInvoiceTarget}
+          title="Delete Invoice?"
+          recordName={`Invoice #${deleteInvoiceTarget.invoiceNumber}`}
+          description="Are you sure you want to delete this invoice? This will restore inventory stock."
+          confirmText="Delete Invoice"
+          onConfirm={() => {
+            executeDeleteInvoiceBill(deleteInvoiceTarget);
+            setDeleteInvoiceTarget(null);
+          }}
+          onClose={() => setDeleteInvoiceTarget(null)}
+        />
+      )}
+
+      {/* Delete Purchase Bill Confirmation Modal */}
+      {deletePurchaseTarget && (
+        <ConfirmDeleteModal
+          isOpen={!!deletePurchaseTarget}
+          title="Delete Purchase Bill?"
+          recordName={`Bill #${deletePurchaseTarget.billNumber}`}
+          description="Are you sure you want to delete this purchase bill? This will revert any stock added by this bill."
+          confirmText="Delete Purchase"
+          onConfirm={() => {
+            executeDeletePurchaseBill(deletePurchaseTarget);
+            setDeletePurchaseTarget(null);
+          }}
+          onClose={() => setDeletePurchaseTarget(null)}
         />
       )}
     </div>

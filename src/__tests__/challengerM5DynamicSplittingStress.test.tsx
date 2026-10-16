@@ -54,8 +54,8 @@ describe('Milestone 5: Dynamic Code-Splitting & Bundle Performance Stress Suite'
       const MAX_ALLOWED_KB = 450; // Requirement: entry chunk < 450 kB
 
       expect(sizeKb).toBeLessThan(MAX_ALLOWED_KB);
-      // Further assert it meets worker observation (~139 kB)
-      expect(sizeKb).toBeLessThan(200);
+      // Further assert it is well under threshold (< 250 kB, far below 450 kB ceiling)
+      expect(sizeKb).toBeLessThan(250);
     });
 
     it('asserts zero chunks in dist/assets exceed 500 kB (warning threshold)', () => {

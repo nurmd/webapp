@@ -7,6 +7,7 @@ import { InventoryItem } from '../../models/item.ts';
 import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { downloadGstr1JsonFile } from '../../core/gst/gstrExport.ts';
+import { computeAgingBreakdown, AgingBucket, PartyAgingRow } from '../../core/accounting/aging.ts';
 
 interface BusinessReportsViewProps {
   company: CompanyProfile;
@@ -80,6 +81,43 @@ function exportBillWiseProfitCsv(
   URL.revokeObjectURL(url);
 }
 
+function exportAgingBreakdownCsv(
+  parties: PartyAgingRow[],
+  mode: 'RECEIVABLES' | 'PAYABLES',
+  totalOutstanding: number,
+  summary: Record<AgingBucket, number>
+) {
+  const headers = ['Party Name', 'Phone', 'Total Due (INR)', '0-30 Days', '31-60 Days', '61-90 Days', '90+ Days'];
+  const rows = parties.map((p) => [
+    `"${(p.partyName || '').replace(/"/g, '""')}"`,
+    `"${p.phone || ''}"`,
+    p.totalOutstanding.toFixed(2),
+    p.brackets['0-30'].toFixed(2),
+    p.brackets['31-60'].toFixed(2),
+    p.brackets['61-90'].toFixed(2),
+    p.brackets['90+'].toFixed(2),
+  ]);
+  rows.push([
+    '"TOTAL"',
+    '""',
+    totalOutstanding.toFixed(2),
+    summary['0-30'].toFixed(2),
+    summary['31-60'].toFixed(2),
+    summary['61-90'].toFixed(2),
+    summary['90+'].toFixed(2),
+  ]);
+  const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${mode.toLowerCase()}_aging_report_${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   company,
   invoices,
@@ -103,6 +141,67 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     const yyyy = String(d.getFullYear());
     return `${mm}${yyyy}`;
   });
+
+  // Milestone 2: Receivables & Payables Aging Engine State
+  const [agingMode, setAgingMode] = useState<'RECEIVABLES' | 'PAYABLES'>('RECEIVABLES');
+  const [agingSearch, setAgingSearch] = useState('');
+  const [selectedAgingBucket, setSelectedAgingBucket] = useState<'ALL' | AgingBucket>('ALL');
+
+  const partyPhoneMap = useMemo(() => {
+    const map = new Map<string, string>();
+    parties.forEach((p) => {
+      if (p.id && p.phone) map.set(p.id, p.phone);
+      if (p.name && p.phone) map.set(p.name.toLowerCase(), p.phone);
+    });
+    return map;
+  }, [parties]);
+
+  const receivableAgingItems = useMemo(() => {
+    return invoices
+      .filter((inv) => inv.paymentStatus !== 'PAID' && (inv.balanceAmount || 0) > 0.01)
+      .map((inv) => ({
+        dueDate: inv.dueDate,
+        date: inv.date,
+        balanceDue: inv.balanceAmount,
+        partyId: inv.partyId,
+        partyName: inv.partyName,
+        phone: (inv.partyId && partyPhoneMap.get(inv.partyId)) || partyPhoneMap.get((inv.partyName || '').toLowerCase()),
+      }));
+  }, [invoices, partyPhoneMap]);
+
+  const payableAgingItems = useMemo(() => {
+    return purchases
+      .filter((pur) => pur.paymentStatus !== 'PAID' && (pur.balanceAmount || 0) > 0.01)
+      .map((pur) => ({
+        dueDate: pur.dueDate,
+        date: pur.date,
+        balanceDue: pur.balanceAmount,
+        partyId: pur.supplierId,
+        partyName: pur.supplierName,
+        phone: (pur.supplierId && partyPhoneMap.get(pur.supplierId)) || partyPhoneMap.get((pur.supplierName || '').toLowerCase()),
+      }));
+  }, [purchases, partyPhoneMap]);
+
+  const activeAgingItems = agingMode === 'RECEIVABLES' ? receivableAgingItems : payableAgingItems;
+
+  const agingBreakdown = useMemo(() => {
+    return computeAgingBreakdown(activeAgingItems);
+  }, [activeAgingItems]);
+
+  const filteredAgingParties = useMemo(() => {
+    return agingBreakdown.parties.filter((party) => {
+      if (agingSearch.trim()) {
+        const q = agingSearch.trim().toLowerCase();
+        const matchName = party.partyName.toLowerCase().includes(q);
+        const matchPhone = party.phone?.toLowerCase().includes(q);
+        if (!matchName && !matchPhone) return false;
+      }
+      if (selectedAgingBucket !== 'ALL') {
+        if ((party.brackets[selectedAgingBucket] || 0) <= 0.01) return false;
+      }
+      return true;
+    });
+  }, [agingBreakdown.parties, agingSearch, selectedAgingBucket]);
 
   // Dynamic Date Range based on selected ProfitPeriod
   const dateRange = useMemo(() => {
@@ -414,7 +513,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
         <div className="mb-space-md relative z-10">
           <div className="flex items-center justify-between gap-2 mb-0.5">
             <span className="text-xs text-surface-container-high font-medium">
-              Net Profit (Estimated)
+              Net Profit
             </span>
             <span className="text-[11px] text-surface-variant/90 font-medium">
               {dateRange.label}
@@ -938,6 +1037,246 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
                       </React.Fragment>
                     );
                   })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* 7. SECTION: Receivables & Payables Aging Breakdown (Parties & Stock) */}
+      {(activeCategory === 'ALL' || activeCategory === 'PARTIES_STOCK') && (
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-outline-variant/20 flex flex-col gap-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-md bg-secondary text-on-secondary font-bold text-xs">
+                  Aging Engine
+                </span>
+                <h3 className="font-headline-sm text-sm font-bold text-on-surface">
+                  Receivables &amp; Payables Aging Breakdown
+                </h3>
+              </div>
+              <div className="text-[11px] text-on-surface-variant mt-0.5">
+                Outstanding dues classified by 0–30, 31–60, 61–90, and 90+ days overdue brackets.
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg bg-surface-container p-0.5 border border-outline-variant/30 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setAgingMode('RECEIVABLES')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    agingMode === 'RECEIVABLES'
+                      ? 'bg-secondary text-on-secondary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Receivables (Customers)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAgingMode('PAYABLES')}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    agingMode === 'PAYABLES'
+                      ? 'bg-secondary text-on-secondary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Payables (Suppliers)
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  exportAgingBreakdownCsv(
+                    filteredAgingParties,
+                    agingMode,
+                    agingBreakdown.totalOutstanding,
+                    agingBreakdown.summary
+                  )
+                }
+                className="px-3 py-1.5 rounded-lg bg-surface-container text-on-surface-variant text-xs font-bold flex items-center gap-1.5 hover:bg-surface-container-high transition-all cursor-pointer"
+                title="Export Aging Report CSV"
+              >
+                <span className="material-symbols-outlined text-[16px]">download</span>
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 KPI Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* 0-30 Days */}
+            <div
+              onClick={() => setSelectedAgingBucket(selectedAgingBucket === '0-30' ? 'ALL' : '0-30')}
+              className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                selectedAgingBucket === '0-30'
+                  ? 'ring-2 ring-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700'
+                  : 'bg-surface-container-low/60 hover:bg-surface-container-low border-outline-variant/30'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-emerald-700 dark:text-emerald-400">0–30 Days</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 font-bold">
+                  {agingBreakdown.counts['0-30']} Bills
+                </span>
+              </div>
+              <div className="text-lg font-bold text-on-surface">
+                {formatINR(agingBreakdown.summary['0-30'])}
+              </div>
+              <div className="text-[10px] text-on-surface-variant">Current / Within Term</div>
+            </div>
+
+            {/* 31-60 Days */}
+            <div
+              onClick={() => setSelectedAgingBucket(selectedAgingBucket === '31-60' ? 'ALL' : '31-60')}
+              className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                selectedAgingBucket === '31-60'
+                  ? 'ring-2 ring-amber-500 bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700'
+                  : 'bg-surface-container-low/60 hover:bg-surface-container-low border-outline-variant/30'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-amber-700 dark:text-amber-400">31–60 Days</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-300 font-bold">
+                  {agingBreakdown.counts['31-60']} Bills
+                </span>
+              </div>
+              <div className="text-lg font-bold text-on-surface">
+                {formatINR(agingBreakdown.summary['31-60'])}
+              </div>
+              <div className="text-[10px] text-on-surface-variant">1–2 Months Overdue</div>
+            </div>
+
+            {/* 61-90 Days */}
+            <div
+              onClick={() => setSelectedAgingBucket(selectedAgingBucket === '61-90' ? 'ALL' : '61-90')}
+              className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                selectedAgingBucket === '61-90'
+                  ? 'ring-2 ring-orange-500 bg-orange-50/80 dark:bg-orange-950/40 border-orange-300 dark:border-orange-700'
+                  : 'bg-surface-container-low/60 hover:bg-surface-container-low border-outline-variant/30'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-orange-700 dark:text-orange-400">61–90 Days</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 font-bold">
+                  {agingBreakdown.counts['61-90']} Bills
+                </span>
+              </div>
+              <div className="text-lg font-bold text-on-surface">
+                {formatINR(agingBreakdown.summary['61-90'])}
+              </div>
+              <div className="text-[10px] text-on-surface-variant">2–3 Months Overdue</div>
+            </div>
+
+            {/* 90+ Days */}
+            <div
+              onClick={() => setSelectedAgingBucket(selectedAgingBucket === '90+' ? 'ALL' : '90+')}
+              className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                selectedAgingBucket === '90+'
+                  ? 'ring-2 ring-rose-500 bg-rose-50/80 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700'
+                  : 'bg-surface-container-low/60 hover:bg-surface-container-low border-outline-variant/30'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-rose-700 dark:text-rose-400">90+ Days</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-300 font-bold">
+                  {agingBreakdown.counts['90+']} Bills
+                </span>
+              </div>
+              <div className="text-lg font-bold text-on-surface">
+                {formatINR(agingBreakdown.summary['90+'])}
+              </div>
+              <div className="text-[10px] text-on-surface-variant">Critical / Action Required</div>
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div className="flex items-center justify-between gap-3 flex-wrap bg-surface-container-low/50 p-2.5 rounded-xl border border-outline-variant/20">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant">search</span>
+              <input
+                type="text"
+                value={agingSearch}
+                onChange={(e) => setAgingSearch(e.target.value)}
+                placeholder="Filter by party name or phone..."
+                className="bg-transparent text-xs text-on-surface outline-none w-full placeholder:text-on-surface-variant/60"
+              />
+              {agingSearch && (
+                <button
+                  type="button"
+                  onClick={() => setAgingSearch('')}
+                  aria-label="Clear search"
+                  className="text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-on-surface-variant">
+                Total Outstanding:
+              </span>
+              <span className="text-xs font-bold text-on-surface px-2 py-0.5 rounded-md bg-surface-container">
+                {formatINR(agingBreakdown.totalOutstanding)}
+              </span>
+            </div>
+          </div>
+
+          {/* Table Breakdown */}
+          <div className="overflow-x-auto rounded-xl border border-outline-variant/20">
+            {filteredAgingParties.length === 0 ? (
+              <div className="py-8 text-center text-xs text-on-surface-variant">
+                No outstanding {agingMode === 'RECEIVABLES' ? 'receivables' : 'payables'} found.
+              </div>
+            ) : (
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-outline-variant/20 bg-surface-container-low text-on-surface-variant font-semibold">
+                    <th className="py-2 px-3">Party Name</th>
+                    <th className="py-2 px-3 text-right">Total Due</th>
+                    <th className="py-2 px-3 text-right">0–30 Days</th>
+                    <th className="py-2 px-3 text-right">31–60 Days</th>
+                    <th className="py-2 px-3 text-right">61–90 Days</th>
+                    <th className="py-2 px-3 text-right">90+ Days</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {filteredAgingParties.map((p) => (
+                    <tr key={p.partyId} className="hover:bg-surface-container-low/50">
+                      <td className="py-2 px-3">
+                        <div className="font-bold text-on-surface">{p.partyName}</div>
+                        {p.phone && (
+                          <div className="text-[10px] text-on-surface-variant">{p.phone}</div>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-right font-extrabold text-on-surface">
+                        {formatINR(p.totalOutstanding)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-on-surface-variant">
+                        {p.brackets['0-30'] > 0 ? formatINR(p.brackets['0-30']) : '—'}
+                      </td>
+                      <td className="py-2 px-3 text-right text-on-surface-variant">
+                        {p.brackets['31-60'] > 0 ? formatINR(p.brackets['31-60']) : '—'}
+                      </td>
+                      <td className="py-2 px-3 text-right text-on-surface-variant">
+                        {p.brackets['61-90'] > 0 ? formatINR(p.brackets['61-90']) : '—'}
+                      </td>
+                      <td
+                        className={`py-2 px-3 text-right font-semibold ${
+                          p.brackets['90+'] > 0
+                            ? 'text-rose-600 dark:text-rose-400 font-bold'
+                            : 'text-on-surface-variant'
+                        }`}
+                      >
+                        {p.brackets['90+'] > 0 ? formatINR(p.brackets['90+']) : '—'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
+import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 
 export interface StockAdjustmentModalProps {
   isOpen: boolean;
@@ -17,14 +18,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   defaultType = 'STOCK_IN',
 }) => {
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>(defaultType);
-  const [adjQty, setAdjQty] = useState<number | ''>(1);
+  const [adjQty, setAdjQty] = useState<string>('1');
   const [adjReason, setAdjReason] = useState('New inventory arrival');
 
   useEffect(() => {
     if (defaultType) {
       setAdjType(defaultType);
     }
-    setAdjQty(1);
+    setAdjQty('1');
     setAdjReason('New inventory arrival');
   }, [item, defaultType, isOpen]);
 
@@ -32,7 +33,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
   const handleApplyAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
-    const qty = typeof adjQty === 'number' ? adjQty : parseFloat(adjQty as string);
+    const parsed = parseFloat(adjQty);
+    const qty = roundQuantity(parsed, 4);
     if (!item || isNaN(qty) || qty <= 0) return;
 
     const adj: StockAdjustment = {
@@ -61,6 +63,8 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+            title="Close"
+            aria-label="Close stock adjustment"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -111,23 +115,16 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             </div>
             <div className="relative flex items-center">
               <input
-                type="number"
-                min="0.001"
-                step="any"
+                type="text"
+                inputMode="decimal"
                 required
                 placeholder="Enter quantity"
                 value={adjQty}
                 onFocus={(e) => e.target.select()}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '') {
-                    setAdjQty('');
-                  } else {
-                    const parsed = parseFloat(val);
-                    setAdjQty(isNaN(parsed) ? '' : parsed);
-                  }
+                  setAdjQty(sanitizeQuantityInput(e.target.value, 4));
                 }}
-                className="w-full h-11 px-3 pr-8 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-base font-bold focus:outline-none focus:border-secondary"
+                className="w-full h-11 px-3 pr-8 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-base font-bold focus:outline-none focus:border-secondary font-tabular-data"
               />
               {adjQty !== '' && (
                 <button
@@ -148,7 +145,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                 <button
                   key={step}
                   type="button"
-                  onClick={() => setAdjQty((prev) => (Number(prev) || 0) + step)}
+                  onClick={() => setAdjQty((prev) => String((Number(prev) || 0) + step))}
                   className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface text-xs font-semibold hover:bg-secondary/15 hover:text-secondary active:scale-95 transition-all cursor-pointer"
                 >
                   +{step}

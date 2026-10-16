@@ -38,9 +38,9 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
           <span
             className={`font-currency-display-mobile text-xl sm:text-2xl font-black mt-0.5 ${
               isReceivable
-                ? 'text-error'
+                ? 'text-emerald-700 dark:text-emerald-400'
                 : isPayable
-                ? 'text-amber-600 dark:text-amber-400'
+                ? 'text-rose-700 dark:text-rose-400'
                 : 'text-secondary'
             }`}
           >
@@ -52,9 +52,9 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               isReceivable
-                ? 'bg-error/10 text-error'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                 : isPayable
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
                 : 'bg-secondary/10 text-secondary'
             }`}
           >
@@ -94,7 +94,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
             <span>Opening Balance:</span>
           </span>
           <div className="flex items-center gap-1.5 font-bold">
-            <span className={party.openingBalanceType === 'TO_PAY' ? 'text-error' : 'text-secondary'}>
+            <span className={party.openingBalanceType === 'TO_PAY' ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}>
               {formatINR(party.openingBalance || 0)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
             </span>
             {party.openingBalanceDate && (
@@ -142,7 +142,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
               <span className="text-outline">Opening Balance</span>
               <div className="flex items-center gap-1.5">
                 {party.openingBalance ? (
-                  <span className="font-bold">
+                  <span className={`font-bold ${party.openingBalanceType === 'TO_PAY' ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                     {formatINR(party.openingBalance)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
                   </span>
                 ) : (

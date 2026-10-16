@@ -27,7 +27,8 @@ interface PartiesViewProps {
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -154,15 +155,17 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     paymentMode: string,
     notes: string,
     paymentType?: 'IN' | 'OUT',
-    paymentSplits?: PaymentSplit[]
+    paymentSplits?: PaymentSplit[],
+    discount?: number
   ) => {
     if (onRecordPartyPayment) {
-      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits);
+      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount);
     } else {
       const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
+      const totalSettled = amount + (discount || 0);
       const newBal = isPaymentIn
-        ? party.currentBalance - amount
-        : party.currentBalance + amount;
+        ? party.currentBalance - totalSettled
+        : party.currentBalance + totalSettled;
       const updatedParty = { ...party, currentBalance: newBal, updatedAt: new Date().toISOString() };
       onSaveParty(updatedParty);
       setSelectedPartyForLedger(updatedParty);
@@ -284,14 +287,14 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               setActiveSegment('CUSTOMERS');
               setStatusFilter('ALL');
             }}
-            className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'CUSTOMERS'
-                ? 'bg-surface-container-lowest shadow-xs text-on-surface font-bold'
+                ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
           >
             <span className="material-symbols-outlined text-[16px] text-secondary">groups</span>
-            <span className="text-xs">Customers</span>
+            <span>Customers</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary/10 text-secondary font-bold">
               {customers.length}
             </span>
@@ -303,14 +306,14 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               setActiveSegment('SUPPLIERS');
               setStatusFilter('ALL');
             }}
-            className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'SUPPLIERS'
-                ? 'bg-surface-container-lowest shadow-xs text-on-surface font-bold'
+                ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
           >
             <span className="material-symbols-outlined text-[16px] text-primary">local_shipping</span>
-            <span className="text-xs">Suppliers</span>
+            <span>Suppliers</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-bold">
               {suppliers.length}
             </span>
@@ -344,6 +347,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
               type="button"
               onClick={() => setSearch('')}
               className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
+              title="Clear search"
+              aria-label="Clear search"
             >
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
@@ -351,11 +356,11 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           <button
             type="button"
             onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95 ${
               statusFilter === 'ALL'
                 ? 'bg-primary text-on-primary'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
@@ -366,7 +371,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('OVERDUE')}
-            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               statusFilter === 'OVERDUE'
                 ? 'bg-primary text-on-primary'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
@@ -378,7 +383,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('SETTLED')}
-            className={`px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               statusFilter === 'SETTLED'
                 ? 'bg-primary text-on-primary'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
@@ -396,8 +401,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                 window.dispatchEvent(new CustomEvent('switch_audit_tab', { detail: 'party_balance' }));
               }, 60);
             }}
-            className="px-2.5 py-1 rounded-full text-xs font-semibold shadow-xs transition-colors flex items-center gap-1 bg-surface-container-lowest text-primary hover:bg-primary/10 border border-primary/30 cursor-pointer ml-auto shrink-0"
+            className="min-h-[36px] sm:min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1 bg-surface-container-lowest text-primary hover:bg-primary/10 border border-primary/30 cursor-pointer ml-auto shrink-0 active:scale-95"
             title="Open Financial Balance Auditor"
+            aria-label="Open Financial Balance Auditor"
           >
             <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
             <span>Audit Balances</span>
@@ -434,9 +440,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                   <div
                     className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs font-extrabold flex-shrink-0 ${
                       isReceivable
-                        ? 'bg-error/10 text-error'
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                         : isPayable
-                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
                         : 'bg-secondary/10 text-secondary'
                     }`}
                   >
@@ -475,9 +481,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                     <span
                       className={`font-currency-display-mobile text-xs sm:text-sm font-extrabold tracking-tight ${
                         isReceivable
-                          ? 'text-error'
+                          ? 'text-emerald-700 dark:text-emerald-400'
                           : isPayable
-                          ? 'text-amber-600 dark:text-amber-400'
+                          ? 'text-rose-700 dark:text-rose-400'
                           : 'text-secondary'
                       }`}
                     >
@@ -486,9 +492,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                     <span
                       className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md mt-0.5 ${
                         isReceivable
-                          ? 'text-error bg-error/10'
+                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10'
                           : isPayable
-                          ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10'
+                          ? 'text-rose-700 dark:text-rose-400 bg-rose-500/10'
                           : 'text-secondary bg-secondary/10'
                       }`}
                     >
@@ -511,8 +517,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                         );
                         window.open(url, '_blank');
                       }}
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-surface-container-low text-secondary hover:bg-secondary/10 flex items-center justify-center active:scale-95 transition-all cursor-pointer ml-0.5"
+                      className="min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg bg-surface-container-low text-secondary hover:bg-secondary/10 flex items-center justify-center active:scale-95 transition-all cursor-pointer ml-0.5"
                       title="Send WhatsApp Reminder"
+                      aria-label="Send WhatsApp reminder"
                     >
                       <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chat</span>
                     </button>

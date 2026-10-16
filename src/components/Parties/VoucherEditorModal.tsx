@@ -6,6 +6,7 @@ import { Voucher, JournalEntryLine } from '../../core/accounting/voucherTypes.ts
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface VoucherEditorModalProps {
   editingLedgerEntry: PassbookEntry | null;
@@ -28,12 +29,14 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   onViewPurchase,
   onRefresh,
 }) => {
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editMode, setEditMode] = useState('UPI');
   const [editSplitCash, setEditSplitCash] = useState('');
   const [editSplitUPI, setEditSplitUPI] = useState('');
   const [editSplitBank, setEditSplitBank] = useState('');
+  const [editDiscount, setEditDiscount] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
   const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
@@ -50,10 +53,18 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
     if (editingLedgerEntry.rawVoucher) {
       const v = editingLedgerEntry.rawVoucher;
+      const discEntry = v.entries.find((e) => e.accountId === 'ACC_EXPENSE_DISCOUNT' || e.accountId === 'ACC_INCOME_DISCOUNT');
+      const discVal = discEntry ? (discEntry.debit || discEntry.credit || 0) : 0;
+      setEditDiscount(discVal > 0 ? discVal.toString() : '');
+
       const cashEntry = v.entries.find((e) => e.accountId === 'ACC_CASH');
       const bankEntries = v.entries.filter((e) => e.accountId === 'ACC_BANK');
       const cashVal = cashEntry ? (cashEntry.debit || cashEntry.credit || 0) : 0;
       const bankVal = bankEntries.reduce((sum, e) => sum + (e.debit || e.credit || 0), 0);
+      const paymentVal = cashVal + bankVal;
+      if (paymentVal > 0) {
+        setEditAmount(paymentVal.toString());
+      }
       if (cashVal > 0 && bankVal > 0) {
         setEditMode('SPLIT');
         setEditSplitCash(cashVal.toString());
@@ -126,6 +137,9 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       const isReceipt = editType === 'IN';
       const newVoucherType = isReceipt ? 'RECEIPT' : 'PAYMENT';
 
+      const disc = parseFloat(editDiscount) || 0;
+      const totalSettled = Number((newAmt + disc).toFixed(2));
+
       let adjustedBal = party.currentBalance;
       if (v.voucherType === 'RECEIPT') {
         adjustedBal += v.totalAmount;
@@ -134,9 +148,9 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       }
 
       if (isReceipt) {
-        adjustedBal -= newAmt;
+        adjustedBal -= totalSettled;
       } else {
-        adjustedBal += newAmt;
+        adjustedBal += totalSettled;
       }
 
       let entries: JournalEntryLine[] = [];
@@ -149,21 +163,25 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         if (isReceipt) {
           if (c > 0) entries.push({ accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: c, credit: 0, narration: 'Payment received via CASH' });
           if (bankSum > 0) entries.push({ accountId: 'ACC_BANK', accountName: 'Bank Account', debit: bankSum, credit: 0, narration: 'Payment received via BANK/UPI' });
-          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: newAmt, narration: editNotes || v.narration });
+          if (disc > 0) entries.push({ accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: disc, credit: 0, narration: 'Cash discount allowed' });
+          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: totalSettled, narration: editNotes || v.narration });
         } else {
-          entries.push({ accountId: party.id, accountName: party.name, debit: newAmt, credit: 0, narration: editNotes || v.narration });
+          entries.push({ accountId: party.id, accountName: party.name, debit: totalSettled, credit: 0, narration: editNotes || v.narration });
           if (c > 0) entries.push({ accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 0, credit: c, narration: 'Paid via CASH' });
           if (bankSum > 0) entries.push({ accountId: 'ACC_BANK', accountName: 'Bank Account', debit: 0, credit: bankSum, narration: 'Paid via BANK/UPI' });
+          if (disc > 0) entries.push({ accountId: 'ACC_INCOME_DISCOUNT', accountName: 'Discount Received', debit: 0, credit: disc, narration: 'Cash discount received' });
         }
       } else {
         const accId = editMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
         const accName = editMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
         if (isReceipt) {
           entries.push({ accountId: accId, accountName: accName, debit: newAmt, credit: 0, narration: `Payment received via ${editMode}` });
-          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: newAmt, narration: editNotes || v.narration });
+          if (disc > 0) entries.push({ accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: disc, credit: 0, narration: 'Cash discount allowed' });
+          entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: totalSettled, narration: editNotes || v.narration });
         } else {
-          entries.push({ accountId: party.id, accountName: party.name, debit: newAmt, credit: 0, narration: editNotes || v.narration });
+          entries.push({ accountId: party.id, accountName: party.name, debit: totalSettled, credit: 0, narration: editNotes || v.narration });
           entries.push({ accountId: accId, accountName: accName, debit: 0, credit: newAmt, narration: `Paid via ${editMode}` });
+          if (disc > 0) entries.push({ accountId: 'ACC_INCOME_DISCOUNT', accountName: 'Discount Received', debit: 0, credit: disc, narration: 'Cash discount received' });
         }
       }
 
@@ -171,7 +189,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         ...v,
         date: editDate,
         voucherType: newVoucherType,
-        totalAmount: newAmt,
+        totalAmount: totalSettled,
         narration: editNotes || v.narration,
         entries,
       };
@@ -328,9 +346,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     onRefresh?.();
   };
 
-  const handleDeleteLedgerItem = (entry: PassbookEntry) => {
-    if (!window.confirm(`Delete this ledger transaction "${entry.docNumber}"?`)) return;
-
+  const executeDeleteLedgerItem = (entry: PassbookEntry) => {
     if (entry.rawVoucher) {
       const v = entry.rawVoucher;
       let adjustedBal = party.currentBalance;
@@ -376,6 +392,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     onRefresh?.();
   };
 
+  const handleDeleteLedgerItem = () => {
+    setIsDeleteConfirmOpen(true);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
       <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-sm shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
@@ -404,6 +424,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             type="button"
             onClick={onClose}
             className="text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer"
+            title="Close"
+            aria-label="Close transaction details"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>
           </button>
@@ -513,8 +535,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             </div>
           )}
 
-          {/* Date & Amount */}
-          <div className="grid grid-cols-2 gap-2">
+          {/* Date, Amount & Discount */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label className="block font-bold text-on-surface-variant mb-0.5">Date</label>
               <input
@@ -522,7 +544,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                 required
                 value={editDate}
                 onChange={(e) => setEditDate(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
               />
             </div>
             <div>
@@ -533,10 +555,34 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                 required
                 value={editAmount}
                 onChange={(e) => setEditAmount(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
+                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-on-surface-variant mb-0.5">
+                {editType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={editDiscount}
+                onChange={(e) => setEditDiscount(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
               />
             </div>
           </div>
+
+          {parseFloat(editDiscount) > 0 && (
+            <div className="flex items-center justify-between px-2.5 py-1 bg-secondary/10 rounded-xl text-[11px] font-bold text-secondary">
+              <span className="flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">discount</span>
+                <span>Total Settled against Balance:</span>
+              </span>
+              <span>{formatINR((parseFloat(editAmount) || 0) + (parseFloat(editDiscount) || 0))}</span>
+            </div>
+          )}
 
           {/* Payment Mode */}
           {(editingLedgerEntry.rawVoucher || editingLedgerEntry.paymentMode) && (
@@ -726,7 +772,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
               <button
                 type="button"
-                onClick={() => handleDeleteLedgerItem(editingLedgerEntry)}
+                onClick={() => handleDeleteLedgerItem()}
                 className="px-2.5 py-1.5 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1"
               >
                 <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -752,6 +798,19 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Delete Ledger Transaction Confirmation Modal */}
+      {isDeleteConfirmOpen && (
+        <ConfirmDeleteModal
+          isOpen={isDeleteConfirmOpen}
+          title={editingLedgerEntry.isOpening ? 'Clear Opening Balance?' : 'Delete Ledger Transaction?'}
+          recordName={editingLedgerEntry.docNumber}
+          description="Are you sure you want to delete this ledger transaction? This action will adjust party balances."
+          confirmText={editingLedgerEntry.isOpening ? 'Clear Balance' : 'Delete Transaction'}
+          onConfirm={() => executeDeleteLedgerItem(editingLedgerEntry)}
+          onClose={() => setIsDeleteConfirmOpen(false)}
+        />
+      )}
     </div>
   );
 };

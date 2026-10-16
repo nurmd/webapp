@@ -83,6 +83,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
           <button
             type="button"
             onClick={() => setSearchTxn('')}
+            aria-label="Clear search"
             className="absolute right-2 text-on-surface-variant hover:text-on-surface cursor-pointer"
           >
             <span className="material-symbols-outlined text-[13px]">close</span>

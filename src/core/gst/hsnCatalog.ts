@@ -4,7 +4,7 @@ export interface HsnItem {
   code: string;
   description: string;
   category: 'Goods' | 'Services';
-  gstRate: number; // Statutory Indian GST rates: 0, 0.1, 0.25, 3, 5, 12, 18, 28
+  gstRate: number; // Statutory Indian GST rates: 0, 0.1, 0.25, 3, 5, 12, 18 (28% discontinued)
 }
 
 export const COMMON_HSN_CODES: HsnItem[] = [

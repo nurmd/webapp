@@ -456,6 +456,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>

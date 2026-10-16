@@ -467,7 +467,22 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         ? { text: 'Cloud Live', type: 'success' }
         : { text: 'Offline Ready', type: 'neutral' },
       action: () => onNavigate('settings'),
-      keywords: ['sync', 'backup', 'cloud', 'couchdb', 'database'],
+      keywords: ['sync', 'cloud', 'couchdb', 'multi-device'],
+    },
+    {
+      id: 'database_backup_restore',
+      title: 'Database Backup & Restore',
+      subtitle: 'Complete offline JSON snapshot & restore of bills, stock & ledger',
+      icon: 'database',
+      category: 'settings',
+      badge: { text: 'JSON Backup', type: 'primary' },
+      action: () => {
+        onNavigate('settings');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('open_database_backup_modal'));
+        }, 120);
+      },
+      keywords: ['backup', 'restore', 'export', 'import', 'database', 'json', 'dump', 'save data', 'download backup'],
     },
     {
       id: 'staff_security',
@@ -690,6 +705,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
                 className="w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer flex-shrink-0"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
@@ -810,6 +826,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
           <button
             type="button"
             onClick={onNewInvoice}
+            aria-label={company.isGstEnabled !== false ? 'Create New GST Invoice' : 'Create New Invoice'}
             className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-secondary text-on-secondary font-label-md text-sm font-bold shadow-[0_4px_16px_rgba(0,108,73,0.25)] active:scale-98 transition-transform cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">add_circle</span>

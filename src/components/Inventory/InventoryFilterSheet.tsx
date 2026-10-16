@@ -67,7 +67,8 @@ export const InventoryFilterSheet: React.FC<InventoryFilterSheetProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+              aria-label="Close filters"
+              className="min-h-[36px] min-w-[36px] w-9 h-9 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">close</span>
             </button>

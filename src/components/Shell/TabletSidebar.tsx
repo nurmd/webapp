@@ -122,6 +122,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
             type="button"
             className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center hover:bg-amber-500/25 transition-colors cursor-pointer relative flex-shrink-0"
             title={`New update v${latestVersion} available!`}
+            aria-label="Check for application update"
           >
             <span className="material-symbols-outlined text-[16px]">system_update</span>
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />

@@ -662,6 +662,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               <button
                 type="button"
                 onClick={() => setInspectRecord(null)}
+                aria-label="Close audit record"
                 className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>

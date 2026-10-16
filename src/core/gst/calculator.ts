@@ -14,7 +14,7 @@ export interface GstTaxBreakdown {
   totalAmount: number;
 }
 
-export const STATUTORY_GST_RATES = [0, 0.1, 0.25, 3, 5, 12, 18, 28] as const;
+export const STATUTORY_GST_RATES = [0, 0.1, 0.25, 3, 5, 12, 18] as const;
 export type StatutoryGstRate = (typeof STATUTORY_GST_RATES)[number];
 
 export const UTGST_STATE_CODES: ReadonlySet<string> = new Set<string>([

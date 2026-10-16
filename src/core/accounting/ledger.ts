@@ -13,12 +13,63 @@ export function validateVoucherBalance(entries: JournalEntryLine[]): { isBalance
   };
 }
 
-export interface VoucherPaymentSplit {
+export interface PaymentSplitTender {
   id?: string;
-  mode: string;
+  mode: 'CASH' | 'BANK' | 'UPI' | 'CARD' | 'CHEQUE' | 'NET_BANKING' | string;
   amount: number;
-  accountId?: string;
+  reference?: string;
   referenceNo?: string;
+  accountId?: string;
+  accountName?: string;
+}
+export type VoucherPaymentSplit = PaymentSplitTender;
+
+/**
+ * Resolves accountId and accountName for split tender modes:
+ * - CASH -> ACC_CASH, 'Cash-in-hand'
+ * - UPI -> ACC_BANK, 'Bank Account (UPI)'
+ * - CARD -> ACC_BANK, 'Bank Account (Card)'
+ * - CHEQUE -> ACC_BANK, 'Bank Account (Cheque)'
+ * - BANK / NET_BANKING -> ACC_BANK, 'Bank Account'
+ * Respects split.accountId and split.accountName if custom accounts are provided.
+ */
+export function resolveAccountForSplit(split: {
+  mode: string;
+  accountId?: string;
+  accountName?: string;
+}): { accountId: string; accountName: string } {
+  if (split.accountId && split.accountName) {
+    return { accountId: split.accountId, accountName: split.accountName };
+  }
+  const modeUpper = (split.mode || '').toUpperCase().trim();
+  if (modeUpper === 'CASH') {
+    return {
+      accountId: split.accountId || 'ACC_CASH',
+      accountName: split.accountName || 'Cash-in-hand',
+    };
+  }
+  if (modeUpper === 'UPI') {
+    return {
+      accountId: split.accountId || 'ACC_BANK',
+      accountName: split.accountName || 'Bank Account (UPI)',
+    };
+  }
+  if (modeUpper === 'CARD') {
+    return {
+      accountId: split.accountId || 'ACC_BANK',
+      accountName: split.accountName || 'Bank Account (Card)',
+    };
+  }
+  if (modeUpper === 'CHEQUE') {
+    return {
+      accountId: split.accountId || 'ACC_BANK',
+      accountName: split.accountName || 'Bank Account (Cheque)',
+    };
+  }
+  return {
+    accountId: split.accountId || 'ACC_BANK',
+    accountName: split.accountName || 'Bank Account',
+  };
 }
 
 /**
@@ -75,23 +126,8 @@ export function createSalesInvoiceVoucher(params: {
           credit: 0,
           narration: `Sales Bill #${params.invoiceNumber} (On Credit)`,
         });
-      } else if (split.mode === 'CASH') {
-        const accountId = split.accountId || 'ACC_CASH';
-        entries.push({
-          accountId,
-          accountName: 'Cash-in-hand',
-          debit: splitAmount,
-          credit: 0,
-          narration: `Sales Bill #${params.invoiceNumber} (Cash)`,
-        });
       } else {
-        const accountId = split.accountId || 'ACC_BANK';
-        const accountName =
-          split.mode === 'UPI'
-            ? 'Bank Account (UPI)'
-            : split.mode === 'CARD'
-            ? 'Bank Account (Card)'
-            : 'Bank Account';
+        const { accountId, accountName } = resolveAccountForSplit(split);
         entries.push({
           accountId,
           accountName,
@@ -317,23 +353,8 @@ export function createPurchaseInvoiceVoucher(params: {
           credit: splitAmount,
           narration: `Payable for bill #${params.billNumber} (On Credit)`,
         });
-      } else if (split.mode === 'CASH') {
-        const accountId = split.accountId || 'ACC_CASH';
-        entries.push({
-          accountId,
-          accountName: 'Cash-in-hand',
-          debit: 0,
-          credit: splitAmount,
-          narration: `Paid bill #${params.billNumber} (Cash)`,
-        });
       } else {
-        const accountId = split.accountId || 'ACC_BANK';
-        const accountName =
-          split.mode === 'UPI'
-            ? 'Bank Account (UPI)'
-            : split.mode === 'CARD'
-            ? 'Bank Account (Card)'
-            : 'Bank Account';
+        const { accountId, accountName } = resolveAccountForSplit(split);
         entries.push({
           accountId,
           accountName,
@@ -397,61 +418,85 @@ export function createPurchaseInvoiceVoucher(params: {
  * Credit: Customer Ledger Account
  */
 export function createPaymentReceiptVoucher(params: {
-  receiptNumber: string;
+  voucherId?: string;
+  receiptNumber?: string;
+  voucherNumber?: string;
   date: string;
   customerName: string;
   customerId: string;
-  amount: number;
-  paymentMode: string;
+  amount?: number;
+  discount?: number;
+  paymentMode?: string;
+  mode?: string;
   referenceNo?: string;
   narration?: string;
-  paymentSplits?: Array<{ mode: string; amount: number; accountId?: string; referenceNo?: string }>;
+  paymentSplits?: PaymentSplitTender[];
 }): Voucher {
-  const activeSplits = (params.paymentSplits || []).filter((s) => s.mode !== 'CREDIT' && s.amount > 0);
+  const receiptNum = params.receiptNumber || params.voucherNumber || `RCPT-${Date.now().toString().slice(-6)}`;
+  const activeSplits = (params.paymentSplits || []).filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && Number(s.amount) > 0);
   const entries: JournalEntryLine[] = [];
+  const discount = Number(Number(params.discount || 0).toFixed(2));
+
+  let totalCashBank = 0;
 
   if (activeSplits.length > 0) {
     activeSplits.forEach((split) => {
-      const isCash = split.mode === 'CASH';
-      const accountId = split.accountId || (isCash ? 'ACC_CASH' : 'ACC_BANK');
-      const accountName = isCash ? 'Cash-in-hand' : 'Bank Account';
+      const splitAmt = Number(Number(split.amount).toFixed(2));
+      totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
+      const { accountId, accountName } = resolveAccountForSplit(split);
+      const splitRef = split.reference || split.referenceNo;
+      const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
+
       entries.push({
         accountId,
         accountName,
-        debit: split.amount,
+        debit: splitAmt,
         credit: 0,
-        narration: `Payment received via ${split.mode}`,
+        narration: `Payment received via ${split.mode}${refSuffix}`,
       });
     });
   } else {
-    const accountId = params.paymentMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
-    const accountName = params.paymentMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
+    const singleMode = params.paymentMode || params.mode || 'CASH';
+    totalCashBank = Number(Number(params.amount || 0).toFixed(2));
+    const { accountId, accountName } = resolveAccountForSplit({ mode: singleMode });
+
     entries.push({
       accountId,
       accountName,
-      debit: params.amount,
+      debit: totalCashBank,
       credit: 0,
-      narration: `Payment received via ${params.paymentMode}`,
+      narration: `Payment received via ${singleMode}`,
     });
   }
 
+  if (discount > 0) {
+    entries.push({
+      accountId: 'ACC_EXPENSE_DISCOUNT',
+      accountName: 'Discount Allowed',
+      debit: discount,
+      credit: 0,
+      narration: `Cash discount allowed on receipt #${receiptNum}`,
+    });
+  }
+
+  const effectiveCredit = Number((totalCashBank + discount).toFixed(2));
   entries.push({
     accountId: params.customerId,
     accountName: params.customerName,
     debit: 0,
-    credit: params.amount,
-    narration: params.narration || `Receipt against dues #${params.receiptNumber}`,
+    credit: effectiveCredit,
+    narration: params.narration || `Receipt against dues #${receiptNum}`,
   });
 
   return {
-    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    voucherNumber: `VCH-RCPT-${params.receiptNumber}`,
+    id: params.voucherId || `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    voucherNumber: `VCH-RCPT-${receiptNum}`,
     voucherType: 'RECEIPT',
     date: params.date,
-    referenceNo: params.referenceNo || params.receiptNumber,
+    referenceNo: params.referenceNo || receiptNum,
     entries,
-    narration: params.narration || `Payment received from ${params.customerName} via ${params.paymentMode}`,
-    totalAmount: params.amount,
+    narration: params.narration || `Payment received from ${params.customerName} via ${params.paymentMode || params.mode || 'SPLIT'}${discount > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
+    totalAmount: effectiveCredit,
     createdAt: new Date().toISOString(),
   };
 }
@@ -462,61 +507,201 @@ export function createPaymentReceiptVoucher(params: {
  * Credit: Cash/Bank Account
  */
 export function createPaymentOutVoucher(params: {
-  voucherNumber: string;
+  voucherId?: string;
+  voucherNumber?: string;
+  receiptNumber?: string;
   date: string;
   supplierName: string;
   supplierId: string;
-  amount: number;
-  paymentMode: string;
+  amount?: number;
+  discount?: number;
+  paymentMode?: string;
+  mode?: string;
   referenceNo?: string;
   narration?: string;
-  paymentSplits?: Array<{ mode: string; amount: number; accountId?: string; referenceNo?: string }>;
+  paymentSplits?: PaymentSplitTender[];
 }): Voucher {
-  const activeSplits = (params.paymentSplits || []).filter((s) => s.mode !== 'CREDIT' && s.amount > 0);
-  const entries: JournalEntryLine[] = [
-    {
-      accountId: params.supplierId,
-      accountName: params.supplierName,
-      debit: params.amount,
-      credit: 0,
-      narration: params.narration || `Payment made towards dues #${params.voucherNumber}`,
-    },
-  ];
+  const vouchNum = params.voucherNumber || params.receiptNumber || `PYMT-${Date.now().toString().slice(-6)}`;
+  const activeSplits = (params.paymentSplits || []).filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && Number(s.amount) > 0);
+  const entries: JournalEntryLine[] = [];
+  const discount = Number(Number(params.discount || 0).toFixed(2));
+
+  let totalCashBank = 0;
+  const splitEntries: JournalEntryLine[] = [];
 
   if (activeSplits.length > 0) {
     activeSplits.forEach((split) => {
-      const isCash = split.mode === 'CASH';
-      const accountId = split.accountId || (isCash ? 'ACC_CASH' : 'ACC_BANK');
-      const accountName = isCash ? 'Cash-in-hand' : 'Bank Account';
-      entries.push({
+      const splitAmt = Number(Number(split.amount).toFixed(2));
+      totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
+      const { accountId, accountName } = resolveAccountForSplit(split);
+      const splitRef = split.reference || split.referenceNo;
+      const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
+
+      splitEntries.push({
         accountId,
         accountName,
         debit: 0,
-        credit: split.amount,
-        narration: `Paid via ${split.mode}`,
+        credit: splitAmt,
+        narration: `Paid via ${split.mode}${refSuffix}`,
       });
     });
   } else {
-    const accountId = params.paymentMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
-    const accountName = params.paymentMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
-    entries.push({
+    const singleMode = params.paymentMode || params.mode || 'CASH';
+    totalCashBank = Number(Number(params.amount || 0).toFixed(2));
+    const { accountId, accountName } = resolveAccountForSplit({ mode: singleMode });
+
+    splitEntries.push({
       accountId,
       accountName,
       debit: 0,
-      credit: params.amount,
-      narration: `Paid via ${params.paymentMode}`,
+      credit: totalCashBank,
+      narration: `Paid via ${singleMode}`,
+    });
+  }
+
+  const effectiveDebit = Number((totalCashBank + discount).toFixed(2));
+  entries.push({
+    accountId: params.supplierId,
+    accountName: params.supplierName,
+    debit: effectiveDebit,
+    credit: 0,
+    narration: params.narration || `Payment made towards dues #${vouchNum}`,
+  });
+  entries.push(...splitEntries);
+
+  if (discount > 0) {
+    entries.push({
+      accountId: 'ACC_INCOME_DISCOUNT',
+      accountName: 'Discount Received',
+      debit: 0,
+      credit: discount,
+      narration: `Cash discount received on payment #${vouchNum}`,
     });
   }
 
   return {
-    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    voucherNumber: `VCH-PYMT-${params.voucherNumber}`,
+    id: params.voucherId || `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    voucherNumber: `VCH-PYMT-${vouchNum}`,
     voucherType: 'PAYMENT',
     date: params.date,
-    referenceNo: params.referenceNo || params.voucherNumber,
+    referenceNo: params.referenceNo || vouchNum,
     entries,
-    narration: params.narration || `Payment disbursed to ${params.supplierName} via ${params.paymentMode}`,
-    totalAmount: params.amount,
+    narration: params.narration || `Payment disbursed to ${params.supplierName} via ${params.paymentMode || params.mode || 'SPLIT'}${discount > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
+    totalAmount: effectiveDebit,
     createdAt: new Date().toISOString(),
   };
 }
+
+/**
+ * Generates automated Double-Entry Journal Voucher for Reverse Charge Mechanism (RCM) liability and ITC.
+ * Under Section 9(3)/9(4) CGST Act:
+ * Debit: Input Tax Credit (RCM) Asset Accounts (CGST/SGST/IGST/Cess)
+ * Credit: Output GST Payable under Reverse Charge Accounts (CGST/SGST/IGST/Cess)
+ */
+export function createRcmJournalVoucher(params: {
+  billId?: string;
+  billNumber: string;
+  date: string;
+  supplierName: string;
+  supplierId: string;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  cessAmount?: number;
+  totalTax: number;
+}): Voucher {
+  const entries: JournalEntryLine[] = [];
+  const cgst = params.cgstAmount || 0;
+  const sgst = params.sgstAmount || 0;
+  const igst = params.igstAmount || 0;
+  const cess = params.cessAmount || 0;
+
+  // 1. Debits: Input Tax Credit (RCM) Asset Claim
+  if (cgst > 0) {
+    entries.push({
+      accountId: 'ACC_INPUT_CGST_RCM',
+      accountName: 'Input CGST (RCM) Account',
+      debit: cgst,
+      credit: 0,
+      narration: `ITC under RCM against bill #${params.billNumber}`,
+    });
+  }
+  if (sgst > 0) {
+    entries.push({
+      accountId: 'ACC_INPUT_SGST_RCM',
+      accountName: 'Input SGST (RCM) Account',
+      debit: sgst,
+      credit: 0,
+      narration: `ITC under RCM against bill #${params.billNumber}`,
+    });
+  }
+  if (igst > 0) {
+    entries.push({
+      accountId: 'ACC_INPUT_IGST_RCM',
+      accountName: 'Input IGST (RCM) Account',
+      debit: igst,
+      credit: 0,
+      narration: `ITC under RCM against bill #${params.billNumber}`,
+    });
+  }
+  if (cess > 0) {
+    entries.push({
+      accountId: 'ACC_INPUT_CESS_RCM',
+      accountName: 'Input Cess (RCM) Account',
+      debit: cess,
+      credit: 0,
+      narration: `ITC Cess under RCM against bill #${params.billNumber}`,
+    });
+  }
+
+  // 2. Credits: GST Output Tax Payable (RCM) Liability
+  if (cgst > 0) {
+    entries.push({
+      accountId: 'ACC_OUTPUT_CGST_RCM',
+      accountName: 'Output CGST Payable (RCM) Account',
+      debit: 0,
+      credit: cgst,
+      narration: `RCM tax payable against bill #${params.billNumber}`,
+    });
+  }
+  if (sgst > 0) {
+    entries.push({
+      accountId: 'ACC_OUTPUT_SGST_RCM',
+      accountName: 'Output SGST Payable (RCM) Account',
+      debit: 0,
+      credit: sgst,
+      narration: `RCM tax payable against bill #${params.billNumber}`,
+    });
+  }
+  if (igst > 0) {
+    entries.push({
+      accountId: 'ACC_OUTPUT_IGST_RCM',
+      accountName: 'Output IGST Payable (RCM) Account',
+      debit: 0,
+      credit: igst,
+      narration: `RCM tax payable against bill #${params.billNumber}`,
+    });
+  }
+  if (cess > 0) {
+    entries.push({
+      accountId: 'ACC_OUTPUT_CESS_RCM',
+      accountName: 'Output Cess Payable (RCM) Account',
+      debit: 0,
+      credit: cess,
+      narration: `RCM Cess payable against bill #${params.billNumber}`,
+    });
+  }
+
+  return {
+    id: `VCH-RCM-${params.billId || Date.now()}`,
+    voucherNumber: `VCH-RCM-${params.billNumber}`,
+    voucherType: 'JOURNAL',
+    date: params.date,
+    referenceNo: params.billNumber,
+    entries,
+    narration: `Automated RCM liability & ITC journal entry for Purchase Bill #${params.billNumber} from ${params.supplierName}`,
+    totalAmount: params.totalTax,
+    createdAt: new Date().toISOString(),
+  };
+}
+

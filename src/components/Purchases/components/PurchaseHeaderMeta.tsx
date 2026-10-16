@@ -13,6 +13,8 @@ export interface PurchaseHeaderMetaProps {
   supplierStateCode: string;
   itcEligibility: ItcEligibility;
   isGstActive: boolean;
+  isRcm?: boolean;
+  onRcmChange?: (isRcm: boolean) => void;
   onSelectSupplierClick: () => void;
   onAddSupplierClick: () => void;
   onClearSupplier: () => void;
@@ -30,6 +32,8 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
   supplierStateCode,
   itcEligibility,
   isGstActive,
+  isRcm,
+  onRcmChange,
   onSelectSupplierClick,
   onAddSupplierClick,
   onClearSupplier,
@@ -146,6 +150,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
                   onClearSupplier();
                 }}
                 title="Clear supplier"
+                aria-label="Clear supplier"
                 className="w-6 h-6 rounded-md flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>
@@ -159,6 +164,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             onClick={onAddSupplierClick}
             className="px-2 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0 active:scale-95"
             title="Add New Supplier Directly"
+            aria-label="Add new supplier"
           >
             <span className="material-symbols-outlined text-[15px]">person_add</span>
             <span className="hidden sm:inline">+ New</span>
@@ -216,6 +222,25 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
                   : 'No ITC'}
               </span>
             </div>
+          )}
+
+          {/* Reverse Charge Mechanism (RCM) Toggle */}
+          {isGstActive && onRcmChange && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(isRcm)}
+              onClick={() => onRcmChange(!isRcm)}
+              className={`h-7 px-2 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer border ${
+                isRcm
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
+                  : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/20'
+              }`}
+              title="Reverse Charge Mechanism (Section 9(3)/9(4) CGST Act)"
+            >
+              <span className="text-[9px] uppercase font-bold text-outline">RCM:</span>
+              <span className="font-bold">{isRcm ? 'YES' : 'NO'}</span>
+            </button>
           )}
         </div>
       </div>

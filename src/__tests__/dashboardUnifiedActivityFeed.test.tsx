@@ -358,17 +358,17 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       );
     });
 
-    const moneyInBadges = Array.from(container.querySelectorAll('*')).filter(
-      (el) => el.textContent?.trim() === 'south_westMoney In' || el.textContent?.trim() === 'Money In'
+    const moneyInAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
+      (el) => el.textContent?.trim().startsWith('+') && el.className.includes('text-emerald-700')
     );
-    const moneyOutBadges = Array.from(container.querySelectorAll('*')).filter(
-      (el) => el.textContent?.trim() === 'north_eastMoney Out' || el.textContent?.trim() === 'Money Out'
+    const moneyOutAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
+      (el) => el.textContent?.trim().startsWith('-') && el.className.includes('text-rose-700')
     );
 
-    // Sales (2) + Receipt Voucher (1) = 3 Money In
-    // Purchase (1) + Expense (1) = 2 Money Out
-    expect(moneyInBadges.length).toBeGreaterThanOrEqual(3);
-    expect(moneyOutBadges.length).toBeGreaterThanOrEqual(2);
+    // Sales (2) + Receipt Voucher (1) = 3 Money In (+)
+    // Purchase (1) + Expense (1) = 2 Money Out (-)
+    expect(moneyInAmounts.length).toBeGreaterThanOrEqual(3);
+    expect(moneyOutAmounts.length).toBeGreaterThanOrEqual(2);
   });
 
   it('R1: displays party/vendor name, payment mode, and settlement status on transaction cards', () => {

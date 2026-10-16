@@ -31,6 +31,7 @@ import { EditBusinessProfileModal } from './modals/EditBusinessProfileModal.tsx'
 import { StoreQrModal } from './modals/StoreQrModal.tsx';
 import { DevicePairModals } from './modals/DevicePairModals.tsx';
 import { SettingsSubModal } from './modals/SettingsSubModal.tsx';
+import { DatabaseBackupModal } from './modals/DatabaseBackupModal.tsx';
 
 export type SettingsCategoryId =
   | 'business_profile'
@@ -177,6 +178,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [importProfileInput, setImportProfileInput] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
+  const [isDatabaseBackupModalOpen, setIsDatabaseBackupModalOpen] = useState(false);
 
   // App Update state
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
@@ -244,8 +246,17 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         setIsMobileDetailView(true);
       }
     };
+    const handleOpenBackupModal = () => {
+      setSelectedCategory('data_sync');
+      setIsMobileDetailView(true);
+      setIsDatabaseBackupModalOpen(true);
+    };
     window.addEventListener('switch_settings_tab', handleSwitch);
-    return () => window.removeEventListener('switch_settings_tab', handleSwitch);
+    window.addEventListener('open_database_backup_modal', handleOpenBackupModal);
+    return () => {
+      window.removeEventListener('switch_settings_tab', handleSwitch);
+      window.removeEventListener('open_database_backup_modal', handleOpenBackupModal);
+    };
   }, []);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -763,6 +774,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 handleStopSync={handleStopSync}
                 copiedSyncCode={copiedSyncCode}
                 handleCopySyncCode={handleCopySyncCode}
+                onOpenDatabaseBackup={() => setIsDatabaseBackupModalOpen(true)}
               />
             )}
 
@@ -824,6 +836,17 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         isOpen={isUpdateModalOpen}
         releaseInfo={updateRelease}
         onClose={() => setIsUpdateModalOpen(false)}
+      />
+
+      {/* 6. Database Backup & Restore Modal */}
+      <DatabaseBackupModal
+        isOpen={isDatabaseBackupModalOpen}
+        onClose={() => setIsDatabaseBackupModalOpen(false)}
+        onRestored={() => {
+          const fresh = db.getCompany();
+          setProfile(fresh);
+          onSave(fresh);
+        }}
       />
     </div>
   );

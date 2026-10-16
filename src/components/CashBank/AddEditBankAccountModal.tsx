@@ -83,6 +83,8 @@ export const AddEditBankAccountModal: React.FC<AddEditBankAccountModalProps> = (
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:bg-surface-container-high transition-colors cursor-pointer"
+            title="Close"
+            aria-label="Close bank account modal"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

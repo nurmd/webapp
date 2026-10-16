@@ -59,3 +59,40 @@ export function formatDate(dateString: string | Date): string {
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
 }
+
+/**
+ * Sanitizes quantity input string to at most `maxDecimals` (defaults to 4).
+ * Prevents multiple decimal points, non-digit characters, and restricts decimal digits.
+ */
+export function sanitizeQuantityInput(valStr: string, maxDecimals = 4): string {
+  const sanitized = valStr.replace(/[^0-9.]/g, '');
+  const parts = sanitized.split('.');
+  if (parts.length > 2) {
+    const whole = parts[0];
+    const dec = parts.slice(1).join('').slice(0, maxDecimals);
+    return dec.length > 0 ? `${whole}.${dec}` : whole;
+  }
+  if (parts.length === 2) {
+    return `${parts[0]}.${parts[1].slice(0, maxDecimals)}`;
+  }
+  return sanitized;
+}
+
+/**
+ * Formats a quantity number cleanly up to `maxDecimals` (default 4) with trailing zeroes removed.
+ * e.g., 2 -> "2", 2.5 -> "2.5", 2.125 -> "2.125", 2.1234 -> "2.1234"
+ */
+export function formatQuantity(qty: number, maxDecimals = 4): string {
+  if (isNaN(qty) || qty === 0) return '0';
+  const fixed = Number(qty.toFixed(maxDecimals));
+  return String(fixed);
+}
+
+/**
+ * Parses and rounds a quantity number to at most `maxDecimals` (default 4).
+ */
+export function roundQuantity(qty: number, maxDecimals = 4): number {
+  if (isNaN(qty)) return 0;
+  return Number(Number(qty).toFixed(maxDecimals));
+}
+

@@ -21,7 +21,16 @@ import {
 } from '../core/inventory/stockEngine.ts';
 import { auditTrail } from './auditTrail.ts';
 import { rbac, UserRole } from './rbac.ts';
+import { createRcmJournalVoucher } from '../core/accounting/ledger.ts';
 import { getFinancialYear } from '../core/utils/dateFilters.ts';
+import {
+  DatabaseBackupBundle,
+  DatabaseBackupData,
+  DatabaseBackupCounts,
+  computeBackupChecksum,
+  generateBackupFilename,
+  validateBackupBundle,
+} from '../core/backup/backupEngine.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -605,13 +614,21 @@ class StorageService {
 
   private purgeDemoData(): void {
     try {
-      if (typeof window === 'undefined') return;
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
       const PURGE_KEY = 'gst_demo_purged_v1017';
       if (localStorage.getItem(PURGE_KEY)) return;
 
       // 1. Company
       const comp = this.getCompany();
-      if (comp && (comp.businessName === 'Apex Technologies Private Limited' || comp.gstin === '27AABCT3518Q1ZS')) {
+      const isFictitious =
+        comp &&
+        (comp.businessName === 'Apex Technologies Private Limited' ||
+          comp.gstin === '27AABCT3518Q1ZS' ||
+          comp.businessName?.toLowerCase().includes('shree ganesh') ||
+          comp.tradeName?.toLowerCase().includes('shree ganesh') ||
+          comp.businessName?.toLowerCase().includes('ganesh'));
+
+      if (isFictitious) {
         this.set(STORAGE_KEYS.COMPANY, DEFAULT_COMPANY);
         pouch.putDoc('company', { ...DEFAULT_COMPANY, id: 'company_profile' });
       }
@@ -1371,6 +1388,32 @@ class StorageService {
       this.recalculatePartyBalance(prevSupplierId);
     }
 
+    // Reverse Charge Mechanism (RCM): Paired Double-Entry Journal Voucher
+    const rcmVoucherId = `VCH-RCM-${bill.id}`;
+    if (bill.isRcm && (bill.totalTax || 0) > 0) {
+      const rcmVoucher = createRcmJournalVoucher({
+        billId: bill.id,
+        billNumber: bill.billNumber,
+        date: bill.date,
+        supplierName: bill.supplierName,
+        supplierId: bill.supplierId,
+        cgstAmount: bill.totalCgst,
+        sgstAmount: bill.totalSgst,
+        igstAmount: bill.totalIgst,
+        cessAmount: bill.totalCess,
+        totalTax: bill.totalTax,
+      });
+      this.saveVoucher(rcmVoucher);
+    } else {
+      // If purchase is not RCM or has 0 tax, clean up any existing RCM voucher
+      const existingRcm = this.getVouchers().find(
+        (v) => v.id === rcmVoucherId || (v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+      );
+      if (existingRcm) {
+        this.deleteVoucher(existingRcm.id);
+      }
+    }
+
     // MCA Audit Trail Hook
     const auditUser = this.getAuditUser();
     const actionType = prevBill ? 'PURCHASE_UPDATE' : 'PURCHASE_CREATE';
@@ -1398,6 +1441,15 @@ class StorageService {
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.deleteDoc('purchase', id);
     this.broadcastChange('purchase', 'delete', id);
+
+    // Clean up paired RCM journal voucher upon bill deletion
+    const rcmVoucherId = `VCH-RCM-${id}`;
+    const pairedRcmVoucher = this.getVouchers().find(
+      (v) => v.id === rcmVoucherId || (bill && v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+    );
+    if (pairedRcmVoucher) {
+      this.deleteVoucher(pairedRcmVoucher.id);
+    }
 
     // Revert stock upon bill deletion via pure domain stockEngine
     if (bill) {
@@ -1665,6 +1717,227 @@ class StorageService {
     pouch.deleteDoc('cash_bank_txn', id);
     this.broadcastChange('cash_bank_txn', 'delete', id);
     this.notifyListeners();
+  }
+
+  // --- Database Backup & Restore Operations ---
+
+  createDatabaseBackup(): DatabaseBackupBundle {
+    const company = this.getCompany();
+    const settings = this.getSettings();
+    const invoices = this.getInvoices();
+    const purchases = this.getPurchases();
+    const items = this.getItems();
+    const parties = this.getParties();
+    const vouchers = this.getVouchers();
+    const expenses = this.getExpenses();
+    const adjustments = this.getStockAdjustments();
+    const bankAccounts = this.getBankAccounts();
+    const cashBankTransactions = this.getCashBankTransactions();
+    const auditLogs = typeof localStorage !== 'undefined'
+      ? JSON.parse(localStorage.getItem('gst_audit_logs') || '[]')
+      : [];
+    const allowNegativeStock = this.getAllowNegativeStock();
+    const hideBuyPrices = !this.getBuyPriceVisibility();
+
+    const counts: DatabaseBackupCounts = {
+      invoices: invoices.length,
+      purchases: purchases.length,
+      items: items.length,
+      parties: parties.length,
+      vouchers: vouchers.length,
+      expenses: expenses.length,
+      stockAdjustments: adjustments.length,
+      bankAccounts: bankAccounts.length,
+      cashBankTransactions: cashBankTransactions.length,
+      auditLogs: auditLogs.length,
+    };
+
+    const data: DatabaseBackupData = {
+      company,
+      settings,
+      invoices,
+      purchases,
+      items,
+      parties,
+      vouchers,
+      expenses,
+      adjustments,
+      bankAccounts,
+      cashBankTransactions,
+      auditLogs,
+      allowNegativeStock,
+      hideBuyPrices,
+    };
+
+    const checksum = computeBackupChecksum(data);
+    const totalSalesAmount = invoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+    const totalPurchasesAmount = purchases.reduce((sum, p) => sum + (p.grandTotal || 0), 0);
+
+    return {
+      format: 'GST_BILLING_BACKUP',
+      version: 1,
+      appName: 'GST Billing & Accounting',
+      appVersion: '1.1.35',
+      createdAt: new Date().toISOString(),
+      checksum,
+      counts,
+      metadata: {
+        businessName: company.businessName,
+        tradeName: company.tradeName,
+        gstin: company.gstin,
+        phone: company.phone,
+        email: company.email,
+        totalSalesAmount,
+        totalPurchasesAmount,
+      },
+      data,
+    };
+  }
+
+  downloadDatabaseBackup(customBundle?: DatabaseBackupBundle): { success: boolean; filename: string } {
+    const bundle = customBundle || this.createDatabaseBackup();
+    const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
+    const jsonStr = JSON.stringify(bundle, null, 2);
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+
+    return { success: true, filename };
+  }
+
+  async restoreDatabaseBackup(
+    bundle: DatabaseBackupBundle,
+    mode: 'REPLACE' | 'MERGE' = 'REPLACE'
+  ): Promise<{ success: boolean; mode: 'REPLACE' | 'MERGE'; restoredCounts: Record<string, number> }> {
+    const validation = validateBackupBundle(bundle);
+    if (!validation.isValid || !validation.bundle) {
+      throw new Error(validation.error || 'Invalid backup bundle');
+    }
+
+    const { data } = validation.bundle;
+
+    // Helper for merging or replacing arrays by ID
+    const mergeCollection = <T extends { id: string }>(current: T[], incoming: T[] = []): T[] => {
+      if (mode === 'REPLACE') return incoming;
+      const map = new Map<string, T>();
+      current.forEach((item) => map.set(item.id, item));
+      incoming.forEach((item) => map.set(item.id, item));
+      return Array.from(map.values());
+    };
+
+    // 1. Company Profile & Settings
+    if (mode === 'REPLACE' || !this.getCompany().gstin) {
+      if (data.company) {
+        this.saveCompany(data.company);
+      }
+    }
+    if (data.settings) {
+      this.saveSettings(data.settings);
+    }
+    if (data.allowNegativeStock !== undefined) {
+      this.setAllowNegativeStock(data.allowNegativeStock);
+    }
+    if (data.hideBuyPrices !== undefined) {
+      this.setBuyPriceVisibility(!data.hideBuyPrices);
+    }
+
+    // 2. Collections
+    const finalInvoices = mergeCollection(this.getInvoices(), data.invoices);
+    const finalPurchases = mergeCollection(this.getPurchases(), data.purchases);
+    const finalItems = mergeCollection(this.getItems(), data.items);
+    const finalParties = mergeCollection(this.getParties(), data.parties);
+    const finalVouchers = mergeCollection(this.getVouchers(), data.vouchers);
+    const finalExpenses = mergeCollection(this.getExpenses(), data.expenses);
+    const finalAdjustments = mergeCollection(this.getStockAdjustments(), data.adjustments);
+    const finalBankAccounts = mergeCollection(this.getBankAccounts(), data.bankAccounts);
+    const finalCashBankTxns = mergeCollection(this.getCashBankTransactions(), data.cashBankTransactions);
+
+    // Save state
+    this.set(STORAGE_KEYS.INVOICES, finalInvoices);
+    this.set(STORAGE_KEYS.PURCHASES, finalPurchases);
+    this.set(STORAGE_KEYS.ITEMS, finalItems);
+    this.set(STORAGE_KEYS.PARTIES, finalParties);
+    this.set(STORAGE_KEYS.VOUCHERS, finalVouchers);
+    this.set(STORAGE_KEYS.EXPENSES, finalExpenses);
+    this.set(STORAGE_KEYS.ADJUSTMENTS, finalAdjustments);
+    this.set(STORAGE_KEYS.BANK_ACCOUNTS, finalBankAccounts);
+    this.set(STORAGE_KEYS.CASH_BANK_TXNS, finalCashBankTxns);
+
+    // 3. PouchDB Sync
+    try {
+      finalInvoices.forEach((inv) => pouch.putDoc('invoice', inv));
+      finalPurchases.forEach((p) => pouch.putDoc('purchase', p));
+      finalItems.forEach((it) => pouch.putDoc('item', it));
+      finalParties.forEach((pty) => pouch.putDoc('party', pty));
+      finalVouchers.forEach((v) => pouch.putDoc('voucher', v));
+      finalExpenses.forEach((exp) => pouch.putDoc('expense', exp));
+      finalAdjustments.forEach((adj) => pouch.putDoc('adjustment', adj));
+      finalBankAccounts.forEach((acc) => pouch.putDoc('bank_account', acc));
+      finalCashBankTxns.forEach((txn) => pouch.putDoc('cash_bank_txn', txn));
+    } catch (err) {
+      console.warn('PouchDB sync during backup restore encountered non-fatal error:', err);
+    }
+
+    // 4. Audit Trail Log
+    try {
+      const auditUser = this.getAuditUser();
+      auditTrail
+        .logEvent({
+          userId: auditUser.userId,
+          userName: auditUser.userName,
+          userRole: auditUser.userRole,
+          actionType: 'SETTINGS_UPDATE',
+          documentId: 'backup_restore',
+          documentType: 'SETTINGS',
+          summary: `Database restored from backup (${mode} mode, created ${validation.bundle.createdAt})`,
+          newSnapshot: {
+            mode,
+            sourceAppVersion: validation.bundle.appVersion,
+            sourceCreatedAt: validation.bundle.createdAt,
+            counts: validation.bundle.counts,
+          },
+        })
+        .catch((auditErr) => {
+          console.warn('Audit trail logging failed during restore:', auditErr);
+        });
+    } catch (auditErr) {
+      console.warn('Audit trail logging failed during restore:', auditErr);
+    }
+
+    // 5. Notify React components & Global listeners
+    this.notifyListeners();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('app_db_restored', {
+          detail: { mode, counts: validation.bundle.counts },
+        })
+      );
+    }
+
+    return {
+      success: true,
+      mode,
+      restoredCounts: {
+        invoices: finalInvoices.length,
+        purchases: finalPurchases.length,
+        items: finalItems.length,
+        parties: finalParties.length,
+        vouchers: finalVouchers.length,
+        expenses: finalExpenses.length,
+        adjustments: finalAdjustments.length,
+        bankAccounts: finalBankAccounts.length,
+        cashBankTransactions: finalCashBankTxns.length,
+      },
+    };
   }
 }
 

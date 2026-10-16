@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatINR } from '../../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
 
 export interface GridRow {
   itemId: string;
@@ -52,7 +52,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
           </span>
           {rows.length > 0 && (
             <span className="text-xs text-on-surface-variant font-medium">
-              · {Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))} units total
+              · {formatQuantity(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0), 4)} units total
             </span>
           )}
         </div>
@@ -153,7 +153,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                         </td>
                       )}
                       <td className="py-2.5 px-3 text-center font-tabular-data font-bold text-on-surface">
-                        {row.quantity} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
+                        {formatQuantity(row.quantity, 4)} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
                         {formatINR(row.unitPrice)}
@@ -220,7 +220,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                   <div className="flex items-center justify-between gap-2 mt-1.5 pt-1.5 border-t border-outline-variant/10 text-xs text-on-surface-variant">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-tabular-data font-bold text-on-surface">
-                        {row.quantity} {row.unit}
+                        {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
                       <span className="text-outline">×</span>
                       <span className="font-tabular-data font-semibold text-on-surface">

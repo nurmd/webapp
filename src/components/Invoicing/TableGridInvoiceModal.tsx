@@ -7,6 +7,7 @@ import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
+import { roundQuantity } from '../../core/utils/formatters.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
@@ -274,12 +275,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   };
 
   const handleSaveItemModal = (itemData: GridRow) => {
+    const cleanedRow: GridRow = {
+      ...itemData,
+      quantity: roundQuantity(Number(itemData.quantity) || 0, 4),
+    };
     if (editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length) {
       const updated = [...rows];
-      updated[editingRowIndex] = itemData;
+      updated[editingRowIndex] = cleanedRow;
       setRows(updated);
     } else {
-      setRows([...rows, itemData]);
+      setRows([...rows, cleanedRow]);
     }
     setEditingRowIndex(null);
   };
@@ -324,11 +329,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         unitPrice: Number(r.unitPrice) || 0,
         discountPercent: combinedDisc,
         discountAmount: overallDiscountPercent > 0 ? undefined : r.discountAmount,
-        gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
-        cessPercent: isGstActive ? (Number(r.cessRate) || 0) : 0,
+        gstRate: isGstActive && !company.isCompositionScheme ? (Number(r.gstRate) || 0) : 0,
+        cessPercent: isGstActive && !company.isCompositionScheme ? (Number(r.cessRate) || 0) : 0,
       };
     });
-  }, [rows, isGstActive, overallDiscountPercent]);
+  }, [rows, isGstActive, company.isCompositionScheme, overallDiscountPercent]);
 
   const calcSummary = useMemo(() => {
     return calculateInvoice(company.stateCode, posStateCode, calcInputs);
@@ -357,14 +362,14 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   // Memoized auto-detected type: B2B if party has 15-char GSTIN, B2CL if inter-state unregistered > ₹2.5L, else B2CS
   const autoDetectedInvoiceType = useMemo<InvoiceType>(() => {
-    if (!isGstActive) return 'B2CS';
+    if (!isGstActive || company.isCompositionScheme) return 'B2CS';
     const isB2B = Boolean(selectedParty?.gstin && selectedParty.gstin.trim().length === 15);
     if (isB2B) return 'B2B';
     if (!calcSummary.isIntraState && finalGrandTotal > 250000) {
       return 'B2CL';
     }
     return 'B2CS';
-  }, [isGstActive, selectedParty?.gstin, calcSummary.isIntraState, finalGrandTotal]);
+  }, [isGstActive, company.isCompositionScheme, selectedParty?.gstin, calcSummary.isIntraState, finalGrandTotal]);
 
   const effectiveInvoiceType = manualInvoiceType || autoDetectedInvoiceType;
 
@@ -482,7 +487,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
       invoiceNumber: invoiceNumber.trim(),
-      invoiceType: effectiveInvoiceType,
+      invoiceType: company.isCompositionScheme ? 'B2CS' : effectiveInvoiceType,
       isRcm: isRcm,
       isGstInvoice: isGstActive,
       date: invoiceDate,
@@ -653,6 +658,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             onInvoiceTypeChange={(val) => setManualInvoiceType(val)}
             isRcm={isRcm}
             onRcmChange={setIsRcm}
+            isCompositionScheme={company.isCompositionScheme}
             shippingAddress={shippingAddress}
             shippingPincode={shippingPincode}
             onShippingAddressChange={setShippingAddress}
@@ -701,7 +707,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             onRemoveDiscount={() => setOverallDiscountPercent(0)}
             isTaxDetailsOpen={isTaxDetailsOpen}
             onToggleTaxDetails={() => setIsTaxDetailsOpen(!isTaxDetailsOpen)}
-            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(3))}
+            totalUnits={Number(rows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0).toFixed(4))}
             finalGrandTotal={finalGrandTotal}
             accentColor="secondary"
           />

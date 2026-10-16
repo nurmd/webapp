@@ -45,76 +45,48 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'parties', label: 'Parties Ledger', icon: <Users size={18} /> },
     { id: 'accounting', label: 'Daybook & Accounts', icon: <BookOpen size={18} /> },
     { id: 'reports', label: isGstActive ? 'GST & Financials' : 'Reports & Financials', icon: <FileSpreadsheet size={18} /> },
-    { id: 'stitch', label: 'Stitch UI Screens', icon: <Layers size={18} /> },
+    ...((import.meta as any).env?.DEV
+      ? [{ id: 'stitch' as NavTab, label: 'Stitch UI Screens', icon: <Layers size={18} /> }]
+      : []),
     { id: 'settings', label: 'Business Profile', icon: <Settings size={18} /> },
   ];
 
   return (
-    <aside style={{
-      width: '240px',
-      backgroundColor: '#131b2e',
-      borderRight: '1px solid #273754',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '1rem 0.75rem',
-      gap: '0.25rem',
-      flexShrink: 0,
-    }}>
-      <div style={{
-        padding: '0.25rem 0.5rem 0.75rem 0.5rem',
-        fontSize: '0.7rem',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        color: '#64748b',
-        fontWeight: 700,
-      }}>
+    <aside className="w-60 bg-surface-container-low border-r border-outline-variant/30 flex flex-col p-4 py-3 gap-1 shrink-0">
+      <div className="px-2 pb-3 pt-1 text-[11px] uppercase tracking-wider text-on-surface-variant font-bold">
         Vyapar Fintech Core
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', overflowY: 'auto', flex: 1 }}>
+      <div className="flex flex-col gap-1 overflow-y-auto flex-1">
         {menuItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.625rem 0.75rem',
-                borderRadius: '8px',
-                border: isActive ? '1px solid rgba(37, 99, 235, 0.4)' : '1px solid transparent',
-                backgroundColor: isActive ? '#1e3a8a' : 'transparent',
-                color: isActive ? '#ffffff' : '#94a3b8',
-                cursor: 'pointer',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.85rem',
-                textAlign: 'left',
-                transition: 'all 0.15s ease-in-out',
-              }}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer text-sm text-left transition-all ${
+                isActive
+                  ? 'bg-primary-container text-on-primary-container font-bold border border-primary/20 shadow-xs'
+                  : 'text-on-surface-variant hover:bg-surface-container font-medium border border-transparent'
+              }`}
             >
               {item.icon}
-              {item.label}
+              <span>{item.label}</span>
             </button>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid #273754' }}>
-        <div style={{
-          backgroundColor: '#0a0f1d',
-          padding: '0.75rem',
-          borderRadius: '8px',
-          fontSize: '0.75rem',
-          color: '#94a3b8',
-          border: '1px solid #1d2a42',
-        }}>
-          <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: '2px' }}>
+      <div className="mt-auto pt-4 border-t border-outline-variant/30">
+        <div className="bg-surface-container-lowest p-3 rounded-xl text-xs text-on-surface-variant border border-outline-variant/30 shadow-xs">
+          <div className="font-bold text-on-surface mb-0.5">
             GST India • Vyapar 2.0
           </div>
           <div>Offline First • SQLite / Sync</div>
-          <div style={{ color: '#6cf8bb', marginTop: '4px', fontWeight: 600 }}>● Core Ready</div>
+          <div className="text-secondary mt-1 font-semibold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-secondary inline-block" />
+            <span>Core Ready</span>
+          </div>
         </div>
       </div>
     </aside>

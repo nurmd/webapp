@@ -5,7 +5,7 @@ import { InventoryItem } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode } from '../../models/invoice.ts';
 import { calculateInvoice, InvoiceItemCalculationInput } from '../../core/gst/calculator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
@@ -31,7 +31,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [customerAddress, setCustomerAddress] = useState<string>(parties[0]?.billingAddress || '');
   const [posStateCode, setPosStateCode] = useState<string>(parties[0]?.stateCode || company.stateCode);
 
-  const [invoiceType, setInvoiceType] = useState<InvoiceType>('B2B');
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>(company.isCompositionScheme ? 'B2CS' : 'B2B');
   const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
 
@@ -55,7 +55,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       setCustomerGstin(p.gstin || '');
       setCustomerAddress(p.billingAddress || '');
       setPosStateCode(p.stateCode);
-      setInvoiceType(p.gstin && p.gstin.length === 15 ? 'B2B' : 'B2CS');
+      setInvoiceType(company.isCompositionScheme ? 'B2CS' : (p.gstin && p.gstin.length === 15 ? 'B2B' : 'B2CS'));
     }
   };
 
@@ -69,7 +69,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         quantity: 1,
         unitPrice: 0,
         discountPercent: 0,
-        gstRate: 18,
+        gstRate: company.isCompositionScheme ? 0 : 18,
       },
     ]);
   };
@@ -81,7 +81,14 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
   const updateLine = (index: number, field: string, value: any) => {
     const updated = [...lines];
-    (updated[index] as any)[field] = value;
+    if (field === 'quantity') {
+      const parsed = parseFloat(String(value));
+      (updated[index] as any).quantity = isNaN(parsed) ? value : roundQuantity(parsed, 4);
+    } else if (company.isCompositionScheme && field === 'gstRate') {
+      (updated[index] as any).gstRate = 0;
+    } else {
+      (updated[index] as any)[field] = value;
+    }
     setLines(updated);
   };
 
@@ -96,7 +103,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         quantity: 1,
         unitPrice: item.salePrice,
         discountPercent: 0,
-        gstRate: item.gstRate,
+        gstRate: company.isCompositionScheme ? 0 : item.gstRate,
       };
       setLines(updated);
     }
@@ -107,7 +114,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     quantity: Number(l.quantity) || 1,
     unitPrice: Number(l.unitPrice) || 0,
     discountPercent: Number(l.discountPercent) || 0,
-    gstRate: Number(l.gstRate) || 0,
+    gstRate: company.isCompositionScheme ? 0 : (Number(l.gstRate) || 0),
   }));
 
   const calcSummary = calculateInvoice(company.stateCode, posStateCode, calcInputs);
@@ -127,20 +134,20 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         discountPercent: l.discountPercent,
         discountAmount: calcItem.discountAmount,
         taxableAmount: calcItem.taxableAmount,
-        gstRate: l.gstRate,
-        cgstAmount: calcItem.cgstAmount,
-        sgstAmount: calcItem.sgstAmount,
-        utgstAmount: calcItem.utgstAmount,
-        igstAmount: calcItem.igstAmount,
-        cessAmount: calcItem.cessAmount,
-        totalAmount: calcItem.totalAmount,
+        gstRate: company.isCompositionScheme ? 0 : l.gstRate,
+        cgstAmount: company.isCompositionScheme ? 0 : calcItem.cgstAmount,
+        sgstAmount: company.isCompositionScheme ? 0 : calcItem.sgstAmount,
+        utgstAmount: company.isCompositionScheme ? 0 : calcItem.utgstAmount,
+        igstAmount: company.isCompositionScheme ? 0 : calcItem.igstAmount,
+        cessAmount: company.isCompositionScheme ? 0 : calcItem.cessAmount,
+        totalAmount: company.isCompositionScheme ? calcItem.taxableAmount : calcItem.totalAmount,
       };
     });
 
     const newInvoice: Invoice = {
       id: 'INV-' + Date.now(),
       invoiceNumber: generateNextInvoiceNumber(company.invoicePrefix || 'INV-', db.getInvoices()),
-      invoiceType,
+      invoiceType: company.isCompositionScheme ? 'B2CS' : invoiceType,
       date: invoiceDate,
       partyId: selectedPartyId,
       partyName: customerName,
@@ -187,10 +194,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             </div>
             <div>
               <h2 className="font-headline-sm text-[16px] font-bold text-on-surface leading-tight">
-                Generate Standard Tax Invoice
+                {company.isCompositionScheme ? 'Generate Bill of Supply (Composition Scheme)' : 'Generate Standard Tax Invoice'}
               </h2>
               <div className="text-[12px] text-on-surface-variant">
-                Regime: {isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
+                {company.isCompositionScheme
+                  ? 'Composition Scheme (Section 10 CGST Act) • Tax cannot be collected from recipients'
+                  : `Regime: ${isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}`}
               </div>
             </div>
           </div>
@@ -288,6 +297,17 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               </button>
             </div>
 
+            {company.isCompositionScheme && (
+              <div className="mb-2.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[17px] text-amber-600 dark:text-amber-400 shrink-0">
+                  info
+                </span>
+                <span>
+                  Composition Scheme Dealer: As per Section 10 of CGST Act, you cannot charge GST to your customers on a Bill of Supply.
+                </span>
+              </div>
+            )}
+
             {lines.length === 0 ? (
               <div className="p-6 text-center rounded-xl bg-surface-container-low/40 border border-outline-variant/30 flex flex-col items-center gap-2">
                 <span className="text-xs text-on-surface-variant font-medium">No line items added to this bill yet.</span>
@@ -342,12 +362,15 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
                     <div className="col-span-4 sm:col-span-1">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Qty"
-                        min="1"
                         value={l.quantity}
-                        onChange={(e) => updateLine(idx, 'quantity', Number(e.target.value))}
-                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-right outline-none font-semibold"
+                        onChange={(e) => {
+                          const sanitized = sanitizeQuantityInput(e.target.value, 4);
+                          updateLine(idx, 'quantity', sanitized);
+                        }}
+                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-right outline-none font-semibold font-tabular-data"
                       />
                     </div>
 
@@ -363,20 +386,28 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     </div>
 
                     <div className="col-span-5 sm:col-span-1">
-                      <select
-                        value={l.gstRate}
-                        onChange={(e) => updateLine(idx, 'gstRate', Number(e.target.value))}
-                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1.5 text-xs rounded-lg text-center outline-none"
-                      >
-                        <option value={0}>0%</option>
-                        <option value={0.1}>0.1%</option>
-                        <option value={0.25}>0.25%</option>
-                        <option value={3}>3%</option>
-                        <option value={5}>5%</option>
-                        <option value={12}>12%</option>
-                        <option value={18}>18%</option>
-                        <option value={28}>28%</option>
-                      </select>
+                      {company.isCompositionScheme ? (
+                        <div
+                          className="w-full bg-surface-container border border-outline-variant/30 text-on-surface-variant px-1 py-1.5 text-xs rounded-lg text-center font-bold"
+                          title="Tax rate locked to 0% for Composition Scheme"
+                        >
+                          0%
+                        </div>
+                      ) : (
+                        <select
+                          value={l.gstRate}
+                          onChange={(e) => updateLine(idx, 'gstRate', Number(e.target.value))}
+                          className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1.5 text-xs rounded-lg text-center outline-none"
+                        >
+                          <option value={0}>0%</option>
+                          <option value={0.1}>0.1%</option>
+                          <option value={0.25}>0.25%</option>
+                          <option value={3}>3%</option>
+                          <option value={5}>5%</option>
+                          <option value={12}>12%</option>
+                          <option value={18}>18%</option>
+                        </select>
+                      )}
                     </div>
 
                     <div className="col-span-5 sm:col-span-1 font-tabular-data text-xs font-bold text-on-surface text-right">
@@ -387,6 +418,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => removeLine(idx)}
+                        aria-label="Remove item"
                         className="text-outline hover:text-error transition-colors p-1"
                       >
                         <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -418,25 +450,32 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
             <div className="flex flex-col gap-1 text-xs">
               <div className="flex justify-between text-on-surface-variant">
-                <span>Taxable Value:</span>
+                <span>{company.isCompositionScheme ? 'Subtotal (Supply Value):' : 'Taxable Value:'}</span>
                 <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalTaxableAmount)}</span>
               </div>
 
-              {calcSummary.isIntraState ? (
-                <>
+              {!company.isCompositionScheme ? (
+                calcSummary.isIntraState ? (
+                  <>
+                    <div className="flex justify-between text-on-surface-variant">
+                      <span>CGST:</span>
+                      <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalCgst)}</span>
+                    </div>
+                    <div className="flex justify-between text-on-surface-variant">
+                      <span>SGST:</span>
+                      <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalSgst)}</span>
+                    </div>
+                  </>
+                ) : (
                   <div className="flex justify-between text-on-surface-variant">
-                    <span>CGST:</span>
-                    <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalCgst)}</span>
+                    <span>IGST (Inter-State):</span>
+                    <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalIgst)}</span>
                   </div>
-                  <div className="flex justify-between text-on-surface-variant">
-                    <span>SGST:</span>
-                    <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalSgst)}</span>
-                  </div>
-                </>
+                )
               ) : (
                 <div className="flex justify-between text-on-surface-variant">
-                  <span>IGST (Inter-State):</span>
-                  <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalIgst)}</span>
+                  <span>GST (Composition 0%):</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">₹0.00</span>
                 </div>
               )}
 
@@ -446,7 +485,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               </div>
 
               <div className="flex justify-between font-bold text-base border-t border-outline-variant/30 pt-2 mt-1 text-on-surface">
-                <span>Total Invoice Value:</span>
+                <span>Total Value:</span>
                 <span className="font-currency-display text-secondary">{formatINR(calcSummary.grandTotal)}</span>
               </div>
             </div>
@@ -466,7 +505,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
               className="inline-flex items-center gap-1.5 bg-secondary text-on-secondary font-label-md text-sm font-bold px-5 py-2.5 rounded-xl shadow-md hover:bg-secondary/90 active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-[18px]">verified</span>
-              <span>Save & Generate Invoice</span>
+              <span>{company.isCompositionScheme ? 'Save & Issue Bill of Supply' : 'Save & Generate Invoice'}</span>
             </button>
           </div>
         </form>

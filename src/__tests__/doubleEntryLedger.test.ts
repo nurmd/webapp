@@ -5,6 +5,7 @@ import {
   createPurchaseInvoiceVoucher,
   createPaymentReceiptVoucher,
   createPaymentOutVoucher,
+  createRcmJournalVoucher,
 } from '@/core/accounting/ledger';
 
 describe('Suite 3: Double-Entry Vouchers & Balancing', () => {
@@ -320,5 +321,40 @@ describe('Suite 3: Double-Entry Vouchers & Balancing', () => {
     expect(voucher.entries.find((e) => e.accountId === 'ACC_CASH')?.credit).toBe(2000);
     expect(voucher.entries.find((e) => e.accountId === 'ACC_BANK')?.credit).toBe(3000);
     expect(validateVoucherBalance(voucher.entries).isBalanced).toBe(true);
+  });
+
+  it('TC-LEDG-17: createRcmJournalVoucher generates perfectly balanced double-entry voucher debiting Input RCM and crediting Output RCM', () => {
+    const voucher = createRcmJournalVoucher({
+      billId: 'PUR-RCM-01',
+      billNumber: 'PB-RCM-101',
+      date: '2026-10-15',
+      supplierName: 'GTA Freight Express',
+      supplierId: 'SUP-GTA',
+      cgstAmount: 250,
+      sgstAmount: 250,
+      igstAmount: 0,
+      cessAmount: 0,
+      totalTax: 500,
+    });
+
+    expect(voucher.voucherType).toBe('JOURNAL');
+    expect(voucher.voucherNumber).toBe('VCH-RCM-PB-RCM-101');
+    expect(voucher.totalAmount).toBe(500);
+
+    // Debits: Input Tax Credit (RCM)
+    const drCgst = voucher.entries.find((e) => e.accountId === 'ACC_INPUT_CGST_RCM');
+    const drSgst = voucher.entries.find((e) => e.accountId === 'ACC_INPUT_SGST_RCM');
+    expect(drCgst?.debit).toBe(250);
+    expect(drSgst?.debit).toBe(250);
+
+    // Credits: Output GST Payable (RCM)
+    const crCgst = voucher.entries.find((e) => e.accountId === 'ACC_OUTPUT_CGST_RCM');
+    const crSgst = voucher.entries.find((e) => e.accountId === 'ACC_OUTPUT_SGST_RCM');
+    expect(crCgst?.credit).toBe(250);
+    expect(crSgst?.credit).toBe(250);
+
+    const balanceCheck = validateVoucherBalance(voucher.entries);
+    expect(balanceCheck.isBalanced).toBe(true);
+    expect(balanceCheck.diff).toBe(0);
   });
 });

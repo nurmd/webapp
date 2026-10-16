@@ -1,11 +1,12 @@
 import React from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -26,6 +27,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   onOpenFullA4Preview,
   onPrintInvoice,
 }) => {
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+  const [showEwayThresholdWarning, setShowEwayThresholdWarning] = React.useState(false);
+
   // System back navigation (priority 25: closes preview before underlying screens)
   useBackNavigation(() => {
     onClose();
@@ -45,10 +49,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
   const handleDelete = () => {
     if (!onDeleteInvoice) return;
-    if (window.confirm(`Are you sure you want to delete Invoice #${invoice.invoiceNumber}?`)) {
-      onDeleteInvoice(invoice.id);
-      onClose();
-    }
+    setIsDeleteModalOpen(true);
   };
 
   return (
@@ -63,6 +64,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
                 onClick={handleDelete}
                 className="w-8 h-8 rounded-xl bg-error/15 text-error hover:bg-error/25 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
                 title="Delete Invoice"
+                aria-label="Delete invoice"
               >
                 <span className="material-symbols-outlined text-[18px]">delete</span>
               </button>
@@ -103,6 +105,8 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
+            title="Close"
+            aria-label="Close invoice details"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
@@ -163,7 +167,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
                         <div className="font-mono font-medium text-on-surface truncate text-center">
-                          {item.quantity} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                          {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
                         </div>
                         <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
                           @ {formatINR(item.unitPrice)}
@@ -302,10 +306,8 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
               type="button"
               onClick={() => {
                 if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
-                  const proceed = confirm(
-                    `Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`
-                  );
-                  if (!proceed) return;
+                  setShowEwayThresholdWarning(true);
+                  return;
                 }
                 downloadEWayBillJson(company, invoice);
               }}
@@ -331,6 +333,36 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Delete Invoice Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isDeleteModalOpen}
+          title="Delete Invoice?"
+          recordName={`Invoice #${invoice.invoiceNumber}`}
+          description="Are you sure you want to delete this invoice? This will restore inventory stock."
+          confirmText="Delete Invoice"
+          onConfirm={() => {
+            onDeleteInvoice?.(invoice.id);
+            onClose();
+          }}
+          onClose={() => setIsDeleteModalOpen(false)}
+        />
+      )}
+
+      {/* E-Way Bill Statutory Threshold Advisory Modal */}
+      {showEwayThresholdWarning && (
+        <ConfirmDeleteModal
+          isOpen={showEwayThresholdWarning}
+          title="Generate E-Way Bill JSON?"
+          recordName={`Invoice #${invoice.invoiceNumber}`}
+          description={`Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`}
+          confirmText="Generate JSON"
+          cancelText="Cancel"
+          onConfirm={() => downloadEWayBillJson(company, invoice)}
+          onClose={() => setShowEwayThresholdWarning(false)}
+        />
+      )}
     </div>
   );
 };

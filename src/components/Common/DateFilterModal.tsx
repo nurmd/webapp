@@ -86,6 +86,7 @@ export const DateFilterModal: React.FC<DateFilterModalProps> = ({
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+            aria-label="Close date filter"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

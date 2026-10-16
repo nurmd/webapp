@@ -4,6 +4,7 @@ import {
   printSettingsService,
   AppPrintSettings,
 } from '../../services/printSettingsService.ts';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 interface PrintSettingsViewProps {
   company: CompanyProfile;
@@ -21,6 +22,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
   const [showLivePreview, setShowLivePreview] = useState(true);
   const [savedNotice, setSavedNotice] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     // If defaultFormat is thermal, pre-select thermal tab
@@ -76,14 +78,16 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
     setTimeout(() => setSavedNotice(false), 2500);
   };
 
+  const executeReset = () => {
+    const reset = printSettingsService.resetDefaults();
+    setSettings(reset);
+    setHasUnsavedChanges(false);
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2500);
+  };
+
   const handleReset = () => {
-    if (window.confirm('Reset all print settings to recommended defaults?')) {
-      const reset = printSettingsService.resetDefaults();
-      setSettings(reset);
-      setHasUnsavedChanges(false);
-      setSavedNotice(true);
-      setTimeout(() => setSavedNotice(false), 2500);
-    }
+    setShowResetConfirm(true);
   };
 
   const a4 = settings.a4;
@@ -1076,6 +1080,22 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
             <span>Save Settings</span>
           </button>
         </div>
+      )}
+
+      {/* Reset Print Settings Confirmation Modal */}
+      {showResetConfirm && (
+        <ConfirmDeleteModal
+          isOpen={showResetConfirm}
+          title="Reset Print Settings?"
+          description="Are you sure you want to reset all print configuration back to recommended default settings?"
+          confirmText="Reset Defaults"
+          cancelText="Cancel"
+          onConfirm={() => {
+            executeReset();
+            setShowResetConfirm(false);
+          }}
+          onClose={() => setShowResetConfirm(false)}
+        />
       )}
     </div>
   );

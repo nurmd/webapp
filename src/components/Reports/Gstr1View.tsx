@@ -4,20 +4,32 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { Download, FileSpreadsheet, ShieldCheck, Calculator, BarChart3, Landmark } from 'lucide-react';
 
+import { Expense } from '../../models/expense.ts';
+import { db } from '../../services/db.ts';
+
 interface Gstr1ViewProps {
   invoices: Invoice[];
   purchases?: PurchaseBill[];
+  expenses?: Expense[];
 }
 
-export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }) => {
+export const Gstr1View: React.FC<Gstr1ViewProps> = ({
+  invoices,
+  purchases = [],
+  expenses: propExpenses,
+}) => {
+  const activeExpenses = propExpenses !== undefined ? propExpenses : db.getExpenses();
   const [activeMainTab, setActiveMainTab] = useState<'GSTR1' | 'GSTR3B' | 'PL' | 'BALANCE_SHEET'>('GSTR1');
-  const [selectedSection, setSelectedSection] = useState<'4_B2B' | '7_B2CS' | '12_HSN'>('4_B2B');
+  const [selectedSection, setSelectedSection] = useState<'4_B2B' | '7_B2CS' | '9B_CDNR' | '12_HSN'>('4_B2B');
 
   // B2B Invoices (Table 4)
   const b2bInvoices = invoices.filter((i) => i.invoiceType === 'B2B' && i.partyGstin);
 
   // B2C Small Invoices (Table 7)
-  const b2csInvoices = invoices.filter((i) => i.invoiceType === 'B2CS' || !i.partyGstin);
+  const b2csInvoices = invoices.filter((i) => (i.invoiceType === 'B2CS' || !i.partyGstin) && i.invoiceType !== 'CREDIT_NOTE' && i.invoiceType !== 'DEBIT_NOTE');
+
+  // Credit / Debit Notes (Table 9B CDNR)
+  const cdnrInvoices = invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE' || i.invoiceType === 'DEBIT_NOTE');
 
   // HSN Summary (Table 12)
   const hsnMap: Record<string, {
@@ -56,23 +68,55 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
       entry.cgst += item.cgstAmount;
       entry.sgst += item.sgstAmount;
       entry.igst += item.igstAmount;
-      entry.cess += item.cessAmount;
+      entry.cess += item.cessAmount || 0;
     }
   }
 
   const hsnSummaryList = Object.values(hsnMap);
 
   // GSTR-3B Calculations
-  const outwardTaxable = invoices.reduce((s, i) => s + i.totalTaxableAmount, 0);
-  const outwardCgst = invoices.reduce((s, i) => s + i.totalCgst, 0);
-  const outwardSgst = invoices.reduce((s, i) => s + i.totalSgst, 0);
-  const outwardIgst = invoices.reduce((s, i) => s + i.totalIgst, 0);
+  // Normal sales add to output tax; Credit notes reduce output tax, Debit notes increase output tax
+  const regularSales = invoices.filter((i) => i.invoiceType !== 'CREDIT_NOTE' && i.invoiceType !== 'DEBIT_NOTE');
+  const creditNotes = invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
+  const debitNotes = invoices.filter((i) => i.invoiceType === 'DEBIT_NOTE');
+
+  const regularOutwardTaxable = regularSales.reduce((s, i) => s + i.totalTaxableAmount, 0);
+  const cnTaxable = creditNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
+  const dnTaxable = debitNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
+  const outwardTaxable = regularOutwardTaxable + dnTaxable - cnTaxable;
+
+  const regularOutwardCgst = regularSales.reduce((s, i) => s + i.totalCgst, 0);
+  const cnCgst = creditNotes.reduce((s, i) => s + i.totalCgst, 0);
+  const dnCgst = debitNotes.reduce((s, i) => s + i.totalCgst, 0);
+  const outwardCgst = Math.max(0, regularOutwardCgst + dnCgst - cnCgst);
+
+  const regularOutwardSgst = regularSales.reduce((s, i) => s + i.totalSgst, 0);
+  const cnSgst = creditNotes.reduce((s, i) => s + i.totalSgst, 0);
+  const dnSgst = debitNotes.reduce((s, i) => s + i.totalSgst, 0);
+  const outwardSgst = Math.max(0, regularOutwardSgst + dnSgst - cnSgst);
+
+  const regularOutwardIgst = regularSales.reduce((s, i) => s + i.totalIgst, 0);
+  const cnIgst = creditNotes.reduce((s, i) => s + i.totalIgst, 0);
+  const dnIgst = debitNotes.reduce((s, i) => s + i.totalIgst, 0);
+  const outwardIgst = Math.max(0, regularOutwardIgst + dnIgst - cnIgst);
+
   const outwardTotalTax = outwardCgst + outwardSgst + outwardIgst;
 
+  // ITC from eligible Purchases
   const eligiblePurchases = purchases.filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS');
-  const itcCgst = eligiblePurchases.reduce((s, p) => s + p.totalCgst, 0);
-  const itcSgst = eligiblePurchases.reduce((s, p) => s + p.totalSgst, 0);
-  const itcIgst = eligiblePurchases.reduce((s, p) => s + p.totalIgst, 0);
+  const purchaseItcCgst = eligiblePurchases.reduce((s, p) => s + p.totalCgst, 0);
+  const purchaseItcSgst = eligiblePurchases.reduce((s, p) => s + p.totalSgst, 0);
+  const purchaseItcIgst = eligiblePurchases.reduce((s, p) => s + p.totalIgst, 0);
+
+  // ITC from eligible Business Expenses (T1.4)
+  const eligibleExpenses = activeExpenses.filter((e) => e.itcEligible && (e.taxAmount || 0) > 0);
+  const expenseItcCgst = eligibleExpenses.reduce((s, e) => s + (e.cgstAmount || 0), 0);
+  const expenseItcSgst = eligibleExpenses.reduce((s, e) => s + (e.sgstAmount || 0), 0);
+  const expenseItcIgst = eligibleExpenses.reduce((s, e) => s + (e.igstAmount || 0), 0);
+
+  const itcCgst = purchaseItcCgst + expenseItcCgst;
+  const itcSgst = purchaseItcSgst + expenseItcSgst;
+  const itcIgst = purchaseItcIgst + expenseItcIgst;
   const totalItc = itcCgst + itcSgst + itcIgst;
 
   const ineligible175Purchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_17_5');
@@ -85,12 +129,12 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
   const netIgstPayable = Math.max(0, outwardIgst - itcIgst);
   const netCashPayable = netCgstPayable + netSgstPayable + netIgstPayable;
 
-  // Profit & Loss Calculations
-  const totalSalesRevenue = invoices.reduce((s, i) => s + i.totalTaxableAmount, 0);
+  // Profit & Loss Calculations using actual expenses (T1.1)
+  const totalSalesRevenue = outwardTaxable;
   const totalCostOfPurchases = purchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
   const grossProfit = totalSalesRevenue - totalCostOfPurchases;
-  const estimatedExpenses = Math.round(totalSalesRevenue * 0.05); // Estimated utilities/rent
-  const netProfit = grossProfit - estimatedExpenses;
+  const totalActualExpenses = activeExpenses.reduce((s, e) => s + (e.taxableAmount || e.amount || 0), 0);
+  const netProfit = grossProfit - totalActualExpenses;
 
   const exportGstrJson = () => {
     const gstr1Payload = {
@@ -112,7 +156,7 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
                 camt: it.cgstAmount,
                 samt: it.sgstAmount,
                 iamt: it.igstAmount,
-                csamt: it.cessAmount,
+                csamt: it.cessAmount || 0,
               },
             })),
           },
@@ -125,6 +169,30 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
         camt: inv.totalCgst,
         samt: inv.totalSgst,
         iamt: inv.totalIgst,
+      })),
+      cdnr: cdnrInvoices.map((inv) => ({
+        ctin: inv.partyGstin || 'UR',
+        nt: [
+          {
+            ntty: inv.invoiceType === 'CREDIT_NOTE' ? 'C' : 'D',
+            nt_num: inv.invoiceNumber,
+            nt_dt: inv.date,
+            val: inv.grandTotal,
+            pos: inv.placeOfSupplyStateCode,
+            rchrg: 'N',
+            itms: inv.items.map((it, idx) => ({
+              num: idx + 1,
+              itm_det: {
+                rt: it.gstRate,
+                txval: it.taxableAmount,
+                camt: it.cgstAmount,
+                samt: it.sgstAmount,
+                iamt: it.igstAmount,
+                csamt: it.cessAmount || 0,
+              },
+            })),
+          },
+        ],
       })),
       hsn: {
         data: hsnSummaryList.map((h, idx) => ({
@@ -316,6 +384,21 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
               Table 7: B2C Small ({b2csInvoices.length})
             </button>
             <button
+              onClick={() => setSelectedSection('9B_CDNR')}
+              style={{
+                backgroundColor: selectedSection === '9B_CDNR' ? '#1d2a42' : 'transparent',
+                color: selectedSection === '9B_CDNR' ? '#60a5fa' : '#94a3b8',
+                border: '1px solid #273754',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Table 9B: CDNR Notes ({cdnrInvoices.length})
+            </button>
+            <button
               onClick={() => setSelectedSection('12_HSN')}
               style={{
                 backgroundColor: selectedSection === '12_HSN' ? '#1d2a42' : 'transparent',
@@ -399,6 +482,61 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
               </table>
             )}
 
+            {selectedSection === '9B_CDNR' && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#0a0f1d', color: '#94a3b8', borderBottom: '1px solid #273754' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Note Type</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Note #</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Date</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Party Name / GSTIN</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Taxable</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tax Amount</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total Note Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cdnrInvoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        No Credit or Debit Notes recorded in this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    cdnrInvoices.map((inv) => (
+                      <tr key={inv.id} style={{ borderBottom: '1px solid #1d2a42' }}>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span
+                            style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              backgroundColor: inv.invoiceType === 'CREDIT_NOTE' ? '#4c0519' : '#1e3a8a',
+                              color: inv.invoiceType === 'CREDIT_NOTE' ? '#fda4af' : '#93c5fd',
+                            }}
+                          >
+                            {inv.invoiceType === 'CREDIT_NOTE' ? 'Credit Note (CN)' : 'Debit Note (DN)'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#f8fafc' }}>{inv.invoiceNumber}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{formatDate(inv.date)}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>
+                          <div>{inv.partyName}</div>
+                          {inv.partyGstin && <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>{inv.partyGstin}</div>}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>{formatINR(inv.totalTaxableAmount)}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>{formatINR(inv.totalTax)}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#f8fafc' }}>
+                          {formatINR(inv.grandTotal)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+
             {selectedSection === '12_HSN' && (
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
                 <thead>
@@ -419,7 +557,7 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
                       <td style={{ padding: '0.75rem 1rem', color: '#cbd5e1' }}>{h.unit}</td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>{h.totalQty}</td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>{formatINR(h.taxableValue)}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#6cf8bb' }}>{formatINR(h.cgst + h.sgst + h.igst)}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 600, color: '#6cf8bb' }}>{formatINR(h.cgst + h.sgst + h.igst + (h.cess || 0))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -549,8 +687,8 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({ invoices, purchases = [] }
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #273754', paddingBottom: '0.4rem' }}>
-              <span style={{ color: '#94a3b8' }}>Less: Operating & Logistics Expenses</span>
-              <span style={{ color: '#ef4444' }}>-{formatINR(estimatedExpenses)}</span>
+              <span style={{ color: '#94a3b8' }}>Less: Operating Overheads &amp; Expenses ({activeExpenses.length} vouchers)</span>
+              <span style={{ color: '#ef4444' }}>-{formatINR(totalActualExpenses)}</span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: '#131b2e', padding: '0.75rem', borderRadius: '6px', border: '1px solid #273754', marginTop: '0.5rem' }}>

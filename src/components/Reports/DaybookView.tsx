@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { BookOpen, CheckCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { BookOpen, CheckCircle } from 'lucide-react';
 
 interface DaybookViewProps {
   vouchers: Voucher[];
@@ -22,57 +22,44 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
   );
 
   return (
-    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="p-4 sm:p-6 flex flex-col gap-5">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+          <h2 className="text-xl font-bold text-on-surface m-0">
             Accounting Daybook & General Ledger
           </h2>
-          <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+          <div className="text-xs sm:text-sm text-on-surface-variant">
             Automated double-entry bookkeeping journal entries
           </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: '1rem',
-          backgroundColor: '#1e293b',
-          padding: '0.5rem 1rem',
-          borderRadius: '6px',
-          border: '1px solid #334155',
-          fontSize: '0.8rem',
-        }}>
+        <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-xl border border-outline-variant/30 text-xs text-on-surface-variant flex-wrap">
           <div>
-            Total Debits: <strong style={{ color: '#60a5fa' }}>{formatINR(totalDebits)}</strong>
+            Total Debits: <strong className="text-blue-600 dark:text-blue-400 font-bold">{formatINR(totalDebits)}</strong>
           </div>
-          <div>•</div>
+          <span>•</span>
           <div>
-            Total Credits: <strong style={{ color: '#4ade80' }}>{formatINR(totalCredits)}</strong>
+            Total Credits: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatINR(totalCredits)}</strong>
           </div>
-          <div>•</div>
-          <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '3px' }}>
+          <span>•</span>
+          <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
             <CheckCircle size={13} /> Balanced
           </div>
         </div>
       </div>
 
       {/* Filter */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="flex gap-2 flex-wrap">
         {['ALL', 'SALES', 'PURCHASE', 'PAYMENT', 'RECEIPT'].map((type) => (
           <button
             key={type}
             onClick={() => setFilterType(type)}
-            style={{
-              backgroundColor: filterType === type ? '#2563eb' : '#1e293b',
-              color: filterType === type ? '#fff' : '#94a3b8',
-              border: '1px solid #334155',
-              padding: '0.4rem 0.8rem',
-              borderRadius: '6px',
-              fontSize: '0.8rem',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border ${
+              filterType === type
+                ? 'bg-primary text-on-primary border-transparent shadow-xs'
+                : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'
+            }`}
           >
             {type}
           </button>
@@ -80,65 +67,58 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
       </div>
 
       {/* Vouchers List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div className="flex flex-col gap-3">
         {filtered.length === 0 ? (
-          <div style={{ backgroundColor: '#1e293b', padding: '3rem', textAlign: 'center', color: '#94a3b8', borderRadius: '8px', border: '1px solid #334155' }}>
-            <BookOpen size={40} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
-            <div>No journal vouchers recorded yet. They are automatically created when invoices are generated.</div>
+          <div className="bg-surface-container-lowest p-8 sm:p-12 text-center text-on-surface-variant rounded-2xl border border-outline-variant/30 shadow-xs">
+            <BookOpen size={40} className="mx-auto opacity-30 mb-2" />
+            <div className="text-xs sm:text-sm">No journal vouchers recorded yet. They are automatically created when invoices are generated.</div>
           </div>
         ) : (
           filtered.map((v) => (
             <div
               key={v.id}
-              style={{
-                backgroundColor: '#1e293b',
-                borderRadius: '8px',
-                border: '1px solid #334155',
-                padding: '1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-              }}
+              className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-4 flex flex-col gap-2.5 shadow-xs"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155', paddingBottom: '0.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    backgroundColor: v.voucherType === 'SALES' ? '#1e3a8a' : '#064e3b',
-                    color: v.voucherType === 'SALES' ? '#93c5fd' : '#86efac',
-                  }}>
+              <div className="flex justify-between items-center border-b border-outline-variant/20 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                    v.voucherType === 'SALES'
+                      ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
+                      : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                  }`}>
                     {v.voucherType}
                   </span>
-                  <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.9rem' }}>{v.voucherNumber}</span>
-                  {v.referenceNo && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>(Ref: {v.referenceNo})</span>}
+                  <span className="font-bold text-on-surface text-sm">{v.voucherNumber}</span>
+                  {v.referenceNo && <span className="text-xs text-on-surface-variant">(Ref: {v.referenceNo})</span>}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                <div className="text-xs text-on-surface-variant">
                   {formatDate(v.date)}
                 </div>
               </div>
 
               {/* Journal Table */}
-              <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', marginTop: '0.25rem' }}>
+              <table className="w-full text-xs border-collapse mt-1">
                 <thead>
-                  <tr style={{ color: '#64748b', textAlign: 'left', borderBottom: '1px solid #334155' }}>
-                    <th style={{ padding: '4px 8px' }}>Ledger Account</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Debit (Dr)</th>
-                    <th style={{ padding: '4px 8px', textAlign: 'right' }}>Credit (Cr)</th>
+                  <tr className="text-on-surface-variant text-left border-b border-outline-variant/20">
+                    <th className="py-1 px-2 font-medium">Ledger Account</th>
+                    <th className="py-1 px-2 text-right font-medium">Debit (Dr)</th>
+                    <th className="py-1 px-2 text-right font-medium">Credit (Cr)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {v.entries.map((entry, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #283548' }}>
-                      <td style={{ padding: '4px 8px', color: '#cbd5e1' }}>
+                    <tr key={idx} className="border-b border-outline-variant/10">
+                      <td className="py-1.5 px-2 text-on-surface font-medium">
                         {entry.accountName}
                       </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'right', color: entry.debit > 0 ? '#60a5fa' : '#64748b' }}>
+                      <td className={`py-1.5 px-2 text-right font-bold ${
+                        entry.debit > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-on-surface-variant/40'
+                      }`}>
                         {entry.debit > 0 ? formatINR(entry.debit) : '-'}
                       </td>
-                      <td style={{ padding: '4px 8px', textAlign: 'right', color: entry.credit > 0 ? '#4ade80' : '#64748b' }}>
+                      <td className={`py-1.5 px-2 text-right font-bold ${
+                        entry.credit > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-on-surface-variant/40'
+                      }`}>
                         {entry.credit > 0 ? formatINR(entry.credit) : '-'}
                       </td>
                     </tr>
@@ -146,7 +126,7 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
                 </tbody>
               </table>
 
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginTop: '2px' }}>
+              <div className="text-xs text-on-surface-variant italic mt-0.5">
                 Narration: {v.narration}
               </div>
             </div>

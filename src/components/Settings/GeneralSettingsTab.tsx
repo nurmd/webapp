@@ -289,7 +289,7 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
               </div>
               <div className="font-body-sm text-xs text-on-surface-variant truncate mt-0.5">
                 {isGstActive
-                  ? 'Slab rates 0%, 5%, 12%, 18%, 28% • RCM & Cess Ready'
+                  ? 'Slab rates 0%, 5%, 12%, 18% • RCM & Cess Ready'
                   : 'Standard slabs dormant while GST is disabled'}
               </div>
             </div>

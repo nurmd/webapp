@@ -6,7 +6,7 @@ import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../mode
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
@@ -22,6 +22,7 @@ import { UpiQrModal } from './UpiQrModal.tsx';
 import { SplitPaymentModal } from './SplitPaymentModal.tsx';
 import { PosCheckoutSuccessModal } from './PosCheckoutSuccessModal.tsx';
 import { PosKeyboardShortcutsModal } from './PosKeyboardShortcutsModal.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 interface QuickBillingViewProps {
   company: CompanyProfile;
@@ -82,6 +83,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isMobileCartDrawerOpen, setIsMobileCartDrawerOpen] = useState(false);
   const [thermalPrintInvoice, setThermalPrintInvoice] = useState<Invoice | null>(null);
+  const [pendingResumeBill, setPendingResumeBill] = useState<HeldBill | null>(null);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
 
   // Post-sale completed invoice state
   const [completedSale, setCompletedSale] = useState<{
@@ -318,7 +321,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       removeFromCart(itemId);
       return;
     }
-    const cleanQty = Math.round(qty * 1000) / 1000;
+    const cleanQty = roundQuantity(qty, 4);
     setCart(
       cart.map((c) => (c.item.id === itemId ? { ...c, qty: cleanQty } : c))
     );
@@ -422,17 +425,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     setIsMobileCartDrawerOpen(false);
   };
 
-  const handleResumeBill = (bill: HeldBill) => {
-    if (cart.length > 0) {
-      if (
-        !window.confirm(
-          'Active cart has items. Resuming will replace current cart. Continue?'
-        )
-      ) {
-        return;
-      }
-    }
-
+  const applyResumeBill = (bill: HeldBill) => {
     setCart(bill.cart);
     setCustomer(bill.customer);
     setCartDiscountType(bill.cartDiscount.type);
@@ -444,6 +437,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     audioService.playScanSuccess();
     setScanMessage({ text: `Resumed ${bill.label}` });
     setTimeout(() => setScanMessage(null), 2500);
+  };
+
+  const handleResumeBill = (bill: HeldBill) => {
+    if (cart.length > 0) {
+      setPendingResumeBill(bill);
+      return;
+    }
+    applyResumeBill(bill);
   };
 
   const handleDiscardHeldBill = (billId: string) => {
@@ -737,6 +738,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               {search && (
                 <button
                   onClick={() => setSearch('')}
+                  aria-label="Clear search"
                   className="text-outline hover:text-on-surface ml-1 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">close</span>
@@ -1070,9 +1072,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm('Clear all items from bill?')) setCart([]);
-                  }}
+                  onClick={() => setShowClearCartConfirm(true)}
                   className="text-[11px] text-error hover:underline cursor-pointer"
                 >
                   Clear
@@ -1127,25 +1127,25 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   <div className="flex items-center gap-1 bg-surface-container-low rounded-lg p-0.5 border border-outline-variant/25">
                     <button
                       type="button"
-                      onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(3)))}
+                      onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(4)))}
                       className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       -
                     </button>
                     <input
-                      type="number"
-                      step="any"
-                      min="0.001"
+                      type="text"
+                      inputMode="decimal"
                       value={qty}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        updateCartQty(item.id, !isNaN(val) && val > 0 ? val : 0);
+                        const sanitized = sanitizeQuantityInput(e.target.value, 4);
+                        const val = parseFloat(sanitized);
+                        updateCartQty(item.id, !isNaN(val) && val > 0 ? roundQuantity(val, 4) : 0);
                       }}
-                      className="w-12 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
+                      className="w-14 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
                     />
                     <button
                       type="button"
-                      onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(3)))}
+                      onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(4)))}
                       className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       +
@@ -1412,6 +1412,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   </button>
                   <button
                     onClick={() => setIsMobileCartDrawerOpen(false)}
+                    aria-label="Close cart drawer"
                     className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-outline cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[16px]">close</span>
@@ -1450,26 +1451,27 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       {item.name}
                     </div>
                     <div className="text-[11px] text-outline mt-0.5">
-                      {formatINR(unitPrice)} × {qty} = {formatINR(unitPrice * qty)}
+                      {formatINR(unitPrice)} × {formatQuantity(qty, 4)} = {formatINR(unitPrice * qty)}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={() => updateCartQty(item.id, qty - 1)}
+                      onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(4)))}
                       className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       -
                     </button>
-                    <span className="w-5 text-center text-xs font-bold">{qty}</span>
+                    <span className="min-w-6 text-center text-xs font-bold px-1">{formatQuantity(qty, 4)}</span>
                     <button
-                      onClick={() => updateCartQty(item.id, qty + 1)}
+                      onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(4)))}
                       className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
                     >
                       +
                     </button>
                     <button
                       onClick={() => removeFromCart(item.id)}
+                      aria-label="Remove item from cart"
                       className="text-outline hover:text-error ml-1 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -1655,6 +1657,39 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             handleBarcodeScanned(code);
             setIsScannerOpen(false);
           }}
+        />
+      )}
+
+      {/* Replace Active Cart Confirmation Modal */}
+      {pendingResumeBill && (
+        <ConfirmDeleteModal
+          isOpen={!!pendingResumeBill}
+          title="Replace Active Cart?"
+          recordName={pendingResumeBill.label}
+          description="Active cart currently has items. Resuming this parked bill will replace the current cart items. Continue?"
+          confirmText="Resume Bill"
+          cancelText="Cancel"
+          onConfirm={() => {
+            applyResumeBill(pendingResumeBill);
+            setPendingResumeBill(null);
+          }}
+          onClose={() => setPendingResumeBill(null)}
+        />
+      )}
+
+      {/* Clear Cart Confirmation Modal */}
+      {showClearCartConfirm && (
+        <ConfirmDeleteModal
+          isOpen={showClearCartConfirm}
+          title="Clear Bill Items?"
+          description="Are you sure you want to clear all items from the current bill?"
+          confirmText="Clear Cart"
+          cancelText="Cancel"
+          onConfirm={() => {
+            setCart([]);
+            setShowClearCartConfirm(false);
+          }}
+          onClose={() => setShowClearCartConfirm(false)}
         />
       )}
     </div>

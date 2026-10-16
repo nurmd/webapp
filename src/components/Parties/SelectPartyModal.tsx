@@ -191,10 +191,10 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                     <span
                       className={`font-tabular-data text-xs font-bold ${
                         isReceivable
-                          ? 'text-error'
+                          ? 'text-emerald-700 dark:text-emerald-400'
                           : isPayable
-                          ? 'text-error'
-                          : 'text-on-surface-variant'
+                          ? 'text-rose-700 dark:text-rose-400'
+                          : 'text-secondary'
                       }`}
                     >
                       {formatINR(Math.abs(party.currentBalance))}
@@ -202,10 +202,10 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full mt-0.5 ${
                         isReceivable
-                          ? 'bg-error-container text-on-error-container'
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                           : isPayable
-                          ? 'bg-error-container text-on-error-container'
-                          : 'bg-surface-container text-on-surface-variant'
+                          ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                          : 'bg-secondary/10 text-secondary'
                       }`}
                     >
                       {isReceivable ? 'To Collect' : isPayable ? 'To Pay' : 'Settled'}

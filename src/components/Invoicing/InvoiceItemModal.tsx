@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
-import { formatINR } from '../../core/utils/formatters.ts';
+import { formatINR, formatQuantity, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
@@ -76,7 +76,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [description, setDescription] = useState(initialItem?.description || '');
   const [hsnSacCode, setHsnSacCode] = useState(initialItem?.hsnSacCode || defaultHsn);
   const [quantity, setQuantity] = useState<string>(
-    initialItem?.quantity !== undefined && initialItem.quantity !== null ? String(initialItem.quantity) : ''
+    initialItem?.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : ''
   );
   const [unit, setUnit] = useState<string>(initialItem?.unit || 'PCS');
   const [unitPrice, setUnitPrice] = useState<number>(initialItem?.unitPrice || 0);
@@ -136,7 +136,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setName(initialItem.name || '');
         setDescription(initialItem.description || '');
         setHsnSacCode(initialItem.hsnSacCode || defaultHsn);
-        setQuantity(initialItem.quantity !== undefined && initialItem.quantity !== null ? String(initialItem.quantity) : '');
+        setQuantity(initialItem.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : '');
         setUnit(initialItem.unit || 'PCS');
         setUnitPrice(initialItem.unitPrice || 0);
         setMrp(initialItem.mrp);
@@ -279,24 +279,21 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setIsCreateItemModalOpen(false);
   };
 
-  // Clean decimal quantity parser (0 when empty string or invalid)
+  // Clean decimal quantity parser (0 when empty string or invalid) capped at 4 decimal places
   const parsedQuantity = useMemo(() => {
     const val = parseFloat(quantity);
-    return !isNaN(val) && val > 0 ? val : 0;
+    return !isNaN(val) && val > 0 ? roundQuantity(val, 4) : 0;
   }, [quantity]);
 
   // When saving or calculating defaults: if empty string, assume 1
   const effectiveQuantity = useMemo(() => {
     if (!quantity.trim()) return 1;
     const val = parseFloat(quantity);
-    return !isNaN(val) && val > 0 ? val : 1;
+    return !isNaN(val) && val > 0 ? roundQuantity(val, 4) : 1;
   }, [quantity]);
 
   const handleQuantityChange = (valStr: string) => {
-    const sanitized = valStr.replace(/[^0-9.]/g, '');
-    const parts = sanitized.split('.');
-    const cleanVal = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
-    setQuantity(cleanVal);
+    setQuantity(sanitizeQuantityInput(valStr, 4));
   };
 
   // Live item total calculation with exact decimal discount handling
@@ -487,7 +484,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       }
     }
 
-    const qty = parsedQuantity > 0 ? parsedQuantity : 1;
+    const qty = roundQuantity(parsedQuantity > 0 ? parsedQuantity : 1, 4);
     const discAmt = calculation.discountAmount > 0 ? calculation.discountAmount : undefined;
 
     return {
@@ -621,6 +618,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     nameInputRef.current?.focus();
                   }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                  title="Clear item name"
+                  aria-label="Clear item name"
                 >
                   <span className="material-symbols-outlined text-[16px]">cancel</span>
                 </button>
@@ -638,6 +637,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     onClick={() => setIsDropdownOpen(false)}
                     className="text-on-surface-variant hover:text-on-surface cursor-pointer p-0.5"
                     title="Close suggestions"
+                    aria-label="Close suggestions"
                   >
                     <span className="material-symbols-outlined text-[15px]">close</span>
                   </button>
@@ -799,7 +799,6 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   <option value={5}>5%</option>
                   <option value={12}>12%</option>
                   <option value={18}>18% (Standard)</option>
-                  <option value={28}>28%</option>
                 </select>
               </div>
             </div>
@@ -1039,6 +1038,8 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 type="button"
                 onClick={() => setIsCreateItemModalOpen(false)}
                 className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
+                title="Close"
+                aria-label="Close add item modal"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -1144,7 +1145,6 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     <option value={5}>5%</option>
                     <option value={12}>12%</option>
                     <option value={18}>18% (Standard)</option>
-                    <option value={28}>28%</option>
                   </select>
                 </div>
               </div>

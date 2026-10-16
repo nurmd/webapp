@@ -52,6 +52,8 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-7 h-7 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline cursor-pointer"
+            title="Close"
+            aria-label="Close UPI QR modal"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>
           </button>

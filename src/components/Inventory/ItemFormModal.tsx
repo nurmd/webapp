@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
+import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
@@ -113,8 +114,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       purchasePrice: Number(purchasePrice),
       gstRate: Number(gstRate),
       cessRate: Number(cessRate) || 0,
-      currentStock: itemType === 'SERVICE' ? 9999 : Number(currentStock),
-      minStockAlert: itemType === 'SERVICE' ? 0 : Number(minStockAlert),
+      currentStock: itemType === 'SERVICE' ? 9999 : roundQuantity(Number(currentStock), 4),
+      minStockAlert: itemType === 'SERVICE' ? 0 : roundQuantity(Number(minStockAlert), 4),
       isActive: !isDisabledState,
       isDisabled: isDisabledState,
       createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
@@ -139,6 +140,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+            title="Close"
+            aria-label="Close inventory item form"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -321,8 +324,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1.5">
                     GST Tax Rate Slab
                   </label>
-                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                    {[0, 0.1, 0.25, 3, 5, 12, 18, 28].map((rate) => (
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                    {[0, 0.1, 0.25, 3, 5, 12, 18].map((rate) => (
                       <button
                         key={rate}
                         type="button"
@@ -372,7 +375,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     Current Stock
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={currentStock === 0 ? '0' : currentStock}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
@@ -380,11 +384,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                       if (val === '' || val === '-') {
                         setCurrentStock(val as unknown as number);
                       } else {
-                        const parsed = parseFloat(val);
+                        const sanitized = sanitizeQuantityInput(val, 4);
+                        const parsed = parseFloat(sanitized);
                         setCurrentStock(isNaN(parsed) ? 0 : parsed);
                       }
                     }}
-                    className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary"
+                    className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary font-tabular-data"
                   />
                 </div>
 
