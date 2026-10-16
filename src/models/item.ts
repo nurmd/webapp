@@ -1,3 +1,5 @@
+export * from './category.ts';
+
 export type UnitOfMeasurement =
   | 'PCS'
   | 'NOS'

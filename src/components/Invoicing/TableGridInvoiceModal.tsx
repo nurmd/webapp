@@ -158,7 +158,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     initialInvoice?.dueDate ||
       (() => {
         const d = new Date();
-        d.setDate(d.getDate() + 15);
+        const offset = typeof db.getDefaultDueDays === 'function' ? db.getDefaultDueDays() : 15;
+        d.setDate(d.getDate() + offset);
         return d.toISOString().split('T')[0];
       })()
   );

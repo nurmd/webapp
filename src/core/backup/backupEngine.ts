@@ -19,6 +19,7 @@ export interface DatabaseBackupCounts {
   bankAccounts: number;
   cashBankTransactions: number;
   auditLogs: number;
+  categories?: number;
 }
 
 export interface DatabaseBackupData {
@@ -33,6 +34,7 @@ export interface DatabaseBackupData {
   adjustments: StockAdjustment[];
   bankAccounts: BankAccount[];
   cashBankTransactions: CashBankTransaction[];
+  categories?: any[];
   auditLogs?: any[];
   allowNegativeStock?: boolean;
   hideBuyPrices?: boolean;

@@ -1,15 +1,15 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-16T09:02:59.575Z",
+  "buildTime": "2026-10-16T13:13:15.525Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "full functional multi-document prefix settings & remove redundant party sort pill",
-    "v1.2.0 with customer selector loop sorting & native backup enhancements",
-    "show small sort icon in customer selector without text pill to prevent vertical overflow",
-    "party customer selector loop sort by recent transaction, name, and amount (v1.1.39)",
-    "add Android storage permissions, file chooser, and native DB backup storage (v1.1.38)",
-    "bump app version to v1.1.37 with verified APK & release notes"
+    "Dedicated category management modal & item categorization under Inventory & Items",
+    "Consolidated Billing & Invoices settings with multi-document series prefix manager",
+    "Indian GST invoice settings: Composition Scheme toggle, customer balance, auto round-off",
+    "Customizable line-item columns (HSN/SAC & discount), authorised signatory, and terms presets",
+    "Fixed hidden area scrolling blocker above mobile bottom navigation bar in Items tab",
+    "Inline bank & UPI editor with live account masking and Store QR modal launcher"
   ]
 }

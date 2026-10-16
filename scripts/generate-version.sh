@@ -14,15 +14,26 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 let notes = [];
 
 try {
-  const log = execSync("git log -n 12 --pretty=format:%s", { encoding: "utf8" });
-  notes = log.split("\n")
-    .map(s => s.trim())
-    .filter(s => s && !s.startsWith("Merge") && !s.startsWith("bump") && !s.includes("subagent") && !s.includes("wip"))
-    .slice(0, 6)
-    .map(s => s.replace(/^[a-z]+(\([a-z0-9_-]+\))?:\s*/i, "").trim())
-    .filter(Boolean);
-} catch (e) {
-  console.warn("Failed to read git log:", e.message);
+  if (fs.existsSync("./public/version.json")) {
+    const existing = JSON.parse(fs.readFileSync("./public/version.json", "utf8"));
+    if (existing.version === pkg.version && Array.isArray(existing.releaseNotes) && existing.releaseNotes.length > 0) {
+      notes = existing.releaseNotes;
+    }
+  }
+} catch (_) {}
+
+if (notes.length === 0) {
+  try {
+    const log = execSync("git log -n 12 --pretty=format:%s", { encoding: "utf8" });
+    notes = log.split("\n")
+      .map(s => s.trim())
+      .filter(s => s && !s.startsWith("Merge") && !s.startsWith("bump") && !s.includes("subagent") && !s.includes("wip"))
+      .slice(0, 6)
+      .map(s => s.replace(/^[a-z]+(\([a-z0-9_-]+\))?:\s*/i, "").trim())
+      .filter(Boolean);
+  } catch (e) {
+    console.warn("Failed to read git log:", e.message);
+  }
 }
 
 if (notes.length === 0) {

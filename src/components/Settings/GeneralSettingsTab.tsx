@@ -357,6 +357,9 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
       {/* 3. Billing & Invoices Tab */}
       <BillingInvoicesTab
         profile={profile}
+        setProfile={setProfile}
+        onSave={onSave}
+        isGstActive={isGstActive}
         defaultPrintOption={defaultPrintOption}
         handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
         setIsQrModalOpen={() => {}}

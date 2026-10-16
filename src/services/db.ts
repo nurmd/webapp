@@ -1,6 +1,6 @@
 import { CompanyProfile } from '../models/company.ts';
 import { Party } from '../models/party.ts';
-import { InventoryItem, StockAdjustment, UnitOfMeasurement } from '../models/item.ts';
+import { InventoryItem, StockAdjustment, UnitOfMeasurement, ItemCategory, DEFAULT_ITEM_CATEGORIES } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { PurchaseBill } from '../models/purchase.ts';
@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
   PARTIES: 'gst_parties',
   ITEMS: 'gst_items',
+  CATEGORIES: 'gst_item_categories',
   INVOICES: 'gst_invoices',
   PURCHASES: 'gst_purchases',
   EXPENSES: 'gst_expenses',
@@ -58,6 +59,8 @@ export interface SyncedSettings {
   ewayBillThreshold?: number;
   autoWhatsAppAlerts?: boolean;
   allowNegativeStock?: boolean;
+  defaultDueDays?: number;
+  autoRoundOff?: boolean;
   updatedAt: string;
 }
 
@@ -895,6 +898,26 @@ class StorageService {
     } catch {}
   }
 
+  // Default Payment Due Days Setting for Invoices (e.g. 0, 7, 15, 30, 45)
+  getDefaultDueDays(): number {
+    const settings = this.getSettings();
+    return typeof settings.defaultDueDays === 'number' ? settings.defaultDueDays : 15;
+  }
+
+  setDefaultDueDays(days: number): void {
+    this.saveSettings({ defaultDueDays: days });
+  }
+
+  // Auto Round-Off Grand Total on Invoices
+  getAutoRoundOff(): boolean {
+    const settings = this.getSettings();
+    return typeof settings.autoRoundOff === 'boolean' ? settings.autoRoundOff : true;
+  }
+
+  setAutoRoundOff(enabled: boolean): void {
+    this.saveSettings({ autoRoundOff: enabled });
+  }
+
   // Device-local Buy Price Privacy Setting (Never synced to remote devices)
   getBuyPriceVisibility(): boolean {
     if (typeof window === 'undefined') return true;
@@ -1169,6 +1192,114 @@ class StorageService {
         this.broadcastChange('item', 'save', updated.id, updated);
       }
     }
+    this.notifyListeners();
+  }
+
+  // Categories Management
+  getCategories(): ItemCategory[] {
+    const stored = this.get<ItemCategory[] | null>(STORAGE_KEYS.CATEGORIES, null);
+    if (!stored || stored.length === 0) {
+      // Seed default categories and auto-discover any categories used in existing items
+      const existingItems = this.getItems();
+      const categoryNames = new Set(DEFAULT_ITEM_CATEGORIES.map((c) => c.name.toLowerCase()));
+      const initial = [...DEFAULT_ITEM_CATEGORIES];
+
+      for (const item of existingItems) {
+        const catName = item.category?.trim();
+        if (catName && !categoryNames.has(catName.toLowerCase())) {
+          categoryNames.add(catName.toLowerCase());
+          initial.push({
+            id: `cat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            name: catName,
+            description: `Auto-imported from catalog`,
+            color: '#64748b',
+            icon: 'category',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      this.set(STORAGE_KEYS.CATEGORIES, initial);
+      return initial;
+    }
+    return stored;
+  }
+
+  saveCategory(category: ItemCategory, renameItems: boolean = true): ItemCategory {
+    const list = this.getCategories();
+    const idx = list.findIndex((c) => c.id === category.id);
+    const prevCategory = idx >= 0 ? list[idx] : null;
+
+    let savedItem: ItemCategory;
+    if (idx >= 0) {
+      savedItem = { ...category, updatedAt: new Date().toISOString() };
+      list[idx] = savedItem;
+    } else {
+      savedItem = {
+        ...category,
+        createdAt: category.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      list.push(savedItem);
+    }
+    this.set(STORAGE_KEYS.CATEGORIES, list);
+
+    // If category name was renamed, synchronize all existing items under this category
+    if (renameItems && prevCategory && prevCategory.name !== category.name) {
+      const items = this.getItems();
+      let changed = false;
+      const updatedItems = items.map((item) => {
+        if (item.category === prevCategory.name) {
+          changed = true;
+          return { ...item, category: category.name, updatedAt: new Date().toISOString() };
+        }
+        return item;
+      });
+      if (changed) {
+        this.set(STORAGE_KEYS.ITEMS, updatedItems);
+        this.broadcastChange('item', 'save', category.id);
+      }
+    }
+
+    this.broadcastChange('category', 'save', category.id, savedItem);
+    this.notifyListeners();
+    return savedItem;
+  }
+
+  deleteCategory(id: string, reassignTo: string = 'General'): { success: boolean; affectedItems: number } {
+    const list = this.getCategories();
+    const catToDelete = list.find((c) => c.id === id);
+    if (!catToDelete) return { success: false, affectedItems: 0 };
+    if (catToDelete.isSystem) return { success: false, affectedItems: 0 };
+
+    const remaining = list.filter((c) => c.id !== id);
+    this.set(STORAGE_KEYS.CATEGORIES, remaining);
+
+    // Reassign items that belonged to this category
+    const items = this.getItems();
+    let affectedItems = 0;
+    const updatedItems = items.map((item) => {
+      if (item.category === catToDelete.name) {
+        affectedItems++;
+        return { ...item, category: reassignTo, updatedAt: new Date().toISOString() };
+      }
+      return item;
+    });
+
+    if (affectedItems > 0) {
+      this.set(STORAGE_KEYS.ITEMS, updatedItems);
+      this.broadcastChange('item', 'save', id);
+    }
+
+    this.broadcastChange('category', 'delete', id);
+    this.notifyListeners();
+    return { success: true, affectedItems };
+  }
+
+  resetCategoriesToDefault(): void {
+    this.set(STORAGE_KEYS.CATEGORIES, DEFAULT_ITEM_CATEGORIES);
+    this.broadcastChange('category', 'save', 'all');
     this.notifyListeners();
   }
 
@@ -1736,6 +1867,7 @@ class StorageService {
     const auditLogs = typeof localStorage !== 'undefined'
       ? JSON.parse(localStorage.getItem('gst_audit_logs') || '[]')
       : [];
+    const categories = this.getCategories();
     const allowNegativeStock = this.getAllowNegativeStock();
     const hideBuyPrices = !this.getBuyPriceVisibility();
 
@@ -1750,6 +1882,7 @@ class StorageService {
       bankAccounts: bankAccounts.length,
       cashBankTransactions: cashBankTransactions.length,
       auditLogs: auditLogs.length,
+      categories: categories.length,
     };
 
     const data: DatabaseBackupData = {
@@ -1764,6 +1897,7 @@ class StorageService {
       adjustments,
       bankAccounts,
       cashBankTransactions,
+      categories,
       auditLogs,
       allowNegativeStock,
       hideBuyPrices,
@@ -1877,6 +2011,10 @@ class StorageService {
     this.set(STORAGE_KEYS.ADJUSTMENTS, finalAdjustments);
     this.set(STORAGE_KEYS.BANK_ACCOUNTS, finalBankAccounts);
     this.set(STORAGE_KEYS.CASH_BANK_TXNS, finalCashBankTxns);
+    if (Array.isArray(data.categories)) {
+      const finalCategories = mergeCollection(this.getCategories(), data.categories);
+      this.set(STORAGE_KEYS.CATEGORIES, finalCategories);
+    }
 
     // 3. PouchDB Sync
     try {

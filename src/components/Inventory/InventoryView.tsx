@@ -289,7 +289,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
   const lowStockItems = items.filter((i) => i.currentStock <= i.minStockAlert);
   const lowStockCount = lowStockItems.length;
-  const categories = Array.from(new Set(items.map((i) => i.category)));
+  const categories = useMemo(() => {
+    const managed = db.getCategories().map((c) => c.name);
+    const fromItems = items.map((i) => i.category);
+    return Array.from(new Set([...managed, ...fromItems])).filter(Boolean);
+  }, [items]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -725,17 +729,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Sticky Bottom Floating Action Center */}
-        <div className="fixed bottom-20 left-0 right-0 z-40 px-margin-mobile pointer-events-none">
-          <div className="max-w-md mx-auto flex items-center justify-end pointer-events-auto">
-            <button
-              onClick={handleOpenAdd}
-              aria-label="Add New Item"
-              className="w-14 h-14 rounded-full bg-secondary text-on-secondary shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-pointer hover:opacity-95"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[30px]">add</span>
-            </button>
-          </div>
+        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+          <button
+            onClick={handleOpenAdd}
+            aria-label="Add New Item"
+            className="w-14 h-14 rounded-full bg-secondary text-on-secondary shadow-xl flex items-center justify-center active:scale-95 transition-transform cursor-pointer hover:opacity-95"
+            type="button"
+          >
+            <span className="material-symbols-outlined text-[30px]">add</span>
+          </button>
         </div>
       </div>
 

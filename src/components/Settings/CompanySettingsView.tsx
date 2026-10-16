@@ -33,6 +33,7 @@ import { DevicePairModals } from './modals/DevicePairModals.tsx';
 import { SettingsSubModal } from './modals/SettingsSubModal.tsx';
 import { DatabaseBackupModal } from './modals/DatabaseBackupModal.tsx';
 import { InvoicePrefixSettingsModal } from './modals/InvoicePrefixSettingsModal.tsx';
+import { CategoryManagementModal } from './modals/CategoryManagementModal.tsx';
 
 export type SettingsCategoryId =
   | 'business_profile'
@@ -181,6 +182,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [isDatabaseBackupModalOpen, setIsDatabaseBackupModalOpen] = useState(false);
   const [isPrefixModalOpen, setIsPrefixModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // App Update state
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
@@ -279,11 +281,16 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     isSyncConfigOpen ||
     isPrefixModalOpen ||
     isDatabaseBackupModalOpen ||
+    isCategoryModalOpen ||
     !!activeSubModal;
 
   useBackNavigation(() => {
     if (activeSubModal) {
       setActiveSubModal(null);
+      return true;
+    }
+    if (isCategoryModalOpen) {
+      setIsCategoryModalOpen(false);
       return true;
     }
     if (isPrefixModalOpen) {
@@ -732,11 +739,15 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             {selectedCategory === 'billing_invoices' && (
               <BillingInvoicesTab
                 profile={profile}
+                setProfile={setProfile}
+                onSave={onSave}
+                isGstActive={isGstActive}
                 defaultPrintOption={defaultPrintOption}
                 handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
                 setIsQrModalOpen={setIsQrModalOpen}
                 setActiveSubModal={setActiveSubModal}
                 setIsPrefixModalOpen={setIsPrefixModalOpen}
+                setIsEditProfileModalOpen={setIsEditModalOpen}
                 onNavigateToTab={(tab) => setSelectedCategory(normalizeSettingsTab(tab))}
               />
             )}
@@ -747,6 +758,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 onToggleNegativeStock={handleToggleNegativeStock}
                 showBuyPricesGlobally={showBuyPricesGlobally}
                 onToggleBuyPrices={handleToggleBuyPriceVisibility}
+                onOpenCategoryManager={() => setIsCategoryModalOpen(true)}
               />
             )}
 
@@ -880,6 +892,12 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             allowNegativeStock,
           });
         }}
+      />
+
+      {/* 8. Dedicated Item Category Management Modal */}
+      <CategoryManagementModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
       />
     </div>
   );

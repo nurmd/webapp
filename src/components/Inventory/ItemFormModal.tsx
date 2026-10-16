@@ -5,6 +5,8 @@ import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import { HsnItem } from '../../core/gst/hsnCatalog';
+import { CategorySelector } from './CategorySelector';
+import { ItemCategory } from '../../models/category.ts';
 
 export interface ItemFormModalProps {
   isOpen: boolean;
@@ -225,12 +227,21 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
                   Category
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Groceries"
+                <CategorySelector
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                  onChange={(newCategory, catObj) => {
+                    setCategory(newCategory);
+                    if (catObj) {
+                      // Apply default GST rate if item is new or still on default 18
+                      if (catObj.defaultGstRate !== undefined && (!editingItem || gstRate === 18)) {
+                        setGstRate(catObj.defaultGstRate);
+                      }
+                      // Apply default HSN if currently blank or generic default
+                      if (catObj.defaultHsn && (!hsn || hsn === '844332' || hsn === '0000')) {
+                        setHsn(catObj.defaultHsn);
+                      }
+                    }
+                  }}
                 />
               </div>
               {isGstActive && (
