@@ -392,22 +392,6 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'security_audit' }));
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('switch_audit_tab', { detail: 'party_balance' }));
-              }, 60);
-            }}
-            className="min-h-[36px] sm:min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1 bg-surface-container-lowest text-primary hover:bg-primary/10 border border-primary/30 cursor-pointer ml-auto shrink-0 active:scale-95"
-            title="Open Financial Balance Auditor"
-            aria-label="Open Financial Balance Auditor"
-          >
-            <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
-            <span>Audit Balances</span>
-          </button>
         </div>
       </section>
 
