@@ -26,16 +26,21 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
 
   // Backup State
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStepText, setExportStepText] = useState('');
   const [lastExportedFilename, setLastExportedFilename] = useState<string | null>(null);
 
   // Restore State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [parsedBundle, setParsedBundle] = useState<DatabaseBackupBundle | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [restoreMode, setRestoreMode] = useState<'REPLACE' | 'MERGE'>('REPLACE');
   const [isArmedConfirm, setIsArmedConfirm] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState(0);
+  const [restoreStepText, setRestoreStepText] = useState('');
   const [restoreSuccessNotice, setRestoreSuccessNotice] = useState<string | null>(null);
 
   // Live database snapshot for Backup view
@@ -46,16 +51,192 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleDownloadBackup = () => {
+  // Process selected file from either <input>, showOpenFilePicker, or drag-and-drop
+  const processSelectedFile = (file: File) => {
+    setValidationError(null);
+    setRestoreSuccessNotice(null);
+    setParsedBundle(null);
+    setSelectedFile(file);
+    setIsArmedConfirm(false);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const res = validateBackupBundle(text);
+        if (!res.isValid || !res.bundle) {
+          setValidationError(res.error || 'Corrupted or unsupported backup file.');
+          setParsedBundle(null);
+        } else {
+          setParsedBundle(res.bundle);
+          setValidationError(null);
+        }
+      } catch {
+        setValidationError('Failed to read backup file as JSON.');
+        setParsedBundle(null);
+      }
+    };
+
+    reader.onerror = () => {
+      setValidationError('Error reading file from disk.');
+      setParsedBundle(null);
+    };
+
+    reader.readAsText(file);
+  };
+
+  // Explicit Browse File Handler supporting Modern Web File System Access API + Fallback
+  const handleBrowseFiles = async () => {
+    if (typeof window !== 'undefined' && 'showOpenFilePicker' in window) {
+      try {
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [
+            {
+              description: 'GST Billing JSON Backup (*.json)',
+              accept: {
+                'application/json': ['.json'],
+                'text/json': ['.json'],
+                'text/plain': ['.json'],
+              },
+            },
+          ],
+          multiple: false,
+        });
+        if (handle) {
+          const file = await handle.getFile();
+          processSelectedFile(file);
+          return;
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return; // User cancelled file picker
+        // Fall back to input click if showOpenFilePicker failed
+      }
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+    // Clear input value so selecting the same file again triggers onChange
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  // Drag-and-drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+  };
+
+  // "Save To..." Handler (File System Access API Save Dialog)
+  const handleSaveToLocation = async () => {
     setIsExporting(true);
+    setExportProgress(15);
+    setExportStepText('Compiling database records & vouchers...');
+
     try {
+      const bundle = liveBackup || db.createDatabaseBackup();
+      const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
+      const jsonStr = JSON.stringify(bundle, null, 2);
+
+      setExportProgress(45);
+      setExportStepText('Verifying data integrity & FNV-1a checksum...');
+      await new Promise((r) => setTimeout(r, 200));
+
+      if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+        setExportProgress(75);
+        setExportStepText('Choose folder to save backup file...');
+
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: 'GST Billing Database Backup',
+              accept: { 'application/json': ['.json'] },
+            },
+          ],
+        });
+
+        setExportProgress(90);
+        setExportStepText('Writing backup to selected location...');
+        const writable = await handle.createWritable();
+        await writable.write(jsonStr);
+        await writable.close();
+
+        setExportProgress(100);
+        setExportStepText('Backup saved successfully!');
+        setLastExportedFilename(filename);
+        showAppToast(`Backup saved to chosen folder: ${filename}`);
+      } else {
+        // Fallback for browsers / webviews without showSaveFilePicker
+        setExportProgress(85);
+        setExportStepText('Saving backup to device Downloads...');
+        const res = db.downloadDatabaseBackup(bundle);
+        setExportProgress(100);
+        setExportStepText('Backup downloaded!');
+        setLastExportedFilename(res.filename);
+        showAppToast(`Backup saved: ${res.filename}`);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        // User cancelled the save file picker dialog
+        return;
+      }
+      showAppToast(`Save failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+        setExportStepText('');
+      }, 1200);
+    }
+  };
+
+  // Quick Direct Download Handler
+  const handleDownloadBackup = async () => {
+    setIsExporting(true);
+    setExportProgress(20);
+    setExportStepText('Gathering financial records & bills...');
+
+    try {
+      await new Promise((r) => setTimeout(r, 150));
+      setExportProgress(60);
+      setExportStepText('Generating JSON backup bundle...');
       const res = db.downloadDatabaseBackup(liveBackup || undefined);
+
+      setExportProgress(100);
+      setExportStepText('Download initiated!');
       setLastExportedFilename(res.filename);
       showAppToast(`Backup downloaded: ${res.filename}`);
     } catch (err: any) {
-      alert(`Backup download failed: ${err?.message || 'Unknown error'}`);
+      showAppToast(`Backup download failed: ${err?.message || 'Unknown error'}`);
     } finally {
-      setIsExporting(false);
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+        setExportStepText('');
+      }, 1000);
     }
   };
 
@@ -88,59 +269,36 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    setValidationError(null);
-    setRestoreSuccessNotice(null);
-    setParsedBundle(null);
-
-    if (!file) {
-      setSelectedFile(null);
-      return;
-    }
-
-    setSelectedFile(file);
-    setIsArmedConfirm(false);
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const res = validateBackupBundle(text);
-        if (!res.isValid || !res.bundle) {
-          setValidationError(res.error || 'Corrupted or unsupported backup file.');
-          setParsedBundle(null);
-        } else {
-          setParsedBundle(res.bundle);
-          setValidationError(null);
-        }
-      } catch {
-        setValidationError('Failed to read backup file as JSON.');
-        setParsedBundle(null);
-      }
-    };
-
-    reader.onerror = () => {
-      setValidationError('Error reading file from disk.');
-      setParsedBundle(null);
-    };
-
-    reader.readAsText(file);
-  };
-
   const handleExecuteRestore = async () => {
     if (!parsedBundle) return;
 
     setIsRestoring(true);
+    setRestoreProgress(10);
+    setRestoreStepText('Validating backup bundle & checksum...');
     setValidationError(null);
     setRestoreSuccessNotice(null);
 
     try {
+      await new Promise((r) => setTimeout(r, 200));
+
       // 1. Download safety backup of current data first
+      setRestoreProgress(35);
+      setRestoreStepText('Creating safety snapshot of current database...');
       db.downloadDatabaseBackup();
+      await new Promise((r) => setTimeout(r, 200));
 
       // 2. Execute restore
+      setRestoreProgress(65);
+      setRestoreStepText('Restoring invoices, items, parties & vouchers...');
       const result = await db.restoreDatabaseBackup(parsedBundle, restoreMode);
+      await new Promise((r) => setTimeout(r, 200));
+
+      setRestoreProgress(90);
+      setRestoreStepText('Syncing local offline database & audit trail...');
+      await new Promise((r) => setTimeout(r, 200));
+
+      setRestoreProgress(100);
+      setRestoreStepText('Database restored successfully!');
 
       setRestoreSuccessNotice(
         `Database restored successfully in ${restoreMode} mode! (${result.restoredCounts.invoices} invoices, ${result.restoredCounts.items} items, ${result.restoredCounts.parties} parties).`
@@ -150,7 +308,9 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     } catch (err: any) {
       setValidationError(err?.message || 'Database restore failed.');
     } finally {
-      setIsRestoring(false);
+      setTimeout(() => {
+        setIsRestoring(false);
+      }, 1000);
     }
   };
 
@@ -319,21 +479,34 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveToLocation}
+                  disabled={isExporting}
+                  className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-secondary text-on-secondary font-bold text-sm shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  title="Choose folder or location on device to save backup"
+                >
+                  <span className="material-symbols-outlined text-[20px]">save_as</span>
+                  <span>{isExporting ? 'Saving...' : 'Save To...'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={handleDownloadBackup}
                   disabled={isExporting}
-                  className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-secondary text-on-secondary font-bold text-sm shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto py-3 px-4 rounded-xl border border-secondary/40 bg-secondary/10 text-secondary hover:bg-secondary/20 font-bold text-sm active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  title="Direct download to browser default Downloads folder"
                 >
                   <span className="material-symbols-outlined text-[20px]">download</span>
-                  <span>{isExporting ? 'Generating...' : 'Download JSON Backup'}</span>
+                  <span>Quick Download</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleShareBackup}
-                  className="w-full sm:w-auto py-3 px-4 rounded-xl bg-surface-container text-on-surface font-bold text-sm hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={isExporting}
+                  className="w-full sm:w-auto py-3 px-4 rounded-xl bg-surface-container text-on-surface font-bold text-sm hover:bg-surface-container-high transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   title="Share backup via Android share sheet, WhatsApp, or Drive"
                 >
                   <span className="material-symbols-outlined text-[20px]">share</span>
@@ -341,7 +514,26 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
                 </button>
               </div>
 
-              {lastExportedFilename && (
+              {/* Export Progress Bar */}
+              {isExporting && (
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-secondary/30 flex flex-col gap-2 animate-fade-in">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="flex items-center gap-1.5 text-secondary">
+                      <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                      <span>{exportStepText || 'Creating backup...'}</span>
+                    </span>
+                    <span className="text-secondary font-mono">{exportProgress}%</span>
+                  </div>
+                  <div className="w-full bg-surface-container h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-secondary h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${exportProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {lastExportedFilename && !isExporting && (
                 <div className="p-2.5 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-xs font-medium flex items-center gap-2 animate-fade-in">
                   <span className="material-symbols-outlined text-[18px]">verified</span>
                   <span>Saved: {lastExportedFilename}</span>
@@ -353,30 +545,89 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
             <div className="flex flex-col gap-4">
               {/* File Upload Zone */}
               <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-outline-variant/40 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 hover:border-secondary transition-colors cursor-pointer bg-surface-container-low/30 text-center"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 transition-all ${
+                  isDragging
+                    ? 'border-secondary bg-secondary/15 scale-[1.01]'
+                    : 'border-outline-variant/40 bg-surface-container-low/30 hover:border-secondary/60'
+                }`}
               >
                 <div className="w-12 h-12 rounded-full bg-secondary/15 flex items-center justify-center text-secondary">
-                  <span className="material-symbols-outlined text-[28px]">upload_file</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-on-surface">
-                    {selectedFile ? selectedFile.name : 'Choose Backup File (.json)'}
+                  <span className="material-symbols-outlined text-[28px]">
+                    {selectedFile ? 'file_present' : 'folder_open'}
                   </span>
-                  <span className="text-xs text-on-surface-variant">
+                </div>
+                <div className="flex flex-col items-center text-center max-w-sm">
+                  <span className="text-sm font-bold text-on-surface truncate max-w-full">
+                    {selectedFile ? selectedFile.name : 'Choose or Drop Backup File (.json)'}
+                  </span>
+                  <span className="text-xs text-on-surface-variant mt-0.5">
                     {selectedFile
-                      ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                      : 'Click to select a GST Billing JSON backup file'}
+                      ? `${(selectedFile.size / 1024).toFixed(1)} KB • Last modified: ${new Date(selectedFile.lastModified).toLocaleDateString()}`
+                      : 'Select a GST Billing JSON backup file from device storage, Google Drive, or SD card'}
                   </span>
                 </div>
+
+                {/* Explicit Action Buttons */}
+                <div className="flex items-center gap-2 mt-1">
+                  <button
+                    type="button"
+                    onClick={handleBrowseFiles}
+                    className="py-2 px-4 rounded-xl bg-secondary text-on-secondary text-xs sm:text-sm font-bold shadow-sm hover:brightness-105 active:scale-98 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">folder_open</span>
+                    <span>{selectedFile ? 'Change Backup File' : 'Browse Backup File'}</span>
+                  </button>
+                  {selectedFile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setParsedBundle(null);
+                        setValidationError(null);
+                      }}
+                      className="py-2 px-3 rounded-xl border border-outline-variant/40 text-on-surface-variant hover:text-error hover:border-error/40 text-xs font-semibold transition-colors cursor-pointer"
+                      title="Remove selected file"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
                 <input
                   ref={fileInputRef}
+                  id="database-restore-file-input"
                   type="file"
-                  accept=".json"
+                  accept=".json,application/json,text/json,text/plain"
                   onChange={handleFileChange}
                   className="hidden"
                 />
               </div>
+
+              {/* Restore Progress Bar */}
+              {isRestoring && (
+                <div className="p-4 rounded-xl bg-secondary/10 border border-secondary/30 flex flex-col gap-2.5 animate-fade-in">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="flex items-center gap-2 text-secondary">
+                      <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
+                      <span>{restoreStepText || 'Restoring database...'}</span>
+                    </span>
+                    <span className="text-secondary font-mono font-bold">{restoreProgress}%</span>
+                  </div>
+                  <div className="w-full bg-surface-container h-2.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-secondary h-full transition-all duration-300 rounded-full"
+                      style={{ width: `${restoreProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                    <span>Do not close this window while restoring...</span>
+                    <span>Safe Mode Active</span>
+                  </div>
+                </div>
+              )}
 
               {/* Validation Error Banner */}
               {validationError && (
@@ -387,7 +638,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
               )}
 
               {/* Restore Success Banner */}
-              {restoreSuccessNotice && (
+              {restoreSuccessNotice && !isRestoring && (
                 <div className="p-3 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-xs font-semibold flex items-center gap-2 animate-fade-in">
                   <span className="material-symbols-outlined text-[20px] flex-shrink-0">check_circle</span>
                   <span>{restoreSuccessNotice}</span>
