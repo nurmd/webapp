@@ -869,17 +869,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {filteredActivities.length} of {allActivities.length}
               </span>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onNavigateTab('sales')}
-                className="text-secondary text-xs font-bold inline-flex items-center gap-0.5 hover:underline cursor-pointer"
-              >
-                <span>Sales Hub</span>
-                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-              </button>
-            </div>
           </div>
 
           {/* Real-Time Live Search Input (R2) */}
