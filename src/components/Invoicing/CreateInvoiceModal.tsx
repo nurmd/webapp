@@ -8,7 +8,8 @@ import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
 import { db } from '../../services/db.ts';
-import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
+import { DocumentSeriesType } from '../../models/company.ts';
 
 interface CreateInvoiceModalProps {
   company: CompanyProfile;
@@ -144,9 +145,20 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       };
     });
 
+    const docType: DocumentSeriesType =
+      invoiceType === 'ESTIMATE'
+        ? 'ESTIMATE'
+        : invoiceType === 'DELIVERY_CHALLAN'
+        ? 'DELIVERY_CHALLAN'
+        : invoiceType === 'CREDIT_NOTE'
+        ? 'CREDIT_NOTE'
+        : invoiceType === 'DEBIT_NOTE'
+        ? 'DEBIT_NOTE'
+        : 'SALES_INVOICE';
+
     const newInvoice: Invoice = {
       id: 'INV-' + Date.now(),
-      invoiceNumber: generateNextInvoiceNumber(company.invoicePrefix || 'INV-', db.getInvoices()),
+      invoiceNumber: generateNextDocumentNumber(docType, company, db.getInvoices()),
       invoiceType: company.isCompositionScheme ? 'B2CS' : invoiceType,
       date: invoiceDate,
       partyId: selectedPartyId,

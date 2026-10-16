@@ -272,21 +272,6 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
               </span>
               <span>With Balance Only</span>
             </button>
-
-            {/* Quick Sort Loop Pill */}
-            <button
-              type="button"
-              onClick={filterType === 'CUSTOMER' ? handleCustomerClick : handleSupplierClick}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-xs shadow-sm transition-all cursor-pointer bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
-              title={`Click to cycle sort: ${sortMode === 'RECENT' ? 'Recent Transactions' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
-            >
-              <span className="material-symbols-outlined text-[13px]">
-                {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-              </span>
-              <span className="hidden sm:inline">
-                {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
-              </span>
-            </button>
           </div>
         </div>
 

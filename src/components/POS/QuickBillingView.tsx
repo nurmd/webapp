@@ -11,7 +11,7 @@ import { hardwareScanner, audioService } from '../../services/barcodeService.ts'
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { db } from '../../services/db.ts';
-import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 import { PosCartItem, PosCustomerState, HeldBill } from './types.ts';
@@ -573,8 +573,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
-      invoiceNumber: generateNextInvoiceNumber(
-        company.invoicePrefix || 'POS-',
+      invoiceNumber: generateNextDocumentNumber(
+        'POS_INVOICE',
+        company,
         db.getInvoices()
       ),
       invoiceType: isB2bInvoice ? 'B2B' : 'B2CS',
@@ -654,8 +655,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   };
 
   const previewInvoiceNumber = useMemo(() => {
-    return generateNextInvoiceNumber(company.invoicePrefix || 'POS-', db.getInvoices());
-  }, [company.invoicePrefix, completedSale]);
+    return generateNextDocumentNumber('POS_INVOICE', company, db.getInvoices());
+  }, [company.documentSeries, company.invoicePrefix, completedSale]);
 
   return (
     <div className="flex flex-col md:grid md:grid-cols-12 h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden bg-surface pb-20 md:pb-0 select-none">

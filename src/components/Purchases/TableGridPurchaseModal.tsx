@@ -12,7 +12,7 @@ import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
 import { db } from '../../services/db.ts';
-import { generateNextInvoiceNumber } from '../../core/utils/invoiceNumber.ts';
+import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { roundQuantity } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { PurchaseHeaderMeta } from './components/PurchaseHeaderMeta.tsx';
@@ -118,7 +118,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   // Bill metadata
   const [billNumber, setBillNumber] = useState<string>(() => {
     if (initialBill?.billNumber) return initialBill.billNumber;
-    return generateNextInvoiceNumber('PB-', db.getPurchases().map((p) => ({ ...p, invoiceNumber: p.billNumber } as any)));
+    const purchaseList = db.getPurchases().map((p) => ({ id: p.id, invoiceNumber: p.billNumber }));
+    return generateNextDocumentNumber('PURCHASE_BILL', company, purchaseList);
   });
   const [billDate, setBillDate] = useState<string>(
     initialBill ? initialBill.date : new Date().toISOString().split('T')[0]

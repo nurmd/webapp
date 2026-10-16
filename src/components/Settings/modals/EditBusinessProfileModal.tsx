@@ -178,13 +178,18 @@ export const EditBusinessProfileModal: React.FC<EditBusinessProfileModalProps> =
             </div>
 
             <div>
-              <label className="font-bold text-on-surface block mb-1">Invoice Numbering Prefix</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-on-surface">Default Sales Invoice Prefix</label>
+                <span className="text-[10px] text-outline">
+                  Configure all 8 document types in Billing Settings
+                </span>
+              </div>
               <input
                 type="text"
-                placeholder="e.g. INV-2024-"
+                placeholder="e.g. INV-2026-"
                 value={profile.invoicePrefix || ''}
                 onChange={(e) => setProfile({ ...profile, invoicePrefix: e.target.value.trim() })}
-                className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-medium outline-none"
+                className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/30 text-xs font-mono font-bold outline-none focus:border-secondary"
               />
             </div>
           </div>

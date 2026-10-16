@@ -9,6 +9,7 @@ export interface SettingsSubModalProps {
   profile: CompanyProfile;
   defaultPrintOption: string;
   handleDefaultPrintOptionChange: (option: string) => void;
+  onOpenPrefixModal?: () => void;
 }
 
 export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
@@ -19,6 +20,7 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
   profile,
   defaultPrintOption,
   handleDefaultPrintOptionChange,
+  onOpenPrefixModal,
 }) => {
   if (!activeSubModal) return null;
 
@@ -166,15 +168,23 @@ export const SettingsSubModal: React.FC<SettingsSubModalProps> = ({
           )}
 
           {activeSubModal === 'prefix_series' && (
-            <>
-              <p className="font-semibold text-on-surface">Invoice Numbering Configuration:</p>
-              <p>
-                Current series starts with: <code>{profile.invoicePrefix || 'INV-2024-'}</code> followed by 4-digit incremental counters.
+            <div className="space-y-3">
+              <p className="font-semibold text-on-surface">Invoice Numbering &amp; Document Series:</p>
+              <p className="text-xs text-on-surface-variant">
+                Active series starts with: <code>{profile.invoicePrefix || 'INV-2026-'}</code>.
               </p>
-              <p>
-                You can change your custom invoice prefix anytime via the <strong>Edit Profile</strong> button.
-              </p>
-            </>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSubModal(null);
+                  onOpenPrefixModal?.();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-secondary text-on-secondary text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer hover:bg-secondary/90 transition-all"
+              >
+                <span className="material-symbols-outlined text-[16px]">tune</span>
+                <span>Open Full Series Configurator</span>
+              </button>
+            </div>
           )}
 
           {activeSubModal === 'whatsapp_alerts' && (

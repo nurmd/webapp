@@ -524,21 +524,6 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
-
-          {/* Quick Sort Toggle Loop Pill */}
-          <button
-            type="button"
-            onClick={activeSegment === 'CUSTOMERS' ? handleCustomersClick : handleSuppliersClick}
-            className="min-h-[36px] sm:min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
-            title={`Click to cycle sort: ${sortMode === 'RECENT' ? 'Recent Transactions' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}`}
-          >
-            <span className="material-symbols-outlined text-[15px]">
-              {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
-            </span>
-            <span className="hidden sm:inline">
-              {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
-            </span>
-          </button>
         </div>
       </section>
 

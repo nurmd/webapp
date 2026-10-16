@@ -1,5 +1,10 @@
 import React from 'react';
 import { CompanyProfile } from '../../../models/company.ts';
+import {
+  formatDocumentNumberPreview,
+  getDocumentSeriesConfig,
+  getFinancialYearString,
+} from '../../../core/utils/invoiceNumber.ts';
 
 export interface BillingInvoicesTabProps {
   profile: CompanyProfile;
@@ -7,6 +12,7 @@ export interface BillingInvoicesTabProps {
   handleDefaultPrintOptionChange: (opt: string) => void;
   setIsQrModalOpen: (open: boolean) => void;
   setActiveSubModal: (modal: string | null) => void;
+  setIsPrefixModalOpen?: (open: boolean) => void;
   onNavigateToTab?: (tab: string) => void;
 }
 
@@ -16,8 +22,27 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
   handleDefaultPrintOptionChange,
   setIsQrModalOpen,
   setActiveSubModal,
+  setIsPrefixModalOpen,
   onNavigateToTab,
 }) => {
+  const salesCfg = getDocumentSeriesConfig(profile, 'SALES_INVOICE');
+  const posCfg = getDocumentSeriesConfig(profile, 'POS_INVOICE');
+  const estCfg = getDocumentSeriesConfig(profile, 'ESTIMATE');
+  const cnCfg = getDocumentSeriesConfig(profile, 'CREDIT_NOTE');
+
+  const salesPreview = formatDocumentNumberPreview(salesCfg, salesCfg.startingNumber || 1);
+  const posPreview = formatDocumentNumberPreview(posCfg, posCfg.startingNumber || 1);
+  const estPreview = formatDocumentNumberPreview(estCfg, estCfg.startingNumber || 1);
+  const cnPreview = formatDocumentNumberPreview(cnCfg, cnCfg.startingNumber || 1);
+
+  const handleOpenPrefixSettings = () => {
+    if (setIsPrefixModalOpen) {
+      setIsPrefixModalOpen(true);
+    } else {
+      setActiveSubModal('prefix_series');
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* 1. Invoice Prefix & Numbering Series Card */}
@@ -28,33 +53,57 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
               <span className="material-symbols-outlined text-[22px]">tag</span>
             </div>
             <div>
-              <h3 className="font-label-md text-sm font-bold text-on-surface">Invoice Numbering &amp; Prefix</h3>
-              <p className="font-body-sm text-[11px] text-on-surface-variant">Sequential financial series &amp; POS billing formats</p>
+              <h3 className="font-label-md text-sm font-bold text-on-surface">Invoice Numbering &amp; Prefix Series</h3>
+              <p className="font-body-sm text-[11px] text-on-surface-variant">Custom prefixes, fiscal years &amp; sequence counters across all billing documents</p>
             </div>
           </div>
           <span className="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold">
-            FY 2026-27 Active
+            FY {getFinancialYearString()} Active
           </span>
         </div>
 
-        <div className="bg-surface-container-low/70 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div>
-            <span className="text-on-surface-variant font-medium block">Active Invoice Prefix:</span>
-            <span className="font-mono text-sm font-bold text-secondary">
-              {profile.invoicePrefix || 'INV-2026-'}
-            </span>
-            <p className="text-[11px] text-on-surface-variant mt-0.5">
-              Auto-increments sequentially: {profile.invoicePrefix || 'INV-2026-'}0001, {profile.invoicePrefix || 'INV-2026-'}0002
+        {/* Multi-Series Quick Overview Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="bg-surface-container-low/70 rounded-xl p-2.5 flex flex-col gap-0.5 border border-outline-variant/20">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Tax Invoice</span>
+            <span className="font-mono text-xs font-extrabold text-secondary truncate">{salesPreview}</span>
+            <span className="text-[9px] text-outline">B2B / B2C Standard</span>
+          </div>
+
+          <div className="bg-surface-container-low/70 rounded-xl p-2.5 flex flex-col gap-0.5 border border-outline-variant/20">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">POS Counter</span>
+            <span className="font-mono text-xs font-extrabold text-primary truncate">{posPreview}</span>
+            <span className="text-[9px] text-outline">Quick Cash Receipt</span>
+          </div>
+
+          <div className="bg-surface-container-low/70 rounded-xl p-2.5 flex flex-col gap-0.5 border border-outline-variant/20">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Estimate</span>
+            <span className="font-mono text-xs font-extrabold text-secondary truncate">{estPreview}</span>
+            <span className="text-[9px] text-outline">Quotation / Proforma</span>
+          </div>
+
+          <div className="bg-surface-container-low/70 rounded-xl p-2.5 flex flex-col gap-0.5 border border-outline-variant/20">
+            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Credit Note</span>
+            <span className="font-mono text-xs font-extrabold text-error truncate">{cnPreview}</span>
+            <span className="text-[9px] text-outline">GST Table 9B</span>
+          </div>
+        </div>
+
+        <div className="bg-surface-container-low/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="space-y-0.5">
+            <span className="text-on-surface font-semibold block">Full Functional Multi-Document Control</span>
+            <p className="text-[11px] text-on-surface-variant">
+              Customize prefixes, delimiters (-, /, .), FY formats, padding digits, and starting counters for 8 document types.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => setActiveSubModal('prefix_series')}
-            className="px-3.5 py-2 rounded-xl bg-surface-container text-on-surface text-xs font-bold hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer"
+            onClick={handleOpenPrefixSettings}
+            className="px-4 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold hover:bg-secondary/90 transition-all shadow-xs flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer active:scale-95 shrink-0"
           >
-            <span className="material-symbols-outlined text-[16px] text-secondary">edit</span>
-            <span>Configure Series</span>
+            <span className="material-symbols-outlined text-[16px]">tune</span>
+            <span>Configure Prefix Series</span>
           </button>
         </div>
       </section>

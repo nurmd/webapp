@@ -18,6 +18,7 @@ import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
 import { db } from '../../services/db.ts';
 import {
   generateNextInvoiceNumber,
+  generateNextDocumentNumber,
   findConflictingInvoice,
 } from '../../core/utils/invoiceNumber.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -140,7 +141,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
     if (initialInvoice?.invoiceNumber) return initialInvoice.invoiceNumber;
     const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
-    return generateNextInvoiceNumber(company.invoicePrefix || 'INV-', invs);
+    return generateNextDocumentNumber('SALES_INVOICE', company, invs);
   });
   const [isInvoiceNumberModalOpen, setIsInvoiceNumberModalOpen] = useState(false);
   const [invoiceConflictError, setInvoiceConflictError] = useState<string | null>(null);

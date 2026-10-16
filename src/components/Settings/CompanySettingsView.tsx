@@ -32,6 +32,7 @@ import { StoreQrModal } from './modals/StoreQrModal.tsx';
 import { DevicePairModals } from './modals/DevicePairModals.tsx';
 import { SettingsSubModal } from './modals/SettingsSubModal.tsx';
 import { DatabaseBackupModal } from './modals/DatabaseBackupModal.tsx';
+import { InvoicePrefixSettingsModal } from './modals/InvoicePrefixSettingsModal.tsx';
 
 export type SettingsCategoryId =
   | 'business_profile'
@@ -179,6 +180,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [isDatabaseBackupModalOpen, setIsDatabaseBackupModalOpen] = useState(false);
+  const [isPrefixModalOpen, setIsPrefixModalOpen] = useState(false);
 
   // App Update state
   const [isUpdateChecking, setIsUpdateChecking] = useState(false);
@@ -275,11 +277,21 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     isImportProfileModalOpen ||
     isUpdateModalOpen ||
     isSyncConfigOpen ||
+    isPrefixModalOpen ||
+    isDatabaseBackupModalOpen ||
     !!activeSubModal;
 
   useBackNavigation(() => {
     if (activeSubModal) {
       setActiveSubModal(null);
+      return true;
+    }
+    if (isPrefixModalOpen) {
+      setIsPrefixModalOpen(false);
+      return true;
+    }
+    if (isDatabaseBackupModalOpen) {
+      setIsDatabaseBackupModalOpen(false);
       return true;
     }
     if (isEditModalOpen) {
@@ -724,6 +736,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
                 setIsQrModalOpen={setIsQrModalOpen}
                 setActiveSubModal={setActiveSubModal}
+                setIsPrefixModalOpen={setIsPrefixModalOpen}
                 onNavigateToTab={(tab) => setSelectedCategory(normalizeSettingsTab(tab))}
               />
             )}
@@ -829,6 +842,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         profile={profile}
         defaultPrintOption={defaultPrintOption}
         handleDefaultPrintOptionChange={handleDefaultPrintOptionChange}
+        onOpenPrefixModal={() => setIsPrefixModalOpen(true)}
       />
 
       {/* 5. App Auto-Update Modal */}
@@ -846,6 +860,25 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           const fresh = db.getCompany();
           setProfile(fresh);
           onSave(fresh);
+        }}
+      />
+
+      {/* 7. Full Functional Document Numbering & Prefix Settings Modal */}
+      <InvoicePrefixSettingsModal
+        isOpen={isPrefixModalOpen}
+        onClose={() => setIsPrefixModalOpen(false)}
+        profile={profile}
+        onSave={(updated) => {
+          setProfile(updated);
+          onSave(updated);
+          db.saveCompany(updated);
+          db.syncAllSettingsAcrossDevices({
+            company: updated,
+            isGstEnabled: isGstActive,
+            appLanguage,
+            isAppLockEnabled,
+            allowNegativeStock,
+          });
         }}
       />
     </div>
