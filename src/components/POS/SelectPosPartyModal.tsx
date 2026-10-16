@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
@@ -23,6 +23,8 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
   const isGstActive = db.getCompany().isGstEnabled !== false;
   const [search, setSearch] = useState('');
   const [isAddingNew, setIsAddingNew] = useState(false);
+  // Party Sort Mode: loops RECENT -> NAME -> AMOUNT -> RECENT on repeated clicks
+  const [sortMode, setSortMode] = useState<'RECENT' | 'NAME' | 'AMOUNT'>('RECENT');
 
   // New Party Form State
   const [newName, setNewName] = useState('');
@@ -31,6 +33,64 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
   const [newStateCode, setNewStateCode] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [gstinError, setGstinError] = useState<string | null>(null);
+
+  // Precomputed lookup map of latest transaction timestamp against each party
+  const partyLatestTxMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const invList = db.getInvoices();
+    const purList = db.getPurchases();
+    const vchList = db.getVouchers();
+
+    for (const p of parties) {
+      let latest = 0;
+      if (p.updatedAt) {
+        const t = new Date(p.updatedAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      if (p.createdAt) {
+        const t = new Date(p.createdAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      map.set(p.id, latest);
+    }
+
+    const checkAndUpdate = (pId?: string, pName?: string, dateStr?: string, createdStr?: string) => {
+      const d = dateStr ? new Date(dateStr).getTime() : 0;
+      const c = createdStr ? new Date(createdStr).getTime() : 0;
+      const txTime = Math.max(isNaN(d) ? 0 : d, isNaN(c) ? 0 : c);
+      if (txTime <= 0) return;
+
+      if (pId && map.has(pId)) {
+        if (txTime > (map.get(pId) || 0)) {
+          map.set(pId, txTime);
+        }
+      } else if (pName) {
+        const trimmed = pName.trim().toLowerCase();
+        for (const p of parties) {
+          if (p.name && p.name.trim().toLowerCase() === trimmed) {
+            if (txTime > (map.get(p.id) || 0)) {
+              map.set(p.id, txTime);
+            }
+          }
+        }
+      }
+    };
+
+    for (const inv of invList) {
+      checkAndUpdate(inv.partyId, inv.partyName, inv.date, inv.createdAt);
+    }
+    for (const pur of purList) {
+      checkAndUpdate(pur.supplierId, pur.supplierName, pur.date, (pur as any).createdAt);
+    }
+    for (const vch of vchList) {
+      checkAndUpdate((vch as any).partyId, (vch as any).partyName, vch.date, vch.createdAt);
+      for (const entry of vch.entries || []) {
+        checkAndUpdate(entry.accountId, entry.accountName, vch.date, vch.createdAt);
+      }
+    }
+
+    return map;
+  }, [parties]);
 
   if (!isOpen) return null;
 
@@ -44,6 +104,32 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
       (p.gstin && p.gstin.toLowerCase().includes(q))
     );
   });
+
+  const sortedCustomers = [...filtered].sort((a, b) => {
+    if (sortMode === 'NAME') {
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    }
+    if (sortMode === 'AMOUNT') {
+      const diff = Math.abs(b.currentBalance || 0) - Math.abs(a.currentBalance || 0);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    }
+    // Default: RECENT (Latest transaction against party)
+    const timeA = partyLatestTxMap.get(a.id) || 0;
+    const timeB = partyLatestTxMap.get(b.id) || 0;
+    if (timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+
+  const handleCycleSort = () => {
+    setSortMode((prev) => {
+      if (prev === 'RECENT') return 'NAME';
+      if (prev === 'NAME') return 'AMOUNT';
+      return 'RECENT';
+    });
+  };
 
   const handleGstinChange = (val: string) => {
     const upper = val.toUpperCase().trim();
@@ -275,14 +361,34 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
               )}
             </div>
 
+            {/* Registered Customers Header & Sort Loop Toggle */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                Customers ({customerParties.length})
+              </span>
+              <button
+                type="button"
+                onClick={handleCycleSort}
+                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-xs transition-all cursor-pointer bg-surface-container-low text-secondary hover:bg-secondary/15 border border-secondary/30 active:scale-95"
+                title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+              >
+                <span className="material-symbols-outlined text-[13px]">
+                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+                </span>
+                <span>
+                  {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
+                </span>
+              </button>
+            </div>
+
             {/* Customers List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[45vh]">
-              {filtered.length === 0 ? (
+              {sortedCustomers.length === 0 ? (
                 <div className="text-center py-8 text-outline text-xs">
                   {search ? 'No customer matched your search.' : 'No customer parties registered yet.'}
                 </div>
               ) : (
-                filtered.map((party) => {
+                sortedCustomers.map((party) => {
                   const isSelected = selectedParty?.id === party.id;
                   const balance = party.currentBalance || 0;
                   return (

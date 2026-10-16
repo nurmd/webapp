@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
@@ -20,6 +20,94 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'CUSTOMER' | 'SUPPLIER'>('ALL');
   const [filterBalanceOnly, setFilterBalanceOnly] = useState(false);
+  // Party Sort Mode: loops RECENT -> NAME -> AMOUNT -> RECENT on repeated clicks when active
+  const [sortMode, setSortMode] = useState<'RECENT' | 'NAME' | 'AMOUNT'>('RECENT');
+
+  // Precomputed lookup map of latest transaction timestamp against each party
+  const partyLatestTxMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const invList = db.getInvoices();
+    const purList = db.getPurchases();
+    const vchList = db.getVouchers();
+
+    for (const p of parties) {
+      let latest = 0;
+      if (p.updatedAt) {
+        const t = new Date(p.updatedAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      if (p.createdAt) {
+        const t = new Date(p.createdAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      map.set(p.id, latest);
+    }
+
+    const checkAndUpdate = (pId?: string, pName?: string, dateStr?: string, createdStr?: string) => {
+      const d = dateStr ? new Date(dateStr).getTime() : 0;
+      const c = createdStr ? new Date(createdStr).getTime() : 0;
+      const txTime = Math.max(isNaN(d) ? 0 : d, isNaN(c) ? 0 : c);
+      if (txTime <= 0) return;
+
+      if (pId && map.has(pId)) {
+        if (txTime > (map.get(pId) || 0)) {
+          map.set(pId, txTime);
+        }
+      } else if (pName) {
+        const trimmed = pName.trim().toLowerCase();
+        for (const p of parties) {
+          if (p.name && p.name.trim().toLowerCase() === trimmed) {
+            if (txTime > (map.get(p.id) || 0)) {
+              map.set(p.id, txTime);
+            }
+          }
+        }
+      }
+    };
+
+    for (const inv of invList) {
+      checkAndUpdate(inv.partyId, inv.partyName, inv.date, inv.createdAt);
+    }
+    for (const pur of purList) {
+      checkAndUpdate(pur.supplierId, pur.supplierName, pur.date, (pur as any).createdAt);
+    }
+    for (const vch of vchList) {
+      checkAndUpdate((vch as any).partyId, (vch as any).partyName, vch.date, vch.createdAt);
+      for (const entry of vch.entries || []) {
+        checkAndUpdate(entry.accountId, entry.accountName, vch.date, vch.createdAt);
+      }
+    }
+
+    return map;
+  }, [parties]);
+
+  const handleCustomerClick = () => {
+    if (filterType !== 'CUSTOMER') {
+      // Normal behavior: select Customer filter and default to latest transaction
+      setFilterType('CUSTOMER');
+      setSortMode('RECENT');
+    } else {
+      // Selector already active: cycle sort mode in a loop: RECENT -> NAME -> AMOUNT -> RECENT
+      setSortMode((prev) => {
+        if (prev === 'RECENT') return 'NAME';
+        if (prev === 'NAME') return 'AMOUNT';
+        return 'RECENT';
+      });
+    }
+  };
+
+  const handleSupplierClick = () => {
+    if (filterType !== 'SUPPLIER') {
+      setFilterType('SUPPLIER');
+      setSortMode('RECENT');
+    } else {
+      setSortMode((prev) => {
+        if (prev === 'RECENT') return 'NAME';
+        if (prev === 'NAME') return 'AMOUNT';
+        return 'RECENT';
+      });
+    }
+  };
 
   const filtered = parties
     .filter((p) => {
@@ -33,8 +121,28 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
       const matchesBalance = filterBalanceOnly ? p.currentBalance !== 0 : true;
 
       return matchesSearch && matchesType && matchesBalance;
-    })
-    .sort((a, b) => Math.abs(b.currentBalance) - Math.abs(a.currentBalance));
+    });
+
+  // Sorted parties according to active sort mode (Default: latest transaction against party)
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortMode === 'NAME') {
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      if (sortMode === 'AMOUNT') {
+        const diff = Math.abs(b.currentBalance) - Math.abs(a.currentBalance);
+        if (diff !== 0) return diff;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      // Default: RECENT (Latest transaction against the party)
+      const timeA = partyLatestTxMap.get(a.id) || 0;
+      const timeB = partyLatestTxMap.get(b.id) || 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+  }, [filtered, sortMode, partyLatestTxMap]);
 
   const customersCount = parties.filter((p) => p.type === 'CUSTOMER').length;
   const suppliersCount = parties.filter((p) => p.type === 'SUPPLIER').length;
@@ -72,7 +180,10 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
           <div className="flex items-center p-1 bg-surface-container-low rounded-xl gap-1">
             <button
               type="button"
-              onClick={() => setFilterType('ALL')}
+              onClick={() => {
+                setFilterType('ALL');
+                setSortMode('RECENT');
+              }}
               className={`flex-1 py-1.5 px-space-sm rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer ${
                 filterType === 'ALL'
                   ? 'bg-surface-container-lowest text-primary shadow-sm'
@@ -83,25 +194,51 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setFilterType('CUSTOMER')}
+              onClick={handleCustomerClick}
               className={`flex-1 py-1.5 px-space-sm rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer ${
                 filterType === 'CUSTOMER'
                   ? 'bg-surface-container-lowest text-secondary shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
+              title={
+                filterType === 'CUSTOMER'
+                  ? `Active Customer Selector — Press again to cycle sort: ${sortMode === 'RECENT' ? 'Recent Tx → Name' : sortMode === 'NAME' ? 'Name → Amount' : 'Amount → Recent Tx'}`
+                  : 'Show Customers'
+              }
             >
-              Customers ({customersCount})
+              <span>Customers ({customersCount})</span>
+              {filterType === 'CUSTOMER' && (
+                <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-secondary/15 text-secondary font-semibold">
+                  <span className="material-symbols-outlined text-[11px]">
+                    {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+                  </span>
+                  <span>{sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}</span>
+                </span>
+              )}
             </button>
             <button
               type="button"
-              onClick={() => setFilterType('SUPPLIER')}
+              onClick={handleSupplierClick}
               className={`flex-1 py-1.5 px-space-sm rounded-lg text-center font-label-md text-xs font-bold transition-all cursor-pointer ${
                 filterType === 'SUPPLIER'
                   ? 'bg-surface-container-lowest text-primary shadow-sm'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
+              title={
+                filterType === 'SUPPLIER'
+                  ? `Active Supplier Selector — Press again to cycle sort: ${sortMode === 'RECENT' ? 'Recent Tx → Name' : sortMode === 'NAME' ? 'Name → Amount' : 'Amount → Recent Tx'}`
+                  : 'Show Suppliers'
+              }
             >
-              Suppliers ({suppliersCount})
+              <span>Suppliers ({suppliersCount})</span>
+              {filterType === 'SUPPLIER' && (
+                <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1 py-0.2 rounded bg-primary/15 text-primary font-semibold">
+                  <span className="material-symbols-outlined text-[11px]">
+                    {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+                  </span>
+                  <span>{sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}</span>
+                </span>
+              )}
             </button>
           </div>
 
@@ -135,12 +272,27 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
               </span>
               <span>With Balance Only</span>
             </button>
+
+            {/* Quick Sort Loop Pill */}
+            <button
+              type="button"
+              onClick={filterType === 'CUSTOMER' ? handleCustomerClick : handleSupplierClick}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-xs shadow-sm transition-all cursor-pointer bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
+              title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+            >
+              <span className="material-symbols-outlined text-[13px]">
+                {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+              </span>
+              <span>
+                {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
+              </span>
+            </button>
           </div>
         </div>
 
         {/* Parties List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[50vh]">
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="py-8 text-center text-on-surface-variant text-xs flex flex-col items-center gap-2">
               <span className="material-symbols-outlined text-[32px] text-outline">group_off</span>
               <p>No parties matching your filter criteria.</p>
@@ -153,7 +305,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
               </button>
             </div>
           ) : (
-            filtered.map((party) => {
+            sorted.map((party) => {
               const isReceivable = party.currentBalance > 0;
               const isPayable = party.currentBalance < 0;
 

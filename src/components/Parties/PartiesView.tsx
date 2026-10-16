@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -63,10 +63,101 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   // Segmented switch: Customers vs Suppliers (Simplified clean layout)
   const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>(initialSegment);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>(initialStatusFilter);
+  // Party Sort Mode: loops RECENT -> NAME -> AMOUNT -> RECENT on repeated clicks when active
+  const [sortMode, setSortMode] = useState<'RECENT' | 'NAME' | 'AMOUNT'>('RECENT');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyForLedger, setSelectedPartyForLedger] = useState<Party | null>(null);
+
+  // Precomputed lookup map of latest transaction timestamp against each party
+  const partyLatestTxMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const invList = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+    const purList = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+    const vchList = allVouchers;
+
+    for (const p of parties) {
+      let latest = 0;
+      if (p.updatedAt) {
+        const t = new Date(p.updatedAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      if (p.createdAt) {
+        const t = new Date(p.createdAt).getTime();
+        if (!isNaN(t) && t > latest) latest = t;
+      }
+      map.set(p.id, latest);
+    }
+
+    const checkAndUpdate = (pId?: string, pName?: string, dateStr?: string, createdStr?: string) => {
+      const d = dateStr ? new Date(dateStr).getTime() : 0;
+      const c = createdStr ? new Date(createdStr).getTime() : 0;
+      const txTime = Math.max(isNaN(d) ? 0 : d, isNaN(c) ? 0 : c);
+      if (txTime <= 0) return;
+
+      if (pId && map.has(pId)) {
+        if (txTime > (map.get(pId) || 0)) {
+          map.set(pId, txTime);
+        }
+      } else if (pName) {
+        const trimmed = pName.trim().toLowerCase();
+        for (const p of parties) {
+          if (p.name && p.name.trim().toLowerCase() === trimmed) {
+            if (txTime > (map.get(p.id) || 0)) {
+              map.set(p.id, txTime);
+            }
+          }
+        }
+      }
+    };
+
+    for (const inv of invList) {
+      checkAndUpdate(inv.partyId, inv.partyName, inv.date, inv.createdAt);
+    }
+    for (const pur of purList) {
+      checkAndUpdate(pur.supplierId, pur.supplierName, pur.date, (pur as any).createdAt);
+    }
+    for (const vch of vchList) {
+      checkAndUpdate((vch as any).partyId, (vch as any).partyName, vch.date, vch.createdAt);
+      for (const entry of vch.entries || []) {
+        checkAndUpdate(entry.accountId, entry.accountName, vch.date, vch.createdAt);
+      }
+    }
+
+    return map;
+  }, [parties, invoices, purchases, allVouchers]);
+
+  // Click handlers for Customer & Supplier selectors with loop sorting when active
+  const handleCustomersClick = () => {
+    if (activeSegment !== 'CUSTOMERS') {
+      // Normal behavior: switch segment & reset default sort to latest transaction
+      setActiveSegment('CUSTOMERS');
+      setStatusFilter('ALL');
+      setSortMode('RECENT');
+    } else {
+      // Selector is already active: cycle sort mode in a loop: RECENT -> NAME -> AMOUNT -> RECENT
+      setSortMode((prev) => {
+        if (prev === 'RECENT') return 'NAME';
+        if (prev === 'NAME') return 'AMOUNT';
+        return 'RECENT';
+      });
+    }
+  };
+
+  const handleSuppliersClick = () => {
+    if (activeSegment !== 'SUPPLIERS') {
+      setActiveSegment('SUPPLIERS');
+      setStatusFilter('ALL');
+      setSortMode('RECENT');
+    } else {
+      setSortMode((prev) => {
+        if (prev === 'RECENT') return 'NAME';
+        if (prev === 'NAME') return 'AMOUNT';
+        return 'RECENT';
+      });
+    }
+  };
 
   // Sync segment and status filter if parent props change (e.g. from Dashboard click)
   useEffect(() => {
@@ -138,6 +229,27 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     }
     return true;
   });
+
+  // Sorted parties according to active sort mode (Default: latest transaction against party)
+  const sortedParties = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortMode === 'NAME') {
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      if (sortMode === 'AMOUNT') {
+        const balDiff = Math.abs(b.currentBalance) - Math.abs(a.currentBalance);
+        if (balDiff !== 0) return balDiff;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      // Default: RECENT (Latest transaction against the party)
+      const timeA = partyLatestTxMap.get(a.id) || 0;
+      const timeB = partyLatestTxMap.get(b.id) || 0;
+      if (timeB !== timeA) {
+        return timeB - timeA;
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+  }, [filtered, sortMode, partyLatestTxMap]);
 
   const handleOpenAddModal = () => {
     setEditingParty(null);
@@ -283,40 +395,64 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         <div className="bg-surface-container/70 p-1 rounded-xl flex items-center shadow-xs">
           <button
             type="button"
-            onClick={() => {
-              setActiveSegment('CUSTOMERS');
-              setStatusFilter('ALL');
-            }}
+            onClick={handleCustomersClick}
             className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'CUSTOMERS'
                 ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
+            title={
+              activeSegment === 'CUSTOMERS'
+                ? `Active Customer Selector — Press again to cycle sort: ${sortMode === 'RECENT' ? 'Recent Tx → Name' : sortMode === 'NAME' ? 'Name → Amount' : 'Amount → Recent Tx'}`
+                : 'Switch to Customers'
+            }
           >
             <span className="material-symbols-outlined text-[16px] text-secondary">groups</span>
             <span>Customers</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary/10 text-secondary font-bold">
               {customers.length}
             </span>
+            {activeSegment === 'CUSTOMERS' && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-secondary/15 text-secondary font-semibold transition-all">
+                <span className="material-symbols-outlined text-[12px]">
+                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+                </span>
+                <span>
+                  {sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}
+                </span>
+              </span>
+            )}
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              setActiveSegment('SUPPLIERS');
-              setStatusFilter('ALL');
-            }}
+            onClick={handleSuppliersClick}
             className={`flex-1 min-h-[40px] py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer text-xs font-bold active:scale-95 ${
               activeSegment === 'SUPPLIERS'
                 ? 'bg-surface-container-lowest shadow-xs text-on-surface'
                 : 'text-on-surface-variant hover:text-on-surface font-medium'
             }`}
+            title={
+              activeSegment === 'SUPPLIERS'
+                ? `Active Supplier Selector — Press again to cycle sort: ${sortMode === 'RECENT' ? 'Recent Tx → Name' : sortMode === 'NAME' ? 'Name → Amount' : 'Amount → Recent Tx'}`
+                : 'Switch to Suppliers'
+            }
           >
             <span className="material-symbols-outlined text-[16px] text-primary">local_shipping</span>
             <span>Suppliers</span>
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-primary/10 text-primary font-bold">
               {suppliers.length}
             </span>
+            {activeSegment === 'SUPPLIERS' && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-primary/15 text-primary font-semibold transition-all">
+                <span className="material-symbols-outlined text-[12px]">
+                  {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+                </span>
+                <span>
+                  {sortMode === 'RECENT' ? 'Recent' : sortMode === 'NAME' ? 'Name' : 'Amount'}
+                </span>
+              </span>
+            )}
           </button>
         </div>
       </section>
@@ -392,12 +528,27 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
+
+          {/* Quick Sort Toggle Loop Pill */}
+          <button
+            type="button"
+            onClick={activeSegment === 'CUSTOMERS' ? handleCustomersClick : handleSuppliersClick}
+            className="min-h-[36px] sm:min-h-[38px] px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 bg-surface-container-lowest text-secondary hover:bg-secondary/10 border border-secondary/30 ml-auto shrink-0"
+            title="Click to cycle sort: Recent Transactions → Name (A-Z) → Amount"
+          >
+            <span className="material-symbols-outlined text-[15px]">
+              {sortMode === 'RECENT' ? 'schedule' : sortMode === 'NAME' ? 'sort_by_alpha' : 'payments'}
+            </span>
+            <span>
+              {sortMode === 'RECENT' ? 'Recent Tx' : sortMode === 'NAME' ? 'Name (A-Z)' : 'Amount'}
+            </span>
+          </button>
         </div>
       </section>
 
       {/* 4. Streamlined Passbook-Style Simplified Parties Feed */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        {filtered.length === 0 ? (
+        {sortedParties.length === 0 ? (
           <div className="md:col-span-2 bg-surface-container-lowest rounded-xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
             <span className="material-symbols-outlined text-[32px] text-outline mb-1">
               person_off
@@ -408,7 +559,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             </p>
           </div>
         ) : (
-          filtered.map((party) => {
+          sortedParties.map((party) => {
             const isReceivable = party.currentBalance > 0;
             const isPayable = party.currentBalance < 0;
             const isSettled = party.currentBalance === 0;
@@ -435,7 +586,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
+                      <span data-testid="party-card-name" className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
                         {party.name}
                       </span>
                       {isGstActive && party.gstin && (

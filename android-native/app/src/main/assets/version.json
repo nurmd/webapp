@@ -1,15 +1,15 @@
 {
-  "version": "1.1.38",
+  "version": "1.1.39",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-16T07:40:06.562Z",
+  "buildTime": "2026-10-16T08:00:29.679Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "add Android storage permissions, file chooser, and native DB backup storage (v1.1.38)",
     "bump app version to v1.1.37 with verified APK & release notes",
     "remove sales hub link from business activity timeline header",
     "remove audit buttons from parties and items views (audits centralized under Security & Audit tab)",
     "simplify dashboard transaction filters to single-line dropdowns and complete database backup restore UX",
-    "prevent sidepanel drawer navigation on browser from resetting to dashboard",
-    "offline database backup & restore, decimal precision, payment discounts, and compliance (v1.1.36)"
+    "prevent sidepanel drawer navigation on browser from resetting to dashboard"
   ]
 }
