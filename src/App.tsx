@@ -1061,6 +1061,7 @@ export const App: React.FC = () => {
             expenses={expenses}
             items={items}
             parties={parties}
+            vouchers={vouchers}
           />
         )}
 

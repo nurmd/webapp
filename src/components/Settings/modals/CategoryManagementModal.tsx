@@ -7,6 +7,7 @@ import {
 import { db } from '../../../services/db.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../../services/toast.ts';
+import { ConfirmDeleteModal } from '../../Common/ConfirmDeleteModal.tsx';
 
 export interface CategoryManagementModalProps {
   isOpen: boolean;
@@ -19,7 +20,24 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   onClose,
   onCategoriesUpdated,
 }) => {
-  useBackNavigation(onClose, isOpen, 45);
+  // Reset Confirmation State
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Delete Confirmation State
+  const [deletingCat, setDeletingCat] = useState<ItemCategory | null>(null);
+  const [reassignTarget, setReassignTarget] = useState('General');
+
+  useBackNavigation(() => {
+    if (showResetConfirm) {
+      setShowResetConfirm(false);
+      return;
+    }
+    if (deletingCat) {
+      setDeletingCat(null);
+      return;
+    }
+    onClose();
+  }, isOpen, 45);
 
   const [categories, setCategories] = useState<ItemCategory[]>(() => db.getCategories());
   const [searchQuery, setSearchQuery] = useState('');
@@ -34,10 +52,6 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   const [formGstRate, setFormGstRate] = useState<string>('NONE');
   const [formHsn, setFormHsn] = useState('');
   const [formError, setFormError] = useState('');
-
-  // Delete Confirmation State
-  const [deletingCat, setDeletingCat] = useState<ItemCategory | null>(null);
-  const [reassignTarget, setReassignTarget] = useState('General');
 
   // Compute item count per category from live catalog
   const items = useMemo(() => db.getItems(), [isOpen, categories]);
@@ -147,12 +161,15 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
     setDeletingCat(null);
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset categories to default industry presets? Custom categories will be refreshed.')) {
-      db.resetCategoriesToDefault();
-      showAppToast('Categories reset to standard presets.');
-      reloadCategories();
-    }
+  const handleOpenResetConfirm = () => {
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = () => {
+    db.resetCategoriesToDefault();
+    showAppToast('Categories reset to standard presets.');
+    reloadCategories();
+    setShowResetConfirm(false);
   };
 
   const filteredCategories = useMemo(() => {
@@ -229,8 +246,9 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
             </button>
             <button
               type="button"
-              onClick={handleResetDefaults}
+              onClick={handleOpenResetConfirm}
               title="Reset to standard categories"
+              aria-label="Reset to standard categories"
               className="p-2 rounded-xl border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">restart_alt</span>
@@ -612,6 +630,17 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
           </button>
         </div>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={showResetConfirm}
+        title="Reset Categories to Defaults?"
+        description="Are you sure you want to reset categories to default industry presets? Custom categories will be refreshed."
+        confirmText="Reset Presets"
+        cancelText="Cancel"
+        onConfirm={handleConfirmReset}
+        onClose={() => setShowResetConfirm(false)}
+      />
     </div>
   );
 };
