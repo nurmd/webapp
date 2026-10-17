@@ -1081,8 +1081,16 @@ class StorageService {
         (inv) => !inv.isCancelled && (inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm))
       );
       partyInvoices.forEach((inv) => {
+        // Estimates, Sales Orders, and Delivery Challans do not post to accounting balances
+        if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
+          return;
+        }
         const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
-        balance += unpaid;
+        if (inv.invoiceType === 'CREDIT_NOTE') {
+          balance -= unpaid; // Credit Note reduces customer receivable
+        } else {
+          balance += unpaid;
+        }
       });
 
       // Check for unallocated/advance receipt vouchers
@@ -1106,8 +1114,16 @@ class StorageService {
         (pur) => pur.supplierId === party.id || (pur.supplierName && pur.supplierName.trim().toLowerCase() === partyNameNorm)
       );
       partyPurchases.forEach((pur) => {
+        // Purchase Orders do not affect vendor payable balances
+        if (pur.purchaseType === 'PO') {
+          return;
+        }
         const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
-        balance -= unpaid;
+        if (pur.purchaseType === 'RETURN') {
+          balance += unpaid; // Purchase Return Debit Note reduces supplier payable
+        } else {
+          balance -= unpaid; // Normal purchase bill increases supplier payable
+        }
       });
 
       // Check for unallocated/advance payment out vouchers
@@ -1339,13 +1355,25 @@ class StorageService {
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
     // Update stock levels via pure domain stockEngine
-    const allowNegativeStock = this.getAllowNegativeStock();
-    const currentItems = this.getItems();
-    const updatedItems = prevInvoice
-      ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items, allowNegativeStock)
-      : applyInvoiceStockDecrement(currentItems, invoice.items, allowNegativeStock);
+    const isQuoteOrOrder = invoice.invoiceType === 'ESTIMATE' || invoice.invoiceType === 'SALES_ORDER';
+    const isCreditNote = invoice.invoiceType === 'CREDIT_NOTE';
+    if (!isQuoteOrOrder) {
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const currentItems = this.getItems();
+      let updatedItems: InventoryItem[];
+      if (isCreditNote) {
+        // Sales Return / Credit Note: restores returned goods to inventory
+        updatedItems = prevInvoice
+          ? revertInvoiceStockAdjustment(currentItems, invoice.items, prevInvoice.items, allowNegativeStock)
+          : restoreInvoiceStock(currentItems, invoice.items);
+      } else {
+        updatedItems = prevInvoice
+          ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items, allowNegativeStock)
+          : applyInvoiceStockDecrement(currentItems, invoice.items, allowNegativeStock);
+      }
 
-    this.persistStockUpdates(currentItems, updatedItems);
+      this.persistStockUpdates(currentItems, updatedItems);
+    }
 
     const targetPartyId =
       invoice.partyId ||
@@ -1408,9 +1436,12 @@ class StorageService {
     this.broadcastChange('invoice', 'delete', id);
 
     // Restore stock upon invoice deletion via pure domain stockEngine
-    if (inv) {
+    if (inv && inv.invoiceType !== 'ESTIMATE' && inv.invoiceType !== 'SALES_ORDER') {
       const currentItems = this.getItems();
-      const updatedItems = restoreInvoiceStock(currentItems, inv.items);
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const updatedItems = inv.invoiceType === 'CREDIT_NOTE'
+        ? applyInvoiceStockDecrement(currentItems, inv.items, allowNegativeStock)
+        : restoreInvoiceStock(currentItems, inv.items);
       this.persistStockUpdates(currentItems, updatedItems);
     }
 
@@ -1463,40 +1494,54 @@ class StorageService {
     pouch.putDoc('purchase', bill);
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
-    // Increase stock levels and update purchase prices via pure domain stockEngine
-    const allowNegativeStock = this.getAllowNegativeStock();
-    const currentItems = this.getItems();
-    const updatedItems = prevBill
-      ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
-      : applyPurchaseStockIncrement(currentItems, bill.items);
-
-    // Auto-register any brand new purchased items not yet in catalog
-    const finalItems = [...updatedItems];
-    for (const line of bill.items) {
-      const exists = findMatchingItem(finalItems, line);
-      if (!exists && line.name && line.name.trim()) {
-        const newId = line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        line.itemId = newId;
-        const newItem: InventoryItem = {
-          id: newId,
-          name: line.name.trim(),
-          hsnSacCode: line.hsnSacCode || '844332',
-          category: 'General',
-          unit: (line.unit as UnitOfMeasurement) || 'PCS',
-          salePrice: Number(((line.unitPrice || 0) * 1.2).toFixed(2)),
-          purchasePrice: line.unitPrice || 0,
-          gstRate: line.gstRate || 0,
-          currentStock: Math.max(0, line.quantity || 0),
-          minStockAlert: 5,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        finalItems.push(newItem);
+    // Adjust stock levels and update purchase prices via pure domain stockEngine
+    const isPo = bill.purchaseType === 'PO';
+    const isReturn = bill.purchaseType === 'RETURN';
+    if (!isPo) {
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const currentItems = this.getItems();
+      let updatedItems: InventoryItem[];
+      if (isReturn) {
+        // Purchase Return / Debit Note: deducts returned items from inventory
+        updatedItems = prevBill
+          ? revertPurchaseStockAdjustment(currentItems, bill.items, prevBill.items, allowNegativeStock)
+          : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+      } else {
+        updatedItems = prevBill
+          ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
+          : applyPurchaseStockIncrement(currentItems, bill.items);
       }
-    }
 
-    this.persistStockUpdates(currentItems, finalItems);
+      // Auto-register any brand new purchased items not yet in catalog (only for regular inward bills)
+      const finalItems = [...updatedItems];
+      if (!isReturn) {
+        for (const line of bill.items) {
+          const exists = findMatchingItem(finalItems, line);
+          if (!exists && line.name && line.name.trim()) {
+            const newId = line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            line.itemId = newId;
+            const newItem: InventoryItem = {
+              id: newId,
+              name: line.name.trim(),
+              hsnSacCode: line.hsnSacCode || '844332',
+              category: 'General',
+              unit: (line.unit as UnitOfMeasurement) || 'PCS',
+              salePrice: Number(((line.unitPrice || 0) * 1.2).toFixed(2)),
+              purchasePrice: line.unitPrice || 0,
+              gstRate: line.gstRate || 0,
+              currentStock: Math.max(0, line.quantity || 0),
+              minStockAlert: 5,
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            finalItems.push(newItem);
+          }
+        }
+      }
+
+      this.persistStockUpdates(currentItems, finalItems);
+    }
 
     const targetSupplierId =
       bill.supplierId ||
@@ -1583,10 +1628,12 @@ class StorageService {
     }
 
     // Revert stock upon bill deletion via pure domain stockEngine
-    if (bill) {
+    if (bill && bill.purchaseType !== 'PO') {
       const allowNegativeStock = this.getAllowNegativeStock();
       const currentItems = this.getItems();
-      const updatedItems = applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+      const updatedItems = bill.purchaseType === 'RETURN'
+        ? applyPurchaseStockIncrement(currentItems, bill.items)
+        : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
       this.persistStockUpdates(currentItems, updatedItems);
     }
 

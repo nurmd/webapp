@@ -29,6 +29,7 @@ interface TableGridPurchaseModalProps {
   itemsCatalog: InventoryItem[];
   initialBill?: PurchaseBill | null;
   initialSupplier?: Party | null;
+  defaultPurchaseType?: 'BILL' | 'PO' | 'RETURN';
   onClose: () => void;
   onSave: (bill: PurchaseBill) => void;
   onAddNewParty?: () => void;
@@ -51,6 +52,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   itemsCatalog,
   initialBill,
   initialSupplier,
+  defaultPurchaseType,
   onClose,
   onSave,
   onAddNewParty,
@@ -119,7 +121,13 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const [billNumber, setBillNumber] = useState<string>(() => {
     if (initialBill?.billNumber) return initialBill.billNumber;
     const purchaseList = db.getPurchases().map((p) => ({ id: p.id, invoiceNumber: p.billNumber }));
-    return generateNextDocumentNumber('PURCHASE_BILL', company, purchaseList);
+    const docSeries: any =
+      defaultPurchaseType === 'PO'
+        ? 'PURCHASE_ORDER'
+        : defaultPurchaseType === 'RETURN'
+        ? 'DEBIT_NOTE'
+        : 'PURCHASE_BILL';
+    return generateNextDocumentNumber(docSeries, company, purchaseList);
   });
   const [billDate, setBillDate] = useState<string>(
     initialBill ? initialBill.date : new Date().toISOString().split('T')[0]
@@ -480,6 +488,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     const newBill: PurchaseBill = {
       id: initialBill ? initialBill.id : `PUR-${Date.now()}`,
       billNumber: billNumber.trim() || `PB-${Date.now().toString().slice(-4)}`,
+      purchaseType: initialBill?.purchaseType || defaultPurchaseType || 'BILL',
       supplierId: selectedSupplier?.id || '',
       supplierName: selectedSupplier?.name || 'General Supplier',
       supplierGstin: isGstActive ? selectedSupplier?.gstin : undefined,

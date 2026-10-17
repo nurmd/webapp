@@ -64,7 +64,12 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
       category: 'Transactions',
       items: [
         { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
+        { id: 'quotations', label: 'Quotations / Estimates', icon: 'request_quote' },
+        { id: 'sales_orders', label: 'Sale Orders', icon: 'assignment' },
+        { id: 'sales_returns', label: 'Sale Returns (CN)', icon: 'assignment_return' },
         { id: 'purchases', label: 'Purchases & Bills', icon: 'shopping_bag' },
+        { id: 'purchase_orders', label: 'Purchase Orders', icon: 'add_shopping_cart' },
+        { id: 'purchase_returns', label: 'Purchase Returns (DN)', icon: 'assignment_turned_in' },
         { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
         { id: 'inventory', label: 'Inventory & Stock', icon: 'inventory_2' },
       ],

@@ -2,10 +2,12 @@ export type DocumentSeriesType =
   | 'SALES_INVOICE'    // Standard B2B / B2C Tax Invoice
   | 'POS_INVOICE'      // Retail POS / Counter Cash Memo
   | 'ESTIMATE'         // Quotation / Proforma / Estimate
+  | 'SALES_ORDER'      // Sales Order
   | 'DELIVERY_CHALLAN' // Delivery Challan / Job Work
   | 'CREDIT_NOTE'      // Credit Note (GST Table 9B)
   | 'DEBIT_NOTE'       // Debit Note (GST Table 9B)
   | 'PURCHASE_BILL'    // Purchase Invoices
+  | 'PURCHASE_ORDER'   // Purchase Order
   | 'PAYMENT_RECEIPT'; // Cash / Bank Receipt Voucher
 
 export type SeriesYearFormat = 'NONE' | 'YYYY' | 'YY_YY';

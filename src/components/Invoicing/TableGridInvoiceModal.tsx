@@ -40,6 +40,7 @@ interface TableGridInvoiceModalProps {
   initialInvoice?: Invoice | null;
   initialParty?: Party | null;
   existingInvoices?: Invoice[];
+  defaultInvoiceType?: InvoiceType;
   onClose: () => void;
   onSave: (invoice: Invoice, options?: { openPrint?: boolean }) => void;
   onAddNewParty?: () => void;
@@ -53,6 +54,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   initialInvoice,
   initialParty,
   existingInvoices,
+  defaultInvoiceType,
   onClose,
   onSave,
   onAddNewParty,
@@ -141,7 +143,19 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
     if (initialInvoice?.invoiceNumber) return initialInvoice.invoiceNumber;
     const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
-    return generateNextDocumentNumber('SALES_INVOICE', company, invs);
+    const docSeries: any =
+      defaultInvoiceType === 'ESTIMATE'
+        ? 'ESTIMATE'
+        : defaultInvoiceType === 'SALES_ORDER'
+        ? 'SALES_ORDER'
+        : defaultInvoiceType === 'DELIVERY_CHALLAN'
+        ? 'DELIVERY_CHALLAN'
+        : defaultInvoiceType === 'CREDIT_NOTE'
+        ? 'CREDIT_NOTE'
+        : defaultInvoiceType === 'DEBIT_NOTE'
+        ? 'DEBIT_NOTE'
+        : 'SALES_INVOICE';
+    return generateNextDocumentNumber(docSeries, company, invs);
   });
   const [isInvoiceNumberModalOpen, setIsInvoiceNumberModalOpen] = useState(false);
   const [invoiceConflictError, setInvoiceConflictError] = useState<string | null>(null);
@@ -173,7 +187,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   // Invoice Type manual override state (null defaults to auto-detected)
   const [manualInvoiceType, setManualInvoiceType] = useState<InvoiceType | null>(
-    () => initialInvoice?.invoiceType || null
+    () => initialInvoice?.invoiceType || defaultInvoiceType || null
   );
 
   // Reverse Charge Mechanism (RCM) state

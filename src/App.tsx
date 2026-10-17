@@ -4,7 +4,7 @@ import { pouch } from './services/pouchdb.ts';
 import { CompanyProfile } from './models/company.ts';
 import { Party } from './models/party.ts';
 import { InventoryItem, StockAdjustment } from './models/item.ts';
-import { Invoice, PaymentSplit, PaymentMode } from './models/invoice.ts';
+import { Invoice, PaymentSplit, PaymentMode, InvoiceType } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
 import { Expense } from './models/expense.ts';
 import { Voucher } from './core/accounting/voucherTypes.ts';
@@ -69,6 +69,21 @@ const SalesHubView = React.lazy(() =>
 );
 const QuickBillingView = React.lazy(() =>
   import('./components/POS/QuickBillingView.tsx').then((m) => ({ default: m.QuickBillingView }))
+);
+const QuotationsEstimatesView = React.lazy(() =>
+  import('./components/Sales/QuotationsEstimatesView.tsx').then((m) => ({ default: m.QuotationsEstimatesView }))
+);
+const SalesOrdersView = React.lazy(() =>
+  import('./components/Orders/SalesOrdersView.tsx').then((m) => ({ default: m.SalesOrdersView }))
+);
+const SalesReturnsView = React.lazy(() =>
+  import('./components/Returns/SalesReturnsView.tsx').then((m) => ({ default: m.SalesReturnsView }))
+);
+const PurchaseOrdersView = React.lazy(() =>
+  import('./components/Orders/PurchaseOrdersView.tsx').then((m) => ({ default: m.PurchaseOrdersView }))
+);
+const PurchaseReturnsView = React.lazy(() =>
+  import('./components/Returns/PurchaseReturnsView.tsx').then((m) => ({ default: m.PurchaseReturnsView }))
 );
 
 // Heavy Modals (Dynamic Code-Splitting with named-export unwrapping)
@@ -169,6 +184,8 @@ export const App: React.FC = () => {
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
+  const [invoiceModalDefaultType, setInvoiceModalDefaultType] = useState<InvoiceType | undefined>(undefined);
+  const [purchaseModalDefaultType, setPurchaseModalDefaultType] = useState<'BILL' | 'PO' | 'RETURN' | undefined>(undefined);
 
   // Declarative Confirm Delete Modal State
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -441,6 +458,48 @@ export const App: React.FC = () => {
   const handleEditPurchase = (bill: PurchaseBill) => {
     setEditingPurchase(bill);
     setSelectedSupplierForPurchase(null);
+    setIsTableGridPurchaseOpen(true);
+  };
+
+  const handleOpenNewInvoice = () => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(null);
+    setInvoiceModalDefaultType(undefined);
+    setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleOpenNewQuotation = () => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(null);
+    setInvoiceModalDefaultType('ESTIMATE');
+    setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleOpenNewSalesOrder = () => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(null);
+    setInvoiceModalDefaultType('SALES_ORDER');
+    setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleOpenNewSalesReturn = () => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(null);
+    setInvoiceModalDefaultType('CREDIT_NOTE');
+    setIsTableGridInvoiceOpen(true);
+  };
+
+  const handleOpenNewPurchaseOrder = () => {
+    setEditingPurchase(null);
+    setSelectedSupplierForPurchase(null);
+    setPurchaseModalDefaultType('PO');
+    setIsTableGridPurchaseOpen(true);
+  };
+
+  const handleOpenNewPurchaseReturn = () => {
+    setEditingPurchase(null);
+    setSelectedSupplierForPurchase(null);
+    setPurchaseModalDefaultType('RETURN');
     setIsTableGridPurchaseOpen(true);
   };
 
@@ -876,10 +935,7 @@ export const App: React.FC = () => {
         company={company}
         activeUser={activeUser}
         onSelectTab={handleSelectTab}
-        onNewInvoice={() => {
-          setEditingInvoice(null);
-          setIsTableGridInvoiceOpen(true);
-        }}
+        onNewInvoice={handleOpenNewInvoice}
         onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
         onCheckUpdate={() => handleCheckUpdate(true)}
         hasUpdate={hasUpdate}
@@ -894,7 +950,7 @@ export const App: React.FC = () => {
             company={company}
             activeUser={activeUser}
             onOpenDrawer={() => setIsDrawerOpen(true)}
-            onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
+            onNewInvoice={handleOpenNewInvoice}
             onSearchClick={() => handleSelectTab('menu')}
             onBarcodeClick={() => handleSelectTab('pos')}
             onProfileClick={() => setIsRoleSwitchOpen(true)}
@@ -929,10 +985,7 @@ export const App: React.FC = () => {
             expenses={expenses}
             items={activeItems}
             parties={parties}
-            onNewInvoice={() => {
-              setEditingInvoice(null);
-              setIsTableGridInvoiceOpen(true);
-            }}
+            onNewInvoice={handleOpenNewInvoice}
             onQuickPos={() => setActiveTab('pos')}
             onViewInvoice={setPreviewInvoice}
             onPrintInvoice={setPrintInvoice}
@@ -962,12 +1015,49 @@ export const App: React.FC = () => {
             onOpenStandardInvoice={() => setIsStandardInvoiceOpen(true)}
             onOpenTableGridInvoice={() => {
               setEditingInvoice(null);
+              setInvoiceModalDefaultType(undefined);
               setIsTableGridInvoiceOpen(true);
             }}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onDeleteInvoice={handleDeleteInvoice}
             onQuickPos={() => setActiveTab('pos')}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'quotations' && (
+          <QuotationsEstimatesView
+            company={company}
+            invoices={invoices}
+            onNewQuotation={handleOpenNewQuotation}
+            onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'sales_orders' && (
+          <SalesOrdersView
+            company={company}
+            invoices={invoices}
+            onNewSalesOrder={handleOpenNewSalesOrder}
+            onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'sales_returns' && (
+          <SalesReturnsView
+            company={company}
+            invoices={invoices}
+            onNewSalesReturn={handleOpenNewSalesReturn}
+            onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
           />
         )}
 
@@ -980,6 +1070,29 @@ export const App: React.FC = () => {
             onSavePurchase={handleSavePurchase}
             onDeletePurchase={handleDeletePurchase}
             onEditPurchase={handleEditPurchase}
+          />
+        )}
+
+        {activeTab === 'purchase_orders' && (
+          <PurchaseOrdersView
+            company={company}
+            purchases={purchases}
+            onNewPurchaseOrder={handleOpenNewPurchaseOrder}
+            onViewPurchase={handleEditPurchase}
+            onEditPurchase={handleEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'purchase_returns' && (
+          <PurchaseReturnsView
+            company={company}
+            purchases={purchases}
+            onNewPurchaseReturn={handleOpenNewPurchaseReturn}
+            onViewPurchase={handleEditPurchase}
+            onEditPurchase={handleEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
           />
         )}
 
@@ -1090,10 +1203,7 @@ export const App: React.FC = () => {
             vouchers={vouchers}
             onNavigate={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
-            onNewInvoice={() => {
-              setEditingInvoice(null);
-              setIsTableGridInvoiceOpen(true);
-            }}
+            onNewInvoice={handleOpenNewInvoice}
             onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
             onCheckUpdate={() => handleCheckUpdate(true)}
             hasUpdate={hasUpdate}
@@ -1109,7 +1219,7 @@ export const App: React.FC = () => {
       <BottomNav
         activeTab={activeTab}
         onSelectTab={setActiveTab}
-        onNewInvoice={() => setIsTableGridInvoiceOpen(true)}
+        onNewInvoice={handleOpenNewInvoice}
       />
 
       {/* Modals */}
@@ -1134,12 +1244,17 @@ export const App: React.FC = () => {
             initialInvoice={editingInvoice}
             initialParty={selectedPartyForInvoice}
             existingInvoices={invoices}
+            defaultInvoiceType={invoiceModalDefaultType}
             onClose={() => {
               setIsTableGridInvoiceOpen(false);
               setEditingInvoice(null);
               setSelectedPartyForInvoice(null);
+              setInvoiceModalDefaultType(undefined);
             }}
-            onSave={handleSaveInvoice}
+            onSave={(inv, opts) => {
+              handleSaveInvoice(inv, opts);
+              setInvoiceModalDefaultType(undefined);
+            }}
             onAddNewParty={() => setActiveTab('parties')}
             onPartyCreated={handleSaveParty}
           />
@@ -1154,16 +1269,19 @@ export const App: React.FC = () => {
             itemsCatalog={activeItems}
             initialBill={editingPurchase}
             initialSupplier={selectedSupplierForPurchase}
+            defaultPurchaseType={purchaseModalDefaultType}
             onClose={() => {
               setIsTableGridPurchaseOpen(false);
               setEditingPurchase(null);
               setSelectedSupplierForPurchase(null);
+              setPurchaseModalDefaultType(undefined);
             }}
             onSave={(bill) => {
               handleSavePurchase(bill);
               setIsTableGridPurchaseOpen(false);
               setEditingPurchase(null);
               setSelectedSupplierForPurchase(null);
+              setPurchaseModalDefaultType(undefined);
             }}
             onAddNewParty={() => setActiveTab('parties')}
             onPartyCreated={handleSaveParty}

@@ -16,6 +16,7 @@ import { RecordPaymentModal } from './RecordPaymentModal.tsx';
 import { VoucherEditorModal } from './VoucherEditorModal.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 export type { PassbookEntry } from './usePartyPassbook.ts';
 
@@ -68,6 +69,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isDeletePartyConfirmOpen, setIsDeletePartyConfirmOpen] = useState(false);
   const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null);
   const [deletePurchaseTarget, setDeletePurchaseTarget] = useState<PurchaseBill | null>(null);
@@ -309,9 +311,9 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
             <button
               type="button"
-              onClick={handleWhatsAppReminder}
+              onClick={() => setIsWhatsAppModalOpen(true)}
               className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors"
-              title="WhatsApp"
+              title="WhatsApp Reminder & Statement"
               aria-label="Send WhatsApp message"
             >
               <span className="material-symbols-outlined text-[17px]">chat</span>
@@ -637,6 +639,20 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             setDeletePurchaseTarget(null);
           }}
           onClose={() => setDeletePurchaseTarget(null)}
+        />
+      )}
+
+      {/* WhatsApp Reminder & Ledger Statement Modal */}
+      {isWhatsAppModalOpen && (
+        <WhatsAppShareModal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          company={company}
+          party={party}
+          initialPartyName={party.name}
+          initialPhone={party.phone}
+          initialBalance={liveNetBalance}
+          initialTemplate={liveNetBalance > 0 ? 'GENTLE_REMINDER' : 'PARTY_STATEMENT'}
         />
       )}
     </div>

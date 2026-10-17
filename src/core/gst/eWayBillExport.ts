@@ -256,6 +256,8 @@ export interface EWayBillTransportOptions {
   vehicleType?: 'R' | 'O';
   transMode?: '1' | '2' | '3' | '4';
   transType?: '1' | '2' | '3' | '4';
+  transDocNo?: string;
+  transDocDate?: string;
 }
 
 export function generateEWayBillJson(
@@ -360,12 +362,16 @@ export function generateEWayBillJson(
     cessValue: Math.round(invoice.totalCess * 100) / 100,
     totInvValue: Math.round(invoice.grandTotal * 100) / 100,
     itemList: items,
-    transId: transportOptions.transporterId || '',
-    transName: transportOptions.transporterName || '',
-    transMode: transportOptions.transMode || '1',
-    transDistance: transportOptions.transDistance || 50,
-    vehNo: transportOptions.vehicleNumber ? transportOptions.vehicleNumber.trim().toUpperCase() : undefined,
-    vehType: transportOptions.vehicleType || 'R',
+    transId: transportOptions.transporterId || invoice.transporterId || '',
+    transName: transportOptions.transporterName || invoice.transporterName || '',
+    transDocNo: invoice.transDocNo || '',
+    transDocDate: invoice.transDocDate ? formatEWayDate(invoice.transDocDate) : '',
+    transMode: transportOptions.transMode || invoice.transportMode || '1',
+    transDistance: transportOptions.transDistance || invoice.transportDistance || 50,
+    vehNo: (transportOptions.vehicleNumber || invoice.vehicleNumber)
+      ? (transportOptions.vehicleNumber || invoice.vehicleNumber)!.trim().toUpperCase()
+      : undefined,
+    vehType: transportOptions.vehicleType || invoice.vehicleType || 'R',
   };
 
   return {

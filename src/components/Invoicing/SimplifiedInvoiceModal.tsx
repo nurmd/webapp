@@ -7,6 +7,7 @@ import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -29,6 +30,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [showEwayThresholdWarning, setShowEwayThresholdWarning] = React.useState(false);
+  const [isWhatsAppOpen, setIsWhatsAppOpen] = React.useState(false);
 
   // System back navigation (priority 25: closes preview before underlying screens)
   useBackNavigation(() => {
@@ -43,8 +45,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   const isGstActive = company.isGstEnabled !== false && invoice.isGstInvoice !== false;
 
   const handleWhatsApp = () => {
-    const url = getWhatsAppShareUrl(invoice, company);
-    window.open(url, '_blank');
+    setIsWhatsAppOpen(true);
   };
 
   const handleDelete = () => {
@@ -361,6 +362,20 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           cancelText="Cancel"
           onConfirm={() => downloadEWayBillJson(company, invoice)}
           onClose={() => setShowEwayThresholdWarning(false)}
+        />
+      )}
+
+      {/* Interactive WhatsApp Delivery & Reminders Modal */}
+      {isWhatsAppOpen && (
+        <WhatsAppShareModal
+          isOpen={isWhatsAppOpen}
+          onClose={() => setIsWhatsAppOpen(false)}
+          company={company}
+          invoice={invoice}
+          initialPartyName={invoice.partyName}
+          initialPhone={invoice.partyPhone}
+          initialBalance={invoice.balanceAmount}
+          initialTemplate="INVOICE_DELIVERY"
         />
       )}
     </div>

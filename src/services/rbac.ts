@@ -541,12 +541,40 @@ export class RbacService {
     if (role === 'OWNER') return true;
 
     if (role === 'CASHIER') {
-      const allowed = ['dashboard', 'pos', 'sales', 'cash_bank', 'inventory', 'menu', 'print_settings'];
+      const allowed = [
+        'dashboard',
+        'pos',
+        'sales',
+        'quotations',
+        'sales_orders',
+        'sales_returns',
+        'cash_bank',
+        'inventory',
+        'menu',
+        'print_settings',
+      ];
       return allowed.includes(tab);
     }
 
     if (role === 'ACCOUNTANT') {
-      const allowed = ['dashboard', 'reports', 'accounting', 'cash_bank', 'sales', 'purchases', 'expenses', 'parties', 'inventory', 'menu', 'print_settings'];
+      const allowed = [
+        'dashboard',
+        'reports',
+        'accounting',
+        'cash_bank',
+        'sales',
+        'quotations',
+        'sales_orders',
+        'sales_returns',
+        'purchases',
+        'purchase_orders',
+        'purchase_returns',
+        'expenses',
+        'parties',
+        'inventory',
+        'menu',
+        'print_settings',
+      ];
       return allowed.includes(tab);
     }
 

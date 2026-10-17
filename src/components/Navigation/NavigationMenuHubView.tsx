@@ -114,6 +114,26 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     return purchases.reduce((acc, p) => acc + (p.balanceAmount || 0), 0);
   }, [purchases]);
 
+  const quotationsCount = useMemo(() => {
+    return invoices.filter((i) => (i.invoiceType as string) === 'ESTIMATE').length;
+  }, [invoices]);
+
+  const pendingSalesOrdersCount = useMemo(() => {
+    return invoices.filter((i) => (i.invoiceType as string) === 'SALES_ORDER' && i.orderStatus === 'PENDING').length;
+  }, [invoices]);
+
+  const salesReturnsCount = useMemo(() => {
+    return invoices.filter((i) => (i.invoiceType as string) === 'CREDIT_NOTE').length;
+  }, [invoices]);
+
+  const pendingPurchaseOrdersCount = useMemo(() => {
+    return purchases.filter((p) => p.purchaseType === 'PO' && p.orderStatus === 'PENDING').length;
+  }, [purchases]);
+
+  const purchaseReturnsCount = useMemo(() => {
+    return purchases.filter((p) => p.purchaseType === 'RETURN').length;
+  }, [purchases]);
+
   // Format currency helper
   const formatInr = (num: number): string => {
     if (num >= 100000) {
@@ -158,8 +178,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Convert estimates & proforma bills directly into invoices',
       icon: 'request_quote',
       category: 'sales',
-      badge: { text: 'Drafts', type: 'neutral' },
-      action: () => onNavigate('sales'),
+      badge: quotationsCount > 0
+        ? { text: `${quotationsCount} Quotes`, type: 'primary' }
+        : { text: 'Drafts', type: 'neutral' },
+      action: () => onNavigate('quotations'),
       keywords: ['estimate', 'quote', 'quotation', 'proforma'],
     },
     {
@@ -168,7 +190,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Track pending customer delivery orders and status',
       icon: 'assignment',
       category: 'sales',
-      action: () => onNavigate('sales'),
+      badge: pendingSalesOrdersCount > 0
+        ? { text: `${pendingSalesOrdersCount} Open`, type: 'warning' }
+        : undefined,
+      action: () => onNavigate('sales_orders'),
       keywords: ['order', 'booking', 'advance', 'sale order'],
     },
     {
@@ -186,7 +211,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Customer returns, damaged goods & balance refunds',
       icon: 'assignment_return',
       category: 'sales',
-      action: () => onNavigate('sales'),
+      badge: salesReturnsCount > 0
+        ? { text: `${salesReturnsCount} Notes`, type: 'neutral' }
+        : undefined,
+      action: () => onNavigate('sales_returns'),
       keywords: ['return', 'credit note', 'refund', 'replacement'],
     },
 
@@ -211,7 +239,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Draft procurement purchase orders to authorized vendors',
       icon: 'add_shopping_cart',
       category: 'purchases',
-      action: () => onNavigate('purchases'),
+      badge: pendingPurchaseOrdersCount > 0
+        ? { text: `${pendingPurchaseOrdersCount} Pending`, type: 'warning' }
+        : undefined,
+      action: () => onNavigate('purchase_orders'),
       keywords: ['po', 'purchase order', 'vendor order'],
     },
     {
@@ -220,7 +251,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Vendor return debit notes & supplier ledger adjustments',
       icon: 'assignment_turned_in',
       category: 'purchases',
-      action: () => onNavigate('purchases'),
+      badge: purchaseReturnsCount > 0
+        ? { text: `${purchaseReturnsCount} Notes`, type: 'neutral' }
+        : undefined,
+      action: () => onNavigate('purchase_returns'),
       keywords: ['debit note', 'purchase return', 'vendor credit'],
     },
 

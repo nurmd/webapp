@@ -17,6 +17,13 @@ import {
   LEDGER_SORT_LABELS,
 } from '../../core/utils/dateFilters.ts';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
+import { EWayBillModal } from '../Invoicing/EWayBillModal.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
+import { showAppToast } from '../../services/toast.ts';
+import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
+import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
+import { BulkPrintModal } from '../Printing/BulkPrintModal.tsx';
 
 interface SalesHubViewProps {
   company: CompanyProfile;
@@ -27,6 +34,7 @@ interface SalesHubViewProps {
   onEditInvoice?: (invoice: Invoice) => void;
   onDeleteInvoice: (id: string) => void;
   onQuickPos?: () => void;
+  onRefresh?: () => void;
 }
 
 export const SalesHubView: React.FC<SalesHubViewProps> = ({
@@ -38,6 +46,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   onEditInvoice,
   onDeleteInvoice,
   onQuickPos,
+  onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<'ALL' | 'UNPAID' | 'PAID' | 'ESTIMATES' | 'CHALLANS'>('ALL');
   const [search, setSearch] = useState('');
@@ -48,6 +57,12 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [splitCash, setSplitCash] = useState<string>('');
   const [splitUPI, setSplitUPI] = useState<string>('');
   const [splitBank, setSplitBank] = useState<string>('');
+
+  // E-Way Bill Modal state
+  const [selectedEwayInvoice, setSelectedEwayInvoice] = useState<Invoice | null>(null);
+
+  // Document Conversion state
+  const [confirmConvertDoc, setConfirmConvertDoc] = useState<Invoice | null>(null);
 
   // Sorting state - Defaults to NEWEST first as requested
   const [sortBy, setSortBy] = useState<LedgerSortOption>('NEWEST');
@@ -60,6 +75,14 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
   useBackNavigation(() => {
+    if (confirmConvertDoc) {
+      setConfirmConvertDoc(null);
+      return true;
+    }
+    if (selectedEwayInvoice) {
+      setSelectedEwayInvoice(null);
+      return true;
+    }
     if (isDateModalOpen) {
       setIsDateModalOpen(false);
       return true;
@@ -70,12 +93,26 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
     }
     setPaymentModalInvoice(null);
     return true;
-  }, isDateModalOpen || isSortDropdownOpen || !!paymentModalInvoice, 20);
+  }, isDateModalOpen || isSortDropdownOpen || !!paymentModalInvoice || !!selectedEwayInvoice || !!confirmConvertDoc, 20);
 
   // Active Date Bounds
   const dateRange = useMemo(() => {
     return getDateFilterBounds(datePreset, customStart, customEnd);
   }, [datePreset, customStart, customEnd]);
+
+  // 1-Tap Document Conversion
+  const handleConvertDocument = async (doc: Invoice) => {
+    try {
+      const newInv = await convertDocumentToTaxInvoice(doc, company);
+      showAppToast(
+        `${doc.invoiceType === 'ESTIMATE' ? 'Quotation' : 'Challan'} #${doc.invoiceNumber} converted to Tax Invoice #${newInv.invoiceNumber}`
+      );
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      console.error('Failed to convert document:', err);
+      showAppToast(err.message || 'Failed to convert document.');
+    }
+  };
 
   // 1. Date Filter
   const dateFilteredInvoices = useMemo(() => {
@@ -140,6 +177,116 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       }
     });
   }, [statusFiltered, sortBy]);
+
+  // Bulk selection and batch operations
+  const {
+    selectedIds,
+    selectedCount,
+    isSelected,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+  } = useBulkSelection();
+
+  const [isBulkPrintOpen, setIsBulkPrintOpen] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+
+  const selectedInvoices = useMemo(() => {
+    return invoices.filter((i) => selectedIds.has(i.id));
+  }, [invoices, selectedIds]);
+
+  const handleBulkExport = () => {
+    if (selectedInvoices.length === 0) return;
+    const headers = [
+      'Invoice Number',
+      'Date',
+      'Due Date',
+      'Type',
+      'Party Name',
+      'Party Phone',
+      'Party GSTIN',
+      'Taxable Amount',
+      'CGST',
+      'SGST',
+      'IGST',
+      'Grand Total',
+      'Paid Amount',
+      'Balance Due',
+      'Payment Status',
+    ];
+    const rows = selectedInvoices.map((inv) => [
+      `"${inv.invoiceNumber || ''}"`,
+      `"${inv.date || ''}"`,
+      `"${inv.dueDate || ''}"`,
+      `"${inv.invoiceType || 'TAX_INVOICE'}"`,
+      `"${(inv.partyName || 'Cash Customer').replace(/"/g, '""')}"`,
+      `"${inv.partyPhone || ''}"`,
+      `"${inv.partyGstin || ''}"`,
+      (inv.totalTaxableAmount || 0).toFixed(2),
+      (inv.totalCgst || 0).toFixed(2),
+      (inv.totalSgst || 0).toFixed(2),
+      (inv.totalIgst || 0).toFixed(2),
+      (inv.grandTotal || 0).toFixed(2),
+      (inv.paidAmount || 0).toFixed(2),
+      (inv.balanceAmount || 0).toFixed(2),
+      `"${inv.paymentStatus || 'UNPAID'}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Sales_Invoices_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showAppToast(`Exported ${selectedInvoices.length} invoices to CSV.`);
+  };
+
+  const handleBulkMarkPaid = async () => {
+    const unpaid = selectedInvoices.filter((i) => i.balanceAmount > 0);
+    if (unpaid.length === 0) {
+      showAppToast('All selected invoices are already fully paid.');
+      return;
+    }
+    for (const inv of unpaid) {
+      const unpaidBal = inv.balanceAmount;
+      const updatedInv: Invoice = {
+        ...inv,
+        paidAmount: inv.grandTotal,
+        balanceAmount: 0,
+        paymentStatus: 'PAID',
+        updatedAt: new Date().toISOString(),
+      };
+      db.saveInvoice(updatedInv);
+
+      if (inv.partyId) {
+        const partyList = db.getParties();
+        const p = partyList.find((party) => party.id === inv.partyId);
+        if (p) {
+          p.currentBalance -= unpaidBal;
+          p.updatedAt = new Date().toISOString();
+          db.saveParty(p);
+        }
+      }
+    }
+    clearSelection();
+    onRefresh?.();
+    showAppToast(`Marked ${unpaid.length} invoices as fully paid.`);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    for (const inv of selectedInvoices) {
+      onDeleteInvoice(inv.id);
+    }
+    clearSelection();
+    setIsBulkDeleteModalOpen(false);
+    onRefresh?.();
+    showAppToast(`Deleted ${selectedInvoices.length} invoices.`);
+  };
 
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -436,6 +583,33 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         </div>
       </div>
 
+      {/* Select All & Multi-Selection Bar */}
+      {sortedInvoices.length > 0 && (
+        <div className="px-margin-mobile md:px-0 mt-2 flex items-center justify-between py-1 text-xs text-on-surface-variant">
+          <label className="flex items-center gap-2 cursor-pointer select-none font-semibold">
+            <input
+              type="checkbox"
+              checked={isAllSelected(sortedInvoices.map((i) => i.id))}
+              ref={(el) => {
+                if (el) el.indeterminate = isIndeterminate(sortedInvoices.map((i) => i.id));
+              }}
+              onChange={() => selectAll(sortedInvoices.map((i) => i.id))}
+              className="w-4 h-4 rounded text-secondary accent-secondary cursor-pointer"
+            />
+            <span>Select All ({sortedInvoices.length})</span>
+          </label>
+          {selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-[11px] font-bold text-secondary hover:underline cursor-pointer"
+            >
+              Clear selection ({selectedCount})
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Invoices List Feed (Slim Passbook Cards) */}
       <div className="px-margin-mobile md:px-0 mt-1 grid grid-cols-1 md:grid-cols-2 gap-2">
         {sortedInvoices.length === 0 ? (
@@ -544,13 +718,34 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               <div
                 key={inv.id}
                 onClick={() => onViewInvoice(inv)}
-                className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-secondary/40 active:scale-[0.99] transition-all cursor-pointer"
+                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
+                  isSelected(inv.id)
+                    ? 'border-secondary ring-1 ring-secondary/30 bg-secondary/5'
+                    : 'border-outline-variant/20 hover:border-secondary/40'
+                }`}
               >
-                {/* Line 1: Party Name (left) | Grand Total (right) */}
+                {/* Line 1: Checkbox + Party Name (left) | Grand Total (right) */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-xs sm:text-sm text-on-surface truncate flex-1 min-w-0">
-                    {inv.partyName || 'Cash Customer'}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelect(inv.id);
+                      }}
+                      className="w-5 h-5 flex items-center justify-center shrink-0 cursor-pointer"
+                      title="Select invoice"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected(inv.id)}
+                        onChange={() => {}}
+                        className="w-3.5 h-3.5 rounded text-secondary accent-secondary cursor-pointer"
+                      />
+                    </div>
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                      {inv.partyName || 'Cash Customer'}
+                    </span>
+                  </div>
                   <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(inv.grandTotal)}
                   </span>
@@ -579,6 +774,55 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                       </span>
                     );
                   })()}
+
+                  {/* Converted Badge */}
+                  {inv.isConverted && (
+                    <span
+                      data-testid="converted-badge"
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                    >
+                      <span className="material-symbols-outlined text-[10px]">transform</span>
+                      <span>Converted {inv.convertedToInvoiceNumber ? `#${inv.convertedToInvoiceNumber}` : ''}</span>
+                    </span>
+                  )}
+
+                  {/* 1-Tap Convert to Tax Invoice Button */}
+                  {canConvertToInvoice(inv) && (
+                    <button
+                      type="button"
+                      data-testid="convert-invoice-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmConvertDoc(inv);
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-secondary text-on-secondary shadow-xs hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer ml-auto"
+                      title="Convert Quotation/Challan directly to Tax Invoice"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">receipt_long</span>
+                      <span>Convert to Invoice</span>
+                    </button>
+                  )}
+
+                  {/* E-Way Bill Button (Statutory threshold >= 50,000 or already has E-Way) */}
+                  {(inv.grandTotal >= 50000 || inv.ewayBillNumber) && inv.invoiceType !== 'ESTIMATE' && inv.invoiceType !== 'DELIVERY_CHALLAN' && (
+                    <button
+                      type="button"
+                      data-testid="eway-bill-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEwayInvoice(inv);
+                      }}
+                      className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border transition-all cursor-pointer active:scale-95 ${
+                        inv.ewayBillNumber
+                          ? 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20'
+                          : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                      }`}
+                      title={inv.ewayBillNumber ? `E-Way Bill: ${inv.ewayBillNumber}` : 'Statutory E-Way Bill Required (Value ≥ ₹50,000)'}
+                    >
+                      <span className="material-symbols-outlined text-[12px]">local_shipping</span>
+                      <span>{inv.ewayBillNumber ? `E-Way #${inv.ewayBillNumber.slice(-4)}` : 'E-Way Bill'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Line 3: Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
@@ -904,6 +1148,77 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         }}
         accentColor="secondary"
       />
+
+      {/* E-Way Bill Modal */}
+      {selectedEwayInvoice && (
+        <EWayBillModal
+          isOpen={!!selectedEwayInvoice}
+          invoice={selectedEwayInvoice}
+          company={company}
+          onClose={() => setSelectedEwayInvoice(null)}
+          onInvoiceUpdated={(_updatedInv: Invoice) => {
+            setSelectedEwayInvoice(null);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {/* Convert Document Confirmation Modal */}
+      {confirmConvertDoc && (
+        <ConfirmDeleteModal
+          isOpen={!!confirmConvertDoc}
+          title="Convert to Tax Invoice?"
+          description={`Are you sure you want to convert ${
+            confirmConvertDoc.invoiceType === 'ESTIMATE' ? 'Quotation' : 'Delivery Challan'
+          } #${confirmConvertDoc.invoiceNumber} into an official Tax Invoice? This will generate a new Tax Invoice, assign a new invoice number, and adjust stock.`}
+          confirmText="Convert Now"
+          confirmButtonClass="bg-secondary text-on-secondary hover:bg-secondary/90"
+          icon="receipt_long"
+          iconBgClass="bg-secondary/15 text-secondary"
+          onConfirm={async () => {
+            const doc = confirmConvertDoc;
+            setConfirmConvertDoc(null);
+            await handleConvertDocument(doc);
+          }}
+          onClose={() => setConfirmConvertDoc(null)}
+        />
+      )}
+
+      {/* Floating Bulk Action Toolbar */}
+      <BulkActionToolbar
+        selectedCount={selectedCount}
+        onClearSelection={clearSelection}
+        onBulkPrint={() => setIsBulkPrintOpen(true)}
+        onBulkExport={handleBulkExport}
+        onBulkMarkPaid={handleBulkMarkPaid}
+        onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+        markPaidLabel="Mark Paid"
+      />
+
+      {/* Bulk Print Preview Modal */}
+      {isBulkPrintOpen && (
+        <BulkPrintModal
+          isOpen={isBulkPrintOpen}
+          onClose={() => setIsBulkPrintOpen(false)}
+          company={company}
+          invoices={selectedInvoices}
+          title="Bulk Sales Invoice Printing"
+        />
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isBulkDeleteModalOpen}
+          title="Delete Selected Invoices?"
+          recordName={`${selectedCount} selected invoices`}
+          description={`Are you sure you want to permanently delete ${selectedCount} selected invoices? This will restore inventory stock.`}
+          confirmText="Delete All Selected"
+          onConfirm={handleConfirmBulkDelete}
+          onClose={() => setIsBulkDeleteModalOpen(false)}
+        />
+      )}
     </div>
   );
 };
+

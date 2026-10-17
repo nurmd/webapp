@@ -8,6 +8,9 @@ export interface ConfirmDeleteModalProps {
   recordName?: string;
   confirmText?: string;
   cancelText?: string;
+  confirmButtonClass?: string;
+  icon?: string;
+  iconBgClass?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -19,6 +22,9 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   recordName,
   confirmText = 'Delete',
   cancelText = 'Cancel',
+  confirmButtonClass,
+  icon = 'delete_forever',
+  iconBgClass = 'bg-error-container/30 text-error',
   onConfirm,
   onClose,
 }) => {
@@ -39,8 +45,8 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-error-container/30 text-error flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[24px]">delete_forever</span>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBgClass}`}>
+            <span className="material-symbols-outlined text-[24px]">{icon}</span>
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">{title}</h3>
@@ -70,9 +76,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
               onConfirm();
               onClose();
             }}
-            className="min-h-[44px] px-5 rounded-xl bg-error text-on-error font-bold text-xs shadow-xs hover:bg-error/90 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+            className={`min-h-[44px] px-5 rounded-xl font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 ${
+              confirmButtonClass || 'bg-error text-on-error hover:bg-error/90'
+            }`}
           >
-            <span className="material-symbols-outlined text-[16px]">delete</span>
+            <span className="material-symbols-outlined text-[16px]">{icon === 'delete_forever' ? 'delete' : icon}</span>
             <span>{confirmText}</span>
           </button>
         </div>

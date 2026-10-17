@@ -16,7 +16,12 @@ export type AppTab =
   | 'pos'
   | 'settings'
   | 'print_settings'
-  | 'menu';
+  | 'menu'
+  | 'quotations'
+  | 'sales_orders'
+  | 'sales_returns'
+  | 'purchase_orders'
+  | 'purchase_returns';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -60,7 +65,12 @@ export const Drawer: React.FC<DrawerProps> = ({
       category: 'Transactions',
       items: [
         { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
+        { id: 'quotations', label: 'Quotations / Estimates', icon: 'request_quote' },
+        { id: 'sales_orders', label: 'Sale Orders', icon: 'assignment' },
+        { id: 'sales_returns', label: 'Sale Returns (Credit Note)', icon: 'assignment_return' },
         { id: 'purchases', label: 'Purchases & Bills', icon: 'shopping_bag' },
+        { id: 'purchase_orders', label: 'Purchase Orders', icon: 'add_shopping_cart' },
+        { id: 'purchase_returns', label: 'Purchase Returns (Debit Note)', icon: 'assignment_turned_in' },
         { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
         { id: 'inventory', label: 'Inventory & Stock', icon: 'inventory_2' },
       ],

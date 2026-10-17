@@ -215,6 +215,12 @@ export const DOCUMENT_SERIES_LABELS: Record<DocumentSeriesType, { title: string;
     icon: 'request_quote',
     description: 'Quotation, price estimation, and proforma invoices',
   },
+  SALES_ORDER: {
+    title: 'Sales Order',
+    shortCode: 'SO',
+    icon: 'assignment',
+    description: 'Confirmed customer booking and delivery order',
+  },
   DELIVERY_CHALLAN: {
     title: 'Delivery Challan',
     shortCode: 'DC',
@@ -234,10 +240,16 @@ export const DOCUMENT_SERIES_LABELS: Record<DocumentSeriesType, { title: string;
     description: 'Supplemental charge / price revision debit note',
   },
   PURCHASE_BILL: {
-    title: 'Purchase Bill / PO',
+    title: 'Purchase Bill',
     shortCode: 'PUR',
-    icon: 'shopping_cart',
-    description: 'Inward vendor procurement bill & purchase order',
+    icon: 'shopping_bag',
+    description: 'Inward vendor procurement bill and tax credit',
+  },
+  PURCHASE_ORDER: {
+    title: 'Purchase Order',
+    shortCode: 'PO',
+    icon: 'add_shopping_cart',
+    description: 'Procurement purchase order sent to authorized vendor',
   },
   PAYMENT_RECEIPT: {
     title: 'Receipt / Payment Voucher',
@@ -269,6 +281,13 @@ export const DEFAULT_SERIES_CONFIGS: Record<DocumentSeriesType, DocumentSeriesCo
     paddingDigits: 4,
     startingNumber: 1,
   },
+  SALES_ORDER: {
+    prefix: 'SO',
+    separator: '-',
+    yearFormat: 'YYYY',
+    paddingDigits: 4,
+    startingNumber: 1,
+  },
   DELIVERY_CHALLAN: {
     prefix: 'DC',
     separator: '/',
@@ -292,6 +311,13 @@ export const DEFAULT_SERIES_CONFIGS: Record<DocumentSeriesType, DocumentSeriesCo
   },
   PURCHASE_BILL: {
     prefix: 'PUR',
+    separator: '-',
+    yearFormat: 'YYYY',
+    paddingDigits: 4,
+    startingNumber: 1,
+  },
+  PURCHASE_ORDER: {
+    prefix: 'PO',
     separator: '-',
     yearFormat: 'YYYY',
     paddingDigits: 4,

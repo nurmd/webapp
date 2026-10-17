@@ -1,15 +1,15 @@
 {
-  "version": "1.2.3",
+  "version": "1.2.4",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-17T12:52:02.574Z",
+  "buildTime": "2026-10-17T15:00:19.692Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Comprehensive 5-category Reporting Hub: GST Tax, Sales, Purchases, Khata Dues, Inventory",
-    "Statutory GSTR-1 & GSTR-3B Table 6.1 with Compensation Cess isolation and Portal JSON export",
-    "1-Click Export to Excel/CSV with RFC 4180 escaping, UTF-8 BOM, and formula sanitization",
-    "1-Click Export to A4 Printable PDF with company branding, table borders, and totals",
-    "Party Khata aging breakdown (0-30, 31-60, 61-90, 90+ days) and party ledger statements",
-    "Stock summary valuation at cost vs selling price, potential margin %, and low-stock alerts"
+    "Commercial Orders & Returns: Quotations/Estimates, Sales Orders, Sales Returns, Purchase Orders, and Purchase Returns",
+    "1-Click Document Conversion pipeline: Quotation -> Tax Invoice and Sales Order -> Tax Invoice with series auto-increment",
+    "Statutory E-Way Bill slip generation with Rule 138 threshold advisory and QR code verification",
+    "Direct WhatsApp Invoicing & Overdue Payment Reminders in English and Hindi with embedded UPI deep-links and bank transfer details",
+    "High-Velocity Bulk Document Operations: Multi-select with Bulk Print, Bulk CSV Export, Bulk Settlement, and Bulk Delete",
+    "Zero-dependency Code128 and QR Code sticker label designer supporting 50x25mm/38x25mm thermal rolls and A4 24/30-up sheets"
   ]
 }

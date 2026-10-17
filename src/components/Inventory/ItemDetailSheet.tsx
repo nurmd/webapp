@@ -45,6 +45,7 @@ export interface ItemDetailSheetProps {
   previewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   previewPurchase?: (bill: PurchaseBill) => void;
+  onPrintBarcode?: (item: InventoryItem) => void;
 }
 
 export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
@@ -65,6 +66,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   previewInvoice,
   onViewPurchase,
   previewPurchase,
+  onPrintBarcode,
 }) => {
   const [txnFilter, setTxnFilter] = useState<'ALL' | 'SALES' | 'PURCHASES' | 'ADJUSTMENTS'>('ALL');
   const [selectedInvoiceForPreview, setSelectedInvoiceForPreview] = useState<Invoice | null>(null);
@@ -565,6 +567,19 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           >
             <span className="material-symbols-outlined text-[18px]">edit</span>
           </button>
+
+          {/* Barcode & QR Label Print Button */}
+          {onPrintBarcode && (
+            <button
+              type="button"
+              onClick={() => onPrintBarcode(item)}
+              className="w-9 h-9 rounded-xl bg-surface-container text-secondary flex items-center justify-center active:scale-95 cursor-pointer hover:bg-surface-container-high transition-colors"
+              title="Print Barcode & QR Sticker Labels"
+              aria-label="Print barcode labels for this item"
+            >
+              <span className="material-symbols-outlined text-[18px]">barcode_scanner</span>
+            </button>
+          )}
 
           {/* Disable / Enable Toggle Button */}
           <button

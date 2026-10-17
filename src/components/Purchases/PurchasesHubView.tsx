@@ -14,6 +14,11 @@ import {
   LEDGER_SORT_LABELS,
 } from '../../core/utils/dateFilters.ts';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
+import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
+import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
+import { BulkPrintModal } from '../Printing/BulkPrintModal.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { showAppToast } from '../../services/toast.ts';
 
 interface PurchasesHubViewProps {
   purchases: PurchaseBill[];
@@ -121,6 +126,100 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
       }
     });
   }, [statusFiltered, sortBy]);
+
+  // Bulk selection and batch operations
+  const {
+    selectedIds,
+    selectedCount,
+    isSelected,
+    toggleSelect,
+    selectAll,
+    clearSelection,
+    isAllSelected,
+    isIndeterminate,
+  } = useBulkSelection();
+
+  const [isBulkPrintOpen, setIsBulkPrintOpen] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+
+  const selectedPurchases = useMemo(() => {
+    return purchases.filter((p) => selectedIds.has(p.id));
+  }, [purchases, selectedIds]);
+
+  const handleBulkExport = () => {
+    if (selectedPurchases.length === 0) return;
+    const headers = [
+      'Bill Number',
+      'Date',
+      'Due Date',
+      'Supplier Name',
+      'Supplier GSTIN',
+      'Taxable Amount',
+      'CGST',
+      'SGST',
+      'IGST',
+      'Grand Total',
+      'Paid Amount',
+      'Balance Due',
+      'Payment Status',
+    ];
+    const rows = selectedPurchases.map((b) => [
+      `"${b.billNumber || ''}"`,
+      `"${b.date || ''}"`,
+      `"${b.dueDate || ''}"`,
+      `"${(b.supplierName || 'Unknown').replace(/"/g, '""')}"`,
+      `"${b.supplierGstin || ''}"`,
+      (b.totalTaxableAmount || 0).toFixed(2),
+      (b.totalCgst || 0).toFixed(2),
+      (b.totalSgst || 0).toFixed(2),
+      (b.totalIgst || 0).toFixed(2),
+      (b.grandTotal || 0).toFixed(2),
+      (b.paidAmount || 0).toFixed(2),
+      (b.balanceAmount || 0).toFixed(2),
+      `"${b.paymentStatus || 'UNPAID'}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Purchase_Bills_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showAppToast(`Exported ${selectedPurchases.length} purchase bills to CSV.`);
+  };
+
+  const handleBulkMarkPaid = () => {
+    const unpaid = selectedPurchases.filter((b) => b.balanceAmount > 0);
+    if (unpaid.length === 0) {
+      showAppToast('All selected purchase bills are already fully settled.');
+      return;
+    }
+    for (const b of unpaid) {
+      const unpaidBal = b.balanceAmount;
+      const updated: PurchaseBill = {
+        ...b,
+        paidAmount: b.grandTotal,
+        balanceAmount: 0,
+        paymentStatus: 'PAID',
+        updatedAt: new Date().toISOString(),
+      };
+      onSavePurchase(updated);
+    }
+    clearSelection();
+    showAppToast(`Marked ${unpaid.length} purchase bills as settled.`);
+  };
+
+  const handleConfirmBulkDelete = () => {
+    for (const b of selectedPurchases) {
+      onDeletePurchase(b.id);
+    }
+    clearSelection();
+    setIsBulkDeleteModalOpen(false);
+    showAppToast(`Deleted ${selectedPurchases.length} purchase bills.`);
+  };
 
 
 
@@ -335,6 +434,33 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         </div>
       </div>
 
+      {/* Select All & Multi-Selection Bar */}
+      {sortedPurchases.length > 0 && (
+        <div className="flex items-center justify-between py-1 text-xs text-on-surface-variant">
+          <label className="flex items-center gap-2 cursor-pointer select-none font-semibold">
+            <input
+              type="checkbox"
+              checked={isAllSelected(sortedPurchases.map((p) => p.id))}
+              ref={(el) => {
+                if (el) el.indeterminate = isIndeterminate(sortedPurchases.map((p) => p.id));
+              }}
+              onChange={() => selectAll(sortedPurchases.map((p) => p.id))}
+              className="w-4 h-4 rounded text-orange-600 accent-orange-600 cursor-pointer"
+            />
+            <span>Select All ({sortedPurchases.length})</span>
+          </label>
+          {selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-[11px] font-bold text-orange-600 hover:underline cursor-pointer"
+            >
+              Clear selection ({selectedCount})
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 4. Purchase Bills List Stream (Slim Passbook Cards) */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
         {sortedPurchases.length === 0 ? (
@@ -352,13 +478,34 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               <div
                 key={bill.id}
                 onClick={() => setSelectedBillForPreview(bill)}
-                className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border border-outline-variant/20 flex flex-col gap-1.5 hover:border-orange-500/40 active:scale-[0.99] transition-all cursor-pointer"
+                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
+                  isSelected(bill.id)
+                    ? 'border-orange-500 ring-1 ring-orange-500/30 bg-orange-500/5'
+                    : 'border-outline-variant/20 hover:border-orange-500/40'
+                }`}
               >
-                {/* Line 1: Supplier Name (left) | Grand Total (right) */}
+                {/* Line 1: Checkbox + Supplier Name (left) | Grand Total (right) */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-bold text-xs sm:text-sm text-on-surface truncate flex-1 min-w-0">
-                    {bill.supplierName}
-                  </span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelect(bill.id);
+                      }}
+                      className="w-5 h-5 flex items-center justify-center shrink-0 cursor-pointer"
+                      title="Select purchase bill"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected(bill.id)}
+                        onChange={() => {}}
+                        className="w-3.5 h-3.5 rounded text-orange-600 accent-orange-600 cursor-pointer"
+                      />
+                    </div>
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                      {bill.supplierName}
+                    </span>
+                  </div>
                   <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(bill.grandTotal)}
                   </span>
@@ -490,6 +637,41 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         }}
         accentColor="orange-500"
       />
+
+      {/* Floating Bulk Action Toolbar */}
+      <BulkActionToolbar
+        selectedCount={selectedCount}
+        onClearSelection={clearSelection}
+        onBulkPrint={() => setIsBulkPrintOpen(true)}
+        onBulkExport={handleBulkExport}
+        onBulkMarkPaid={handleBulkMarkPaid}
+        onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+        markPaidLabel="Settle Bills"
+      />
+
+      {/* Bulk Print Preview Modal */}
+      {isBulkPrintOpen && (
+        <BulkPrintModal
+          isOpen={isBulkPrintOpen}
+          onClose={() => setIsBulkPrintOpen(false)}
+          company={company}
+          purchases={selectedPurchases}
+          title="Bulk Purchase Bills Printing"
+        />
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteModalOpen && (
+        <ConfirmDeleteModal
+          isOpen={isBulkDeleteModalOpen}
+          title="Delete Selected Purchase Bills?"
+          recordName={`${selectedCount} selected bills`}
+          description={`Are you sure you want to permanently delete ${selectedCount} selected purchase bills? This will revert inventory stock.`}
+          confirmText="Delete All Selected"
+          onConfirm={handleConfirmBulkDelete}
+          onClose={() => setIsBulkDeleteModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

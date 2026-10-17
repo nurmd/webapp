@@ -7,6 +7,7 @@ export type InvoiceType =
   | 'EXPORT'        // Export with or without IGST payment
   | 'SEZ'           // Special Economic Zone supply
   | 'ESTIMATE'      // Non-tax quotation / estimate
+  | 'SALES_ORDER'   // Sales Order
   | 'DELIVERY_CHALLAN'
   | 'CREDIT_NOTE'   // Credit note issued to customer (GSTR-1 Table 9B CDNR/CDNUR)
   | 'DEBIT_NOTE';   // Debit note issued to customer (GSTR-1 Table 9B CDNR/CDNUR)
@@ -103,6 +104,28 @@ export interface Invoice {
   originalInvoiceNumber?: string;              // Referenced invoice number for Credit/Debit notes (Table 9B)
   originalInvoiceDate?: string;                // Referenced invoice date for Credit/Debit notes (Table 9B)
   noteType?: 'C' | 'D';                        // 'C' = Credit Note, 'D' = Debit Note (Table 9B)
+  returnReason?: string;                       // Reason for Credit/Debit Note (e.g. Goods Damaged, Billing Error)
+  orderStatus?: 'PENDING' | 'FULFILLED' | 'CANCELLED'; // Status for Sales Orders
   isRcm?: boolean;                             // Reverse Charge Mechanism flag (Table 4 / Table 3.1(d))
   isCancelled?: boolean;                       // Document cancelled status flag (Table 13 doc_issue)
+
+  // --- E-Way Bill & Transport Fields (Rule 138) ---
+  ewayBillNumber?: string;                     // Generated 12-digit E-Way Bill Number from GST Portal
+  ewayBillDate?: string;                       // E-Way Bill generation timestamp
+  transporterId?: string;                      // 15-digit GSTIN / TRANSIN of Transporter
+  transporterName?: string;                    // Name of Transport Company / Agency
+  transportMode?: '1' | '2' | '3' | '4';       // 1=Road, 2=Rail, 3=Air, 4=Ship
+  transportDistance?: number;                  // Approximate transit distance in KM
+  transDocNo?: string;                         // Goods Receipt (GR) / Railway Receipt (RR) / Airway Bill No
+  transDocDate?: string;                       // Transport Document Date
+  vehicleNumber?: string;                      // Vehicle registration number (e.g. MH12AB1234)
+  vehicleType?: 'R' | 'O';                     // R=Regular, O=Over Dimensional Cargo
+
+  // --- Document Conversion & Flow Tracking ---
+  convertedFromDocType?: 'ESTIMATE' | 'QUOTATION' | 'DELIVERY_CHALLAN' | 'SALES_ORDER' | 'PURCHASE_ORDER';
+  convertedFromDocId?: string;
+  convertedFromDocNumber?: string;
+  isConverted?: boolean;                       // True if this estimate/challan has been converted to an invoice
+  convertedToInvoiceId?: string;               // ID of the resulting Tax Invoice
+  convertedToInvoiceNumber?: string;           // Number of the resulting Tax Invoice (e.g. INV-001)
 }

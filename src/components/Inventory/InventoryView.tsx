@@ -13,6 +13,7 @@ import { ItemDetailSheet, ItemTransactionRecord, ItemTransactionType } from './I
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { BarcodeLabelModal } from './BarcodeLabelModal.tsx';
 
 export type { ItemTransactionType, ItemTransactionRecord };
 
@@ -66,6 +67,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [previewPurchase, setPreviewPurchase] = useState<PurchaseBill | null>(null);
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [barcodeModalInitialItem, setBarcodeModalInitialItem] = useState<InventoryItem | undefined>(undefined);
   const company = useMemo(() => db.getCompany(), []);
 
   const handleViewInvoice = (inv: Invoice) => {
@@ -504,6 +507,18 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </span>
               )}
             </button>
+            <button
+              aria-label="Print Barcode & QR Sticker Labels"
+              title="Print Barcode & QR Sticker Labels"
+              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm active:bg-surface-container-low transition-colors cursor-pointer hover:bg-secondary/10"
+              type="button"
+              onClick={() => {
+                setBarcodeModalInitialItem(undefined);
+                setIsBarcodeModalOpen(true);
+              }}
+            >
+              <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+            </button>
           </div>
 
           {/* Active Filter Chips Row (if any filter is active) */}
@@ -768,6 +783,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         previewInvoice={handleViewInvoice}
         onViewPurchase={handleViewPurchase}
         previewPurchase={handleViewPurchase}
+        onPrintBarcode={(item) => {
+          setBarcodeModalInitialItem(item);
+          setIsBarcodeModalOpen(true);
+        }}
       />
 
       {/* 2. Add / Edit Item Modal */}
@@ -844,6 +863,20 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           cancelText="Cancel"
           onConfirm={executeReconcileAllDiscrepancies}
           onClose={() => setIsReconcileModalOpen(false)}
+        />
+      )}
+
+      {/* 8. Barcode & QR Label Sticker Designer Modal */}
+      {isBarcodeModalOpen && (
+        <BarcodeLabelModal
+          isOpen={isBarcodeModalOpen}
+          onClose={() => {
+            setIsBarcodeModalOpen(false);
+            setBarcodeModalInitialItem(undefined);
+          }}
+          items={items}
+          company={company}
+          initialSelectedItem={barcodeModalInitialItem}
         />
       )}
     </div>

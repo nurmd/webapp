@@ -11,6 +11,7 @@ import { AddEditPartyModal } from './AddEditPartyModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 interface PartiesViewProps {
   parties: Party[];
@@ -69,6 +70,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyForLedger, setSelectedPartyForLedger] = useState<Party | null>(null);
+  const [whatsappParty, setWhatsappParty] = useState<Party | null>(null);
 
   // Precomputed lookup map of latest transaction timestamp against each party
   const partyLatestTxMap = useMemo(() => {
@@ -624,14 +626,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const url = getPaymentReminderWhatsAppUrl(
-                          party.name,
-                          party.phone,
-                          party.currentBalance,
-                          company.tradeName || company.businessName,
-                          company.upiId
-                        );
-                        window.open(url, '_blank');
+                        setWhatsappParty(party);
                       }}
                       className="min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg bg-surface-container-low text-secondary hover:bg-secondary/10 flex items-center justify-center active:scale-95 transition-all cursor-pointer ml-0.5"
                       title="Send WhatsApp Reminder"
@@ -680,6 +675,20 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
         initialType={activeSegment === 'CUSTOMERS' ? 'CUSTOMER' : 'SUPPLIER'}
         parties={parties}
       />
+
+      {/* Interactive WhatsApp Share & Reminder Modal */}
+      {whatsappParty && (
+        <WhatsAppShareModal
+          isOpen={!!whatsappParty}
+          onClose={() => setWhatsappParty(null)}
+          company={company}
+          party={whatsappParty}
+          initialPartyName={whatsappParty.name}
+          initialPhone={whatsappParty.phone}
+          initialBalance={whatsappParty.currentBalance}
+          initialTemplate={whatsappParty.currentBalance > 0 ? 'GENTLE_REMINDER' : 'PARTY_STATEMENT'}
+        />
+      )}
     </div>
   );
 };

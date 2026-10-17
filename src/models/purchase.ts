@@ -79,9 +79,19 @@ export interface PurchaseBill {
   updatedAt: string;
 
   // --- Extended GSTR Compliance & Filing Fields ---
+  purchaseType?: 'BILL' | 'PO' | 'RETURN';     // 'BILL' = Inward Bill, 'PO' = Purchase Order, 'RETURN' = Purchase Return / Debit Note
+  orderStatus?: 'PENDING' | 'FULFILLED' | 'CANCELLED'; // For Purchase Orders
+  returnReason?: string;                       // Reason for Return / Debit Note (e.g. Defective Goods, Rate Difference)
   originalBillNumber?: string;                 // For Supplier Credit/Debit notes
   originalBillDate?: string;                   // For Supplier Credit/Debit notes
   noteType?: 'C' | 'D';                        // 'C' (Supplier Credit Note) | 'D' (Debit Note)
   isCancelled?: boolean;                       // Cancelled purchase flag
   importType?: 'GOODS' | 'SERVICES';           // Import classification
+
+  // --- Document Conversion & Flow Tracking ---
+  isConverted?: boolean;                       // True if this PO has been converted into a Purchase Bill
+  convertedToBillId?: string;                  // Resulting Purchase Bill ID
+  convertedToBillNumber?: string;              // Resulting Purchase Bill Number (e.g. PUR-001)
+  convertedFromPoId?: string;                  // Source PO ID
+  convertedFromPoNumber?: string;              // Source PO Number
 }
