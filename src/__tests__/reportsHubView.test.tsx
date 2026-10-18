@@ -693,15 +693,28 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
     // Verify graph is NOT present when collapsed
     expect(container.querySelector('svg.cursor-crosshair')).toBeNull();
 
-    // Verify two columns exist for Gross Profit & Net Profit
-    const twoColGrid = container.querySelector('.grid-cols-2');
-    expect(twoColGrid).not.toBeNull();
-    expect(twoColGrid?.textContent).toContain('Gross Profit');
-    expect(twoColGrid?.textContent).toContain('Net Profit');
+    // Verify two columns exist across all tabs in collapsed view
+    const twoColGrids = container.querySelectorAll('.grid-cols-2');
+    expect(twoColGrids.length).toBeGreaterThanOrEqual(3);
 
-    // Verify extra info is hidden in collapsed view
-    expect(twoColGrid?.textContent).not.toContain('Total Revenue:');
-    expect(twoColGrid?.textContent).not.toContain('Operating Expenses:');
+    // Slide 0: Gross Profit & Net Profit
+    expect(twoColGrids[0]?.textContent).toContain('Gross Profit');
+    expect(twoColGrids[0]?.textContent).toContain('Net Profit');
+    expect(twoColGrids[0]?.textContent).not.toContain('Total Revenue:');
+
+    // Slide 1: Total Sales & Total Purchases
+    expect(twoColGrids[1]?.textContent).toContain('Total Sales');
+    expect(twoColGrids[1]?.textContent).toContain('Total Purchases');
+    expect(twoColGrids[1]?.textContent).not.toContain('Avg Bill:');
+
+    // Slide 2: Opening Stock & Closing Stock
+    expect(twoColGrids[2]?.textContent).toContain('Opening Stock');
+    expect(twoColGrids[2]?.textContent).toContain('Closing Stock');
+    expect(twoColGrids[2]?.textContent).not.toContain('Valuation Basis:');
+
+    // Verify horizontal carousel is present
+    const carousel = container.querySelector('.overflow-x-auto');
+    expect(carousel).not.toBeNull();
 
     // Click Expand
     await act(async () => {

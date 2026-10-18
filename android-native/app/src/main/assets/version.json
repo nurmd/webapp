@@ -1,15 +1,15 @@
 {
-  "version": "1.2.6",
+  "version": "1.2.7",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-18T09:17:52.423Z",
+  "buildTime": "2026-10-18T09:28:41.833Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "default collapsed two-column view for business performance card v1.2.6",
     "v1.2.5 business performance card redesign, dual-axis gesture disambiguation & release APK",
     "v1.2.4 commercial orders, returns, WhatsApp sharing & bulk operations",
     "v1.2.3 comprehensive reporting hub with 5 categories & 1-click PDF/Excel export",
     "v1.2.2 category management, billing & invoice settings consolidation & release APK",
-    "v1.2.1 fix Android hardware back navigation to dashboard & release APK",
-    "full functional multi-document prefix settings & remove redundant party sort pill"
+    "v1.2.1 fix Android hardware back navigation to dashboard & release APK"
   ]
 }

@@ -979,311 +979,412 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
             )}
           </button>
 
-          {/* Slide Arrow Controls (only when expanded) */}
-          {!isCollapsed && (
-            <div className="hidden sm:flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => scrollToSlide(Math.max(0, activeSlide - 1))}
-                disabled={activeSlide === 0}
-                className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-                aria-label="Previous card slide"
-              >
-                <ChevronLeft size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToSlide(Math.min(SLIDES.length - 1, activeSlide + 1))}
-                disabled={activeSlide === SLIDES.length - 1}
-                className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-                aria-label="Next card slide"
-              >
-                <ChevronRight size={13} />
-              </button>
-            </div>
-          )}
+          {/* Slide Arrow Controls */}
+          <div className="hidden sm:flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => scrollToSlide(Math.max(0, activeSlide - 1))}
+              disabled={activeSlide === 0}
+              className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+              aria-label="Previous card slide"
+            >
+              <ChevronLeft size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSlide(Math.min(SLIDES.length - 1, activeSlide + 1))}
+              disabled={activeSlide === SLIDES.length - 1}
+              className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+              aria-label="Next card slide"
+            >
+              <ChevronRight size={13} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Collapsed 2-Column View (Default): Only Gross Profit and Net Profit side-by-side */}
-      {isCollapsed ? (
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-1">
-          {/* Column 1: Gross Profit */}
-          <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-emerald-500/25 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-1 mb-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                  Gross Profit
-                </span>
-              </div>
-              <div
-                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
-                  isGrossProfitPositive
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                }`}
-              >
-                {isGrossProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                <span>{summary.grossMarginPct > 0 ? `+${summary.grossMarginPct}%` : `${summary.grossMarginPct}%`}</span>
-              </div>
-            </div>
-
-            <div className="my-1">
-              <div
-                className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
-                  isGrossProfitPositive ? 'text-emerald-400' : 'text-rose-400'
-                }`}
-              >
-                {formatINR(summary.grossProfit)}
-              </div>
-            </div>
-          </div>
-
-          {/* Column 2: Net Profit */}
-          <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-1 mb-1">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-400' : 'bg-rose-400'}`} />
-                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                  Net Profit
-                </span>
-              </div>
-              <div
-                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
-                  isNetProfitPositive
-                    ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                }`}
-              >
-                {isNetProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                <span>{summary.netMarginPct > 0 ? `+${summary.netMarginPct}%` : `${summary.netMarginPct}%`}</span>
-              </div>
-            </div>
-
-            <div className="my-1">
-              <div
-                className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
-                  isNetProfitPositive ? 'text-teal-400' : 'text-rose-400'
-                }`}
-              >
-                {formatINR(summary.netProfit)}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Swipeable Carousel: Each slide contains Full-Width Metric Cards + Anchored Chart */}
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="relative flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 pb-0.5 -mx-0.5 px-0.5"
+      {/* Swipeable Carousel: Each slide supports 2-Column Collapsed view OR Detailed Expanded view with Chart */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="relative flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 pb-0.5 -mx-0.5 px-0.5"
         style={{ scrollBehavior: 'smooth', touchAction: 'pan-x pan-y' }}
       >
         {/* ============================================================ */}
-        {/* SLIDE 1: PROFITS & MARGINS (Full Width Cards + Anchored Chart) */}
+        {/* SLIDE 1: PROFITS & MARGINS */}
         {/* ============================================================ */}
         <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
-          <div className="flex flex-col gap-2 sm:gap-2.5">
-            {/* Gross Profit Card (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-emerald-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Gross Profit
-                  </span>
+          {isCollapsed ? (
+            /* Collapsed Two-Column View: Just Gross Profit & Net Profit */
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              {/* Gross Profit Card */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-emerald-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Gross Profit
+                    </span>
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                      isGrossProfitPositive
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }`}
+                  >
+                    {isGrossProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    <span>{summary.grossMarginPct > 0 ? `+${summary.grossMarginPct}%` : `${summary.grossMarginPct}%`}</span>
+                  </div>
                 </div>
-                <div
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 ${
-                    isGrossProfitPositive
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  }`}
-                >
-                  {isGrossProfitPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                  <span>{summary.grossMarginPct > 0 ? `+${summary.grossMarginPct}%` : `${summary.grossMarginPct}%`} Margin</span>
+
+                <div className="my-1">
+                  <div
+                    className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                      isGrossProfitPositive ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {formatINR(summary.grossProfit)}
+                  </div>
                 </div>
               </div>
 
-              <div className="my-1">
-                <div
-                  className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
-                    isGrossProfitPositive ? 'text-emerald-400' : 'text-rose-400'
-                  }`}
-                >
-                  {formatINR(summary.grossProfit)}
+              {/* Net Profit Card */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-400' : 'bg-rose-400'}`} />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Net Profit
+                    </span>
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                      isNetProfitPositive
+                        ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    }`}
+                  >
+                    {isNetProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                    <span>{summary.netMarginPct > 0 ? `+${summary.netMarginPct}%` : `${summary.netMarginPct}%`}</span>
+                  </div>
                 </div>
-              </div>
 
-              <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Total Revenue: <strong className="text-white font-mono">{formatINR(summary.totalSales)}</strong></span>
-                <span className="text-slate-400">COGS: <strong className="text-slate-200 font-mono">{formatINR(summary.totalCogs)}</strong></span>
+                <div className="my-1">
+                  <div
+                    className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                      isNetProfitPositive ? 'text-teal-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {formatINR(summary.netProfit)}
+                  </div>
+                </div>
               </div>
             </div>
+          ) : (
+            /* Expanded Full Details + Area Chart */
+            <>
+              <div className="flex flex-col gap-2 sm:gap-2.5">
+                {/* Gross Profit Card (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-emerald-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Gross Profit
+                      </span>
+                    </div>
+                    <div
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 ${
+                        isGrossProfitPositive
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      }`}
+                    >
+                      {isGrossProfitPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                      <span>{summary.grossMarginPct > 0 ? `+${summary.grossMarginPct}%` : `${summary.grossMarginPct}%`} Margin</span>
+                    </div>
+                  </div>
 
-            {/* Net Profit Card (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-400' : 'bg-rose-400'}`} />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Net Profit (Bottom Line)
-                  </span>
+                  <div className="my-1">
+                    <div
+                      className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
+                        isGrossProfitPositive ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {formatINR(summary.grossProfit)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Total Revenue: <strong className="text-white font-mono">{formatINR(summary.totalSales)}</strong></span>
+                    <span className="text-slate-400">COGS: <strong className="text-slate-200 font-mono">{formatINR(summary.totalCogs)}</strong></span>
+                  </div>
                 </div>
-                <div
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 ${
-                    isNetProfitPositive
-                      ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                  }`}
-                >
-                  {isNetProfitPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                  <span>{summary.netMarginPct > 0 ? `+${summary.netMarginPct}%` : `${summary.netMarginPct}%`} Margin</span>
+
+                {/* Net Profit Card (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-400' : 'bg-rose-400'}`} />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Net Profit (Bottom Line)
+                      </span>
+                    </div>
+                    <div
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold shrink-0 ${
+                        isNetProfitPositive
+                          ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      }`}
+                    >
+                      {isNetProfitPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                      <span>{summary.netMarginPct > 0 ? `+${summary.netMarginPct}%` : `${summary.netMarginPct}%`} Margin</span>
+                    </div>
+                  </div>
+
+                  <div className="my-1">
+                    <div
+                      className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
+                        isNetProfitPositive ? 'text-teal-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {formatINR(summary.netProfit)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Gross Profit: <strong className="text-white font-mono">{formatINR(summary.grossProfit)}</strong></span>
+                    <span className="text-rose-400">Operating Exp: <strong className="font-mono">-{formatINR(summary.totalExpenses)}</strong></span>
+                  </div>
                 </div>
               </div>
-
-              <div className="my-1">
-                <div
-                  className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
-                    isNetProfitPositive ? 'text-teal-300' : 'text-rose-300'
-                  }`}
-                >
-                  {formatINR(summary.netProfit)}
-                </div>
-              </div>
-
-              <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Gross Profit: <strong className="text-white font-mono">{formatINR(summary.grossProfit)}</strong></span>
-                <span className="text-rose-400">Operating Exp: <strong className="font-mono">-{formatINR(summary.totalExpenses)}</strong></span>
-              </div>
-            </div>
-          </div>
-          {/* Anchored Chart for Profits & Margins */}
-          {renderAreaChart(0)}
+              {/* Anchored Chart for Profits & Margins */}
+              {renderAreaChart(0)}
+            </>
+          )}
         </div>
 
         {/* ============================================================ */}
-        {/* SLIDE 2: SALES & PURCHASES (Full Width Cards + Anchored Chart) */}
+        {/* SLIDE 2: SALES & PURCHASES */}
         {/* ============================================================ */}
         <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
-          <div className="flex flex-col gap-2 sm:gap-2.5">
-            {/* Total Sales (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-blue-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Total Sales
+          {isCollapsed ? (
+            /* Collapsed Two-Column View: Just Total Sales & Total Purchases */
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              {/* Total Sales */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-blue-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Total Sales
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                    {summary.salesBillCount} Invoices
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
-                  {summary.salesBillCount} Invoices
-                </span>
-              </div>
 
-              <div className="my-1">
-                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white truncate">
-                  {formatINR(summary.totalSales)}
+                <div className="my-1">
+                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-white truncate">
+                    {formatINR(summary.totalSales)}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Avg Bill: <strong className="text-white font-mono">{formatINR(avgSalesBill)}</strong></span>
-                <span className="text-slate-400 truncate">Outward Supply Turnover</span>
-              </div>
-            </div>
-
-            {/* Total Purchases (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-amber-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Total Purchases
+              {/* Total Purchases */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-amber-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Total Purchases
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                    {summary.purchasesBillCount} Bills
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                  {summary.purchasesBillCount} Bills
-                </span>
-              </div>
 
-              <div className="my-1">
-                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-300 truncate">
-                  {formatINR(summary.totalPurchases)}
+                <div className="my-1">
+                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-amber-300 truncate">
+                    {formatINR(summary.totalPurchases)}
+                  </div>
                 </div>
               </div>
-
-              <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Trade Surplus: <strong className={`font-mono ${tradeNetSurplus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(tradeNetSurplus)}</strong></span>
-                <span className="text-slate-400 truncate">Inward Inventory Inflow</span>
-              </div>
             </div>
-          </div>
-          {/* Anchored Chart for Sales & Purchases */}
-          {renderAreaChart(1)}
+          ) : (
+            /* Expanded Full Details + Area Chart */
+            <>
+              <div className="flex flex-col gap-2 sm:gap-2.5">
+                {/* Total Sales (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-blue-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Total Sales
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 shrink-0">
+                      {summary.salesBillCount} Invoices
+                    </span>
+                  </div>
+
+                  <div className="my-1">
+                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white truncate">
+                      {formatINR(summary.totalSales)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Avg Bill: <strong className="text-white font-mono">{formatINR(avgSalesBill)}</strong></span>
+                    <span className="text-slate-400 truncate">Outward Supply Turnover</span>
+                  </div>
+                </div>
+
+                {/* Total Purchases (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-amber-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Total Purchases
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                      {summary.purchasesBillCount} Bills
+                    </span>
+                  </div>
+
+                  <div className="my-1">
+                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-300 truncate">
+                      {formatINR(summary.totalPurchases)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-300 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Trade Surplus: <strong className={`font-mono ${tradeNetSurplus >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatINR(tradeNetSurplus)}</strong></span>
+                    <span className="text-slate-400 truncate">Inward Inventory Inflow</span>
+                  </div>
+                </div>
+              </div>
+              {/* Anchored Chart for Sales & Purchases */}
+              {renderAreaChart(1)}
+            </>
+          )}
         </div>
 
         {/* ============================================================ */}
-        {/* SLIDE 3: STOCK VALUATION (Full Width Cards + Anchored Chart)  */}
+        {/* SLIDE 3: STOCK VALUATION */}
         {/* ============================================================ */}
         <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
-          <div className="flex flex-col gap-2 sm:gap-2.5">
-            {/* Opening Stock (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-purple-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Opening Stock
+          {isCollapsed ? (
+            /* Collapsed Two-Column View: Just Opening Stock & Closing Stock */
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              {/* Opening Stock */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-purple-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Opening Stock
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                    {summary.openingStockQuantity} Units
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
-                  {summary.openingStockQuantity} Units
-                </span>
-              </div>
 
-              <div className="my-1">
-                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-300 truncate">
-                  {formatINR(summary.openingStockValue)}
+                <div className="my-1">
+                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-purple-300 truncate">
+                    {formatINR(summary.openingStockValue)}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-[10.5px] text-slate-400 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Valuation Basis: <strong className="text-slate-200 font-medium">Cost basis</strong></span>
-                <span className="text-slate-300 font-medium truncate">Period Start Asset</span>
-              </div>
-            </div>
-
-            {/* Closing Stock (Full Width) */}
-            <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs transition-all">
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
-                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
-                    Closing Stock
+              {/* Closing Stock */}
+              <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                      Closing Stock
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 shrink-0">
+                    {summary.closingStockQuantity} Units
                   </span>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 shrink-0">
-                  {summary.closingStockQuantity} Units
-                </span>
-              </div>
 
-              <div className="my-1">
-                <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-teal-300 truncate">
-                  {formatINR(summary.closingStockValue)}
+                <div className="my-1">
+                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-teal-300 truncate">
+                    {formatINR(summary.closingStockValue)}
+                  </div>
                 </div>
               </div>
-
-              <div className="text-[10.5px] text-slate-400 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
-                <span>Stock Change: <strong className={`font-mono ${stockDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{stockDelta >= 0 ? '+' : ''}{formatINR(stockDelta)}</strong></span>
-                <span className="text-slate-300 font-medium truncate">Current On-Hand Asset</span>
-              </div>
             </div>
-          </div>
-          {/* Anchored Chart for Stock Valuation */}
-          {renderAreaChart(2)}
+          ) : (
+            /* Expanded Full Details + Area Chart */
+            <>
+              <div className="flex flex-col gap-2 sm:gap-2.5">
+                {/* Opening Stock (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-purple-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Opening Stock
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                      {summary.openingStockQuantity} Units
+                    </span>
+                  </div>
+
+                  <div className="my-1">
+                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-300 truncate">
+                      {formatINR(summary.openingStockValue)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-400 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Valuation Basis: <strong className="text-slate-200 font-medium">Cost basis</strong></span>
+                    <span className="text-slate-300 font-medium truncate">Period Start Asset</span>
+                  </div>
+                </div>
+
+                {/* Closing Stock (Full Width) */}
+                <div className="w-full bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs transition-all">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                        Closing Stock
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 shrink-0">
+                      {summary.closingStockQuantity} Units
+                    </span>
+                  </div>
+
+                  <div className="my-1">
+                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-teal-300 truncate">
+                      {formatINR(summary.closingStockValue)}
+                    </div>
+                  </div>
+
+                  <div className="text-[10.5px] text-slate-400 pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <span>Stock Change: <strong className={`font-mono ${stockDelta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{stockDelta >= 0 ? '+' : ''}{formatINR(stockDelta)}</strong></span>
+                    <span className="text-slate-300 font-medium truncate">Current On-Hand Asset</span>
+                  </div>
+                </div>
+              </div>
+              {/* Anchored Chart for Stock Valuation */}
+              {renderAreaChart(2)}
+            </>
+          )}
         </div>
       </div>
 
@@ -1310,8 +1411,6 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
           );
         })}
       </div>
-        </>
-      )}
 
       {/* Date Filter Modal */}
       {isDateModalOpen && (
