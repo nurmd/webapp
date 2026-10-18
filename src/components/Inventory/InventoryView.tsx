@@ -89,16 +89,21 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }
   };
 
-  // Back Navigation for modals (priority 20)
+  // Priority 20: Back Navigation for dialogs and modals
   useBackNavigation(() => {
     if (previewInvoice !== null) { setPreviewInvoice(null); return true; }
     if (previewPurchase !== null) { setPreviewPurchase(null); return true; }
     if (isModalOpen) { setIsModalOpen(false); return true; }
     if (isFilterModalOpen) { setIsFilterModalOpen(false); return true; }
     if (adjustmentItem !== null) { setAdjustmentItem(null); return true; }
-    if (activeItemDetail !== null) { setActiveItemDetail(null); return true; }
     return false;
-  }, isModalOpen || isFilterModalOpen || activeItemDetail !== null || adjustmentItem !== null || previewInvoice !== null || previewPurchase !== null, 20);
+  }, isModalOpen || isFilterModalOpen || adjustmentItem !== null || previewInvoice !== null || previewPurchase !== null, 20);
+
+  // Priority 15: Sub-view sheet back navigation (Item details & transaction passbook)
+  useBackNavigation(() => {
+    setActiveItemDetail(null);
+    return true;
+  }, activeItemDetail !== null, 15);
 
   // Privacy toggles: Buy price visibility per item & global setting
   const [showBuyPricesGlobally, setShowBuyPricesGlobally] = useState<boolean>(() => {
@@ -517,7 +522,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 setIsBarcodeModalOpen(true);
               }}
             >
-              <span className="material-symbols-outlined text-[22px]">barcode_scanner</span>
+              <span className="material-symbols-outlined text-[22px]">qr_code_2</span>
             </button>
           </div>
 

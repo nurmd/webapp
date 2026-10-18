@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DatePreset, getDateFilterBounds } from '../../core/utils/dateFilters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface DateFilterModalProps {
   isOpen: boolean;
@@ -32,6 +33,11 @@ export const DateFilterModal: React.FC<DateFilterModalProps> = ({
   onSelectRange,
   accentColor = 'secondary',
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 25);
+
   const [selectedPreset, setSelectedPreset] = useState<DatePreset>(activePreset);
   const [startInput, setStartInput] = useState<string>(customStartDate);
   const [endInput, setEndInput] = useState<string>(customEndDate);

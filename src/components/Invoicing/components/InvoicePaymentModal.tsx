@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoice.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { formatSplitNotes } from '../../../core/accounting/paymentSplitUtils.ts';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 export interface InvoicePaymentModalProps {
   isOpen: boolean;
@@ -41,6 +42,11 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
   initialSplits,
   onConfirmPayment,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [splits, setSplits] = useState<PaymentSplit[]>(() => {
     if (initialSplits && initialSplits.length > 0) {
       return initialSplits.map((s, idx) => ({

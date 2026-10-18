@@ -138,28 +138,14 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     vouchers,
   });
 
-  // Priority 15 back navigation handling for Android back button / escape
+  // Priority 20: Dismiss expanded party detail card before leaving page
   useBackNavigation(() => {
-    if (selectedInvoiceForView) {
-      setSelectedInvoiceForView(null);
-      return true;
-    }
-    if (selectedPurchaseBill) {
-      setSelectedPurchaseBill(null);
-      return true;
-    }
-    if (editingLedgerEntry) {
-      setEditingLedgerEntry(null);
-      return true;
-    }
-    if (isPaymentOpen) {
-      setIsPaymentOpen(false);
-      return true;
-    }
-    if (showPartyDetails) {
-      setShowPartyDetails(false);
-      return true;
-    }
+    setShowPartyDetails(false);
+    return true;
+  }, showPartyDetails, 20);
+
+  // Priority 15 back navigation handling for Android back button / escape to return to Parties list
+  useBackNavigation(() => {
     onBack();
     return true;
   }, true, 15);

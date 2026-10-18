@@ -117,14 +117,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     }
   }, [heldBills]);
 
-  // Handle Back Navigation
+  // Priority 20: Handle POS modals and overlays
   useBackNavigation(() => {
-    if (completedSale) {
-      setCompletedSale(null);
-      return true;
-    }
     if (thermalPrintInvoice) {
       setThermalPrintInvoice(null);
+      return true;
+    }
+    if (completedSale) {
+      setCompletedSale(null);
       return true;
     }
     if (isScannerOpen) {
@@ -155,12 +155,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       setIsShortcutsModalOpen(false);
       return true;
     }
-    if (isMobileCartDrawerOpen) {
-      setIsMobileCartDrawerOpen(false);
-      return true;
-    }
     return false;
-  }, isScannerOpen || isCustomerModalOpen || isCustomItemModalOpen || isHoldModalOpen || isUpiModalOpen || isSplitModalOpen || isShortcutsModalOpen || isMobileCartDrawerOpen || !!completedSale || !!thermalPrintInvoice, 20);
+  }, isScannerOpen || isCustomerModalOpen || isCustomItemModalOpen || isHoldModalOpen || isUpiModalOpen || isSplitModalOpen || isShortcutsModalOpen || !!completedSale || !!thermalPrintInvoice, 20);
+
+  // Priority 15: Sub-view mobile cart drawer dismissal
+  useBackNavigation(() => {
+    setIsMobileCartDrawerOpen(false);
+    return true;
+  }, isMobileCartDrawerOpen, 15);
 
   // Unique Categories
   const categories = useMemo(() => {

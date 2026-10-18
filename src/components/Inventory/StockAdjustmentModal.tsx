@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface StockAdjustmentModalProps {
   isOpen: boolean;
@@ -17,6 +18,11 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   onSaveAdjustment,
   defaultType = 'STOCK_IN',
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen && !!item, 20);
+
   const [adjType, setAdjType] = useState<'STOCK_IN' | 'STOCK_OUT'>(defaultType);
   const [adjQty, setAdjQty] = useState<string>('1');
   const [adjReason, setAdjReason] = useState('New inventory arrival');

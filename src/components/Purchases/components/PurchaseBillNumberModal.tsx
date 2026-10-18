@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getStateList } from '../../../core/gst/stateCodes.ts';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 export interface PurchaseBillNumberModalProps {
   isOpen: boolean;
@@ -18,6 +19,11 @@ export const PurchaseBillNumberModal: React.FC<PurchaseBillNumberModalProps> = (
   onApply,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [customBillNo, setCustomBillNo] = useState(billNumber);
   const [currentBillDate, setCurrentBillDate] = useState(billDate);
   const [currentSupplierStateCode, setCurrentSupplierStateCode] = useState(supplierStateCode);

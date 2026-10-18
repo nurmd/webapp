@@ -4,6 +4,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
 import { db } from '../../services/db.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface SelectPosPartyModalProps {
   isOpen: boolean;
@@ -23,6 +24,18 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
   const isGstActive = db.getCompany().isGstEnabled !== false;
   const [search, setSearch] = useState('');
   const [isAddingNew, setIsAddingNew] = useState(false);
+
+  // Priority 25: Dismiss Add New Party sub-form before closing modal
+  useBackNavigation(() => {
+    setIsAddingNew(false);
+    return true;
+  }, isAddingNew, 25);
+
+  // Priority 20: Close Select Party modal
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
   // Party Sort Mode: loops RECENT -> NAME -> AMOUNT -> RECENT on repeated clicks
   const [sortMode, setSortMode] = useState<'RECENT' | 'NAME' | 'AMOUNT'>('RECENT');
 

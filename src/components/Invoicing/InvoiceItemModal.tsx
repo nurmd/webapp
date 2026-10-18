@@ -5,6 +5,7 @@ import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import { HsnItem } from '../../core/gst/hsnCatalog';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -59,6 +60,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   mode = 'sale',
   onItemCreated,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
   const isPurchase = mode === 'purchase';
   const defaultHsn = isPurchase ? '844332' : '998313';
   const isEditing = Boolean(initialItem);

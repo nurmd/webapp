@@ -7,6 +7,7 @@ import {
   formatWhatsAppMessage,
   openWhatsAppShare,
 } from '../../services/whatsappService.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface WhatsAppShareModalProps {
   invoice: Invoice;
@@ -19,6 +20,11 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   company,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, true, 30);
+
   const [language, setLanguage] = useState<TemplateLanguage>('en');
   const [purpose, setPurpose] = useState<MessagePurpose>('invoice');
   const [phone, setPhone] = useState('');

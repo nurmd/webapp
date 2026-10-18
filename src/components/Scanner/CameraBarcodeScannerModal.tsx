@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { audioService } from '../../services/barcodeService.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface CameraBarcodeScannerModalProps {
   isOpen: boolean;
@@ -12,6 +13,11 @@ export const CameraBarcodeScannerModal: React.FC<CameraBarcodeScannerModalProps>
   onClose,
   onScan,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 30);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [torchOn, setTorchOn] = useState(false);

@@ -2,6 +2,7 @@ import React from 'react';
 import { HeldBill } from './types.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface HoldBillsModalProps {
   isOpen: boolean;
@@ -20,6 +21,11 @@ export const HoldBillsModal: React.FC<HoldBillsModalProps> = ({
   onClearAll,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [showClearAllConfirm, setShowClearAllConfirm] = React.useState(false);
 
   if (!isOpen) return null;

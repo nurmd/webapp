@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface CustomItemModalProps {
   isOpen: boolean;
@@ -13,6 +14,11 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   onClose,
   onAddCustomItem,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [qty, setQty] = useState('');

@@ -211,6 +211,9 @@ export const App: React.FC = () => {
   ) => {
     setPartiesSegment(segment);
     setPartiesFilter(filter);
+    if (activeTab !== 'parties') {
+      previousTabRef.current = activeTab;
+    }
     setActiveTab('parties');
   };
 
@@ -229,6 +232,7 @@ export const App: React.FC = () => {
 
   const activeTabRef = React.useRef(activeTab);
   activeTabRef.current = activeTab;
+  const previousTabRef = React.useRef<AppTab>('dashboard');
 
   React.useEffect(() => {
     rbac.migrateLegacyPins().catch((err) => {
@@ -287,6 +291,13 @@ export const App: React.FC = () => {
     setIsUpdateModalOpen(false);
     return true;
   }, isUpdateModalOpen, 25);
+
+  // Quick Billing POS: navigate to parent sales hub or dashboard on back
+  useBackNavigation(() => {
+    const fallbackTab = previousTabRef.current === 'sales' ? 'sales' : 'dashboard';
+    setActiveTab(fallbackTab);
+    return true;
+  }, activeTab === 'pos', 10);
 
   React.useEffect(() => {
     // Listen for reactive DB data updates (from local writes, remote CouchDB/PouchDB, or multi-tab BroadcastChannel)
@@ -924,6 +935,9 @@ export const App: React.FC = () => {
       setIsRoleSwitchOpen(true);
       return;
     }
+    if (tab !== activeTab) {
+      previousTabRef.current = activeTab;
+    }
     setActiveTab(tab);
   };
 
@@ -986,7 +1000,10 @@ export const App: React.FC = () => {
             items={activeItems}
             parties={parties}
             onNewInvoice={handleOpenNewInvoice}
-            onQuickPos={() => setActiveTab('pos')}
+            onQuickPos={() => {
+              previousTabRef.current = 'dashboard';
+              setActiveTab('pos');
+            }}
             onViewInvoice={setPreviewInvoice}
             onPrintInvoice={setPrintInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1021,7 +1038,10 @@ export const App: React.FC = () => {
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onDeleteInvoice={handleDeleteInvoice}
-            onQuickPos={() => setActiveTab('pos')}
+            onQuickPos={() => {
+              previousTabRef.current = 'sales';
+              setActiveTab('pos');
+            }}
             onRefresh={refreshData}
           />
         )}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR } from '../../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 export interface BillDiscountModalProps {
   isOpen: boolean;
@@ -18,6 +19,11 @@ export const BillDiscountModal: React.FC<BillDiscountModalProps> = ({
   onApplyDiscountPercent,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 25);
+
   if (!isOpen) return null;
 
   return (

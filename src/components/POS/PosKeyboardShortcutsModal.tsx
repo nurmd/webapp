@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface PosKeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -9,6 +10,11 @@ export const PosKeyboardShortcutsModal: React.FC<PosKeyboardShortcutsModalProps>
   isOpen,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   if (!isOpen) return null;
 
   const shortcuts = [

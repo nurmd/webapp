@@ -7,6 +7,7 @@ import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import { HsnItem } from '../../core/gst/hsnCatalog';
 import { CategorySelector } from './CategorySelector';
 import { ItemCategory } from '../../models/category.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface ItemFormModalProps {
   isOpen: boolean;
@@ -25,6 +26,11 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   isGstActive,
   existingItems,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');

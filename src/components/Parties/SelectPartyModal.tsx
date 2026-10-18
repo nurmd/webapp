@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface SelectPartyModalProps {
   parties: Party[];
@@ -16,6 +17,11 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   onClose,
   onAddNewParty,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, true, 20);
+
   const isGstActive = db.getCompany().isGstEnabled !== false;
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'CUSTOMER' | 'SUPPLIER'>('ALL');

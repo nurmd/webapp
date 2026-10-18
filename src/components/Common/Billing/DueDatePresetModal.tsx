@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 export interface DueDatePresetModalProps {
   isOpen: boolean;
@@ -17,6 +18,11 @@ export const DueDatePresetModal: React.FC<DueDatePresetModalProps> = ({
   onClose,
   accentColor = 'secondary',
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 25);
+
   if (!isOpen) return null;
 
   const isOrange = accentColor === 'orange';

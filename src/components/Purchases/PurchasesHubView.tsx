@@ -19,6 +19,7 @@ import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
 import { BulkPrintModal } from '../Printing/BulkPrintModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface PurchasesHubViewProps {
   purchases: PurchaseBill[];
@@ -50,6 +51,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   // Sorting state - Defaults to NEWEST first as requested
   const [sortBy, setSortBy] = useState<LedgerSortOption>('NEWEST');
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
+  useBackNavigation(() => {
+    setIsSortDropdownOpen(false);
+    return true;
+  }, isSortDropdownOpen, 20);
 
   // Date Range Filter state - Interactive selectable date picker
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');

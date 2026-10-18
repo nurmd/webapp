@@ -7,6 +7,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface VoucherEditorModalProps {
   editingLedgerEntry: PassbookEntry | null;
@@ -29,6 +30,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   onViewPurchase,
   onRefresh,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, !!editingLedgerEntry, 20);
+
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');

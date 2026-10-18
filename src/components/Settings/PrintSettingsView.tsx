@@ -5,6 +5,7 @@ import {
   AppPrintSettings,
 } from '../../services/printSettingsService.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface PrintSettingsViewProps {
   company: CompanyProfile;
@@ -23,6 +24,14 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
   const [savedNotice, setSavedNotice] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  useBackNavigation(() => {
+    if (onBack) {
+      onBack();
+      return true;
+    }
+    return false;
+  }, !!onBack, 10);
 
   useEffect(() => {
     // If defaultFormat is thermal, pre-select thermal tab

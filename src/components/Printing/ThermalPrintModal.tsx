@@ -11,6 +11,7 @@ import {
 } from '../../core/printer/escposBinary.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
 import { db } from '../../services/db.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface ThermalPrintModalProps {
   invoice: Invoice;
@@ -23,6 +24,11 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   company,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, true, 30);
+
   const [width, setWidth] = useState<32 | 48>(
     () => (Number(localStorage.getItem('printer_paper_width')) as 32 | 48) || 32
   );

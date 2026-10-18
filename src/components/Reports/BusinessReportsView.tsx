@@ -23,6 +23,7 @@ import type { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { db } from '../../services/db.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 // Hub Components
 import { BusinessPerformanceCard } from './BusinessPerformanceCard.tsx';
@@ -169,6 +170,12 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const [activeReportPage, setActiveReportPage] = useState<ReportCategoryKey | 'hub'>(
     initialReportPage || 'hub'
   );
+
+  // Priority 15: Sub-view back navigation back to Reports Hub
+  useBackNavigation(() => {
+    setActiveReportPage('hub');
+    return true;
+  }, activeReportPage !== 'hub', 15);
 
   // Sub-report tab state for reports with multiple tabs
   const [activeSubReport, setActiveSubReport] = useState<string>('gstr1');

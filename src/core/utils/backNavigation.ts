@@ -94,13 +94,69 @@ export function triggerBack(): boolean {
   return triggerBack();
 }
 
-function showExitToast() {
-  if (typeof window !== 'undefined') {
+export function showExitToast() {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const existing = document.getElementById('back-exit-toast');
+    if (existing) {
+      existing.remove();
+    }
     const toast = document.createElement('div');
+    toast.id = 'back-exit-toast';
     toast.innerText = 'Press back again to exit app';
     toast.className = 'fixed bottom-16 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-4 py-2 rounded-full z-50 shadow-lg animate-fade-in pointer-events-none';
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, 2000);
+  }
+}
+
+export function handleExitOrToast(): boolean {
+  const now = Date.now();
+  if (now - lastBackPressTime < 2000) {
+    try {
+      if ((window as any).AndroidBridge?.exitApp) {
+        (window as any).AndroidBridge.exitApp();
+      } else {
+        const p = App.exitApp();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      }
+    } catch {
+      try {
+        const p = App.exitApp();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      } catch {}
+    }
+    return true;
+  } else {
+    lastBackPressTime = now;
+    showExitToast();
+    return false;
+  }
+}
+
+export function getLastBackPressTime(): number {
+  return lastBackPressTime;
+}
+
+export function setLastBackPressTime(time: number) {
+  lastBackPressTime = time;
+}
+
+export function resetBackNavigationForTesting() {
+  backHandlerStack.length = 0;
+  lastBackPressTime = 0;
+  ignorePopstateCount = 0;
+  globalRootBackHandler = undefined;
+  const existing = typeof document !== 'undefined' ? document.getElementById('back-exit-toast') : null;
+  if (existing) {
+    existing.remove();
   }
 }
 
@@ -147,21 +203,7 @@ export function initBackNavigation(onRootBack?: RootBackHandler) {
             return;
           }
         }
-        const now = Date.now();
-        if (now - lastBackPressTime < 2000) {
-          try {
-            if ((window as any).AndroidBridge?.exitApp) {
-              (window as any).AndroidBridge.exitApp();
-            } else {
-              App.exitApp();
-            }
-          } catch {
-            App.exitApp();
-          }
-        } else {
-          lastBackPressTime = now;
-          showExitToast();
-        }
+        handleExitOrToast();
       }
     });
   } catch (err) {
@@ -172,8 +214,14 @@ export function initBackNavigation(onRootBack?: RootBackHandler) {
   document.addEventListener('backbutton', (e) => {
     e.preventDefault();
     const handled = triggerBack();
-    if (!handled && globalRootBackHandler) {
-      globalRootBackHandler();
+    if (!handled) {
+      if (globalRootBackHandler) {
+        const rootHandled = globalRootBackHandler();
+        if (rootHandled !== false) {
+          return;
+        }
+      }
+      handleExitOrToast();
     }
   });
 
@@ -184,8 +232,14 @@ export function initBackNavigation(onRootBack?: RootBackHandler) {
       return;
     }
     const handled = triggerBack();
-    if (!handled && globalRootBackHandler) {
-      globalRootBackHandler();
+    if (!handled) {
+      if (globalRootBackHandler) {
+        const rootHandled = globalRootBackHandler();
+        if (rootHandled !== false) {
+          return;
+        }
+      }
+      handleExitOrToast();
     }
   });
 }

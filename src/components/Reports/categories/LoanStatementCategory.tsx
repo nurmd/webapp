@@ -13,6 +13,7 @@ import type { CompanyProfile } from '../../../models/company.ts';
 import type { LoanAccount, LoanTransaction } from '../../../models/loan.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { exportReportToCsv, printReportDocument } from '../utils/reportExportUtils.ts';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 interface LoanStatementCategoryProps {
   company: CompanyProfile;
@@ -37,6 +38,11 @@ export const LoanStatementCategory: React.FC<LoanStatementCategoryProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'LOANS_LIST' | 'REPAYMENT_SCHEDULE'>('LOANS_LIST');
   const [isAddLoanModalOpen, setIsAddLoanModalOpen] = useState(false);
+
+  useBackNavigation(() => {
+    setIsAddLoanModalOpen(false);
+    return true;
+  }, isAddLoanModalOpen, 20);
 
   // Form State for Adding New Loan
   const [newLoan, setNewLoan] = useState<Partial<LoanAccount>>({

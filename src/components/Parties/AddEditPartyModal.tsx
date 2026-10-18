@@ -4,6 +4,7 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface AddEditPartyModalProps {
   isOpen: boolean;
@@ -22,6 +23,11 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   initialType = 'CUSTOMER',
   parties = [],
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const isGstActive = db.getCompany().isGstEnabled !== false;
   const allStates = getStateList();
 

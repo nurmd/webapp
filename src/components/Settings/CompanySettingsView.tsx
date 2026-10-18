@@ -288,6 +288,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     isCategoryModalOpen ||
     !!activeSubModal;
 
+  // Priority 25: Settings dialogs and sub-modals
   useBackNavigation(() => {
     if (activeSubModal) {
       setActiveSubModal(null);
@@ -329,12 +330,14 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       setIsSyncConfigOpen(false);
       return true;
     }
-    if (isMobileDetailView) {
-      setIsMobileDetailView(false);
-      return true;
-    }
     return false;
-  }, isAnySettingsModalOpen || isMobileDetailView, 20);
+  }, isAnySettingsModalOpen, 25);
+
+  // Priority 15: Sub-view back navigation - Return to settings category menu on mobile
+  useBackNavigation(() => {
+    setIsMobileDetailView(false);
+    return true;
+  }, isMobileDetailView, 15);
 
   useEffect(() => {
     setProfile({ ...company });

@@ -46,6 +46,7 @@ const mockInvoice: Invoice = {
   dueDate: '2026-10-25',
   partyId: 'party-1',
   partyName: 'Bharat Electronics',
+  partyPhone: '9876543210',
   partyAddress: 'Shop 4, Market Complex',
   partyStateCode: '27',
   placeOfSupplyStateCode: '27',

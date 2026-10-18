@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface UpiQrModalProps {
   isOpen: boolean;
@@ -19,6 +20,11 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
   onPaymentConfirmed,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;

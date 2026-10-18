@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Invoice } from '../../../models/invoice.ts';
 import { getStateList } from '../../../core/gst/stateCodes.ts';
 import { findConflictingInvoice, suggestNextUniqueInvoiceNumber } from '../../../core/utils/invoiceNumber.ts';
+import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
 export interface InvoiceNumberDateModalProps {
   isOpen: boolean;
@@ -24,6 +25,11 @@ export const InvoiceNumberDateModal: React.FC<InvoiceNumberDateModalProps> = ({
   onApply,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [customInvoiceNumberInput, setCustomInvoiceNumberInput] = useState(invoiceNumber);
   const [currentDateInput, setCurrentDateInput] = useState(invoiceDate);
   const [currentPosStateCode, setCurrentPosStateCode] = useState(posStateCode);

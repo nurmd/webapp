@@ -13,6 +13,7 @@ import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -48,6 +49,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return localStorage.getItem('defaultPrintOption') || 'A4';
   });
   const [copyType, setCopyType] = useState<InvoiceCopyType>('ORIGINAL FOR RECIPIENT');
+
+  // Priority 30: Dismiss more actions dropdown before closing preview modal
+  useBackNavigation(() => {
+    setShowMoreActions(false);
+    return true;
+  }, showMoreActions, 30);
+
+  // Priority 25: Close preview modal
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, true, 25);
 
   const isGst = company.isGstEnabled !== false && (propInvoice as any)?.isGstInvoice !== false;
 

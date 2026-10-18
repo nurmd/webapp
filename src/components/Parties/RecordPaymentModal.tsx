@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Party } from '../../models/party.ts';
 import { PaymentSplit } from '../../models/invoice.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -30,6 +31,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   onRecordPayment,
   onRefresh,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [paymentType, setPaymentType] = useState<'IN' | 'OUT'>(isCustomer ? 'IN' : 'OUT');
   const [paymentAmount, setPaymentAmount] = useState<string>(
     party.currentBalance !== 0 ? Math.abs(party.currentBalance).toString() : ''

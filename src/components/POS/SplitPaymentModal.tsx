@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface SplitPaymentBreakdown {
   cash: number;
@@ -23,6 +24,11 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   onConfirmSplit,
   onClose,
 }) => {
+  useBackNavigation(() => {
+    onClose();
+    return true;
+  }, isOpen, 20);
+
   const [cash, setCash] = useState<string>('');
   const [upi, setUpi] = useState<string>('');
   const [card, setCard] = useState<string>('');
