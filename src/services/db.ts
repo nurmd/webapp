@@ -7,6 +7,7 @@ import { PurchaseBill } from '../models/purchase.ts';
 
 import { Expense } from '../models/expense.ts';
 import { BankAccount, CashBankTransaction } from '../models/bankAccount.ts';
+import { LoanAccount, LoanTransaction } from '../models/loan.ts';
 import { pouch, type PouchDocChange } from './pouchdb.ts';
 import {
   applyInvoiceStockDecrement,
@@ -31,6 +32,19 @@ import {
   generateBackupFilename,
   validateBackupBundle,
 } from '../core/backup/backupEngine.ts';
+import {
+  DEMO_COMPANY,
+  DEMO_ITEMS,
+  DEMO_PARTIES,
+  DEMO_INVOICES,
+  DEMO_PURCHASES,
+  DEMO_EXPENSES,
+  DEMO_BANK_ACCOUNTS,
+  DEMO_CASH_BANK_TXNS,
+  DEMO_LOANS,
+  DEMO_LOAN_TRANSACTIONS,
+  DEMO_VOUCHERS,
+} from './demoData.ts';
 
 const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -45,6 +59,8 @@ const STORAGE_KEYS = {
   SETTINGS: 'gst_app_settings',
   BANK_ACCOUNTS: 'gst_bank_accounts',
   CASH_BANK_TXNS: 'gst_cash_bank_transactions',
+  LOANS: 'gst_loans',
+  LOAN_TXNS: 'gst_loan_transactions',
   LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
 };
 
@@ -444,6 +460,16 @@ class StorageService {
           this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
           break;
         }
+        case 'loan': {
+          const list = this.getLoans().filter((l) => l.id !== docId);
+          this.set(STORAGE_KEYS.LOANS, list);
+          break;
+        }
+        case 'loan_txn': {
+          const list = this.getLoanTransactions().filter((t) => t.id !== docId);
+          this.set(STORAGE_KEYS.LOAN_TXNS, list);
+          break;
+        }
       }
       this.notifyListeners();
       return;
@@ -595,6 +621,28 @@ class StorageService {
         this.set(STORAGE_KEYS.COMPANY, cleanEntity as CompanyProfile);
         break;
       }
+      case 'loan': {
+        const list = this.getLoans();
+        const idx = list.findIndex((l) => l.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as any;
+        } else {
+          list.push(cleanEntity as any);
+        }
+        this.set(STORAGE_KEYS.LOANS, list);
+        break;
+      }
+      case 'loan_txn': {
+        const list = this.getLoanTransactions();
+        const idx = list.findIndex((t) => t.id === docId);
+        if (idx >= 0) {
+          list[idx] = cleanEntity as any;
+        } else {
+          list.unshift(cleanEntity as any);
+        }
+        this.set(STORAGE_KEYS.LOAN_TXNS, list);
+        break;
+      }
       case 'settings': {
         const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = cleanEntity as any;
         const current = this.getSettings();
@@ -700,6 +748,8 @@ class StorageService {
         remoteVouchers,
         remoteBankAccounts,
         remoteCashBankTxns,
+        remoteLoans,
+        remoteLoanTxns,
       ] = await Promise.all([
         pouch.getAllDocs<SyncedSettings>('settings'),
         pouch.getAllDocs<CompanyProfile>('company'),
@@ -712,6 +762,8 @@ class StorageService {
         pouch.getAllDocs<Voucher>('voucher'),
         pouch.getAllDocs<BankAccount>('bank_account'),
         pouch.getAllDocs<CashBankTransaction>('cash_bank_txn'),
+        pouch.getAllDocs<LoanAccount>('loan'),
+        pouch.getAllDocs<LoanTransaction>('loan_txn'),
       ]);
 
       if (remoteSettings.length > 0) {
@@ -770,11 +822,68 @@ class StorageService {
         const filtered = remoteCashBankTxns.filter((t) => !DEMO_TXN_IDS.has(t.id));
         this.set(STORAGE_KEYS.CASH_BANK_TXNS, filtered);
       }
+      if (remoteLoans.length > 0) {
+        this.set(STORAGE_KEYS.LOANS, remoteLoans);
+      }
+      if (remoteLoanTxns.length > 0) {
+        this.set(STORAGE_KEYS.LOAN_TXNS, remoteLoanTxns);
+      }
 
       this.syncAllPartyBalances();
       this.notifyListeners();
     } catch (e) {
       console.warn('Error applying full PouchDB sync:', e);
+    }
+  }
+
+  public async loadDemoData(): Promise<void> {
+    try {
+      this.saveCompany(DEMO_COMPANY);
+      this.set(STORAGE_KEYS.ITEMS, DEMO_ITEMS);
+      for (const item of DEMO_ITEMS) {
+        await pouch.putDoc('item', item);
+      }
+      this.set(STORAGE_KEYS.PARTIES, DEMO_PARTIES);
+      for (const party of DEMO_PARTIES) {
+        await pouch.putDoc('party', party);
+      }
+      this.set(STORAGE_KEYS.INVOICES, DEMO_INVOICES);
+      for (const inv of DEMO_INVOICES) {
+        await pouch.putDoc('invoice', inv);
+      }
+      this.set(STORAGE_KEYS.PURCHASES, DEMO_PURCHASES);
+      for (const pur of DEMO_PURCHASES) {
+        await pouch.putDoc('purchase', pur);
+      }
+      this.set(STORAGE_KEYS.EXPENSES, DEMO_EXPENSES);
+      for (const exp of DEMO_EXPENSES) {
+        await pouch.putDoc('expense', exp);
+      }
+      this.set(STORAGE_KEYS.BANK_ACCOUNTS, DEMO_BANK_ACCOUNTS);
+      for (const acc of DEMO_BANK_ACCOUNTS) {
+        await pouch.putDoc('bank_account', acc);
+      }
+      this.set(STORAGE_KEYS.CASH_BANK_TXNS, DEMO_CASH_BANK_TXNS);
+      for (const txn of DEMO_CASH_BANK_TXNS) {
+        await pouch.putDoc('cash_bank_txn', txn);
+      }
+      this.set(STORAGE_KEYS.LOANS, DEMO_LOANS);
+      for (const loan of DEMO_LOANS) {
+        await pouch.putDoc('loan', loan);
+      }
+      this.set(STORAGE_KEYS.LOAN_TXNS, DEMO_LOAN_TRANSACTIONS);
+      for (const txn of DEMO_LOAN_TRANSACTIONS) {
+        await pouch.putDoc('loan_txn', txn);
+      }
+      this.set(STORAGE_KEYS.VOUCHERS, DEMO_VOUCHERS);
+      for (const v of DEMO_VOUCHERS) {
+        await pouch.putDoc('voucher', v);
+      }
+      this.syncAllPartyBalances();
+      this.notifyListeners();
+    } catch (e) {
+      console.error('Failed to load demo data:', e);
+      throw e;
     }
   }
 
@@ -1894,6 +2003,55 @@ class StorageService {
     this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
     pouch.deleteDoc('cash_bank_txn', id);
     this.broadcastChange('cash_bank_txn', 'delete', id);
+    this.notifyListeners();
+  }
+
+  // Loans & Borrowings
+  getLoans(): LoanAccount[] {
+    return this.get<LoanAccount[]>(STORAGE_KEYS.LOANS, []) || [];
+  }
+
+  saveLoan(loan: LoanAccount): void {
+    const list = this.getLoans();
+    const idx = list.findIndex((l) => l.id === loan.id);
+    if (idx >= 0) {
+      list[idx] = loan;
+    } else {
+      list.push(loan);
+    }
+    this.set(STORAGE_KEYS.LOANS, list);
+    pouch.putDoc('loan', loan);
+    this.broadcastChange('loan', 'save', loan.id, loan);
+    this.notifyListeners();
+  }
+
+  deleteLoan(id: string): void {
+    const list = this.getLoans().filter((l) => l.id !== id);
+    this.set(STORAGE_KEYS.LOANS, list);
+    pouch.deleteDoc('loan', id);
+    this.broadcastChange('loan', 'delete', id);
+    this.notifyListeners();
+  }
+
+  getLoanTransactions(loanId?: string): LoanTransaction[] {
+    const list = this.get<LoanTransaction[]>(STORAGE_KEYS.LOAN_TXNS, []) || [];
+    if (loanId) {
+      return list.filter((t) => t.loanId === loanId);
+    }
+    return list;
+  }
+
+  saveLoanTransaction(txn: LoanTransaction): void {
+    const list = this.getLoanTransactions();
+    const idx = list.findIndex((t) => t.id === txn.id);
+    if (idx >= 0) {
+      list[idx] = txn;
+    } else {
+      list.unshift(txn);
+    }
+    this.set(STORAGE_KEYS.LOAN_TXNS, list);
+    pouch.putDoc('loan_txn', txn);
+    this.broadcastChange('loan_txn', 'save', txn.id, txn);
     this.notifyListeners();
   }
 

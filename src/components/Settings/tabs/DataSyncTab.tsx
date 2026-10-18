@@ -1,5 +1,5 @@
 import React from 'react';
-import { PouchSyncState } from '../../../services/pouchdb.ts';
+import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL } from '../../../services/pouchdb.ts';
 
 export interface DataSyncTabProps {
   isSyncingProfile: boolean;
@@ -20,6 +20,10 @@ export interface DataSyncTabProps {
   copiedSyncCode?: boolean;
   handleCopySyncCode?: () => void;
   onOpenDatabaseBackup?: () => void;
+  handleLoadDemoCouchDb?: () => void;
+  handlePopulateDemoData?: () => void;
+  isPopulatingDemo?: boolean;
+  demoNotice?: string | null;
 }
 
 export const DataSyncTab: React.FC<DataSyncTabProps> = ({
@@ -41,6 +45,10 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   copiedSyncCode,
   handleCopySyncCode,
   onOpenDatabaseBackup,
+  handleLoadDemoCouchDb,
+  handlePopulateDemoData,
+  isPopulatingDemo = false,
+  demoNotice = null,
 }) => {
   return (
     <div className="flex flex-col gap-4">
@@ -184,12 +192,21 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
               <span className="material-symbols-outlined text-[22px]">cloud_done</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
-                Store Data Protected
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
+                  Store Data Protected
+                </span>
+                {syncState.remoteUrl?.includes('gst_demo') && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
+                    Demo Cloud
+                  </span>
+                )}
+              </div>
               <span className="text-[11px] text-on-secondary-container/80 truncate">
                 {(syncState.status === 'synced' || syncState.status === 'syncing')
-                  ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
+                  ? (syncState.remoteUrl?.includes('gst_demo')
+                      ? 'Live 2-Way Sync Active with Demo CouchDB Server'
+                      : 'Continuous 2-Way CouchDB Multi-Device Sync Active')
                   : '100% Offline-First IndexedDB Storage Ready'}
               </span>
             </div>
@@ -215,9 +232,62 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
           </div>
         </div>
 
+        {demoNotice && (
+          <div className="p-2.5 rounded-xl bg-secondary/15 border border-secondary/30 text-on-secondary-container text-xs font-semibold flex items-center gap-2 animate-fade-in">
+            <span className="material-symbols-outlined text-[18px]">info</span>
+            <span>{demoNotice}</span>
+          </div>
+        )}
+
         {/* Collapsible Sync Settings */}
         {isSyncConfigOpen && (
-          <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2 animate-fade-in">
+          <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2.5 animate-fade-in">
+            {/* Demo CouchDB Server Quick Selector */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-[18px] text-secondary">cloud_sync</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-on-surface">Demo CouchDB Server</span>
+                  <span className="text-[10px] text-on-surface-variant font-mono truncate">
+                    sync.brahmaputrahw.store/gst_demo
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  data-testid="use-demo-couchdb-btn"
+                  onClick={() => {
+                    if (handleLoadDemoCouchDb) {
+                      handleLoadDemoCouchDb();
+                    } else {
+                      setSyncUrlInput(DEFAULT_COUCHDB_REMOTE_URL);
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Connect directly to Brahmaputra demo CouchDB"
+                >
+                  <span className="material-symbols-outlined text-[14px]">bolt</span>
+                  <span>Use Demo CouchDB</span>
+                </button>
+                {handlePopulateDemoData && (
+                  <button
+                    type="button"
+                    data-testid="populate-demo-data-btn"
+                    disabled={isPopulatingDemo}
+                    onClick={handlePopulateDemoData}
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
+                    title="Populate demo invoices, purchases, items, parties and accounting records"
+                  >
+                    <span className={`material-symbols-outlined text-[14px] ${isPopulatingDemo ? 'animate-spin' : ''}`}>
+                      {isPopulatingDemo ? 'progress_activity' : 'dataset'}
+                    </span>
+                    <span>{isPopulatingDemo ? 'Populating...' : 'Populate Demo Data'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             <label className="text-[11px] font-bold text-on-secondary-container">
               Remote CouchDB / Cloudflare Tunnel URL:
             </label>
@@ -225,7 +295,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
               <input
                 type="text"
                 data-testid="sync-url-input"
-                placeholder="https://admin:pass@sync.example.com/vyapar_store"
+                placeholder={DEFAULT_COUCHDB_REMOTE_URL}
                 value={syncUrlInput}
                 onChange={(e) => setSyncUrlInput(e.target.value)}
                 className="flex-1 bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"

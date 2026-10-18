@@ -1,15 +1,15 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-17T15:00:19.692Z",
+  "buildTime": "2026-10-18T07:22:04.000Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Commercial Orders & Returns: Quotations/Estimates, Sales Orders, Sales Returns, Purchase Orders, and Purchase Returns",
-    "1-Click Document Conversion pipeline: Quotation -> Tax Invoice and Sales Order -> Tax Invoice with series auto-increment",
-    "Statutory E-Way Bill slip generation with Rule 138 threshold advisory and QR code verification",
-    "Direct WhatsApp Invoicing & Overdue Payment Reminders in English and Hindi with embedded UPI deep-links and bank transfer details",
-    "High-Velocity Bulk Document Operations: Multi-select with Bulk Print, Bulk CSV Export, Bulk Settlement, and Bulk Delete",
-    "Zero-dependency Code128 and QR Code sticker label designer supporting 50x25mm/38x25mm thermal rolls and A4 24/30-up sheets"
+    "v1.2.5 business performance card: anchored charts, dual-axis gesture disambiguation & interactive point inspection",
+    "v1.2.4 commercial orders, returns, WhatsApp sharing & bulk operations",
+    "v1.2.3 comprehensive reporting hub with 5 categories & 1-click PDF/Excel export",
+    "v1.2.2 category management, billing & invoice settings consolidation & release APK",
+    "v1.2.1 fix Android hardware back navigation to dashboard & release APK",
+    "full functional multi-document prefix settings & remove redundant party sort pill"
   ]
 }

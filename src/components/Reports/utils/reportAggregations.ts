@@ -2,8 +2,8 @@ import { Invoice } from '../../../models/invoice.ts';
 import { PurchaseBill } from '../../../models/purchase.ts';
 import { Expense, ExpenseCategory } from '../../../models/expense.ts';
 import { InventoryItem } from '../../../models/item.ts';
-import { Party } from '../../../models/party.ts';
 import { computeAgingBreakdown, AgingBreakdownResult, AgingBucket } from '../../../core/accounting/aging.ts';
+import { DatePreset, getDateFilterBounds } from '../../../core/utils/dateFilters.ts';
 
 export const ALL_EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Rent & Utilities',
@@ -425,3 +425,398 @@ export function aggregateGstr3b(
     netCashPayable,
   };
 }
+
+export interface TradingProfitAndStockSummary {
+  grossProfit: number;
+  grossMarginPct: number;
+  netProfit: number;
+  netMarginPct: number;
+  totalSales: number;
+  grossSales: number;
+  salesBillCount: number;
+  totalPurchases: number;
+  purchasesBillCount: number;
+  openingStockValue: number;
+  openingStockQuantity: number;
+  closingStockValue: number;
+  closingStockQuantity: number;
+  totalCogs: number;
+  totalExpenses: number;
+}
+
+/**
+ * Calculates comprehensive Trading Profit & Loss and Stock Valuation summary for the top performance card:
+ * Gross Profit, Net Profit, Sales, Purchases, Opening Stock, and Closing Stock.
+ */
+export function computeTradingProfitAndStockSummary(
+  invoices: Invoice[],
+  purchases: PurchaseBill[],
+  expenses: Expense[],
+  items: InventoryItem[]
+): TradingProfitAndStockSummary {
+  // Items map for fast item lookups
+  const itemsMap = new Map<string, InventoryItem>();
+  for (const item of items) {
+    itemsMap.set(item.id, item);
+    if (item.name) itemsMap.set(item.name.toLowerCase(), item);
+  }
+
+  // 1. Sales & COGS calculation
+  let totalSales = 0;
+  let grossSales = 0;
+  let totalCogs = 0;
+  let validSalesCount = 0;
+
+  // Track item quantities sold in this period
+  const itemSoldQtyMap = new Map<string, number>();
+
+  for (const inv of invoices) {
+    if (inv.isCancelled) continue;
+    if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
+      continue;
+    }
+
+    const isCreditNote = inv.invoiceType === 'CREDIT_NOTE';
+    const multiplier = isCreditNote ? -1 : 1;
+
+    const taxable = inv.totalTaxableAmount || (inv.grandTotal - (inv.totalTax || 0));
+    totalSales += taxable * multiplier;
+    grossSales += (inv.grandTotal || 0) * multiplier;
+
+    if (!isCreditNote) {
+      validSalesCount++;
+    }
+
+    const { cogs } = calculateBillProfit(inv, itemsMap);
+    totalCogs += cogs * multiplier;
+
+    // Track per-item sold quantity
+    if (inv.items && Array.isArray(inv.items)) {
+      for (const line of inv.items) {
+        const id = line.itemId || line.name?.toLowerCase();
+        if (id) {
+          const prev = itemSoldQtyMap.get(id) || 0;
+          itemSoldQtyMap.set(id, prev + (line.quantity || 0) * multiplier);
+        }
+      }
+    }
+  }
+
+  // 2. Purchases calculation
+  let totalPurchases = 0;
+  let validPurchasesCount = 0;
+  const itemPurchasedQtyMap = new Map<string, number>();
+
+  for (const pur of purchases) {
+    if (pur.isCancelled) continue;
+    totalPurchases += pur.grandTotal || 0;
+    validPurchasesCount++;
+
+    if (pur.items && Array.isArray(pur.items)) {
+      for (const line of pur.items) {
+        const id = line.itemId || line.name?.toLowerCase();
+        if (id) {
+          const prev = itemPurchasedQtyMap.get(id) || 0;
+          itemPurchasedQtyMap.set(id, prev + (line.quantity || 0));
+        }
+      }
+    }
+  }
+
+  // 3. Stock Valuations (Opening & Closing)
+  let closingStockValue = 0;
+  let closingStockQuantity = 0;
+  let openingStockValue = 0;
+  let openingStockQuantity = 0;
+
+  for (const item of items) {
+    if (item.isDisabled) continue;
+
+    const currentQty = Math.max(0, item.currentStock || 0);
+    const purchaseCost = item.purchasePrice || 0;
+
+    closingStockQuantity += currentQty;
+    closingStockValue += currentQty * purchaseCost;
+
+    // Opening Stock = Current Stock + Sold in Period - Purchased in Period
+    const sold = itemSoldQtyMap.get(item.id) || itemSoldQtyMap.get(item.name?.toLowerCase()) || 0;
+    const purchased = itemPurchasedQtyMap.get(item.id) || itemPurchasedQtyMap.get(item.name?.toLowerCase()) || 0;
+    const openingQty = Math.max(0, currentQty + sold - purchased);
+
+    openingStockQuantity += openingQty;
+    openingStockValue += openingQty * purchaseCost;
+  }
+
+  // 4. Operating Expenses
+  const expSummary = aggregateExpenseCategories(expenses);
+  const totalExpenses = expSummary.totalExpense;
+
+  // Rounding and profit calculations
+  totalSales = Math.round(totalSales * 100) / 100;
+  grossSales = Math.round(grossSales * 100) / 100;
+  totalPurchases = Math.round(totalPurchases * 100) / 100;
+  totalCogs = Math.round(totalCogs * 100) / 100;
+  closingStockValue = Math.round(closingStockValue * 100) / 100;
+  closingStockQuantity = Math.round(closingStockQuantity * 100) / 100;
+  openingStockValue = Math.round(openingStockValue * 100) / 100;
+  openingStockQuantity = Math.round(openingStockQuantity * 100) / 100;
+
+  const grossProfit = Math.round((totalSales - totalCogs) * 100) / 100;
+  const grossMarginPct = totalSales > 0 ? Math.round(((grossProfit / totalSales) * 100) * 10) / 10 : 0;
+
+  const netProfit = Math.round((grossProfit - totalExpenses) * 100) / 100;
+  const netMarginPct = totalSales > 0 ? Math.round(((netProfit / totalSales) * 100) * 10) / 10 : 0;
+
+  return {
+    grossProfit,
+    grossMarginPct,
+    netProfit,
+    netMarginPct,
+    totalSales,
+    grossSales,
+    salesBillCount: validSalesCount,
+    totalPurchases,
+    purchasesBillCount: validPurchasesCount,
+    openingStockValue,
+    openingStockQuantity,
+    closingStockValue,
+    closingStockQuantity,
+    totalCogs,
+    totalExpenses,
+  };
+}
+
+export type PerformanceGranularity = 'MONTH' | 'WEEK' | 'DAY';
+
+export interface PerformanceIntervalPoint {
+  label: string;
+  fullDate?: string;
+  sales: number;
+  purchases: number;
+  grossProfit: number;
+  netProfit: number;
+  closingStock: number;
+  openingStock: number;
+}
+
+export interface PerformanceTimeSeriesResult {
+  granularity: PerformanceGranularity;
+  granularityLabel: string;
+  points: PerformanceIntervalPoint[];
+}
+
+const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Computes time-series intervals for the Business Performance graph:
+ * - 'MONTH': If date filter is set to year (THIS_FY, ALL_TIME) or custom range >= 180 days (half-year)
+ * - 'WEEK': If date range exceeds a month (> 31 days, e.g. THIS_QUARTER)
+ * - 'DAY': For the rest (<= 31 days, e.g. THIS_MONTH, TODAY, YESTERDAY, custom <= 31 days)
+ */
+export function computePerformanceTimeSeries(
+  invoices: Invoice[],
+  purchases: PurchaseBill[],
+  expenses: Expense[],
+  items: InventoryItem[],
+  datePreset: DatePreset,
+  customStart?: string,
+  customEnd?: string
+): PerformanceTimeSeriesResult {
+  const bounds = getDateFilterBounds(datePreset, customStart, customEnd);
+  const startStr = bounds.start;
+  const endStr = bounds.end;
+
+  const dStart = new Date(`${startStr}T00:00:00Z`);
+  const dEnd = new Date(`${endStr}T00:00:00Z`);
+  const diffDays = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+  let granularity: PerformanceGranularity = 'DAY';
+  let granularityLabel = 'Daily Breakdown';
+
+  if (datePreset === 'THIS_FY' || datePreset === 'ALL_TIME' || diffDays >= 180) {
+    granularity = 'MONTH';
+    granularityLabel = 'Monthly Breakdown';
+  } else if (diffDays > 31 || datePreset === 'THIS_QUARTER') {
+    granularity = 'WEEK';
+    granularityLabel = 'Weekly Breakdown';
+  } else {
+    granularity = 'DAY';
+    granularityLabel = diffDays === 1 ? 'Intraday Breakdown' : 'Daily Breakdown';
+  }
+
+  // Pre-build items map for COGS computation
+  const itemsMap = new Map<string, InventoryItem>();
+  let baseStockValue = 0;
+  for (const item of items) {
+    if (item.isDisabled) continue;
+    itemsMap.set(item.id, item);
+    if (item.name) itemsMap.set(item.name.toLowerCase(), item);
+    baseStockValue += (item.currentStock || 0) * (item.purchasePrice || 0);
+  }
+
+  // Generate bucket intervals based on granularity
+  const buckets: { start: string; end: string; label: string }[] = [];
+
+  if (granularity === 'MONTH') {
+    const [sY, sM] = startStr.split('-').map(Number);
+    const [eY, eM] = endStr.split('-').map(Number);
+
+    let curY = sY;
+    let curM = sM;
+
+    while (curY < eY || (curY === eY && curM <= eM)) {
+      const lastDayOfMonth = new Date(curY, curM, 0).getDate();
+      const padM = String(curM).padStart(2, '0');
+      const mStart = `${curY}-${padM}-01`;
+      const mEnd = `${curY}-${padM}-${String(lastDayOfMonth).padStart(2, '0')}`;
+
+      const effectiveStart = mStart < startStr ? startStr : mStart;
+      const effectiveEnd = mEnd > endStr ? endStr : mEnd;
+
+      const label = sY !== eY ? `${MONTH_NAMES_SHORT[curM - 1]} '${String(curY).slice(2)}` : MONTH_NAMES_SHORT[curM - 1];
+
+      buckets.push({
+        start: effectiveStart,
+        end: effectiveEnd,
+        label,
+      });
+
+      curM++;
+      if (curM > 12) {
+        curM = 1;
+        curY++;
+      }
+    }
+  } else if (granularity === 'WEEK') {
+    let cur = new Date(dStart);
+    while (cur <= dEnd) {
+      const wStartStr = cur.toISOString().split('T')[0];
+      const nextCur = new Date(cur);
+      nextCur.setUTCDate(cur.getUTCDate() + 6);
+
+      const wEnd = nextCur > dEnd ? new Date(dEnd) : nextCur;
+      const wEndStr = wEnd.toISOString().split('T')[0];
+
+      const dNum = cur.getUTCDate();
+      const mName = MONTH_NAMES_SHORT[cur.getUTCMonth()];
+      const label = `${dNum} ${mName}`;
+
+      buckets.push({
+        start: wStartStr,
+        end: wEndStr,
+        label,
+      });
+
+      cur.setUTCDate(cur.getUTCDate() + 7);
+    }
+  } else {
+    // Granularity === 'DAY'
+    if (startStr === endStr) {
+      // Single-day view: 2 checkpoints (start of day baseline to end of day closing)
+      const summary = computeTradingProfitAndStockSummary(invoices, purchases, expenses, items);
+      return {
+        granularity,
+        granularityLabel,
+        points: [
+          {
+            label: 'Start (₹0)',
+            sales: 0,
+            purchases: 0,
+            grossProfit: 0,
+            netProfit: 0,
+            closingStock: summary.openingStockValue,
+            openingStock: summary.openingStockValue,
+          },
+          {
+            label: 'Closing',
+            sales: summary.totalSales,
+            purchases: summary.totalPurchases,
+            grossProfit: summary.grossProfit,
+            netProfit: summary.netProfit,
+            closingStock: summary.closingStockValue,
+            openingStock: summary.openingStockValue,
+          },
+        ],
+      };
+    }
+
+    let cur = new Date(dStart);
+    while (cur <= dEnd) {
+      const dayStr = cur.toISOString().split('T')[0];
+      const dNum = cur.getUTCDate();
+      const mName = MONTH_NAMES_SHORT[cur.getUTCMonth()];
+      const label = diffDays <= 14 ? `${dNum} ${mName}` : `${dNum}`;
+
+      buckets.push({
+        start: dayStr,
+        end: dayStr,
+        label,
+      });
+
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+  }
+
+  // Aggregate metrics for each bucket
+  let runningStock = baseStockValue;
+  const points: PerformanceIntervalPoint[] = buckets.map((b) => {
+    const bInvoices = invoices.filter((i) => i.date >= b.start && i.date <= b.end && !i.isCancelled);
+    const bPurchases = purchases.filter((p) => p.date >= b.start && p.date <= b.end && !p.isCancelled);
+    const bExpenses = expenses.filter((e) => e.date >= b.start && e.date <= b.end);
+
+    let sales = 0;
+    let cogs = 0;
+    for (const inv of bInvoices) {
+      if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') continue;
+      const mult = inv.invoiceType === 'CREDIT_NOTE' ? -1 : 1;
+      const total = inv.grandTotal ?? 0;
+      sales += total * mult;
+
+      for (const it of inv.items || []) {
+        const itemMaster = itemsMap.get(it.itemId) || itemsMap.get((it.name || '').toLowerCase());
+        const unitCost = itemMaster?.purchasePrice ?? (it.unitPrice * 0.7);
+        cogs += (it.quantity || 0) * unitCost * mult;
+      }
+    }
+
+    let purchasesTotal = 0;
+    for (const pur of bPurchases) {
+      const total = pur.grandTotal ?? pur.totalGrossAmount ?? 0;
+      purchasesTotal += total;
+    }
+
+    let expensesTotal = 0;
+    for (const exp of bExpenses) {
+      expensesTotal += exp.amount || 0;
+    }
+
+    sales = Math.round(sales * 100) / 100;
+    purchasesTotal = Math.round(purchasesTotal * 100) / 100;
+    cogs = Math.round(cogs * 100) / 100;
+    expensesTotal = Math.round(expensesTotal * 100) / 100;
+
+    const grossProfit = Math.round((sales - cogs) * 100) / 100;
+    const netProfit = Math.round((grossProfit - expensesTotal) * 100) / 100;
+
+    // Track stock variation
+    runningStock = runningStock + purchasesTotal - cogs;
+
+    return {
+      label: b.label,
+      fullDate: b.start,
+      sales,
+      purchases: purchasesTotal,
+      grossProfit,
+      netProfit,
+      closingStock: Math.round(runningStock * 100) / 100,
+      openingStock: baseStockValue,
+    };
+  });
+
+  return {
+    granularity,
+    granularityLabel,
+    points,
+  };
+}
+

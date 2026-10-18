@@ -9,6 +9,8 @@ import { Voucher } from '../core/accounting/voucherTypes.ts';
 
 export type SyncStatus = 'offline' | 'connecting' | 'synced' | 'syncing' | 'error';
 
+export const DEFAULT_COUCHDB_REMOTE_URL = 'https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo';
+
 export interface PouchSyncState {
   status: SyncStatus;
   remoteUrl: string;
@@ -75,9 +77,12 @@ class PouchService {
       });
     }
 
-    // Auto-restore remote sync URL from settings
+    // Auto-restore remote sync URL from settings, defaulting to demo CouchDB if not configured
     const savedRemote = localStorage.getItem('couchdb_remote_url');
-    if (savedRemote && savedRemote.trim()) {
+    if (savedRemote === null && typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      localStorage.setItem('couchdb_remote_url', DEFAULT_COUCHDB_REMOTE_URL);
+      this.startSync(DEFAULT_COUCHDB_REMOTE_URL);
+    } else if (savedRemote && savedRemote.trim()) {
       this.startSync(savedRemote.trim());
     }
   }

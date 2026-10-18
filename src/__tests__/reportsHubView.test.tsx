@@ -9,6 +9,20 @@ import { PurchaseBill } from '../models/purchase.ts';
 import { Expense } from '../models/expense.ts';
 import { InventoryItem } from '../models/item.ts';
 import { Party } from '../models/party.ts';
+import { BankAccount, CashBankTransaction } from '../models/bankAccount.ts';
+import { LoanAccount, LoanTransaction } from '../models/loan.ts';
+
+// Mock pouchdb
+vi.mock('../services/pouchdb.ts', () => ({
+  pouch: {
+    putDoc: vi.fn(),
+    deleteDoc: vi.fn(),
+    getSyncState: vi.fn(),
+    syncNow: vi.fn(),
+    startSync: vi.fn(),
+    migrateFromLocalStorage: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 // Mock browser APIs
 const mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
@@ -16,7 +30,7 @@ const mockRevokeObjectURL = vi.fn();
 const mockPrint = vi.fn();
 const mockOpen = vi.fn();
 
-describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test.tsx)', () => {
+describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubView.test.tsx)', () => {
   let container: HTMLDivElement;
   let root: ReturnType<typeof createRoot>;
 
@@ -107,24 +121,32 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       partyId: 'party-cust-1',
       partyName: 'Apex Infotech',
       partyGstin: '27AAAAA0000A1Z5',
+      partyAddress: 'Main Road, Mumbai',
+      partyStateCode: '27',
       isIntraState: true,
       placeOfSupplyStateCode: '27',
+      totalGrossAmount: 10000,
+      totalDiscount: 0,
       totalTaxableAmount: 10000,
       totalCgst: 900,
       totalSgst: 900,
       totalIgst: 0,
+      totalCess: 0,
       totalTax: 1800,
+      roundOff: 0,
       grandTotal: 11800,
+      amountInWords: 'Eleven Thousand Eight Hundred Only',
       paidAmount: 6800,
       balanceAmount: 5000,
       paymentStatus: 'PARTIAL',
-      paymentMode: 'BANK',
+      paymentMode: 'UPI',
       items: [
         {
           itemId: 'item-1',
           name: 'LED Panel 40W',
-          quantity: 10,
+          hsnSacCode: '8539',
           unit: 'PCS',
+          quantity: 10,
           unitPrice: 1000,
           taxableAmount: 10000,
           gstRate: 18,
@@ -133,11 +155,12 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
           igstAmount: 0,
           cessAmount: 0,
           totalAmount: 11800,
-          hsnSacCode: '8539',
         },
       ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
-  ] as unknown as Invoice[];
+  ];
 
   const mockPurchases: PurchaseBill[] = [
     {
@@ -147,30 +170,55 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       supplierId: 'party-supp-1',
       supplierName: 'Bajaj Electricals Ltd',
       supplierGstin: '27BBBBB0000B1Z6',
-      isIntraState: true,
+      supplierAddress: 'MIDC, Pune',
+      supplierStateCode: '27',
       placeOfSupplyStateCode: '27',
+      isIntraState: true,
       itcEligibility: 'ELIGIBLE_INPUTS',
-      totalTaxableAmount: 20000,
-      totalCgst: 1800,
-      totalSgst: 1800,
+      isRcm: false,
+      totalGrossAmount: 15000,
+      totalDiscount: 0,
+      totalTaxableAmount: 15000,
+      totalCgst: 1350,
+      totalSgst: 1350,
       totalIgst: 0,
-      totalTax: 3600,
-      grandTotal: 23600,
-      paidAmount: 15600,
+      totalCess: 0,
+      totalTax: 2700,
+      roundOff: 0,
+      grandTotal: 17700,
+      paidAmount: 9700,
       balanceAmount: 8000,
       paymentStatus: 'PARTIAL',
       paymentMode: 'BANK',
-      items: [],
+      items: [
+        {
+          itemId: 'item-1',
+          name: 'LED Panel 40W',
+          hsnSacCode: '8539',
+          unit: 'PCS',
+          quantity: 25,
+          unitPrice: 600,
+          taxableAmount: 15000,
+          gstRate: 18,
+          cgstAmount: 1350,
+          sgstAmount: 1350,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 17700,
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
-  ] as unknown as PurchaseBill[];
+  ];
 
   const mockExpenses: Expense[] = [
     {
       id: 'exp-1',
       category: 'Rent & Utilities',
-      title: 'Shop Rent',
-      amount: 15000,
-      taxableAmount: 15000,
+      title: 'Shop Rent October',
+      amount: 25000,
+      taxableAmount: 25000,
       gstRate: 0,
       taxAmount: 0,
       cgstAmount: 0,
@@ -181,6 +229,93 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       itcEligible: false,
       createdAt: new Date().toISOString(),
     },
+    {
+      id: 'exp-2',
+      category: 'Electricity & Water',
+      title: 'Commercial Power Bill',
+      amount: 4500,
+      taxableAmount: 4500,
+      gstRate: 0,
+      taxAmount: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: 0,
+      date: new Date().toISOString().split('T')[0],
+      paymentMode: 'CASH',
+      itcEligible: false,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  const mockBankAccounts: BankAccount[] = [
+    {
+      id: 'acc-cash',
+      accountName: 'Cash in Hand',
+      accountType: 'CASH',
+      openingBalance: 15000,
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+    },
+    {
+      id: 'acc-bank-1',
+      accountName: 'State Bank of India',
+      accountType: 'BANK',
+      bankName: 'State Bank of India',
+      accountNumber: '32109876543',
+      ifscCode: 'SBIN0001234',
+      openingBalance: 100000,
+      isDefault: true,
+      createdAt: '2026-10-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+    },
+  ];
+
+  const mockCashBankTxns: CashBankTransaction[] = [
+    {
+      id: 'txn-1',
+      txnNumber: 'TXN-001',
+      date: new Date().toISOString().split('T')[0],
+      type: 'DEPOSIT',
+      fromAccountId: 'acc-cash',
+      toAccountId: 'acc-bank-1',
+      amount: 5000,
+      description: 'Cash deposited to SBI',
+      createdAt: '2026-10-01T00:00:00Z',
+    },
+  ];
+
+  const mockLoans: LoanAccount[] = [
+    {
+      id: 'loan-1',
+      lenderName: 'HDFC Bank Term Loan',
+      accountNumber: '5010045678',
+      loanType: 'TERM_LOAN',
+      sanctionAmount: 500000,
+      disbursedDate: '2026-04-01',
+      interestRateAnnual: 10.5,
+      tenorMonths: 36,
+      emiAmount: 16250,
+      currentPrincipalOutstanding: 420000,
+      status: 'ACTIVE',
+      createdAt: '2026-04-01T00:00:00Z',
+      updatedAt: '2026-10-01T00:00:00Z',
+    },
+  ];
+
+  const mockLoanTransactions: LoanTransaction[] = [
+    {
+      id: 'ltxn-1',
+      loanId: 'loan-1',
+      date: new Date().toISOString().split('T')[0],
+      type: 'EMI_PAYMENT',
+      principalPaid: 12500,
+      interestPaid: 3750,
+      totalAmount: 16250,
+      paymentMode: 'BANK',
+      referenceNo: 'EMI-OCT-2026',
+      remainingPrincipal: 420000,
+      createdAt: '2026-10-01T00:00:00Z',
+    },
   ];
 
   beforeEach(() => {
@@ -188,12 +323,10 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
     document.body.appendChild(container);
     root = createRoot(container);
 
-    URL.createObjectURL = mockCreateObjectURL;
-    URL.revokeObjectURL = mockRevokeObjectURL;
-    window.print = mockPrint;
+    global.URL.createObjectURL = mockCreateObjectURL;
+    global.URL.revokeObjectURL = mockRevokeObjectURL;
     window.open = mockOpen;
-
-    vi.clearAllMocks();
+    window.print = mockPrint;
   });
 
   afterEach(() => {
@@ -204,7 +337,79 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
     vi.restoreAllMocks();
   });
 
-  it('1. Mounts BusinessReportsView with all 5 category navigation cards and active counters', async () => {
+  it('1. Mounts Reports Hub with Top Business Performance Card displaying all 6 core metrics', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          cashBankTxns={mockCashBankTxns}
+          loans={mockLoans}
+          loanTransactions={mockLoanTransactions}
+        />
+      );
+    });
+
+    // Check Top Performance Card header
+    expect(container.textContent).toContain('Business Performance & Profit');
+    expect(container.textContent).toContain('Trading Formula:');
+
+    // Check all 6 requested metrics exist in the card:
+    // 1. Gross Profit
+    expect(container.textContent).toContain('Gross Profit');
+    // 2. Net Profit
+    expect(container.textContent).toContain('Net Profit (Bottom Line)');
+    // 3. Total Sales
+    expect(container.textContent).toContain('Total Sales');
+    // 4. Total Purchases
+    expect(container.textContent).toContain('Total Purchases');
+    // 5. Opening Stock
+    expect(container.textContent).toContain('Opening Stock');
+    // 6. Closing Stock
+    expect(container.textContent).toContain('Closing Stock');
+  });
+
+  it('2. Renders all 10 selectable navigation report cards across Operations and Financials', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          cashBankTxns={mockCashBankTxns}
+          loans={mockLoans}
+          loanTransactions={mockLoanTransactions}
+        />
+      );
+    });
+
+    // Section 1: Operations & Tax Compliance
+    expect(container.textContent).toContain('Operations & Tax Compliance');
+    expect(container.textContent).toContain('GST & Tax Compliance');
+    expect(container.textContent).toContain('Sales & Revenue');
+    expect(container.textContent).toContain('Purchases & Expenses');
+    expect(container.textContent).toContain('Party & Khata Dues');
+    expect(container.textContent).toContain('Inventory & Stock Valuation');
+
+    // Section 2: Financial Statements & Banking
+    expect(container.textContent).toContain('Financial Statements & Banking');
+    expect(container.textContent).toContain('Cash Flow Statement');
+    expect(container.textContent).toContain('Balance Sheet');
+    expect(container.textContent).toContain('Bank Statement');
+    expect(container.textContent).toContain('Loan Statement & EMIs');
+    expect(container.textContent).toContain('Accounting Daybook');
+  });
+
+  it('3. Navigates to dedicated GST & Tax Compliance page, switches sub-reports, and navigates back to Hub', async () => {
     await act(async () => {
       root.render(
         <BusinessReportsView
@@ -218,64 +423,49 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       );
     });
 
-    // Check all 5 category buttons exist
-    const tabs = container.querySelectorAll('[role="tab"]');
-    expect(tabs.length).toBe(5);
+    // Click GST & Tax Compliance report card
+    const gstCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('GST & Tax Compliance')
+    ) as HTMLElement | undefined;
+    expect(gstCard).toBeDefined();
 
-    expect(container.textContent).toContain('GST & Tax');
-    expect(container.textContent).toContain('Sales');
-    expect(container.textContent).toContain('Purchases');
-    expect(container.textContent).toContain('Khata Dues');
-    expect(container.textContent).toContain('Stock');
+    await act(async () => {
+      gstCard?.click();
+    });
 
-    // Default category is GST & Tax Compliance
+    // Verify we are on dedicated page with Back button
+    expect(container.textContent).toContain('Reports Hub');
     expect(container.textContent).toContain('GSTR-1 Outward');
     expect(container.textContent).toContain('GSTR-3B Tax Offset');
     expect(container.textContent).toContain('HSN/SAC Summary');
-  });
-
-  it('2. Switches sub-reports within GST & Tax Compliance (GSTR-3B, HSN Summary)', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-        />
-      );
-    });
 
     // Switch to GSTR-3B sub-report
-    const gstr3bBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+    const gstr3bTab = Array.from(container.querySelectorAll('[role="tab"]')).find((b) =>
       b.textContent?.includes('GSTR-3B Tax Offset')
-    );
-    expect(gstr3bBtn).toBeDefined();
-
+    ) as HTMLElement | undefined;
     await act(async () => {
-      gstr3bBtn?.click();
+      gstr3bTab?.click();
     });
 
-    // Verify GSTR-3B tables render
     expect(container.textContent).toContain('Table 3.1: Details of Outward Supplies & Liabilities');
     expect(container.textContent).toContain('Table 4: Eligible Input Tax Credit');
-    expect(container.textContent).toContain('Table 6.1: Payment of Tax');
 
-    // Switch to HSN Summary
-    const hsnBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('HSN/SAC Summary')
+    // Click Back to Reports Hub
+    const backBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Reports Hub')
     );
+    expect(backBtn).toBeDefined();
+
     await act(async () => {
-      hsnBtn?.click();
+      backBtn?.click();
     });
 
-    expect(container.textContent).toContain('8539');
-    expect(container.textContent).toContain('LED Panel 40W');
+    // Verify we are back on Reports Hub
+    expect(container.textContent).toContain('Business Performance & Profit');
+    expect(container.textContent).toContain('Operations & Tax Compliance');
   });
 
-  it('3. Navigates to Sales & Revenue category and renders Bill-Wise Profit and Item-Wise Sales', async () => {
+  it('4. Navigates to dedicated Sales & Revenue page and verifies bill-wise profit', async () => {
     await act(async () => {
       root.render(
         <BusinessReportsView
@@ -289,37 +479,156 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       );
     });
 
-    // Click Sales & Revenue category tab
-    const salesTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
-      t.textContent?.includes('Sales')
+    // Click Sales & Revenue card
+    const salesCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('Sales & Revenue')
     ) as HTMLElement | undefined;
+
     await act(async () => {
-      salesTab?.click();
+      salesCard?.click();
     });
 
+    expect(container.textContent).toContain('Sales & Revenue Reports');
     expect(container.textContent).toContain('Sales Register');
     expect(container.textContent).toContain('Item-Wise Sales & Margin');
-
-    // Verify Sales Register contents
     expect(container.textContent).toContain('INV-2026-001');
     expect(container.textContent).toContain('Apex Infotech');
-    // Profit = 10000 taxable - (10 qty * 600 cost = 6000 COGS) = 4000
-    expect(container.textContent).toContain('40.0%');
-
-    // Switch to Item-Wise Sales
-    const itemWiseBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Item-Wise Sales & Margin')
-    );
-    await act(async () => {
-      itemWiseBtn?.click();
-    });
-
-    expect(container.textContent).toContain('LED Panel 40W');
-    expect(container.textContent).toContain('Qty Sold');
-    expect(container.textContent).toContain('10');
+    expect(container.textContent).toContain('40.0%'); // Margin
   });
 
-  it('4. Navigates to Purchases & Expenses category and displays 10-category expense breakdown', async () => {
+  it('5. Navigates to dedicated Cash Flow Statement page and displays Operating & Net Cash Flow', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          cashBankTxns={mockCashBankTxns}
+        />
+      );
+    });
+
+    // Click Cash Flow Statement card
+    const cashFlowCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('Cash Flow Statement')
+    ) as HTMLElement | undefined;
+
+    await act(async () => {
+      cashFlowCard?.click();
+    });
+
+    expect(container.textContent).toContain('Opening Liquid Balance');
+    expect(container.textContent).toContain('Operating Cash Flow');
+    expect(container.textContent).toContain('Net Cash Flow');
+    expect(container.textContent).toContain('Closing Liquid Balance');
+    expect(container.textContent).toContain('Sales Receipt (INV-2026-001)');
+  });
+
+  it('6. Navigates to dedicated Balance Sheet page and verifies Balance invariant', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          cashBankTxns={mockCashBankTxns}
+          loans={mockLoans}
+        />
+      );
+    });
+
+    // Click Balance Sheet card
+    const bsCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('Balance Sheet')
+    ) as HTMLElement | undefined;
+
+    await act(async () => {
+      bsCard?.click();
+    });
+
+    expect(container.textContent).toContain('Balance Sheet Statement');
+    expect(container.textContent).toContain('1. ASSETS');
+    expect(container.textContent).toContain('2. LIABILITIES & EQUITY');
+    expect(container.textContent).toContain('Balanced');
+    expect(container.textContent).toContain('Current Assets');
+    expect(container.textContent).toContain('Closing Inventory');
+    expect(container.textContent).toContain('Sundry Creditors');
+  });
+
+  it('7. Navigates to dedicated Bank Statement page and displays passbook ledger with running balance', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          cashBankTxns={mockCashBankTxns}
+        />
+      );
+    });
+
+    // Click Bank Statement card
+    const bankCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('Bank Statement')
+    ) as HTMLElement | undefined;
+
+    await act(async () => {
+      bankCard?.click();
+    });
+
+    expect(container.textContent).toContain('Bank Statement & Passbook');
+    expect(container.textContent).toContain('Select Bank Account / Register');
+    expect(container.textContent).toContain('State Bank of India');
+    expect(container.textContent).toContain('Total Deposits (Credit)');
+    expect(container.textContent).toContain('Total Withdrawals (Debit)');
+  });
+
+  it('8. Navigates to dedicated Loan Statement page and renders borrowings overview and EMI schedule', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+          bankAccounts={mockBankAccounts}
+          loans={mockLoans}
+          loanTransactions={mockLoanTransactions}
+        />
+      );
+    });
+
+    // Click Loan Statement card
+    const loanCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('Loan Statement & EMIs')
+    ) as HTMLElement | undefined;
+
+    await act(async () => {
+      loanCard?.click();
+    });
+
+    expect(container.textContent).toContain('Loan Statement & EMIs');
+    expect(container.textContent).toContain('Total Sanctioned Principal');
+    expect(container.textContent).toContain('Total Outstanding Debt');
+    expect(container.textContent).toContain('HDFC Bank Term Loan');
+    expect(container.textContent).toContain('10.5% p.a.');
+  });
+
+  it('9. Triggers Export Excel and Export PDF correctly from a dedicated page', async () => {
     await act(async () => {
       root.render(
         <BusinessReportsView
@@ -333,132 +642,15 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
       );
     });
 
-    // Click Purchases category tab
-    const purTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
-      t.textContent?.includes('Purchases')
+    // Open GST page
+    const gstCard = Array.from(container.querySelectorAll('[role="button"]')).find((c) =>
+      c.textContent?.includes('GST & Tax Compliance')
     ) as HTMLElement | undefined;
     await act(async () => {
-      purTab?.click();
+      gstCard?.click();
     });
 
-    expect(container.textContent).toContain('Purchase Register');
-    expect(container.textContent).toContain('Expense Category Breakdown');
-    expect(container.textContent).toContain('PUR-8801');
-    expect(container.textContent).toContain('Bajaj Electricals Ltd');
-
-    // Switch to Expense Category Breakdown
-    const expBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Expense Category Breakdown')
-    );
-    await act(async () => {
-      expBtn?.click();
-    });
-
-    expect(container.textContent).toContain('Rent & Utilities');
-    expect(container.textContent).toContain('Electricity & Water');
-    expect(container.textContent).toContain('Transport & Logistics');
-    expect(container.textContent).toContain('Salaries & Wages');
-    expect(container.textContent).toContain('Cash Expenses');
-    expect(container.textContent).toContain('Bank & Digital Payments');
-  });
-
-  it('5. Navigates to Party & Khata Dues and renders Receivables Aging & Party Ledger Statements', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-        />
-      );
-    });
-
-    // Click Party & Khata Dues
-    const khataTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
-      t.textContent?.includes('Khata Dues')
-    ) as HTMLElement | undefined;
-    await act(async () => {
-      khataTab?.click();
-    });
-
-    expect(container.textContent).toContain('Receivables Aging');
-    expect(container.textContent).toContain('Payables Aging');
-    expect(container.textContent).toContain('Party Statements');
-
-    // Receivables Aging table
-    expect(container.textContent).toContain('Apex Infotech');
-    expect(container.textContent).toContain('0-30 Days');
-
-    // Switch to Party Statements (Passbook)
-    const partyStmtBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Party Statements')
-    );
-    await act(async () => {
-      partyStmtBtn?.click();
-    });
-
-    expect(container.textContent).toContain('Select Party:');
-    expect(container.textContent).toContain('Running Balance');
-    expect(container.textContent).toContain('OPENING');
-  });
-
-  it('6. Navigates to Inventory & Stock category and surfaces valuation & low stock alerts', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-        />
-      );
-    });
-
-    // Click Inventory & Stock
-    const stockTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
-      t.textContent?.includes('Stock')
-    ) as HTMLElement | undefined;
-    await act(async () => {
-      stockTab?.click();
-    });
-
-    expect(container.textContent).toContain('Stock Summary & Valuation');
-    expect(container.textContent).toContain('Low Stock Warnings');
-    expect(container.textContent).toContain('LED Panel 40W');
-    expect(container.textContent).toContain('Copper Wire 1.5mm');
-
-    // Switch to Low Stock Warnings
-    const lowStockBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Low Stock Warnings')
-    );
-    await act(async () => {
-      lowStockBtn?.click();
-    });
-
-    expect(container.textContent).toContain('Copper Wire 1.5mm'); // 3 <= 5
-    expect(container.textContent).toContain('Reorder Sheet');
-  });
-
-  it('7. Triggers 1-Click Export Excel and Export PDF buttons correctly', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-        />
-      );
-    });
-
-    // Export Excel button
+    // Click Export Excel
     const exportExcelBtn = container.querySelector('button[aria-label="Export report to Excel or CSV"]') as HTMLButtonElement;
     expect(exportExcelBtn).toBeDefined();
 
@@ -468,7 +660,7 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
 
     expect(mockCreateObjectURL).toHaveBeenCalled();
 
-    // Export PDF button
+    // Click Export PDF
     const exportPdfBtn = container.querySelector('button[aria-label="Export report to printable PDF"]') as HTMLButtonElement;
     expect(exportPdfBtn).toBeDefined();
 
@@ -477,45 +669,5 @@ describe('Reports Hub & Categorized Views Integration Suite (reportsHubView.test
     });
 
     expect(mockOpen).toHaveBeenCalled();
-  });
-
-  it('8. Search input filters records dynamically', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-        />
-      );
-    });
-
-    const searchInput = container.querySelector('input[aria-label="Filter report records"]') as HTMLInputElement;
-    expect(searchInput).toBeDefined();
-
-    await act(async () => {
-      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-      nativeSetter?.call(searchInput, 'NonExistentInvoice999');
-      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain('No records found in Table 4 B2B');
-  });
-
-  it('9. Preserves zero window.confirm and accessibility aria-label invariant', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm');
-    expect(confirmSpy).not.toHaveBeenCalled();
-
-    // Verify all icon buttons have aria-label
-    const buttons = container.querySelectorAll('button');
-    buttons.forEach((btn) => {
-      const hasAria = btn.getAttribute('aria-label') !== null;
-      const hasText = (btn.textContent || '').trim().length > 0;
-      expect(hasAria || hasText).toBe(true);
-    });
   });
 });

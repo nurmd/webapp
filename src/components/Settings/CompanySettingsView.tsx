@@ -15,7 +15,7 @@ import {
 import { CompanyProfile } from '../../models/company.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
-import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
+import { pouch, PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL } from '../../services/pouchdb.ts';
 import { db } from '../../services/db.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
@@ -192,9 +192,13 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
 
   // Sync state
   const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
-  const [syncUrlInput, setSyncUrlInput] = useState(syncState.remoteUrl || '');
+  const [syncUrlInput, setSyncUrlInput] = useState(
+    syncState.remoteUrl || localStorage.getItem('couchdb_remote_url') || DEFAULT_COUCHDB_REMOTE_URL
+  );
   const [isSyncConfigOpen, setIsSyncConfigOpen] = useState(false);
   const [isSyncStarting, setIsSyncStarting] = useState(false);
+  const [isPopulatingDemo, setIsPopulatingDemo] = useState(false);
+  const [demoNotice, setDemoNotice] = useState<string | null>(null);
 
   // App preferences
   const [appLanguage, setAppLanguage] = useState<'English (India)' | 'हिंदी (Hindi)'>('English (India)');
@@ -396,6 +400,32 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleStopSync = () => {
     pouch.stopSync();
     setSyncUrlInput('');
+  };
+
+  const handleLoadDemoCouchDb = () => {
+    setSyncUrlInput(DEFAULT_COUCHDB_REMOTE_URL);
+    setIsSyncStarting(true);
+    pouch.startSync(DEFAULT_COUCHDB_REMOTE_URL);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      setIsSyncStarting(false);
+      setIsSyncConfigOpen(false);
+    }, 800);
+  };
+
+  const handlePopulateDemoData = async () => {
+    setIsPopulatingDemo(true);
+    try {
+      await db.loadDemoData();
+      await pouch.syncNow();
+      setDemoNotice('Demo data populated and synced successfully!');
+      setTimeout(() => setDemoNotice(null), 3500);
+    } catch (e: any) {
+      setDemoNotice('Error populating demo data: ' + (e?.message || String(e)));
+      setTimeout(() => setDemoNotice(null), 4000);
+    } finally {
+      setIsPopulatingDemo(false);
+    }
   };
 
   const handleGstinChange = (value: string) => {
@@ -797,6 +827,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 setSyncUrlInput={setSyncUrlInput}
                 handleConnectSync={handleConnectSync}
                 handleStopSync={handleStopSync}
+                handleLoadDemoCouchDb={handleLoadDemoCouchDb}
+                handlePopulateDemoData={handlePopulateDemoData}
+                isPopulatingDemo={isPopulatingDemo}
+                demoNotice={demoNotice}
                 copiedSyncCode={copiedSyncCode}
                 handleCopySyncCode={handleCopySyncCode}
                 onOpenDatabaseBackup={() => setIsDatabaseBackupModalOpen(true)}

@@ -1,34 +1,54 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Invoice } from '../../models/invoice.ts';
-import { PurchaseBill } from '../../models/purchase.ts';
-import { Expense } from '../../models/expense.ts';
-import { CompanyProfile } from '../../models/company.ts';
-import { InventoryItem } from '../../models/item.ts';
-import { Party } from '../../models/party.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import {
+  ShieldCheck,
+  TrendingUp,
+  ShoppingBag,
+  Users,
+  Package,
+  Waves,
+  Scale,
+  Landmark,
+  CreditCard,
+  BookOpen,
+} from 'lucide-react';
+import type { Invoice } from '../../models/invoice.ts';
+import type { PurchaseBill } from '../../models/purchase.ts';
+import type { Expense } from '../../models/expense.ts';
+import type { CompanyProfile } from '../../models/company.ts';
+import type { InventoryItem } from '../../models/item.ts';
+import type { Party } from '../../models/party.ts';
+import type { Voucher } from '../../core/accounting/voucherTypes.ts';
+import type { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
+import type { LoanAccount, LoanTransaction } from '../../models/loan.ts';
+import { db } from '../../services/db.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
-import {
-  ReportsHubHeader,
-  ReportCategoryKey,
-  SubReportOption,
-  ReportKpiItem,
-} from './ReportsHubHeader.tsx';
 
-// 5 Dedicated Interactive Category Views
+// Hub Components
+import { BusinessPerformanceCard } from './BusinessPerformanceCard.tsx';
+import { ReportsNavList, ReportCategoryKey } from './ReportsNavList.tsx';
+import { DedicatedReportPageHeader, SubReportTabOption } from './DedicatedReportPageHeader.tsx';
+
+// 5 Operations & Tax Dedicated Category Views
 import { GstTaxComplianceCategory } from './categories/GstTaxComplianceCategory.tsx';
 import { SalesRevenueCategory } from './categories/SalesRevenueCategory.tsx';
 import { PurchasesExpensesCategory } from './categories/PurchasesExpensesCategory.tsx';
 import { PartyKhataDuesCategory } from './categories/PartyKhataDuesCategory.tsx';
 import { InventoryStockCategory } from './categories/InventoryStockCategory.tsx';
 
+// 4 Financial & Banking Dedicated Category Views
+import { CashFlowCategory } from './categories/CashFlowCategory.tsx';
+import { BalanceSheetCategory } from './categories/BalanceSheetCategory.tsx';
+import { BankStatementCategory } from './categories/BankStatementCategory.tsx';
+import { LoanStatementCategory } from './categories/LoanStatementCategory.tsx';
+import { DaybookView } from './DaybookView.tsx';
+
 // Aggregations
 import {
-  aggregateGstr3b,
-  calculateBillProfit,
+  computeTradingProfitAndStockSummary,
   aggregateStockValuation,
-  aggregateExpenseCategories,
 } from './utils/reportAggregations.ts';
+import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
 import { computeAgingBreakdown } from '../../core/accounting/aging.ts';
 
 export interface BusinessReportsViewProps {
@@ -39,11 +59,14 @@ export interface BusinessReportsViewProps {
   items: InventoryItem[];
   parties: Party[];
   vouchers?: Voucher[];
+  bankAccounts?: BankAccount[];
+  cashBankTxns?: CashBankTransaction[];
+  loans?: LoanAccount[];
+  loanTransactions?: LoanTransaction[];
+  initialReportPage?: ReportCategoryKey | null;
 }
 
-export type ProfitPeriod = 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'THIS_QUARTER' | 'THIS_FY' | 'CUSTOM';
-
-const SUB_REPORTS_MAP: Record<ReportCategoryKey, SubReportOption[]> = {
+const SUB_REPORTS_MAP: Record<string, SubReportTabOption[]> = {
   gst_tax: [
     { id: 'gstr1', label: 'GSTR-1 Outward' },
     { id: 'gstr3b', label: 'GSTR-3B Tax Offset' },
@@ -68,6 +91,66 @@ const SUB_REPORTS_MAP: Record<ReportCategoryKey, SubReportOption[]> = {
   ],
 };
 
+const CATEGORY_META: Record<
+  ReportCategoryKey,
+  {
+    title: string;
+    subtitle: string;
+    icon: React.ComponentType<{ size?: string | number; className?: string }>;
+  }
+> = {
+  gst_tax: {
+    title: 'GST & Tax Compliance',
+    subtitle: 'GSTR-1 outward, GSTR-3B tax computation, ITC offset & HSN summary',
+    icon: ShieldCheck,
+  },
+  sales_revenue: {
+    title: 'Sales & Revenue Reports',
+    subtitle: 'Sales register, bill-wise profitability & item profit margins',
+    icon: TrendingUp,
+  },
+  purchases_expenses: {
+    title: 'Purchases & Expenses Reports',
+    subtitle: 'Purchase register, vendor bills & 10-category expense breakdown',
+    icon: ShoppingBag,
+  },
+  party_khata: {
+    title: 'Party & Khata Dues Ledger',
+    subtitle: 'Receivables aging, payables aging & party passbook ledger',
+    icon: Users,
+  },
+  inventory_stock: {
+    title: 'Inventory & Stock Valuation',
+    subtitle: 'Stock valuation at cost vs retail, low stock & reorder alerts',
+    icon: Package,
+  },
+  cash_flow: {
+    title: 'Cash Flow Statement',
+    subtitle: 'Operating, financing & investing liquid cash/bank inflows & outflows',
+    icon: Waves,
+  },
+  balance_sheet: {
+    title: 'Balance Sheet Statement',
+    subtitle: 'Financial position: Current & fixed assets vs. liabilities & equity',
+    icon: Scale,
+  },
+  bank_statement: {
+    title: 'Bank Statement & Passbook',
+    subtitle: 'Account deposits, withdrawals, UTR references & running balances',
+    icon: Landmark,
+  },
+  loan_statement: {
+    title: 'Loan Statement & EMIs',
+    subtitle: 'Active loans, borrowings, EMI schedule & principal repayment ledger',
+    icon: CreditCard,
+  },
+  daybook: {
+    title: 'Accounting Daybook & Ledger',
+    subtitle: 'Automated double-entry general journal vouchers audit trail',
+    icon: BookOpen,
+  },
+};
+
 export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   company,
   invoices,
@@ -76,9 +159,18 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   items,
   parties,
   vouchers = [],
+  bankAccounts,
+  cashBankTxns,
+  loans,
+  loanTransactions,
+  initialReportPage = null,
 }) => {
-  // Hub Navigation State
-  const [activeCategory, setActiveCategory] = useState<ReportCategoryKey>('gst_tax');
+  // Navigation State: 'hub' or a specific dedicated report category
+  const [activeReportPage, setActiveReportPage] = useState<ReportCategoryKey | 'hub'>(
+    initialReportPage || 'hub'
+  );
+
+  // Sub-report tab state for reports with multiple tabs
   const [activeSubReport, setActiveSubReport] = useState<string>('gstr1');
 
   // Filtering State
@@ -87,20 +179,49 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const [customEnd, setCustomEnd] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Child export handlers callback ref
-  const exportHandlersRef = useRef<{ exportCsv?: () => void; exportPdf?: () => void }>({});
+  // Fallbacks for bank accounts and loans if not provided in props
+  const resolvedBankAccounts = useMemo(() => {
+    return bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts();
+  }, [bankAccounts]);
 
-  const handleCategoryChange = (cat: ReportCategoryKey) => {
-    setActiveCategory(cat);
-    const defaultSub = SUB_REPORTS_MAP[cat][0].id;
-    setActiveSubReport(defaultSub);
-    setSearchQuery('');
+  const resolvedCashBankTxns = useMemo(() => {
+    return cashBankTxns && cashBankTxns.length > 0 ? cashBankTxns : db.getCashBankTransactions();
+  }, [cashBankTxns]);
+
+  const [localLoans, setLocalLoans] = useState<LoanAccount[]>(() => {
+    return loans && loans.length > 0 ? loans : db.getLoans();
+  });
+
+  const [localLoanTxns, setLocalLoanTxns] = useState<LoanTransaction[]>(() => {
+    return loanTransactions && loanTransactions.length > 0 ? loanTransactions : db.getLoanTransactions();
+  });
+
+  const handleSaveLoan = (loan: LoanAccount) => {
+    db.saveLoan(loan);
+    setLocalLoans(db.getLoans());
   };
+
+  const handleSaveLoanTxn = (txn: LoanTransaction) => {
+    db.saveLoanTransaction(txn);
+    setLocalLoanTxns(db.getLoanTransactions());
+  };
+
+  // Child export handlers ref
+  const exportHandlersRef = useRef<{ exportCsv?: () => void; exportPdf?: () => void }>({});
 
   const handleDateRangeChange = (preset: DatePreset, start?: string, end?: string) => {
     setDatePreset(preset);
     if (start) setCustomStart(start);
     if (end) setCustomEnd(end);
+  };
+
+  const handleNavigateToReport = (reportKey: ReportCategoryKey) => {
+    setActiveReportPage(reportKey);
+    const subOptions = SUB_REPORTS_MAP[reportKey];
+    if (subOptions && subOptions.length > 0) {
+      setActiveSubReport(subOptions[0].id);
+    }
+    setSearchQuery('');
   };
 
   // Date Filter Bounds
@@ -121,249 +242,148 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     return expenses.filter((e) => isDateInRange(e.date, dateBounds.start, dateBounds.end));
   }, [expenses, dateBounds]);
 
-  // Category Record Counters
-  const categoryCounters: Record<ReportCategoryKey, number> = useMemo(() => {
-    return {
-      gst_tax: periodInvoices.length + periodPurchases.length,
-      sales_revenue: periodInvoices.length,
-      purchases_expenses: periodPurchases.length + periodExpenses.length,
-      party_khata: parties.filter((p) => Math.abs(p.currentBalance || 0) > 0.01).length,
-      inventory_stock: items.filter((i) => !i.isDisabled).length,
-    };
-  }, [periodInvoices, periodPurchases, periodExpenses, parties, items]);
+  // Trading Profit and Stock Summary for the top performance card
+  const tradingSummary = useMemo(() => {
+    return computeTradingProfitAndStockSummary(
+      periodInvoices,
+      periodPurchases,
+      periodExpenses,
+      items
+    );
+  }, [periodInvoices, periodPurchases, periodExpenses, items]);
 
-  // Items map for fast lookups
-  const itemsMap = useMemo(() => {
-    const map = new Map<string, InventoryItem>();
-    for (const item of items) {
-      map.set(item.id, item);
-      if (item.name) map.set(item.name.toLowerCase(), item);
-    }
-    return map;
+  // Inventory valuation summary
+  const stockValuation = useMemo(() => {
+    return aggregateStockValuation(items);
   }, [items]);
 
-  // Calculate KPIs for current category
-  const currentKpis: ReportKpiItem[] = useMemo(() => {
-    switch (activeCategory) {
-      case 'gst_tax': {
-        const gstr3b = aggregateGstr3b(periodInvoices, periodPurchases, periodExpenses);
-        return [
-          {
-            label: 'Total Outward Tax',
-            value: formatINR(gstr3b.totalOutwardTax),
-            hint: 'From Sales & Debit Notes',
-            color: 'primary',
-          },
-          {
-            label: 'Eligible ITC Available',
-            value: formatINR(gstr3b.totalItc),
-            hint: 'Purchases & Business Expenses',
-            color: 'success',
-          },
-          {
-            label: 'Net Cash Tax Payable',
-            value: formatINR(gstr3b.netCashPayable),
-            hint: 'After ITC offset',
-            color: gstr3b.netCashPayable > 0 ? 'danger' : 'success',
-          },
-          {
-            label: 'Taxable Turnover',
-            value: formatINR(gstr3b.outwardTaxable),
-            hint: 'Net Taxable Outward',
-            color: 'info',
-          },
-        ];
-      }
+  // Receivables & Payables Aging
+  const { receivablesTotal, payablesTotal } = useMemo(() => {
+    const recInputs = periodInvoices
+      .filter((i) => !i.isCancelled)
+      .map((i) => ({
+        dueDate: i.dueDate,
+        date: i.date,
+        balanceDue: i.balanceAmount !== undefined ? i.balanceAmount : i.grandTotal - (i.paidAmount || 0),
+        partyId: i.partyId,
+        partyName: i.partyName,
+      }));
+    const recAging = computeAgingBreakdown(recInputs);
 
-      case 'sales_revenue': {
-        let totalRev = 0;
-        let totalCogs = 0;
-        let totalProfit = 0;
+    const purInputs = periodPurchases
+      .filter((p) => !p.isCancelled)
+      .map((p) => ({
+        dueDate: p.dueDate,
+        date: p.date,
+        balanceDue: p.balanceAmount !== undefined ? p.balanceAmount : p.grandTotal - (p.paidAmount || 0),
+        partyId: p.supplierId,
+        partyName: p.supplierName,
+      }));
+    const purAging = computeAgingBreakdown(purInputs);
 
-        for (const inv of periodInvoices) {
-          if (inv.isCancelled) continue;
-          const { cogs, grossProfit } = calculateBillProfit(inv, itemsMap);
-          totalRev += inv.totalTaxableAmount || (inv.grandTotal - (inv.totalTax || 0));
-          totalCogs += cogs;
-          totalProfit += grossProfit;
-        }
+    return {
+      receivablesTotal: formatINR(recAging.totalOutstanding),
+      payablesTotal: formatINR(purAging.totalOutstanding),
+    };
+  }, [periodInvoices, periodPurchases]);
 
-        const avgMargin = totalRev > 0 ? (totalProfit / totalRev) * 100 : 0;
+  // Liquid Balance
+  const cashBankFinancial = useMemo(() => {
+    return computeCashBankSummary({
+      accounts: resolvedBankAccounts,
+      invoices: periodInvoices,
+      purchases: periodPurchases,
+      expenses: periodExpenses,
+      transactions: resolvedCashBankTxns,
+    });
+  }, [resolvedBankAccounts, periodInvoices, periodPurchases, periodExpenses, resolvedCashBankTxns]);
 
-        return [
-          {
-            label: 'Taxable Sales Revenue',
-            value: formatINR(totalRev),
-            hint: `${periodInvoices.filter((i) => !i.isCancelled).length} bills recorded`,
-            color: 'primary',
-          },
-          {
-            label: 'Cost of Goods Sold (COGS)',
-            value: formatINR(totalCogs),
-            hint: 'At item purchase cost',
-            color: 'warning',
-          },
-          {
-            label: 'Gross Profit',
-            value: formatINR(totalProfit),
-            hint: 'Net Profit before overheads',
-            color: totalProfit >= 0 ? 'success' : 'danger',
-          },
-          {
-            label: 'Average Gross Margin',
-            value: `${avgMargin.toFixed(1)}%`,
-            hint: 'Profit margin %',
-            color: avgMargin >= 20 ? 'success' : 'warning',
-          },
-        ];
-      }
+  // Hub Metrics for selectable list chips
+  const hubMetrics = useMemo(() => {
+    return {
+      gstTaxInvoices: periodInvoices.length + periodPurchases.length,
+      salesTotal: formatINR(tradingSummary.totalSales),
+      purchasesTotal: formatINR(tradingSummary.totalPurchases),
+      receivablesTotal,
+      payablesTotal,
+      stockValuation: formatINR(stockValuation.purchaseValuation),
+      lowStockCount: stockValuation.lowStockCount,
+      liquidBalance: formatINR(cashBankFinancial.totalLiquidBalance),
+      activeBankCount: resolvedBankAccounts.filter((a) => a.accountType === 'BANK').length,
+      activeLoanCount: localLoans.filter((l) => l.status === 'ACTIVE').length,
+      voucherCount: vouchers.length,
+    };
+  }, [
+    periodInvoices,
+    periodPurchases,
+    tradingSummary,
+    receivablesTotal,
+    payablesTotal,
+    stockValuation,
+    cashBankFinancial,
+    resolvedBankAccounts,
+    localLoans,
+    vouchers,
+  ]);
 
-      case 'purchases_expenses': {
-        const totalPurchases = periodPurchases
-          .filter((p) => !p.isCancelled)
-          .reduce((s, p) => s + p.grandTotal, 0);
-        const expAgg = aggregateExpenseCategories(periodExpenses);
+  // -------------------------------------------------------------
+  // TIER 1: REPORTS HUB (Landing view when activeReportPage === 'hub')
+  // -------------------------------------------------------------
+  if (activeReportPage === 'hub') {
+    return (
+      <div className="p-2.5 sm:p-5 max-w-7xl mx-auto space-y-3.5 sm:space-y-5">
+        {/* Top Business Performance & Profit Card */}
+        <BusinessPerformanceCard
+          summary={tradingSummary}
+          datePreset={datePreset}
+          customStart={customStart}
+          customEnd={customEnd}
+          onSelectDateRange={handleDateRangeChange}
+          invoices={invoices}
+          purchases={purchases}
+          expenses={expenses}
+          items={items}
+        />
 
-        return [
-          {
-            label: 'Total Purchases',
-            value: formatINR(totalPurchases),
-            hint: `${periodPurchases.filter((p) => !p.isCancelled).length} bills recorded`,
-            color: 'primary',
-          },
-          {
-            label: 'Operating Expenses',
-            value: formatINR(expAgg.totalExpense),
-            hint: `${periodExpenses.length} expense vouchers`,
-            color: 'info',
-          },
-          {
-            label: 'Cash Outflow',
-            value: formatINR(expAgg.cashOutflow),
-            hint: 'Cash paid out',
-            color: 'warning',
-          },
-          {
-            label: 'Total Claimable ITC',
-            value: formatINR(
-              periodPurchases.filter((p) => !p.isCancelled && p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS').reduce((s, p) => s + p.totalTax, 0) + expAgg.totalItc
-            ),
-            hint: 'GST credits claimed',
-            color: 'success',
-          },
-        ];
-      }
+        {/* Selectable Report Navigation List */}
+        <ReportsNavList
+          onSelectReport={handleNavigateToReport}
+          metrics={hubMetrics}
+        />
+      </div>
+    );
+  }
 
-      case 'party_khata': {
-        const recInputs = periodInvoices
-          .filter((i) => !i.isCancelled)
-          .map((i) => ({
-            dueDate: i.dueDate,
-            date: i.date,
-            balanceDue: i.balanceAmount !== undefined ? i.balanceAmount : i.grandTotal - (i.paidAmount || 0),
-            partyId: i.partyId,
-            partyName: i.partyName,
-          }));
-        const recAging = computeAgingBreakdown(recInputs);
-
-        const purInputs = periodPurchases
-          .filter((p) => !p.isCancelled)
-          .map((p) => ({
-            dueDate: p.dueDate,
-            date: p.date,
-            balanceDue: p.balanceAmount !== undefined ? p.balanceAmount : p.grandTotal - (p.paidAmount || 0),
-            partyId: p.supplierId,
-            partyName: p.supplierName,
-          }));
-        const purAging = computeAgingBreakdown(purInputs);
-
-        return [
-          {
-            label: 'Total Receivables (To Collect)',
-            value: formatINR(recAging.totalOutstanding),
-            hint: `${recAging.parties.length} customer balances`,
-            color: 'success',
-          },
-          {
-            label: 'Total Payables (To Pay)',
-            value: formatINR(purAging.totalOutstanding),
-            hint: `${purAging.parties.length} supplier balances`,
-            color: 'danger',
-          },
-          {
-            label: 'Critical Overdue (90+ Days)',
-            value: formatINR(recAging.summary['90+']),
-            hint: 'High collection risk',
-            color: recAging.summary['90+'] > 0 ? 'danger' : 'info',
-          },
-          {
-            label: 'Recent Dues (0-30 Days)',
-            value: formatINR(recAging.summary['0-30']),
-            hint: 'Current healthy receivables',
-            color: 'info',
-          },
-        ];
-      }
-
-      case 'inventory_stock': {
-        const val = aggregateStockValuation(items);
-        return [
-          {
-            label: 'Stock Value @ Cost',
-            value: formatINR(val.purchaseValuation),
-            hint: 'Based on purchase prices',
-            color: 'primary',
-          },
-          {
-            label: 'Stock Value @ Retail',
-            value: formatINR(val.saleValuation),
-            hint: 'Potential sales realization',
-            color: 'info',
-          },
-          {
-            label: 'Expected Gross Margin',
-            value: `${val.potentialMarginPct.toFixed(1)}%`,
-            hint: `₹ ${val.potentialGrossProfit.toLocaleString('en-IN')} profit`,
-            color: 'success',
-          },
-          {
-            label: 'Low Stock Warnings',
-            value: String(val.lowStockCount),
-            hint: `${val.outOfStockCount} out of stock`,
-            color: val.lowStockCount > 0 ? 'warning' : 'success',
-          },
-        ];
-      }
-
-      default:
-        return [];
-    }
-  }, [activeCategory, periodInvoices, periodPurchases, periodExpenses, items, itemsMap]);
+  // -------------------------------------------------------------
+  // TIER 2: DEDICATED STANDALONE REPORT PAGES
+  // -------------------------------------------------------------
+  const categoryMeta = CATEGORY_META[activeReportPage];
+  const subReportTabs = SUB_REPORTS_MAP[activeReportPage] || [];
 
   return (
-    <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-6">
-      {/* Categorized Hub Navigation Header */}
-      <ReportsHubHeader
-        activeCategory={activeCategory}
-        onSelectCategory={handleCategoryChange}
-        categoryCounters={categoryCounters}
-        activeSubReport={activeSubReport}
-        onSelectSubReport={setActiveSubReport}
-        subReports={SUB_REPORTS_MAP[activeCategory]}
+    <div className="p-2.5 sm:p-5 max-w-7xl mx-auto space-y-3.5 sm:space-y-5">
+      {/* Universal Standalone Page Header with Back Button */}
+      <DedicatedReportPageHeader
+        title={categoryMeta.title}
+        subtitle={categoryMeta.subtitle}
+        icon={categoryMeta.icon}
+        onBack={() => setActiveReportPage('hub')}
         datePreset={datePreset}
         customStart={customStart}
         customEnd={customEnd}
         onSelectDateRange={handleDateRangeChange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        kpis={currentKpis}
+        subReports={subReportTabs}
+        activeSubReport={activeSubReport}
+        onSelectSubReport={setActiveSubReport}
         onExportPdf={() => exportHandlersRef.current.exportPdf?.()}
         onExportExcel={() => exportHandlersRef.current.exportCsv?.()}
       />
 
-      {/* Active Dedicated Category Report View */}
+      {/* Dedicated Category Report View */}
       <main>
-        {activeCategory === 'gst_tax' && (
+        {activeReportPage === 'gst_tax' && (
           <GstTaxComplianceCategory
             company={company}
             invoices={periodInvoices}
@@ -378,7 +398,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           />
         )}
 
-        {activeCategory === 'sales_revenue' && (
+        {activeReportPage === 'sales_revenue' && (
           <SalesRevenueCategory
             company={company}
             invoices={periodInvoices}
@@ -392,7 +412,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           />
         )}
 
-        {activeCategory === 'purchases_expenses' && (
+        {activeReportPage === 'purchases_expenses' && (
           <PurchasesExpensesCategory
             company={company}
             purchases={periodPurchases}
@@ -406,7 +426,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           />
         )}
 
-        {activeCategory === 'party_khata' && (
+        {activeReportPage === 'party_khata' && (
           <PartyKhataDuesCategory
             company={company}
             parties={parties}
@@ -422,7 +442,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           />
         )}
 
-        {activeCategory === 'inventory_stock' && (
+        {activeReportPage === 'inventory_stock' && (
           <InventoryStockCategory
             company={company}
             items={items}
@@ -433,6 +453,79 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
               exportHandlersRef.current = handlers;
             }}
           />
+        )}
+
+        {activeReportPage === 'cash_flow' && (
+          <CashFlowCategory
+            company={company}
+            accounts={resolvedBankAccounts}
+            invoices={periodInvoices}
+            purchases={periodPurchases}
+            expenses={periodExpenses}
+            vouchers={vouchers}
+            transactions={resolvedCashBankTxns}
+            loans={localLoans}
+            loanTransactions={localLoanTxns}
+            searchQuery={searchQuery}
+            dateRangeLabel={dateBounds.label}
+            onRegisterExportHandlers={(handlers) => {
+              exportHandlersRef.current = handlers;
+            }}
+          />
+        )}
+
+        {activeReportPage === 'balance_sheet' && (
+          <BalanceSheetCategory
+            company={company}
+            accounts={resolvedBankAccounts}
+            transactions={resolvedCashBankTxns}
+            invoices={periodInvoices}
+            purchases={periodPurchases}
+            expenses={periodExpenses}
+            items={items}
+            parties={parties}
+            loans={localLoans}
+            dateRangeLabel={dateBounds.label}
+            onRegisterExportHandlers={(handlers) => {
+              exportHandlersRef.current = handlers;
+            }}
+          />
+        )}
+
+        {activeReportPage === 'bank_statement' && (
+          <BankStatementCategory
+            company={company}
+            accounts={resolvedBankAccounts}
+            transactions={resolvedCashBankTxns}
+            invoices={periodInvoices}
+            purchases={periodPurchases}
+            expenses={periodExpenses}
+            vouchers={vouchers}
+            searchQuery={searchQuery}
+            dateRangeLabel={dateBounds.label}
+            onRegisterExportHandlers={(handlers) => {
+              exportHandlersRef.current = handlers;
+            }}
+          />
+        )}
+
+        {activeReportPage === 'loan_statement' && (
+          <LoanStatementCategory
+            company={company}
+            loans={localLoans}
+            loanTransactions={localLoanTxns}
+            onSaveLoan={handleSaveLoan}
+            onSaveLoanTransaction={handleSaveLoanTxn}
+            searchQuery={searchQuery}
+            dateRangeLabel={dateBounds.label}
+            onRegisterExportHandlers={(handlers) => {
+              exportHandlersRef.current = handlers;
+            }}
+          />
+        )}
+
+        {activeReportPage === 'daybook' && (
+          <DaybookView vouchers={vouchers} />
         )}
       </main>
     </div>

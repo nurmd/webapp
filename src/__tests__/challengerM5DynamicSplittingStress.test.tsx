@@ -21,6 +21,7 @@ if (typeof window !== 'undefined') {
 }
 
 vi.mock('../services/pouchdb.ts', () => ({
+  DEFAULT_COUCHDB_REMOTE_URL: 'https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo',
   pouch: {
     putDoc: vi.fn(),
     deleteDoc: vi.fn(),
