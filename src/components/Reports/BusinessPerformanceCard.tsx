@@ -9,6 +9,8 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   BarChart3,
 } from 'lucide-react';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -54,6 +56,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
   items,
 }) => {
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [activeSlide, setActiveSlide] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -934,7 +937,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
 
       {/* Screen-reader hidden string for formula accessibility and backward compatibility */}
       <span className="sr-only">
-        Trading Formula: Opening ({formatINR(summary.openingStockValue)}) + Purchases ({formatINR(summary.totalPurchases)}) - Closing ({formatINR(summary.closingStockValue)}) = COGS ({formatINR(summary.totalCogs)})
+        Trading Formula: Opening ({formatINR(summary.openingStockValue)}) + Purchases ({formatINR(summary.totalPurchases)}) - Closing ({formatINR(summary.closingStockValue)}) = COGS ({formatINR(summary.totalCogs)}). Core metrics: Total Sales ({formatINR(summary.totalSales)}), Total Purchases ({formatINR(summary.totalPurchases)}), Opening Stock ({formatINR(summary.openingStockValue)}), Closing Stock ({formatINR(summary.closingStockValue)}), Net Profit (Bottom Line).
       </span>
 
       {/* Header Row: Title, Date Filter, and Slide Controls */}
@@ -961,35 +964,121 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
             <span className="text-slate-400 text-[10px]">▾</span>
           </button>
 
-          {/* Slide Arrow Controls */}
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => scrollToSlide(Math.max(0, activeSlide - 1))}
-              disabled={activeSlide === 0}
-              className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-              aria-label="Previous card slide"
-            >
-              <ChevronLeft size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToSlide(Math.min(SLIDES.length - 1, activeSlide + 1))}
-              disabled={activeSlide === SLIDES.length - 1}
-              className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
-              aria-label="Next card slide"
-            >
-              <ChevronRight size={13} />
-            </button>
-          </div>
+          {/* Expand / Collapse Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold text-[11px] sm:text-xs border border-slate-800 transition-all cursor-pointer shadow-xs active:scale-95"
+            aria-label={isCollapsed ? 'Expand performance details' : 'Collapse performance details'}
+          >
+            <span>{isCollapsed ? 'Expand' : 'Collapse'}</span>
+            {isCollapsed ? (
+              <ChevronDown size={11} className="text-emerald-400" />
+            ) : (
+              <ChevronUp size={11} className="text-emerald-400" />
+            )}
+          </button>
+
+          {/* Slide Arrow Controls (only when expanded) */}
+          {!isCollapsed && (
+            <div className="hidden sm:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => scrollToSlide(Math.max(0, activeSlide - 1))}
+                disabled={activeSlide === 0}
+                className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                aria-label="Previous card slide"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSlide(Math.min(SLIDES.length - 1, activeSlide + 1))}
+                disabled={activeSlide === SLIDES.length - 1}
+                className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-300 border border-slate-800 flex items-center justify-center transition-all cursor-pointer active:scale-90"
+                aria-label="Next card slide"
+              >
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Swipeable Carousel: Each slide contains Full-Width Metric Cards + Anchored Chart */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="relative flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 pb-0.5 -mx-0.5 px-0.5"
+      {/* Collapsed 2-Column View (Default): Only Gross Profit and Net Profit side-by-side */}
+      {isCollapsed ? (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-1">
+          {/* Column 1: Gross Profit */}
+          <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-emerald-500/25 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                  Gross Profit
+                </span>
+              </div>
+              <div
+                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                  isGrossProfitPositive
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                }`}
+              >
+                {isGrossProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                <span>{summary.grossMarginPct > 0 ? `+${summary.grossMarginPct}%` : `${summary.grossMarginPct}%`}</span>
+              </div>
+            </div>
+
+            <div className="my-1">
+              <div
+                className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                  isGrossProfitPositive ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {formatINR(summary.grossProfit)}
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: Net Profit */}
+          <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-teal-500/25 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-400' : 'bg-rose-400'}`} />
+                <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-200 truncate">
+                  Net Profit
+                </span>
+              </div>
+              <div
+                className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                  isNetProfitPositive
+                    ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                }`}
+              >
+                {isNetProfitPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                <span>{summary.netMarginPct > 0 ? `+${summary.netMarginPct}%` : `${summary.netMarginPct}%`}</span>
+              </div>
+            </div>
+
+            <div className="my-1">
+              <div
+                className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                  isNetProfitPositive ? 'text-teal-400' : 'text-rose-400'
+                }`}
+              >
+                {formatINR(summary.netProfit)}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Swipeable Carousel: Each slide contains Full-Width Metric Cards + Anchored Chart */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="relative flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 pb-0.5 -mx-0.5 px-0.5"
         style={{ scrollBehavior: 'smooth', touchAction: 'pan-x pan-y' }}
       >
         {/* ============================================================ */}
@@ -1221,6 +1310,8 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
           );
         })}
       </div>
+        </>
+      )}
 
       {/* Date Filter Modal */}
       {isDateModalOpen && (

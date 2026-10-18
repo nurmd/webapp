@@ -670,4 +670,62 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
 
     expect(mockOpen).toHaveBeenCalled();
   });
+
+  it('10. Business Performance Card is collapsed to two columns by default, hides graph, and toggles expand/collapse', async () => {
+    await act(async () => {
+      root.render(
+        <BusinessReportsView
+          company={mockCompany}
+          invoices={mockInvoices}
+          purchases={mockPurchases}
+          expenses={mockExpenses}
+          items={mockItems}
+          parties={mockParties}
+        />
+      );
+    });
+
+    // Verify Expand button is present
+    const toggleBtn = container.querySelector('button[aria-label="Expand performance details"]') as HTMLButtonElement;
+    expect(toggleBtn).toBeDefined();
+    expect(toggleBtn.textContent).toContain('Expand');
+
+    // Verify graph is NOT present when collapsed
+    expect(container.querySelector('svg.cursor-crosshair')).toBeNull();
+
+    // Verify two columns exist for Gross Profit & Net Profit
+    const twoColGrid = container.querySelector('.grid-cols-2');
+    expect(twoColGrid).not.toBeNull();
+    expect(twoColGrid?.textContent).toContain('Gross Profit');
+    expect(twoColGrid?.textContent).toContain('Net Profit');
+
+    // Verify extra info is hidden in collapsed view
+    expect(twoColGrid?.textContent).not.toContain('Total Revenue:');
+    expect(twoColGrid?.textContent).not.toContain('Operating Expenses:');
+
+    // Click Expand
+    await act(async () => {
+      toggleBtn.click();
+    });
+
+    // Now button should say Collapse
+    const collapseBtn = container.querySelector('button[aria-label="Collapse performance details"]') as HTMLButtonElement;
+    expect(collapseBtn).toBeDefined();
+    expect(collapseBtn.textContent).toContain('Collapse');
+
+    // Chart and full tabs are now rendered
+    expect(container.querySelector('svg.cursor-crosshair')).not.toBeNull();
+    expect(container.textContent).toContain('Profits & Margins');
+    expect(container.textContent).toContain('Sales & Purchases');
+    expect(container.textContent).toContain('Stock Valuation');
+
+    // Click Collapse again
+    await act(async () => {
+      collapseBtn.click();
+    });
+
+    // Graph is hidden again and button says Expand
+    expect(container.querySelector('svg.cursor-crosshair')).toBeNull();
+    expect(container.querySelector('button[aria-label="Expand performance details"]')).not.toBeNull();
+  });
 });
