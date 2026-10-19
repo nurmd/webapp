@@ -10,6 +10,7 @@ import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { DocumentSeriesType } from '../../models/company.ts';
+import { draftService } from '../../services/draftService.ts';
 
 interface CreateInvoiceModalProps {
   company: CompanyProfile;
@@ -26,15 +27,27 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [selectedPartyId, setSelectedPartyId] = useState<string>(parties[0]?.id || '');
-  const [customerName, setCustomerName] = useState<string>(parties[0]?.name || '');
-  const [customerGstin, setCustomerGstin] = useState<string>(parties[0]?.gstin || '');
-  const [customerAddress, setCustomerAddress] = useState<string>(parties[0]?.billingAddress || '');
-  const [posStateCode, setPosStateCode] = useState<string>(parties[0]?.stateCode || company.stateCode);
+  const initialDraft = React.useMemo(() => draftService.getInvoiceDraft(), []);
+
+  const [selectedPartyId, setSelectedPartyId] = useState<string>(
+    initialDraft?.selectedParty?.id || parties[0]?.id || ''
+  );
+  const [customerName, setCustomerName] = useState<string>(
+    initialDraft?.selectedParty?.name || parties[0]?.name || ''
+  );
+  const [customerGstin, setCustomerGstin] = useState<string>(
+    initialDraft?.selectedParty?.gstin || parties[0]?.gstin || ''
+  );
+  const [customerAddress, setCustomerAddress] = useState<string>(
+    initialDraft?.selectedParty?.billingAddress || parties[0]?.billingAddress || ''
+  );
+  const [posStateCode, setPosStateCode] = useState<string>(
+    initialDraft?.posStateCode || initialDraft?.selectedParty?.stateCode || parties[0]?.stateCode || company.stateCode
+  );
   const isGstActive = company.isGstEnabled !== false;
 
   const [invoiceType, setInvoiceType] = useState<InvoiceType>(company.isCompositionScheme ? 'B2CS' : 'B2B');
-  const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [invoiceDate, setInvoiceDate] = useState<string>(initialDraft?.invoiceDate || new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
 
   // Line items state - clean start without dummy placeholders
@@ -46,7 +59,20 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     unitPrice: number;
     discountPercent: number;
     gstRate: number;
-  }>>([]);
+  }>>(() => {
+    if (initialDraft?.rows && initialDraft.rows.length > 0) {
+      return initialDraft.rows.map((r) => ({
+        itemId: r.itemId || 'CUSTOM-' + Date.now(),
+        name: r.name,
+        hsnSacCode: r.hsnSacCode || '998313',
+        quantity: Number(r.quantity) || 1,
+        unitPrice: Number(r.unitPrice) || 0,
+        discountPercent: Number(r.discountPercent) || 0,
+        gstRate: Number(r.gstRate) || (company.isCompositionScheme ? 0 : 18),
+      }));
+    }
+    return [];
+  });
 
   // Handle party change
   const handlePartySelect = (partyId: string) => {
@@ -191,6 +217,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
+    draftService.clearInvoiceDraft();
     onSave(newInvoice);
   };
 

@@ -30,6 +30,8 @@ import { InvoiceActionDock } from './components/InvoiceActionDock.tsx';
 import { InvoiceNumberDateModal } from './components/InvoiceNumberDateModal.tsx';
 import { DueDatePresetModal } from '../Common/Billing/DueDatePresetModal.tsx';
 import { BillDiscountModal } from '../Common/Billing/BillDiscountModal.tsx';
+import { draftService, InvoiceDraft } from '../../services/draftService.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 export type { GridRow };
 
@@ -60,6 +62,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onAddNewParty,
   onPartyCreated,
 }) => {
+  // Draft state for new invoice restoration
+  const initialDraft = useMemo(() => (!initialInvoice ? draftService.getInvoiceDraft() : null), [initialInvoice]);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(() => Boolean(initialDraft));
+
   // Parties synchronized with direct additions
   const [localParties, setLocalParties] = useState<Party[]>(parties);
   useEffect(() => {
@@ -134,6 +140,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       const dbParty = initialParty.id ? db.getParties().find((p) => p.id === initialParty.id) : null;
       return dbParty || initialParty;
     }
+    if (initialDraft?.selectedParty) {
+      return initialDraft.selectedParty;
+    }
     return null;
   });
 
@@ -143,6 +152,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
     if (initialInvoice?.invoiceNumber) return initialInvoice.invoiceNumber;
     const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    if (initialDraft?.invoiceNumber && !findConflictingInvoice(initialDraft.invoiceNumber, undefined, invs)) {
+      return initialDraft.invoiceNumber;
+    }
     const docSeries: any =
       defaultInvoiceType === 'ESTIMATE'
         ? 'ESTIMATE'
@@ -166,10 +178,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   }, [invoiceNumber, initialInvoice, allInvoices]);
 
   const [invoiceDate, setInvoiceDate] = useState<string>(
-    initialInvoice ? initialInvoice.date : new Date().toISOString().split('T')[0]
+    initialInvoice ? initialInvoice.date : (initialDraft?.invoiceDate || new Date().toISOString().split('T')[0])
   );
   const [dueDate, setDueDate] = useState<string>(
     initialInvoice?.dueDate ||
+      initialDraft?.dueDate ||
       (() => {
         const d = new Date();
         const offset = typeof db.getDefaultDueDays === 'function' ? db.getDefaultDueDays() : 15;
@@ -182,24 +195,24 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Place of supply
   const isGstActive = company.isGstEnabled !== false;
   const [posStateCode, setPosStateCode] = useState<string>(
-    initialInvoice?.placeOfSupplyStateCode || selectedParty?.stateCode || company.stateCode
+    initialInvoice?.placeOfSupplyStateCode || initialDraft?.posStateCode || selectedParty?.stateCode || company.stateCode
   );
 
   // Invoice Type manual override state (null defaults to auto-detected)
   const [manualInvoiceType, setManualInvoiceType] = useState<InvoiceType | null>(
-    () => initialInvoice?.invoiceType || defaultInvoiceType || null
+    () => initialInvoice?.invoiceType || initialDraft?.manualInvoiceType || defaultInvoiceType || null
   );
 
   // Reverse Charge Mechanism (RCM) state
   const [isRcm, setIsRcm] = useState<boolean>(
-    () => Boolean(initialInvoice?.isRcm)
+    () => Boolean(initialInvoice?.isRcm ?? initialDraft?.isRcm)
   );
 
   // Overall Discount & Shipping
-  const [overallDiscountPercent, setOverallDiscountPercent] = useState<number>(0);
-  const [shippingAmount, setShippingAmount] = useState<number>(initialInvoice?.shippingAmount || 0);
-  const [shippingAddress, setShippingAddress] = useState<string>(() => initialInvoice?.shippingAddress || '');
-  const [shippingPincode, setShippingPincode] = useState<string>(() => initialInvoice?.shippingPincode || '');
+  const [overallDiscountPercent, setOverallDiscountPercent] = useState<number>(initialDraft?.overallDiscountPercent || 0);
+  const [shippingAmount, setShippingAmount] = useState<number>(initialInvoice?.shippingAmount || initialDraft?.shippingAmount || 0);
+  const [shippingAddress, setShippingAddress] = useState<string>(() => initialInvoice?.shippingAddress || initialDraft?.shippingAddress || '');
+  const [shippingPincode, setShippingPincode] = useState<string>(() => initialInvoice?.shippingPincode || initialDraft?.shippingPincode || '');
   const [isExtraDiscountModalOpen, setIsExtraDiscountModalOpen] = useState(false);
 
   // Scanner modal
@@ -328,6 +341,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         discountAmount: it.discountAmount,
         gstRate: it.gstRate,
       }));
+    }
+    if (initialDraft?.rows && initialDraft.rows.length > 0) {
+      return initialDraft.rows;
     }
     return [];
   });
@@ -581,20 +597,147 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return true;
   }, [rows, invoiceNumber, initialInvoice, allInvoices, constructInvoiceObject, company.stateCode, isGstActive]);
 
+  // Auto-save draft on invoice edits when creating a new invoice
+  useEffect(() => {
+    if (initialInvoice) return;
+    draftService.saveInvoiceDraft({
+      invoiceNumber,
+      invoiceDate,
+      dueDate,
+      selectedParty,
+      posStateCode,
+      manualInvoiceType,
+      isRcm,
+      overallDiscountPercent,
+      shippingAmount,
+      shippingAddress,
+      shippingPincode,
+      rows,
+    });
+  }, [
+    initialInvoice,
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    selectedParty,
+    posStateCode,
+    manualInvoiceType,
+    isRcm,
+    overallDiscountPercent,
+    shippingAmount,
+    shippingAddress,
+    shippingPincode,
+    rows,
+  ]);
+
+  // Safe close handler saving draft if unsaved progress exists
+  const handleClose = useCallback(() => {
+    if (!initialInvoice) {
+      const draftData = {
+        invoiceNumber,
+        invoiceDate,
+        dueDate,
+        selectedParty,
+        posStateCode,
+        manualInvoiceType,
+        isRcm,
+        overallDiscountPercent,
+        shippingAmount,
+        shippingAddress,
+        shippingPincode,
+        rows,
+      };
+      if (draftService.isInvoiceDraftNotEmpty(draftData)) {
+        draftService.saveInvoiceDraft(draftData);
+        showAppToast('Invoice progress saved as draft');
+      }
+    }
+    onClose();
+  }, [
+    initialInvoice,
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    selectedParty,
+    posStateCode,
+    manualInvoiceType,
+    isRcm,
+    overallDiscountPercent,
+    shippingAmount,
+    shippingAddress,
+    shippingPincode,
+    rows,
+    onClose,
+  ]);
+
+  // Manual save draft handler
+  const handleSaveDraft = useCallback(() => {
+    const draftData = {
+      invoiceNumber,
+      invoiceDate,
+      dueDate,
+      selectedParty,
+      posStateCode,
+      manualInvoiceType,
+      isRcm,
+      overallDiscountPercent,
+      shippingAmount,
+      shippingAddress,
+      shippingPincode,
+      rows,
+    };
+    draftService.saveInvoiceDraft(draftData);
+    showAppToast('Invoice progress saved as draft');
+  }, [
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    selectedParty,
+    posStateCode,
+    manualInvoiceType,
+    isRcm,
+    overallDiscountPercent,
+    shippingAmount,
+    shippingAddress,
+    shippingPincode,
+    rows,
+  ]);
+
+  // Discard draft and reset form
+  const handleDiscardDraft = useCallback(() => {
+    draftService.clearInvoiceDraft();
+    setRows([]);
+    if (!initialParty) {
+      setSelectedParty(null);
+    }
+    setShippingAmount(0);
+    setShippingAddress('');
+    setShippingPincode('');
+    setOverallDiscountPercent(0);
+    setHasRestoredDraft(false);
+    showAppToast('Draft discarded');
+  }, [initialParty]);
+
   // "Save & Print" from Action Dock: saves bill as UNPAID and triggers print
   const handleSaveAndPrint = useCallback(() => {
     if (!validateInvoice()) return;
     const unpaidInvoice = constructInvoiceObject();
+    if (!initialInvoice) {
+      draftService.clearInvoiceDraft();
+    }
     onSave(unpaidInvoice, { openPrint: true });
     setPreviewInvoiceData(unpaidInvoice);
-  }, [validateInvoice, constructInvoiceObject, onSave]);
+  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice]);
 
   // "Save Invoice" from Action Dock: saves bill directly as UNPAID (Credit)
   const handleSaveInvoiceDirect = useCallback(() => {
     if (!validateInvoice()) return;
     const unpaidInvoice = constructInvoiceObject();
+    if (!initialInvoice) {
+      draftService.clearInvoiceDraft();
+    }
     onSave(unpaidInvoice);
-  }, [validateInvoice, constructInvoiceObject, onSave]);
+  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice]);
 
   // "Pay & Save" from Action Dock: opens Payment Modal
   const handleOpenPaymentModal = useCallback(() => {
@@ -616,13 +759,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       andPrint = false
     ) => {
       const paidInvoice = constructInvoiceObject(paymentData);
+      if (!initialInvoice) {
+        draftService.clearInvoiceDraft();
+      }
       setIsPaymentModalOpen(false);
       onSave(paidInvoice, { openPrint: andPrint });
       if (andPrint) {
         setPreviewInvoiceData(paidInvoice);
       }
     },
-    [constructInvoiceObject, onSave]
+    [constructInvoiceObject, onSave, initialInvoice]
   );
 
   // Global POS Keyboard Shortcuts (F2: Scanner, F8: Add Item, F9: Save, F10: Pay & Save, F12: Party Selector)
@@ -656,7 +802,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       <main className="flex-1 flex flex-col relative w-full pt-14 pb-36 sm:pb-32 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
           <InvoiceHeaderMeta
-            onClose={onClose}
+            onClose={handleClose}
             initialInvoice={initialInvoice}
             invoiceNumber={invoiceNumber}
             invoiceDate={invoiceDate}
@@ -693,6 +839,45 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               setInvoiceConflictError(null);
             }}
           />
+
+          {/* Restored Unsaved Draft Alert Banner */}
+          {hasRestoredDraft && (
+            <div
+              data-testid="invoice-draft-banner"
+              className="p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-center justify-between gap-3 animate-fadeIn"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="material-symbols-outlined text-[20px] text-amber-600 dark:text-amber-400 shrink-0">
+                  restore_page
+                </span>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block">
+                    Restored Unsaved Draft
+                  </span>
+                  <span className="text-[11px] text-amber-800/80 dark:text-amber-300/80 truncate block">
+                    Auto-saved progress ({rows.length} {rows.length === 1 ? 'item' : 'items'}{selectedParty ? ` • ${selectedParty.name}` : ''}) was restored.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDiscardDraft}
+                  className="px-2.5 py-1 text-xs font-bold rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-all cursor-pointer"
+                >
+                  Discard Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasRestoredDraft(false)}
+                  className="p-1 rounded-lg text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                  title="Dismiss banner"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           <InvoiceLineItemsGrid
             rows={rows}
@@ -737,6 +922,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onSaveAndPrint={handleSaveAndPrint}
         onSaveInvoice={handleSaveInvoiceDirect}
         onPayAndSave={handleOpenPaymentModal}
+        onSaveDraft={!initialInvoice ? handleSaveDraft : undefined}
       />
 
       {/* Select Party Modal */}

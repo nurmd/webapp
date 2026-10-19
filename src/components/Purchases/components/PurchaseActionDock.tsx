@@ -6,6 +6,7 @@ export interface PurchaseActionDockProps {
   isSubmitting?: boolean;
   onClose: () => void;
   onSaveBill: () => void;
+  onSaveDraft?: () => void;
 }
 
 export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
@@ -13,6 +14,7 @@ export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
   isSubmitting = false,
   onClose,
   onSaveBill,
+  onSaveDraft,
 }) => {
   return (
     <aside
@@ -30,10 +32,21 @@ export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onSaveDraft && (
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              className="h-10 px-3.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95"
+              title="Save current progress as draft"
+            >
+              <span className="material-symbols-outlined text-[18px]">drafts</span>
+              <span>Save Draft</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40"
+            className="h-10 px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95"
           >
             Cancel
           </button>

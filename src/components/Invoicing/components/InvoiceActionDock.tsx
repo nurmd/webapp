@@ -6,6 +6,7 @@ export interface InvoiceActionDockProps {
   onSaveAndPrint: () => void;
   onSaveInvoice: () => void;
   onPayAndSave: () => void;
+  onSaveDraft?: () => void;
   /** Optional legacy alias for tests */
   onPrintThermal?: () => void;
 }
@@ -15,6 +16,7 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
   onSaveAndPrint,
   onSaveInvoice,
   onPayAndSave,
+  onSaveDraft,
   onPrintThermal,
 }) => {
   return (
@@ -40,8 +42,20 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
           </div>
         </div>
 
-        {/* Right: Save Invoice (Unpaid/Credit) + Pay & Save */}
+        {/* Right: Save Draft + Save Invoice (Unpaid/Credit) + Pay & Save */}
         <div className="flex items-center gap-2">
+          {onSaveDraft && (
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              className="h-10 px-3 sm:px-3.5 rounded-xl bg-surface-container font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 active:scale-95"
+              title="Save current progress as draft"
+            >
+              <span className="material-symbols-outlined text-[18px]">drafts</span>
+              <span className="hidden xs:inline">Save Draft</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onSaveInvoice}

@@ -22,6 +22,8 @@ import { PaymentSettlementDock } from '../Common/Billing/PaymentSettlementDock.t
 import { PurchaseActionDock } from './components/PurchaseActionDock.tsx';
 import { PurchaseBillNumberModal } from './components/PurchaseBillNumberModal.tsx';
 import { DueDatePresetModal } from '../Common/Billing/DueDatePresetModal.tsx';
+import { draftService, PurchaseDraft } from '../../services/draftService.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 interface TableGridPurchaseModalProps {
   company: CompanyProfile;
@@ -58,6 +60,10 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   onAddNewParty,
   onPartyCreated,
 }) => {
+  // Draft state for new purchase bill restoration
+  const initialDraft = useMemo(() => (!initialBill ? draftService.getPurchaseDraft() : null), [initialBill]);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(() => Boolean(initialDraft));
+
   const [suppliers, setSuppliers] = useState<Party[]>(parties);
   useEffect(() => {
     setSuppliers(parties);
@@ -112,6 +118,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     if (initialSupplier) {
       return initialSupplier;
     }
+    if (initialDraft?.selectedSupplier) {
+      return initialDraft.selectedSupplier;
+    }
     return null;
   });
 
@@ -120,6 +129,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   // Bill metadata
   const [billNumber, setBillNumber] = useState<string>(() => {
     if (initialBill?.billNumber) return initialBill.billNumber;
+    if (initialDraft?.billNumber) return initialDraft.billNumber;
     const purchaseList = db.getPurchases().map((p) => ({ id: p.id, invoiceNumber: p.billNumber }));
     const docSeries: any =
       defaultPurchaseType === 'PO'
@@ -130,10 +140,11 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     return generateNextDocumentNumber(docSeries, company, purchaseList);
   });
   const [billDate, setBillDate] = useState<string>(
-    initialBill ? initialBill.date : new Date().toISOString().split('T')[0]
+    initialBill ? initialBill.date : (initialDraft?.billDate || new Date().toISOString().split('T')[0])
   );
   const [dueDate, setDueDate] = useState<string>(
     initialBill?.dueDate ||
+      initialDraft?.dueDate ||
       (() => {
         const d = new Date();
         d.setDate(d.getDate() + 30);
@@ -143,16 +154,17 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   const isGstActive = company.isGstEnabled !== false;
   const [supplierStateCode, setSupplierStateCode] = useState<string>(
-    initialBill?.supplierStateCode || selectedSupplier?.stateCode || company.stateCode
+    initialBill?.supplierStateCode || initialDraft?.supplierStateCode || selectedSupplier?.stateCode || company.stateCode
   );
 
   const [itcEligibility, setItcEligibility] = useState<ItcEligibility>(() => {
     if (initialBill?.itcEligibility) return initialBill.itcEligibility;
+    if (initialDraft?.itcEligibility) return initialDraft.itcEligibility;
     if (initialSupplier?.isComposition) return 'INELIGIBLE_OTHERS';
     return 'ELIGIBLE_INPUTS';
   });
 
-  const [isRcm, setIsRcm] = useState<boolean>(() => Boolean(initialBill?.isRcm));
+  const [isRcm, setIsRcm] = useState<boolean>(() => Boolean(initialBill?.isRcm ?? initialDraft?.isRcm));
 
   // Dedicated Add/Edit item modal
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -217,6 +229,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         gstRate: it.gstRate,
       }));
     }
+    if (initialDraft?.rows && initialDraft.rows.length > 0) {
+      return initialDraft.rows;
+    }
     return [];
   });
 
@@ -239,7 +254,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     return calculateInvoice(supplierStateCode, company.stateCode, calcInputs);
   }, [supplierStateCode, company.stateCode, calcInputs]);
 
-  const [shippingAmount, setShippingAmount] = useState<number>(initialBill?.shippingAmount || 0);
+  const [shippingAmount, setShippingAmount] = useState<number>(initialBill?.shippingAmount || initialDraft?.shippingAmount || 0);
 
   const finalGrandTotal = useMemo(() => {
     const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
@@ -252,6 +267,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   }, [calcSummary.netAmount, shippingAmount, finalGrandTotal]);
 
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
+    if (initialDraft?.paymentSplits && initialDraft.paymentSplits.length > 0) {
+      return initialDraft.paymentSplits;
+    }
     return parseSplitsFromPurchase(initialBill, finalGrandTotal);
   });
 
@@ -524,9 +542,119 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
+    if (!initialBill) {
+      draftService.clearPurchaseDraft();
+    }
+
     setIsSubmitting(true);
     onSave(newBill);
   }, [rows, calcSummary, isGstActive, paymentSplits, autoPaymentStatus, balanceDue, initialBill, billNumber, selectedSupplier, supplierStateCode, company.stateCode, billDate, dueDate, itcEligibility, isRcm, finalRoundOff, shippingAmount, finalGrandTotal, totalPaid, onSave]);
+
+  // Auto-save draft on purchase bill edits when creating a new bill
+  useEffect(() => {
+    if (initialBill) return;
+    draftService.savePurchaseDraft({
+      billNumber,
+      billDate,
+      dueDate,
+      selectedSupplier,
+      supplierStateCode,
+      itcEligibility,
+      isRcm,
+      shippingAmount,
+      rows,
+      paymentSplits,
+    });
+  }, [
+    initialBill,
+    billNumber,
+    billDate,
+    dueDate,
+    selectedSupplier,
+    supplierStateCode,
+    itcEligibility,
+    isRcm,
+    shippingAmount,
+    rows,
+    paymentSplits,
+  ]);
+
+  // Safe close handler saving draft if unsaved progress exists
+  const handleClose = useCallback(() => {
+    if (!initialBill) {
+      const draftData = {
+        billNumber,
+        billDate,
+        dueDate,
+        selectedSupplier,
+        supplierStateCode,
+        itcEligibility,
+        isRcm,
+        shippingAmount,
+        rows,
+        paymentSplits,
+      };
+      if (draftService.isPurchaseDraftNotEmpty(draftData)) {
+        draftService.savePurchaseDraft(draftData);
+        showAppToast('Purchase bill saved as draft');
+      }
+    }
+    onClose();
+  }, [
+    initialBill,
+    billNumber,
+    billDate,
+    dueDate,
+    selectedSupplier,
+    supplierStateCode,
+    itcEligibility,
+    isRcm,
+    shippingAmount,
+    rows,
+    paymentSplits,
+    onClose,
+  ]);
+
+  // Manual save draft handler
+  const handleSaveDraft = useCallback(() => {
+    const draftData = {
+      billNumber,
+      billDate,
+      dueDate,
+      selectedSupplier,
+      supplierStateCode,
+      itcEligibility,
+      isRcm,
+      shippingAmount,
+      rows,
+      paymentSplits,
+    };
+    draftService.savePurchaseDraft(draftData);
+    showAppToast('Purchase bill saved as draft');
+  }, [
+    billNumber,
+    billDate,
+    dueDate,
+    selectedSupplier,
+    supplierStateCode,
+    itcEligibility,
+    isRcm,
+    shippingAmount,
+    rows,
+    paymentSplits,
+  ]);
+
+  // Discard draft and reset form
+  const handleDiscardDraft = useCallback(() => {
+    draftService.clearPurchaseDraft();
+    setRows([]);
+    if (!initialSupplier) {
+      setSelectedSupplier(null);
+    }
+    setShippingAmount(0);
+    setHasRestoredDraft(false);
+    showAppToast('Draft discarded');
+  }, [initialSupplier]);
 
   // Modals for editing dates/numbers
   const [isBillNoModalOpen, setIsBillNoModalOpen] = useState(false);
@@ -604,7 +732,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       <main className="flex-1 flex flex-col relative w-full pt-14 pb-36 sm:pb-32 bg-surface overflow-y-auto">
         <div className="px-3 sm:px-6 py-3 flex flex-col gap-3 w-full">
           <PurchaseHeaderMeta
-            onClose={onClose}
+            onClose={handleClose}
             isEditing={Boolean(initialBill)}
             selectedSupplier={selectedSupplier}
             billNumber={billNumber}
@@ -621,6 +749,45 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             onOpenBillNoModal={() => setIsBillNoModalOpen(true)}
             onOpenDueDateModal={() => setIsDueDateModalOpen(true)}
           />
+
+          {/* Restored Unsaved Draft Alert Banner */}
+          {hasRestoredDraft && (
+            <div
+              data-testid="purchase-draft-banner"
+              className="p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-center justify-between gap-3 animate-fadeIn"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="material-symbols-outlined text-[20px] text-amber-600 dark:text-amber-400 shrink-0">
+                  restore_page
+                </span>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block">
+                    Restored Unsaved Draft
+                  </span>
+                  <span className="text-[11px] text-amber-800/80 dark:text-amber-300/80 truncate block">
+                    Auto-saved progress ({rows.length} {rows.length === 1 ? 'item' : 'items'}{selectedSupplier ? ` • ${selectedSupplier.name}` : ''}) was restored.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDiscardDraft}
+                  className="px-2.5 py-1 text-xs font-bold rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-all cursor-pointer"
+                >
+                  Discard Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHasRestoredDraft(false)}
+                  className="p-1 rounded-lg text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 transition-all cursor-pointer"
+                  title="Dismiss banner"
+                >
+                  <span className="material-symbols-outlined text-[16px]">close</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Composition Dealer Warning Alert Banner */}
           {selectedSupplier?.isComposition && (
@@ -694,8 +861,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       <PurchaseActionDock
         finalGrandTotal={finalGrandTotal}
         isSubmitting={isSubmitting}
-        onClose={onClose}
+        onClose={handleClose}
         onSaveBill={handleSaveBill}
+        onSaveDraft={!initialBill ? handleSaveDraft : undefined}
       />
 
       {/* Select Supplier Modal */}
