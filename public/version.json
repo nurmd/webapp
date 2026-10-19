@@ -1,10 +1,11 @@
 {
-  "version": "1.2.14",
+  "version": "1.2.15",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T07:35:31.546Z",
+  "buildTime": "2026-10-19T08:15:13.945Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "clean mobile card document views and auto-fit responsive A4 previews for mobile (v1.2.15)",
     "move draft save & restore to top bar, fix reports PDF preview back navigation (v1.2.14)",
     "add draft auto-save and restore for new invoices and bills (v1.2.13)",
     "restore business activity timeline filter to 3 dropdown filters (v1.2.12)",

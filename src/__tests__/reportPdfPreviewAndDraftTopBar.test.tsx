@@ -177,6 +177,42 @@ describe('Reports PDF Preview & Draft Top Bar Suite', () => {
       expect(customHandler).toHaveBeenCalledTimes(1);
       expect(customHandler).toHaveBeenCalledWith(mockPdfConfig);
     });
+
+    it('toggles between Mobile Cards view and A4 Sheet view seamlessly', () => {
+      act(() => {
+        root.render(
+          <ReportPdfPreviewModal
+            isOpen={true}
+            config={mockPdfConfig}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      // Switch to Cards mode explicitly
+      const cardsBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Cards'));
+      expect(cardsBtn).toBeDefined();
+
+      act(() => {
+        cardsBtn?.click();
+      });
+
+      // In cards mode, check for Records and Report Summary
+      expect(container.textContent).toContain('Records (2)');
+      expect(container.textContent).toContain('Report Summary & Totals');
+
+      // Switch to A4 Sheet mode explicitly
+      const a4Btn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('A4 Sheet'));
+      expect(a4Btn).toBeDefined();
+
+      act(() => {
+        a4Btn?.click();
+      });
+
+      // Verify A4 table is present
+      expect(container.querySelector('#report-pdf-print-root')).not.toBeNull();
+      expect(container.querySelector('table')).not.toBeNull();
+    });
   });
 
   describe('2. Top Bar Save as Draft & Restore Navigation', () => {
