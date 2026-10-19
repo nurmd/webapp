@@ -14,6 +14,7 @@ import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
 
 interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -327,13 +328,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     thermalWidth
   );
 
-  const upiQrUrl = company.upiId
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
-        `upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(
-          company.tradeName || company.businessName
-        )}&am=${invoice.balanceAmount > 0 ? invoice.balanceAmount : resolvedGrandTotal}&cu=INR`
-      )}`
-    : null;
+  const upiQrUrl = useMemo(() => {
+    if (!company.upiId) return null;
+    try {
+      const upiPayload = `upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(
+        company.tradeName || company.businessName
+      )}&am=${invoice.balanceAmount > 0 ? invoice.balanceAmount : resolvedGrandTotal}&cu=INR`;
+      const svg = generateQrCodeSvgString(upiPayload, { size: 140, margin: 1 });
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    } catch {
+      return null;
+    }
+  }, [company.upiId, company.tradeName, company.businessName, invoice.balanceAmount, resolvedGrandTotal]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-2 print-modal-overlay animate-fade-in">

@@ -2,22 +2,27 @@ import React, { useState } from 'react';
 import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { db } from '../../services/db.ts';
 
 interface CustomItemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddCustomItem: (item: InventoryItem, qty: number) => void;
+  isGstActive?: boolean;
 }
 
 export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   isOpen,
   onClose,
   onAddCustomItem,
+  isGstActive,
 }) => {
   useBackNavigation(() => {
     onClose();
     return true;
   }, isOpen, 20);
+
+  const isGstEnabled = isGstActive ?? (typeof db?.getCompany === 'function' ? (db.getCompany()?.isGstEnabled !== false) : true);
 
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -39,11 +44,11 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
     const newItem: InventoryItem = {
       id: `ADHOC-${Date.now()}`,
       name: name.trim(),
-      hsnSacCode: hsnCode.trim() || '9983',
+      hsnSacCode: isGstEnabled ? (hsnCode.trim() || '9983') : '',
       unit,
       salePrice: parsedPrice,
       purchasePrice: 0,
-      gstRate,
+      gstRate: isGstEnabled ? gstRate : 0,
       currentStock: 9999,
       minStockAlert: 0,
       category: 'Custom / Service',
@@ -127,23 +132,25 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-outline mb-1">GST Tax Slab</label>
-              <select
-                value={gstRate}
-                onChange={(e) => setGstRate(Number(e.target.value))}
-                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-on-surface outline-none focus:border-secondary"
-              >
-                <option value={0}>0% (Exempt / Nil)</option>
-                <option value={0.1}>0.1% GST</option>
-                <option value={0.25}>0.25% GST</option>
-                <option value={3}>3% GST (Gold/Precious)</option>
-                <option value={5}>5% GST</option>
-                <option value={12}>12% GST</option>
-                <option value={18}>18% GST (Standard)</option>
-              </select>
-            </div>
+          <div className={`grid ${isGstEnabled ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
+            {isGstEnabled && (
+              <div>
+                <label className="block text-xs font-semibold text-outline mb-1">GST Tax Slab</label>
+                <select
+                  value={gstRate}
+                  onChange={(e) => setGstRate(Number(e.target.value))}
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-on-surface outline-none focus:border-secondary"
+                >
+                  <option value={0}>0% (Exempt / Nil)</option>
+                  <option value={0.1}>0.1% GST</option>
+                  <option value={0.25}>0.25% GST</option>
+                  <option value={3}>3% GST (Gold/Precious)</option>
+                  <option value={5}>5% GST</option>
+                  <option value={12}>12% GST</option>
+                  <option value={18}>18% GST (Standard)</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-outline mb-1">Unit of Measure</label>
@@ -163,18 +170,20 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-outline mb-1">
-              HSN / SAC Code (Optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. 9983 for services"
-              value={hsnCode}
-              onChange={(e) => setHsnCode(e.target.value)}
-              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
-            />
-          </div>
+          {isGstEnabled && (
+            <div>
+              <label className="block text-xs font-semibold text-outline mb-1">
+                HSN / SAC Code (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 9983 for services"
+                value={hsnCode}
+                onChange={(e) => setHsnCode(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface outline-none focus:border-secondary"
+              />
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/20">
             <button

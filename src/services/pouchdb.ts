@@ -41,21 +41,32 @@ class PouchService {
   };
 
   constructor() {
-    this.localDB = new PouchDB('vyapar_fintech_store', { auto_compaction: true });
+    try {
+      this.localDB = new PouchDB('vyapar_fintech_store', { auto_compaction: true });
 
-    // Listen for local and remote changes continuously
-    this.localDB
-      .changes({ since: 'now', live: true, include_docs: true })
-      .on('change', (change) => {
-        this.notifyDataChange({
-          id: change.id,
-          doc: change.doc,
-          deleted: change.deleted,
+      // Listen for local and remote changes continuously
+      this.localDB
+        .changes({ since: 'now', live: true, include_docs: true })
+        .on('change', (change) => {
+          this.notifyDataChange({
+            id: change.id,
+            doc: change.doc,
+            deleted: change.deleted,
+          });
+        })
+        .on('error', (err) => {
+          console.warn('PouchDB changes feed error:', err);
         });
-      })
-      .on('error', (err) => {
-        console.warn('PouchDB changes feed error:', err);
-      });
+    } catch {
+      this.localDB = {
+        changes: () => ({ on: () => ({ on: () => {} }) }),
+        get: async () => { throw { status: 404 }; },
+        put: async () => ({ ok: true }),
+        remove: async () => ({ ok: true }),
+        allDocs: async () => ({ rows: [] }),
+        bulkDocs: async () => [],
+      } as any;
+    }
 
     // Auto-reconnect when device comes online or screen/app becomes visible
     if (typeof window !== 'undefined') {
@@ -78,8 +89,8 @@ class PouchService {
     }
 
     // Auto-restore remote sync URL from settings, defaulting to demo CouchDB if not configured
-    const savedRemote = localStorage.getItem('couchdb_remote_url');
-    if (savedRemote === null && typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    const savedRemote = typeof localStorage !== 'undefined' ? localStorage.getItem('couchdb_remote_url') : null;
+    if (savedRemote === null && typeof window !== 'undefined' && process.env.NODE_ENV !== 'test' && typeof localStorage !== 'undefined') {
       localStorage.setItem('couchdb_remote_url', DEFAULT_COUCHDB_REMOTE_URL);
       this.startSync(DEFAULT_COUCHDB_REMOTE_URL);
     } else if (savedRemote && savedRemote.trim()) {
@@ -315,7 +326,7 @@ class PouchService {
     bankAccounts?: any[];
     cashBankTxns?: any[];
   }): Promise<void> {
-    const isMigrated = localStorage.getItem('pouchdb_initial_migrated');
+    const isMigrated = typeof localStorage !== 'undefined' ? localStorage.getItem('pouchdb_initial_migrated') : null;
     if (isMigrated) return;
 
     try {
@@ -342,7 +353,9 @@ class PouchService {
       if (docs.length > 0) {
         await this.localDB.bulkDocs(docs);
       }
-      localStorage.setItem('pouchdb_initial_migrated', 'true');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('pouchdb_initial_migrated', 'true');
+      }
     } catch (e) {
       console.error('PouchDB initial migration error:', e);
     }

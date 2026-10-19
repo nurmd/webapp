@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
 
 interface UpiQrModalProps {
   isOpen: boolean;
@@ -35,9 +36,14 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
     merchantName
   )}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(`Bill ${invoiceNumber}`)}`;
 
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-    upiUrl
-  )}`;
+  const qrImageUrl = useMemo(() => {
+    try {
+      const svg = generateQrCodeSvgString(upiUrl, { size: 250, margin: 2 });
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    } catch {
+      return '';
+    }
+  }, [upiUrl]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(upiUrl);

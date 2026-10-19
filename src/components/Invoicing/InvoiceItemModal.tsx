@@ -4,7 +4,7 @@ import { formatINR, formatQuantity, roundQuantity, sanitizeQuantityInput } from 
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
-import { HsnItem } from '../../core/gst/hsnCatalog';
+import type { HsnItem } from '../../core/gst/hsnCatalog';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface InvoiceItemData {
@@ -56,7 +56,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   initialItem,
   itemsCatalog,
   isIntraState,
-  isGstActive = true,
+  isGstActive = db.getCompany()?.isGstEnabled !== false,
   mode = 'sale',
   onItemCreated,
 }) => {
@@ -268,7 +268,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       salePrice: sale,
       purchasePrice: purchase,
       unit: newItemUnit,
-      hsnSacCode: newItemHsn.trim() || defaultHsn,
+      hsnSacCode: isGstActive ? (newItemHsn.trim() || defaultHsn) : '',
       gstRate: isGstActive ? (Number(newItemGstRate) || 0) : 0,
       currentStock: createdStock,
       minStockAlert: 5,
@@ -663,7 +663,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                           <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
                             <span>Stock: {item.currentStock} {item.unit}</span>
                             {item.mrp && <span>• MRP ₹{item.mrp}</span>}
-                            {item.hsnSacCode && <span>• HSN {item.hsnSacCode}</span>}
+                            {isGstActive && item.hsnSacCode && <span>• HSN {item.hsnSacCode}</span>}
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -784,6 +784,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     setGstRate(item.gstRate);
                   }}
                   placeholder="e.g. 8471 or Laptop"
+                  isGstEnabled={isGstActive}
                   className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-mono text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
                 />
               </div>
@@ -1118,7 +1119,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               </div>
 
               {/* Unit & GST Rate */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid ${isGstActive ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
                 <div>
                   <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
                     Unit of Measurement
@@ -1134,43 +1135,48 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
-                    GST Rate
-                  </label>
-                  <select
-                    value={newItemGstRate}
-                    onChange={(e) => setNewGstRate(Number(e.target.value))}
-                    className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
-                  >
-                    <option value={0}>0% (Exempt)</option>
-                    <option value={0.1}>0.1%</option>
-                    <option value={0.25}>0.25%</option>
-                    <option value={3}>3% (Gold/Precious)</option>
-                    <option value={5}>5%</option>
-                    <option value={12}>12%</option>
-                    <option value={18}>18% (Standard)</option>
-                  </select>
-                </div>
+                {isGstActive && (
+                  <div>
+                    <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                      GST Rate
+                    </label>
+                    <select
+                      value={newItemGstRate}
+                      onChange={(e) => setNewGstRate(Number(e.target.value))}
+                      className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
+                    >
+                      <option value={0}>0% (Exempt)</option>
+                      <option value={0.1}>0.1%</option>
+                      <option value={0.25}>0.25%</option>
+                      <option value={3}>3% (Gold/Precious)</option>
+                      <option value={5}>5%</option>
+                      <option value={12}>12%</option>
+                      <option value={18}>18% (Standard)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* HSN & Opening Stock */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
-                    HSN / SAC Code
-                  </label>
-                  <HsnAutocompleteInput
-                    value={newItemHsn}
-                    onChange={(val) => setNewItemHsn(val)}
-                    onSelectHsn={(item: HsnItem) => {
-                      setNewItemHsn(item.code);
-                      setNewGstRate(item.gstRate);
-                    }}
-                    placeholder="e.g. 8471"
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-mono text-on-surface border border-outline-variant/30 outline-none h-[36px]"
-                  />
-                </div>
+              <div className={`grid ${isGstActive ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                {isGstActive && (
+                  <div>
+                    <label className="text-[11px] font-bold text-on-surface-variant block mb-1">
+                      HSN / SAC Code
+                    </label>
+                    <HsnAutocompleteInput
+                      value={newItemHsn}
+                      onChange={(val) => setNewItemHsn(val)}
+                      onSelectHsn={(item: HsnItem) => {
+                        setNewItemHsn(item.code);
+                        setNewGstRate(item.gstRate);
+                      }}
+                      placeholder="e.g. 8471"
+                      isGstEnabled={isGstActive}
+                      className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs font-mono text-on-surface border border-outline-variant/30 outline-none h-[36px]"
+                    />
+                  </div>
+                )}
 
                 {isPurchase ? (
                   <div className="p-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-700 dark:text-orange-300 flex flex-col justify-center">

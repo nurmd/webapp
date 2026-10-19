@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useId } from 'react';
-import { searchHsn, HsnItem } from '../../core/gst/hsnCatalog';
+import type { HsnItem } from '../../core/gst/hsnCatalog';
+import { db } from '../../services/db.ts';
+
+export type { HsnItem };
 
 export interface HsnAutocompleteInputProps {
   value: string;
@@ -12,6 +15,24 @@ export interface HsnAutocompleteInputProps {
   required?: boolean;
   id?: string;
   'aria-label'?: string;
+  isGstEnabled?: boolean;
+}
+
+// Module-level cache so dynamic import executes only once across the application lifecycle
+let hsnCatalogPromise: Promise<typeof import('../../core/gst/hsnCatalog')> | null = null;
+let cachedSearchHsn: ((query: string, limit?: number) => HsnItem[]) | null = null;
+
+export function loadHsnCatalog(): Promise<(query: string, limit?: number) => HsnItem[]> {
+  if (cachedSearchHsn) {
+    return Promise.resolve(cachedSearchHsn);
+  }
+  if (!hsnCatalogPromise) {
+    hsnCatalogPromise = import('../../core/gst/hsnCatalog');
+  }
+  return hsnCatalogPromise.then((mod) => {
+    cachedSearchHsn = mod.searchHsn;
+    return mod.searchHsn;
+  });
 }
 
 export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
@@ -25,6 +46,7 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
   required = false,
   id,
   'aria-label': ariaLabel = 'HSN or SAC Code',
+  isGstEnabled,
 }) => {
   const generatedId = useId();
   const inputId = id || generatedId;
@@ -35,8 +57,12 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
 
+  // Determine if GST is active: prop takes precedence, fallback to db.getCompany().isGstEnabled !== false
+  const activeGst = isGstEnabled ?? (typeof db?.getCompany === 'function' ? (db.getCompany()?.isGstEnabled !== false) : true);
+
   // Dynamically calculate whether dropdown should anchor left or right based on viewport bounds
   useEffect(() => {
+    if (!activeGst) return;
     if (isOpen && containerRef.current && typeof window !== 'undefined') {
       const rect = containerRef.current.getBoundingClientRect();
       const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 360;
@@ -46,17 +72,46 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
         setDropdownAlign('left');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, activeGst]);
 
-  // Update suggestions whenever value changes
+  // Update suggestions whenever value changes or dropdown opens
   useEffect(() => {
-    const results = searchHsn(value, 15);
-    setSuggestions(results);
-    setSelectedIndex(-1);
-  }, [value]);
+    if (!activeGst) {
+      return;
+    }
+    if (!isOpen && !cachedSearchHsn) {
+      return;
+    }
+
+    let isSubscribed = true;
+
+    if (cachedSearchHsn) {
+      setSuggestions(cachedSearchHsn(value, 15));
+      setSelectedIndex(-1);
+    } else {
+      loadHsnCatalog()
+        .then((searchFn) => {
+          if (isSubscribed) {
+            setSuggestions(searchFn(value, 15));
+            setSelectedIndex(-1);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load HSN catalog:', err);
+          if (isSubscribed) {
+            setSuggestions([]);
+          }
+        });
+    }
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [value, isOpen, activeGst]);
 
   // Handle outside clicks to close dropdown (both mouse click and mobile touch)
   useEffect(() => {
+    if (!activeGst) return;
     function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -68,13 +123,31 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, []);
+  }, [activeGst]);
+
+  // If GST is disabled, do not render any DOM elements
+  if (!activeGst) {
+    return null;
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVal = e.target.value;
     onChange(newVal);
     if (!isOpen) {
       setIsOpen(true);
+    }
+    if (cachedSearchHsn) {
+      setSuggestions(cachedSearchHsn(newVal, 15));
+      setSelectedIndex(-1);
+    } else {
+      loadHsnCatalog()
+        .then((searchFn) => {
+          setSuggestions(searchFn(newVal, 15));
+          setSelectedIndex(-1);
+        })
+        .catch(() => {
+          setSuggestions([]);
+        });
     }
   };
 
@@ -89,6 +162,17 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       setIsOpen(true);
+      if (cachedSearchHsn) {
+        setSuggestions(cachedSearchHsn(value, 15));
+      } else {
+        loadHsnCatalog()
+          .then((searchFn) => {
+            setSuggestions(searchFn(value, 15));
+          })
+          .catch(() => {
+            setSuggestions([]);
+          });
+      }
       return;
     }
 
@@ -121,7 +205,17 @@ export const HsnAutocompleteInput: React.FC<HsnAutocompleteInputProps> = ({
         onChange={handleInputChange}
         onFocus={() => {
           setIsOpen(true);
-          setSuggestions(searchHsn(value, 15));
+          if (cachedSearchHsn) {
+            setSuggestions(cachedSearchHsn(value, 15));
+          } else {
+            loadHsnCatalog()
+              .then((searchFn) => {
+                setSuggestions(searchFn(value, 15));
+              })
+              .catch(() => {
+                setSuggestions([]);
+              });
+          }
         }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}

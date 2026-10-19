@@ -1,15 +1,14 @@
 {
-  "version": "1.2.8",
+  "version": "1.2.10",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-18T18:08:41.783Z",
+  "buildTime": "2026-10-19T05:38:00.000Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8",
-    "apply collapsed two-column view and horizontal scroll across all tabs v1.2.7",
-    "default collapsed two-column view for business performance card v1.2.6",
-    "v1.2.5 business performance card redesign, dual-axis gesture disambiguation & release APK",
-    "v1.2.4 commercial orders, returns, WhatsApp sharing & bulk operations",
-    "v1.2.3 comprehensive reporting hub with 5 categories & 1-click PDF/Excel export"
+    "Full offline PWA resources (local Material Symbols & Inter/Plus Jakarta Sans fonts, local vector SVG QR codes) eliminating FOUT / ligature text flash",
+    "On-demand lazy loaded 448 kB HSN catalog chunk with conditional hide when GST is disabled across invoice & item modals",
+    "In-memory O(1) heap cache with reactive broadcast invalidation across all collections & settings",
+    "Granular state decoupling with React 18 useSyncExternalStore eliminating whole-tree re-render cascades in App.tsx",
+    "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8"
   ]
 }

@@ -4,7 +4,7 @@ import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
-import { HsnItem } from '../../core/gst/hsnCatalog';
+import type { HsnItem } from '../../core/gst/hsnCatalog';
 import { CategorySelector } from './CategorySelector';
 import { ItemCategory } from '../../models/category.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -14,7 +14,7 @@ export interface ItemFormModalProps {
   onClose: () => void;
   editingItem: InventoryItem | null;
   onSaveItem: (item: InventoryItem) => void;
-  isGstActive: boolean;
+  isGstActive?: boolean;
   existingItems?: InventoryItem[];
 }
 
@@ -23,7 +23,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   onClose,
   editingItem,
   onSaveItem,
-  isGstActive,
+  isGstActive = db.getCompany()?.isGstEnabled !== false,
   existingItems,
 }) => {
   useBackNavigation(() => {
@@ -87,7 +87,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setName('');
       setSku(`SKU-${Date.now().toString().slice(-4)}`);
       setBarcode('');
-      setHsn(isGstActive ? '844332' : '0000');
+      setHsn(isGstActive ? '844332' : '');
       setCategory('General');
       setUnit('PCS');
       setSalePrice(0);
@@ -115,7 +115,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       name: name.trim(),
       sku: sku.trim() || `SKU-${Date.now().toString().slice(-4)}`,
       barcode: barcode.trim() || undefined,
-      hsnSacCode: hsn.trim() || '844332',
+      hsnSacCode: isGstActive ? (hsn.trim() || '844332') : (hsn.trim() || ''),
       category: category.trim() || 'General',
       unit: itemType === 'SERVICE' ? 'HOURS' : unit,
       salePrice: Number(salePrice),
@@ -267,6 +267,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                       }
                     }}
                     placeholder="e.g. 1006 or Rice"
+                    isGstEnabled={isGstActive}
                   />
                 </div>
               )}

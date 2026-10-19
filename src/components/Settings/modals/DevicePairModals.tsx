@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { generateQrCodeSvgString } from '../../../core/utils/qrCodeSvg.ts';
 
 export interface DevicePairModalsProps {
   isPairQrModalOpen: boolean;
@@ -46,7 +47,7 @@ export const DevicePairModals: React.FC<DevicePairModalsProps> = ({
             {/* Dynamic QR Code */}
             <div className="w-52 h-52 rounded-2xl bg-white p-3 border border-outline-variant/20 flex flex-col items-center justify-center shadow-inner my-1">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(allSettingsSyncPayload)}`}
+                src={`data:image/svg+xml;utf8,${encodeURIComponent(generateQrCodeSvgString(allSettingsSyncPayload || 'empty', { size: 180, margin: 1 }))}`}
                 alt="Settings Sync QR Code"
                 className="w-44 h-44 object-contain rounded-lg"
               />

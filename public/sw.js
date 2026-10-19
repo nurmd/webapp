@@ -3,7 +3,7 @@
  * Provides resilient offline caching, app shell hydration, and instant updates.
  */
 
-const CACHE_VERSION = 'vyapar-pwa-v1.1.26';
+const CACHE_VERSION = 'vyapar-pwa-v1.3.0';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -11,7 +11,10 @@ const PRECACHE_ASSETS = [
   './favicon.svg',
   './icon-192.png',
   './icon-512.png',
-  './apple-touch-icon.png'
+  './apple-touch-icon.png',
+  './fonts/inter-latin.woff2',
+  './fonts/plus-jakarta-sans-latin.woff2',
+  './fonts/material-symbols-outlined.woff2'
 ];
 
 // Install: Pre-cache core app shell

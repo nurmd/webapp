@@ -434,7 +434,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             itemId: found.id,
             name: found.name,
             description: '',
-            hsnSacCode: found.hsnSacCode || '998313',
+            hsnSacCode: isGstActive ? (found.hsnSacCode || '998313') : '',
             quantity: 1,
             unit: found.unit || 'PCS',
             unitPrice: found.salePrice || 0,

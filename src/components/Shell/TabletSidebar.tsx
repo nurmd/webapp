@@ -16,7 +16,7 @@ interface TabletSidebarProps {
   latestVersion?: string;
 }
 
-export const TabletSidebar: React.FC<TabletSidebarProps> = ({
+export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
   activeTab,
   company,
   activeUser,
@@ -297,6 +297,6 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = ({
       </div>
     </aside>
   );
-};
+});
 
 

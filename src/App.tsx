@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from './services/db.ts';
 import { pouch } from './services/pouchdb.ts';
 import { CompanyProfile } from './models/company.ts';
@@ -19,6 +19,17 @@ import { Header } from './components/Shell/Header.tsx';
 import { Drawer, AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
 import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
+import {
+  useCompany,
+  useParties,
+  useItems,
+  useInvoices,
+  usePurchases,
+  useExpenses,
+  useVouchers,
+  useBankAccounts,
+  useCashBankTxns,
+} from './core/store/useDataStore.ts';
 
 // Cold-Start Primary View (Statically imported for instant FCP)
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
@@ -164,15 +175,16 @@ export const App: React.FC = () => {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [company, setCompany] = useState<CompanyProfile>(db.getCompany());
-  const [parties, setParties] = useState<Party[]>(db.getParties());
-  const [items, setItems] = useState<InventoryItem[]>(db.getItems());
-  const [invoices, setInvoices] = useState<Invoice[]>(db.getInvoices());
-  const [purchases, setPurchases] = useState<PurchaseBill[]>(db.getPurchases());
-  const [expenses, setExpenses] = useState<Expense[]>(db.getExpenses());
-  const [vouchers, setVouchers] = useState<Voucher[]>(db.getVouchers());
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(db.getBankAccounts());
-  const [cashBankTxns, setCashBankTxns] = useState<CashBankTransaction[]>(db.getCashBankTransactions());
+  // React 18 Granular External Store Subscriptions
+  const company = useCompany();
+  const parties = useParties();
+  const items = useItems();
+  const invoices = useInvoices();
+  const purchases = usePurchases();
+  const expenses = useExpenses();
+  const vouchers = useVouchers();
+  const bankAccounts = useBankAccounts();
+  const cashBankTxns = useCashBankTxns();
 
   // Modals state
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
@@ -205,30 +217,24 @@ export const App: React.FC = () => {
   const [partiesSegment, setPartiesSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>('CUSTOMERS');
   const [partiesFilter, setPartiesFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>('ALL');
 
-  const handleNavigateToParties = (
+  const handleNavigateToParties = useCallback((
     segment: 'CUSTOMERS' | 'SUPPLIERS' = 'CUSTOMERS',
     filter: 'ALL' | 'OVERDUE' | 'SETTLED' = 'ALL'
   ) => {
     setPartiesSegment(segment);
     setPartiesFilter(filter);
-    if (activeTab !== 'parties') {
-      previousTabRef.current = activeTab;
-    }
-    setActiveTab('parties');
-  };
+    setActiveTab((prevTab) => {
+      if (prevTab !== 'parties') {
+        previousTabRef.current = prevTab;
+      }
+      return 'parties';
+    });
+  }, []);
 
-  // Sync state on change
-  const refreshData = () => {
-    setCompany(db.getCompany());
-    setParties(db.getParties());
-    setItems(db.getItems());
-    setInvoices(db.getInvoices());
-    setPurchases(db.getPurchases());
-    setExpenses(db.getExpenses());
-    setVouchers(db.getVouchers());
-    setBankAccounts(db.getBankAccounts());
-    setCashBankTxns(db.getCashBankTransactions());
-  };
+  // Stable refresh callback for child view onRefresh prop compatibility
+  const refreshData = useCallback(() => {
+    db.notifyListeners();
+  }, []);
 
   const activeTabRef = React.useRef(activeTab);
   activeTabRef.current = activeTab;
@@ -239,7 +245,6 @@ export const App: React.FC = () => {
       console.error('Failed to migrate legacy PINs:', err);
     });
     db.syncAllPartyBalances();
-    refreshData();
     initBackNavigation(() => {
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');
@@ -300,25 +305,38 @@ export const App: React.FC = () => {
   }, activeTab === 'pos', 10);
 
   React.useEffect(() => {
-    // Listen for reactive DB data updates (from local writes, remote CouchDB/PouchDB, or multi-tab BroadcastChannel)
-    const unsub = db.subscribe(() => {
-      refreshData();
-    });
-    return unsub;
-  }, []);
+    // Gracefully dismiss splashscreen overlay after initial render & fonts are fully ready
+    let isCancelled = false;
+    let fadeTimer: NodeJS.Timeout | number;
 
-  React.useEffect(() => {
-    // Gracefully dismiss splashscreen overlay after initial render & layout settle
-    const timer = setTimeout(() => {
+    const dismissSplash = () => {
+      if (isCancelled) return;
       const splash = document.getElementById('app-splash');
-      if (splash) {
+      if (splash && !splash.classList.contains('fade-out')) {
         splash.classList.add('fade-out');
-        setTimeout(() => {
+        fadeTimer = setTimeout(() => {
           splash.remove();
         }, 400);
       }
-    }, 400);
-    return () => clearTimeout(timer);
+    };
+
+    if (typeof document !== 'undefined' && 'fonts' in document && document.fonts.ready) {
+      Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => setTimeout(resolve, 1500))
+      ]).then(() => {
+        requestAnimationFrame(() => {
+          setTimeout(dismissSplash, 60);
+        });
+      }).catch(dismissSplash);
+    } else {
+      fadeTimer = setTimeout(dismissSplash, 600);
+    }
+
+    return () => {
+      isCancelled = true;
+      if (fadeTimer) clearTimeout(fadeTimer);
+    };
   }, []);
 
   // Background silent OTA / PWA update check on mount & listen for Service Worker updates
@@ -344,12 +362,12 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((cur) => (cur === msg ? null : cur));
     }, 3500);
-  };
+  }, []);
 
   React.useEffect(() => {
     const handleToastEvent = (e: Event) => {
@@ -362,9 +380,9 @@ export const App: React.FC = () => {
     return () => {
       window.removeEventListener('app_show_toast', handleToastEvent);
     };
-  }, []);
+  }, [showToast]);
 
-  const handleCheckUpdate = async (explicit: boolean = true) => {
+  const handleCheckUpdate = useCallback(async (explicit: boolean = true) => {
     if (hasUpdate && latestRelease) {
       setIsUpdateModalOpen(true);
       return;
@@ -394,14 +412,18 @@ export const App: React.FC = () => {
     } finally {
       setIsCheckingUpdate(false);
     }
-  };
+  }, [hasUpdate, latestRelease, showToast]);
 
-  const handleSaveInvoice = (
+  const handleCheckUpdateFromChrome = useCallback(() => {
+    handleCheckUpdate(true);
+  }, [handleCheckUpdate]);
+
+  const handleSaveInvoice = useCallback((
     newInvoice: Invoice,
     options?: { openPreview?: boolean; openPrint?: boolean }
   ) => {
     // Enforce uniqueness of invoice number under GST compliance
-    const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, invoices);
+    const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, db.getInvoices());
     if (conflict) {
       showToast(`Conflict: Invoice #${newInvoice.invoiceNumber} already exists for ${conflict.partyName} (${conflict.date}). Only unique numbers allowed.`);
       return;
@@ -432,10 +454,8 @@ export const App: React.FC = () => {
     });
     db.saveVoucher(voucher);
 
-    refreshData();
     if (newInvoice.partyId) {
       db.recalculatePartyBalance(newInvoice.partyId);
-      refreshData();
     }
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
@@ -446,75 +466,75 @@ export const App: React.FC = () => {
     if (options?.openPreview !== false) {
       setPreviewInvoice(newInvoice);
     }
-  };
+  }, [showToast]);
 
-  const handleEditInvoice = (inv: Invoice) => {
+  const handleEditInvoice = useCallback((inv: Invoice) => {
     setEditingInvoice(inv);
     setSelectedPartyForInvoice(null);
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleCreateInvoiceForParty = (party: Party) => {
+  const handleCreateInvoiceForParty = useCallback((party: Party) => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(party);
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleCreatePurchaseForParty = (party: Party) => {
+  const handleCreatePurchaseForParty = useCallback((party: Party) => {
     setEditingPurchase(null);
     setSelectedSupplierForPurchase(party);
     setIsTableGridPurchaseOpen(true);
-  };
+  }, []);
 
-  const handleEditPurchase = (bill: PurchaseBill) => {
+  const handleEditPurchase = useCallback((bill: PurchaseBill) => {
     setEditingPurchase(bill);
     setSelectedSupplierForPurchase(null);
     setIsTableGridPurchaseOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewInvoice = () => {
+  const handleOpenNewInvoice = useCallback(() => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(null);
     setInvoiceModalDefaultType(undefined);
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewQuotation = () => {
+  const handleOpenNewQuotation = useCallback(() => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(null);
     setInvoiceModalDefaultType('ESTIMATE');
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewSalesOrder = () => {
+  const handleOpenNewSalesOrder = useCallback(() => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(null);
     setInvoiceModalDefaultType('SALES_ORDER');
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewSalesReturn = () => {
+  const handleOpenNewSalesReturn = useCallback(() => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(null);
     setInvoiceModalDefaultType('CREDIT_NOTE');
     setIsTableGridInvoiceOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewPurchaseOrder = () => {
+  const handleOpenNewPurchaseOrder = useCallback(() => {
     setEditingPurchase(null);
     setSelectedSupplierForPurchase(null);
     setPurchaseModalDefaultType('PO');
     setIsTableGridPurchaseOpen(true);
-  };
+  }, []);
 
-  const handleOpenNewPurchaseReturn = () => {
+  const handleOpenNewPurchaseReturn = useCallback(() => {
     setEditingPurchase(null);
     setSelectedSupplierForPurchase(null);
     setPurchaseModalDefaultType('RETURN');
     setIsTableGridPurchaseOpen(true);
-  };
+  }, []);
 
-  const handleSavePurchase = (newBill: PurchaseBill) => {
+  const handleSavePurchase = useCallback((newBill: PurchaseBill) => {
     db.savePurchase(newBill);
 
     // Auto-create Double-Entry Accounting Voucher for Purchase (Input Tax Credit)
@@ -538,11 +558,9 @@ export const App: React.FC = () => {
     if (newBill.supplierId) {
       db.recalculatePartyBalance(newBill.supplierId);
     }
+  }, []);
 
-    refreshData();
-  };
-
-  const handleDeleteInvoice = (id: string) => {
+  const handleDeleteInvoice = useCallback((id: string) => {
     if (!rbac.canDeleteInvoice(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete invoices. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -560,12 +578,11 @@ export const App: React.FC = () => {
         if (inv?.partyId) {
           db.recalculatePartyBalance(inv.partyId);
         }
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
-  const handleDeletePurchase = (id: string) => {
+  const handleDeletePurchase = useCallback((id: string) => {
     if (!rbac.canDeletePurchase(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete purchase bills. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -583,17 +600,15 @@ export const App: React.FC = () => {
         if (bill?.supplierId) {
           db.recalculatePartyBalance(bill.supplierId);
         }
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
-  const handleSaveExpense = (newExpense: Expense) => {
+  const handleSaveExpense = useCallback((newExpense: Expense) => {
     db.saveExpense(newExpense);
-    refreshData();
-  };
+  }, []);
 
-  const handleDeleteExpense = (id: string) => {
+  const handleDeleteExpense = useCallback((id: string) => {
     if (!rbac.canDeleteExpense(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete expense vouchers. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -608,17 +623,15 @@ export const App: React.FC = () => {
       confirmText: 'Delete Expense',
       onConfirm: () => {
         db.deleteExpense(id);
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
-  const handleSaveParty = (party: Party) => {
+  const handleSaveParty = useCallback((party: Party) => {
     db.saveParty(party);
-    refreshData();
-  };
+  }, []);
 
-  const handleRecordPartyPayment = (
+  const handleRecordPartyPayment = useCallback((
     party: Party,
     amount: number,
     paymentMode: string,
@@ -794,10 +807,9 @@ export const App: React.FC = () => {
     }
 
     db.recalculatePartyBalance(party.id);
-    refreshData();
-  };
+  }, []);
 
-  const handleDeleteParty = (id: string) => {
+  const handleDeleteParty = useCallback((id: string) => {
     if (!rbac.canDeleteParty(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete customer/supplier accounts. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -812,16 +824,15 @@ export const App: React.FC = () => {
       confirmText: 'Delete Party',
       onConfirm: () => {
         db.deleteParty(id);
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
   const activeItems = React.useMemo(() => getActiveItems(items), [items]);
 
-  const handleSaveItem = (item: InventoryItem) => {
+  const handleSaveItem = useCallback((item: InventoryItem) => {
     const trimmed = (item.name || '').normalize('NFC').trim().toLowerCase();
-    const isDup = items.some(
+    const isDup = db.getItems().some(
       (existing) =>
         String(existing.id) !== String(item.id) &&
         (existing.name || '').normalize('NFC').trim().toLowerCase() === trimmed
@@ -831,20 +842,19 @@ export const App: React.FC = () => {
       return;
     }
     db.saveItem(item);
-    refreshData();
-  };
+  }, [showToast]);
 
-  const handleDeleteItem = (id: string) => {
+  const handleDeleteItem = useCallback((id: string) => {
     if (!rbac.canDeleteItem(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete inventory items. Please switch user role.');
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (isItemInBills(id, invoices, purchases)) {
+    if (isItemInBills(id, db.getInvoices(), db.getPurchases())) {
       showToast('Cannot delete: This item exists in bills. You can disable it instead.');
       return;
     }
-    const item = items.find((it) => it.id === id);
+    const item = db.getItems().find((it) => it.id === id);
     setDeleteConfirmation({
       isOpen: true,
       title: 'Delete Inventory Item?',
@@ -853,32 +863,28 @@ export const App: React.FC = () => {
       confirmText: 'Delete Item',
       onConfirm: () => {
         db.deleteItem(id);
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role, showToast]);
 
-  const handleSaveAdjustment = (adj: StockAdjustment) => {
+  const handleSaveAdjustment = useCallback((adj: StockAdjustment) => {
     db.saveStockAdjustment(adj);
-    refreshData();
-  };
+  }, []);
 
-  const handleSaveCompany = (updated: CompanyProfile) => {
+  const handleSaveCompany = useCallback((updated: CompanyProfile) => {
     if (!rbac.canEditCompanySettings(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can edit company profile and settings. Please switch user role.');
       setIsRoleSwitchOpen(true);
       return;
     }
     db.saveCompany(updated);
-    refreshData();
-  };
+  }, [activeUser.role]);
 
-  const handleSaveBankAccount = (account: BankAccount) => {
+  const handleSaveBankAccount = useCallback((account: BankAccount) => {
     db.saveBankAccount(account);
-    refreshData();
-  };
+  }, []);
 
-  const handleDeleteBankAccount = (id: string) => {
+  const handleDeleteBankAccount = useCallback((id: string) => {
     if (!rbac.canDeleteBankAccount(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete bank accounts. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -893,17 +899,15 @@ export const App: React.FC = () => {
       confirmText: 'Delete Account',
       onConfirm: () => {
         db.deleteBankAccount(id);
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
-  const handleSaveCashBankTxn = (txn: CashBankTransaction) => {
+  const handleSaveCashBankTxn = useCallback((txn: CashBankTransaction) => {
     db.saveCashBankTransaction(txn);
-    refreshData();
-  };
+  }, []);
 
-  const handleDeleteCashBankTxn = (id: string) => {
+  const handleDeleteCashBankTxn = useCallback((id: string) => {
     if (!rbac.canDeleteCashBankTxn(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete cash/bank transactions. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -918,10 +922,9 @@ export const App: React.FC = () => {
       confirmText: 'Delete Transaction',
       onConfirm: () => {
         db.deleteCashBankTransaction(id);
-        refreshData();
       },
     });
-  };
+  }, [activeUser.role]);
 
   useEffect(() => {
     const mainEl = document.getElementById('main-content-scroll');
@@ -930,16 +933,26 @@ export const App: React.FC = () => {
     }
   }, [activeTab]);
 
-  const handleSelectTab = (tab: AppTab) => {
+  const handleSelectTab = useCallback((tab: AppTab) => {
     if (!rbac.canAccessTab(tab, activeUser.role)) {
       setIsRoleSwitchOpen(true);
       return;
     }
-    if (tab !== activeTab) {
-      previousTabRef.current = activeTab;
-    }
-    setActiveTab(tab);
-  };
+    setActiveTab((curTab) => {
+      if (tab !== curTab) {
+        previousTabRef.current = curTab;
+      }
+      return tab;
+    });
+  }, [activeUser.role]);
+
+  // Navigation Chrome Callbacks
+  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const handleOpenRoleSwitch = useCallback(() => setIsRoleSwitchOpen(true), []);
+  const handleCloseRoleSwitch = useCallback(() => setIsRoleSwitchOpen(false), []);
+  const handleSearchClick = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
+  const handleBarcodeClick = useCallback(() => handleSelectTab('pos'), [handleSelectTab]);
 
   return (
     <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
@@ -950,8 +963,8 @@ export const App: React.FC = () => {
         activeUser={activeUser}
         onSelectTab={handleSelectTab}
         onNewInvoice={handleOpenNewInvoice}
-        onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
-        onCheckUpdate={() => handleCheckUpdate(true)}
+        onOpenRoleSwitch={handleOpenRoleSwitch}
+        onCheckUpdate={handleCheckUpdateFromChrome}
         hasUpdate={hasUpdate}
         latestVersion={latestRelease?.version}
       />
@@ -963,11 +976,11 @@ export const App: React.FC = () => {
           <Header
             company={company}
             activeUser={activeUser}
-            onOpenDrawer={() => setIsDrawerOpen(true)}
+            onOpenDrawer={handleOpenDrawer}
             onNewInvoice={handleOpenNewInvoice}
-            onSearchClick={() => handleSelectTab('menu')}
-            onBarcodeClick={() => handleSelectTab('pos')}
-            onProfileClick={() => setIsRoleSwitchOpen(true)}
+            onSearchClick={handleSearchClick}
+            onBarcodeClick={handleBarcodeClick}
+            onProfileClick={handleOpenRoleSwitch}
             hasUpdate={hasUpdate}
           />
         </div>
@@ -978,10 +991,10 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           company={company}
           activeUser={activeUser}
-          onClose={() => setIsDrawerOpen(false)}
+          onClose={handleCloseDrawer}
           onSelectTab={handleSelectTab}
-          onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
-          onCheckUpdate={() => handleCheckUpdate(true)}
+          onOpenRoleSwitch={handleOpenRoleSwitch}
+          onCheckUpdate={handleCheckUpdateFromChrome}
           hasUpdate={hasUpdate}
           latestVersion={latestRelease?.version}
           isCheckingUpdate={isCheckingUpdate}
@@ -1226,8 +1239,8 @@ export const App: React.FC = () => {
             onNavigate={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
             onNewInvoice={handleOpenNewInvoice}
-            onOpenRoleSwitch={() => setIsRoleSwitchOpen(true)}
-            onCheckUpdate={() => handleCheckUpdate(true)}
+            onOpenRoleSwitch={handleOpenRoleSwitch}
+            onCheckUpdate={handleCheckUpdateFromChrome}
             hasUpdate={hasUpdate}
             latestVersion={latestRelease?.version}
             isCheckingUpdate={isCheckingUpdate}
@@ -1240,7 +1253,7 @@ export const App: React.FC = () => {
       {/* Modern Touch Bottom Navigation */}
       <BottomNav
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleSelectTab}
         onNewInvoice={handleOpenNewInvoice}
       />
 

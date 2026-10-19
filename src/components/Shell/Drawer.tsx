@@ -37,7 +37,7 @@ interface DrawerProps {
   isCheckingUpdate?: boolean;
 }
 
-export const Drawer: React.FC<DrawerProps> = ({
+export const Drawer: React.FC<DrawerProps> = React.memo(({
   isOpen,
   activeTab,
   company,
@@ -279,4 +279,4 @@ export const Drawer: React.FC<DrawerProps> = ({
       </aside>
     </>
   );
-};
+});

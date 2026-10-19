@@ -414,7 +414,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             itemId: found.id,
             name: found.name,
             description: '',
-            hsnSacCode: found.hsnSacCode || '844332',
+            hsnSacCode: isGstActive ? (found.hsnSacCode || '844332') : '',
             quantity: 1,
             unit: found.unit || 'PCS',
             unitPrice: found.purchasePrice || found.salePrice || 100,

@@ -7,7 +7,7 @@ interface BottomNavProps {
   onNewInvoice: () => void;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({
+export const BottomNav: React.FC<BottomNavProps> = React.memo(({
   activeTab,
   onSelectTab,
   onNewInvoice,
@@ -93,4 +93,4 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       </div>
     </nav>
   );
-};
+});

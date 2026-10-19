@@ -148,6 +148,9 @@ class StorageService {
   private listeners: Set<() => void> = new Set();
   private batchNotifyTimeout: any = null;
   private broadcastChannel: BroadcastChannel | null = null;
+  private memoryCache: Map<string, any> = new Map<string, any>();
+  private rawCache: Map<string, string | null> = new Map<string, string | null>();
+  private quotaExceededKeys: Set<string> = new Set<string>();
 
   constructor() {
     // Purge any legacy sample/demo data to guarantee clean production state
@@ -189,9 +192,13 @@ class StorageService {
     // Cross-tab storage event fallback
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (event) => {
-        if (event.key && (event.key.startsWith('gst_') || event.key === 'couchdb_remote_url')) {
-          this.notifyListeners();
+        if (!event.key) {
+          // Global localStorage.clear() occurred in another window
+          this.invalidateCache();
+        } else if (event.key.startsWith('gst_') || event.key === 'couchdb_remote_url') {
+          this.invalidateCache(event.key);
         }
+        this.notifyListeners();
       });
     }
 
@@ -243,6 +250,20 @@ class StorageService {
     }, 16);
   }
 
+  public notify(): void {
+    if (this.batchNotifyTimeout) {
+      clearTimeout(this.batchNotifyTimeout);
+      this.batchNotifyTimeout = null;
+    }
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (e) {
+        console.error('DB listener error:', e);
+      }
+    });
+  }
+
   private broadcastChange(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       try {
@@ -278,7 +299,7 @@ class StorageService {
     } else if (data) {
       switch (entity) {
         case 'invoice': {
-          const list = this.getInvoices();
+          const list = [...this.getInvoices()];
           const idx = list.findIndex((i) => i.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.INVOICES, list);
@@ -291,7 +312,7 @@ class StorageService {
           break;
         }
         case 'purchase': {
-          const list = this.getPurchases();
+          const list = [...this.getPurchases()];
           const idx = list.findIndex((p) => p.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.PURCHASES, list);
@@ -304,7 +325,7 @@ class StorageService {
           break;
         }
         case 'party': {
-          const list = this.getParties();
+          const list = [...this.getParties()];
           const idx = list.findIndex((p) => p.id === id);
           if (idx >= 0) {
             const existing = list[idx];
@@ -339,21 +360,21 @@ class StorageService {
           break;
         }
         case 'item': {
-          const list = this.getItems();
+          const list = [...this.getItems()];
           const idx = list.findIndex((i) => i.id === id);
           if (idx >= 0) list[idx] = data; else list.push(data);
           this.set(STORAGE_KEYS.ITEMS, list);
           break;
         }
         case 'expense': {
-          const list = this.getExpenses();
+          const list = [...this.getExpenses()];
           const idx = list.findIndex((e) => e.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.EXPENSES, list);
           break;
         }
         case 'voucher': {
-          const list = this.getVouchers();
+          const list = [...this.getVouchers()];
           const idx = list.findIndex((v) => v.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.VOUCHERS, list);
@@ -369,21 +390,21 @@ class StorageService {
           break;
         }
         case 'adjustment': {
-          const list = this.getStockAdjustments();
+          const list = [...this.getStockAdjustments()];
           const idx = list.findIndex((a) => a.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.ADJUSTMENTS, list);
           break;
         }
         case 'bank_account': {
-          const list = this.getBankAccounts();
+          const list = [...this.getBankAccounts()];
           const idx = list.findIndex((b) => b.id === id);
           if (idx >= 0) list[idx] = data; else list.push(data);
           this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
           break;
         }
         case 'cash_bank_txn': {
-          const list = this.getCashBankTransactions();
+          const list = [...this.getCashBankTransactions()];
           const idx = list.findIndex((t) => t.id === id);
           if (idx >= 0) list[idx] = data; else list.unshift(data);
           this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
@@ -486,7 +507,7 @@ class StorageService {
     switch (docType) {
       case 'invoice': {
         const inv = cleanEntity as Invoice;
-        const list = this.getInvoices();
+        const list = [...this.getInvoices()];
         const idx = list.findIndex((i) => i.id === docId);
         if (idx >= 0) {
           list[idx] = inv;
@@ -501,7 +522,7 @@ class StorageService {
       }
       case 'purchase': {
         const pur = cleanEntity as PurchaseBill;
-        const list = this.getPurchases();
+        const list = [...this.getPurchases()];
         const idx = list.findIndex((p) => p.id === docId);
         if (idx >= 0) {
           list[idx] = pur;
@@ -515,7 +536,7 @@ class StorageService {
         break;
       }
       case 'party': {
-        const list = this.getParties();
+        const list = [...this.getParties()];
         const idx = list.findIndex((p) => p.id === docId);
         const incoming = cleanEntity as Party;
         if (idx >= 0) {
@@ -551,7 +572,7 @@ class StorageService {
         break;
       }
       case 'item': {
-        const list = this.getItems();
+        const list = [...this.getItems()];
         const idx = list.findIndex((i) => i.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as InventoryItem;
@@ -562,7 +583,7 @@ class StorageService {
         break;
       }
       case 'expense': {
-        const list = this.getExpenses();
+        const list = [...this.getExpenses()];
         const idx = list.findIndex((e) => e.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as Expense;
@@ -573,7 +594,7 @@ class StorageService {
         break;
       }
       case 'voucher': {
-        const list = this.getVouchers();
+        const list = [...this.getVouchers()];
         const idx = list.findIndex((v) => v.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as Voucher;
@@ -585,7 +606,7 @@ class StorageService {
         break;
       }
       case 'adjustment': {
-        const list = this.getStockAdjustments();
+        const list = [...this.getStockAdjustments()];
         const idx = list.findIndex((a) => a.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as StockAdjustment;
@@ -596,7 +617,7 @@ class StorageService {
         break;
       }
       case 'bank_account': {
-        const list = this.getBankAccounts();
+        const list = [...this.getBankAccounts()];
         const idx = list.findIndex((b) => b.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as BankAccount;
@@ -607,7 +628,7 @@ class StorageService {
         break;
       }
       case 'cash_bank_txn': {
-        const list = this.getCashBankTransactions();
+        const list = [...this.getCashBankTransactions()];
         const idx = list.findIndex((t) => t.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as CashBankTransaction;
@@ -622,7 +643,7 @@ class StorageService {
         break;
       }
       case 'loan': {
-        const list = this.getLoans();
+        const list = [...this.getLoans()];
         const idx = list.findIndex((l) => l.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as any;
@@ -633,7 +654,7 @@ class StorageService {
         break;
       }
       case 'loan_txn': {
-        const list = this.getLoanTransactions();
+        const list = [...this.getLoanTransactions()];
         const idx = list.findIndex((t) => t.id === docId);
         if (idx >= 0) {
           list[idx] = cleanEntity as any;
@@ -889,16 +910,65 @@ class StorageService {
 
   private get<T>(key: string, defaultValue: T): T {
     try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : defaultValue;
+      if (typeof localStorage === 'undefined' || this.quotaExceededKeys.has(key)) {
+        if (this.memoryCache.has(key)) {
+          return this.memoryCache.get(key);
+        }
+        const initialValue = Array.isArray(defaultValue)
+          ? ([...defaultValue] as unknown as T)
+          : typeof defaultValue === 'object' && defaultValue !== null
+          ? ({ ...defaultValue } as unknown as T)
+          : defaultValue;
+        this.memoryCache.set(key, initialValue);
+        return initialValue;
+      }
+
+      const raw = localStorage.getItem(key);
+
+      if (this.memoryCache.has(key) && this.rawCache.get(key) === raw) {
+        return this.memoryCache.get(key);
+      }
+
+      if (raw === null) {
+        const initialValue = Array.isArray(defaultValue)
+          ? ([...defaultValue] as unknown as T)
+          : typeof defaultValue === 'object' && defaultValue !== null
+          ? ({ ...defaultValue } as unknown as T)
+          : defaultValue;
+        this.memoryCache.set(key, initialValue);
+        this.rawCache.set(key, null);
+        return initialValue;
+      }
+
+      const parsed = JSON.parse(raw);
+      this.memoryCache.set(key, parsed);
+      this.rawCache.set(key, raw);
+      return parsed;
     } catch {
-      return defaultValue;
+      const fallback = Array.isArray(defaultValue)
+        ? ([...defaultValue] as unknown as T)
+        : typeof defaultValue === 'object' && defaultValue !== null
+        ? ({ ...defaultValue } as unknown as T)
+        : defaultValue;
+      return fallback;
     }
   }
 
   private set<T>(key: string, value: T): void {
+    const raw = JSON.stringify(value);
+    const cached = Array.isArray(value)
+      ? ([...value] as unknown as T)
+      : typeof value === 'object' && value !== null
+      ? ({ ...value } as unknown as T)
+      : value;
+    this.memoryCache.set(key, cached);
+    this.rawCache.set(key, raw);
+
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, raw);
+        this.quotaExceededKeys.delete(key);
+      }
     } catch (e: any) {
       const isQuotaExceeded =
         (typeof DOMException !== 'undefined' && e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) ||
@@ -908,11 +978,39 @@ class StorageService {
         (typeof e?.message === 'string' && e.message.toLowerCase().includes('quota'));
 
       if (isQuotaExceeded) {
+        this.quotaExceededKeys.add(key);
         console.warn(`StorageService.set: QuotaExceededError encountered for key "${key}". Write skipped in localStorage without failing unhandled.`, e);
       } else {
         console.error('Local storage write error:', e);
       }
     }
+  }
+
+  private remove(key: string): void {
+    this.memoryCache.delete(key);
+    this.rawCache.delete(key);
+    this.quotaExceededKeys.delete(key);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
+  public invalidateCache(key?: string): void {
+    if (key) {
+      this.memoryCache.delete(key);
+      this.rawCache.delete(key);
+      this.quotaExceededKeys.delete(key);
+    } else {
+      this.memoryCache.clear();
+      this.rawCache.clear();
+      this.quotaExceededKeys.clear();
+    }
+  }
+
+  public clearMemoryCache(): void {
+    this.invalidateCache();
   }
 
   private getAuditUser(): { userId: string; userName: string; userRole: UserRole } {
@@ -973,6 +1071,12 @@ class StorageService {
 
   // Synced Settings (All settings except device-local printing & privacy settings)
   getSettings(): SyncedSettings {
+    if (this.memoryCache.has(STORAGE_KEYS.SETTINGS)) {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.SETTINGS) : null;
+      if (this.rawCache.get(STORAGE_KEYS.SETTINGS) === raw) {
+        return this.memoryCache.get(STORAGE_KEYS.SETTINGS);
+      }
+    }
     const defaultSettings: SyncedSettings = {
       id: 'app_settings',
       company: this.getCompany(),
@@ -995,6 +1099,12 @@ class StorageService {
       const stored = localStorage.getItem('gst_allow_negative_stock');
       if (stored !== null) {
         return stored === 'true';
+      }
+      if (this.memoryCache.has(STORAGE_KEYS.SETTINGS)) {
+        const cached = this.memoryCache.get(STORAGE_KEYS.SETTINGS);
+        if (typeof cached?.allowNegativeStock === 'boolean') {
+          return cached.allowNegativeStock;
+        }
       }
       const rawSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
       if (rawSettings) {
@@ -1063,12 +1173,13 @@ class StorageService {
     const merged: SyncedSettings = {
       ...current,
       ...syncable,
+      company: syncable.company ? syncable.company : this.getCompany(),
       updatedAt: new Date().toISOString(),
     };
     this.set(STORAGE_KEYS.SETTINGS, merged);
-    if (merged.company) {
-      this.set(STORAGE_KEYS.COMPANY, merged.company);
-      pouch.putDoc('company', merged.company);
+    if (syncable.company) {
+      this.set(STORAGE_KEYS.COMPANY, syncable.company);
+      pouch.putDoc('company', syncable.company);
     }
     pouch.putDoc('settings', merged);
     this.broadcastChange('settings', 'save', 'app_settings', merged);
@@ -1094,7 +1205,7 @@ class StorageService {
   }
 
   saveParty(party: Party): void {
-    const list = this.getParties();
+    const list = [...this.getParties()];
     const idx = list.findIndex((p) => p.id === party.id);
     let partyToSave = party;
     if (idx >= 0) {
@@ -1430,17 +1541,19 @@ class StorageService {
 
       const netBalance = Math.round(balance * 100) / 100;
       if (party.currentBalance !== netBalance) {
-        party.currentBalance = netBalance;
-        party.updatedAt = new Date().toISOString();
-        parties[i] = party;
-        changedParties.push(party);
+        parties[i] = {
+          ...party,
+          currentBalance: netBalance,
+          updatedAt: new Date().toISOString(),
+        };
+        changedParties.push(parties[i]);
         hasChanges = true;
       }
     }
 
     // 6. Single atomic persist and notification
     if (hasChanges) {
-      this.set(STORAGE_KEYS.PARTIES, parties);
+      this.set(STORAGE_KEYS.PARTIES, [...parties]);
       changedParties.forEach((p) => {
         pouch.putDoc('party', p);
         this.broadcastChange('party', 'save', p.id, p);
@@ -1455,7 +1568,7 @@ class StorageService {
   }
 
   saveItem(item: InventoryItem): void {
-    const list = this.getItems();
+    const list = [...this.getItems()];
     const idx = list.findIndex((i) => i.id === item.id);
     if (idx >= 0) {
       list[idx] = item;
@@ -1608,12 +1721,11 @@ class StorageService {
 
   // Invoices
   getInvoices(): Invoice[] {
-    const list = this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
-    return list && list.length > 0 ? list : DEFAULT_INVOICES;
+    return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
   }
 
   saveInvoice(invoice: Invoice): void {
-    const list = this.getInvoices();
+    const list = [...this.getInvoices()];
     // Enforce unique invoice number under GST compliance
     const norm = (invoice.invoiceNumber || '').trim().toUpperCase();
     const conflict = list.find(
@@ -1767,7 +1879,7 @@ class StorageService {
   }
 
   savePurchase(bill: PurchaseBill): void {
-    const list = this.getPurchases();
+    const list = [...this.getPurchases()];
     const idx = list.findIndex((b) => b.id === bill.id);
     const prevBill = idx >= 0 ? list[idx] : null;
 
@@ -1959,7 +2071,7 @@ class StorageService {
   }
 
   saveStockAdjustment(adj: StockAdjustment): void {
-    const list = this.getStockAdjustments();
+    const list = [...this.getStockAdjustments()];
     list.unshift(adj);
     this.set(STORAGE_KEYS.ADJUSTMENTS, list);
     pouch.putDoc('adjustment', adj);
@@ -1999,7 +2111,7 @@ class StorageService {
   }
 
   saveVoucher(voucher: Voucher): void {
-    const list = this.getVouchers();
+    const list = [...this.getVouchers()];
     const idx = list.findIndex((v) => v.id === voucher.id);
     const prevVoucher = idx >= 0 ? list[idx] : null;
 
@@ -2106,7 +2218,7 @@ class StorageService {
   }
 
   saveExpense(expense: Expense): void {
-    const list = this.getExpenses();
+    const list = [...this.getExpenses()];
     const idx = list.findIndex((e) => e.id === expense.id);
     if (idx >= 0) {
       list[idx] = expense;
@@ -2134,7 +2246,7 @@ class StorageService {
   }
 
   saveBankAccount(account: BankAccount): void {
-    const list = this.getBankAccounts();
+    const list = [...this.getBankAccounts()];
     const idx = list.findIndex((b) => b.id === account.id);
     if (idx >= 0) {
       list[idx] = account;
@@ -2162,7 +2274,7 @@ class StorageService {
   }
 
   saveCashBankTransaction(txn: CashBankTransaction): void {
-    const list = this.getCashBankTransactions();
+    const list = [...this.getCashBankTransactions()];
     const idx = list.findIndex((t) => t.id === txn.id);
     if (idx >= 0) {
       list[idx] = txn;
@@ -2189,7 +2301,7 @@ class StorageService {
   }
 
   saveLoan(loan: LoanAccount): void {
-    const list = this.getLoans();
+    const list = [...this.getLoans()];
     const idx = list.findIndex((l) => l.id === loan.id);
     if (idx >= 0) {
       list[idx] = loan;
@@ -2219,7 +2331,7 @@ class StorageService {
   }
 
   saveLoanTransaction(txn: LoanTransaction): void {
-    const list = this.getLoanTransactions();
+    const list = [...this.getLoanTransactions()];
     const idx = list.findIndex((t) => t.id === txn.id);
     if (idx >= 0) {
       list[idx] = txn;
@@ -2348,6 +2460,10 @@ class StorageService {
     }
 
     const { data } = validation.bundle;
+
+    if (mode === 'REPLACE') {
+      this.clearMemoryCache();
+    }
 
     // Helper for merging or replacing arrays by ID
     const mergeCollection = <T extends { id: string }>(current: T[], incoming: T[] = []): T[] => {

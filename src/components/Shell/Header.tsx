@@ -13,7 +13,7 @@ interface HeaderProps {
   hasUpdate?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   company,
   activeUser,
   onOpenDrawer,
@@ -157,4 +157,4 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
   );
-};
+});

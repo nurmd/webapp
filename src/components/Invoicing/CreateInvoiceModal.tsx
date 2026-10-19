@@ -31,6 +31,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [customerGstin, setCustomerGstin] = useState<string>(parties[0]?.gstin || '');
   const [customerAddress, setCustomerAddress] = useState<string>(parties[0]?.billingAddress || '');
   const [posStateCode, setPosStateCode] = useState<string>(parties[0]?.stateCode || company.stateCode);
+  const isGstActive = company.isGstEnabled !== false;
 
   const [invoiceType, setInvoiceType] = useState<InvoiceType>(company.isCompositionScheme ? 'B2CS' : 'B2B');
   const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -128,20 +129,20 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       return {
         itemId: l.itemId,
         name: l.name || 'Custom Item',
-        hsnSacCode: l.hsnSacCode,
+        hsnSacCode: isGstActive ? l.hsnSacCode : '',
         unit: 'PCS',
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         discountPercent: l.discountPercent,
         discountAmount: calcItem.discountAmount,
         taxableAmount: calcItem.taxableAmount,
-        gstRate: company.isCompositionScheme ? 0 : l.gstRate,
-        cgstAmount: company.isCompositionScheme ? 0 : calcItem.cgstAmount,
-        sgstAmount: company.isCompositionScheme ? 0 : calcItem.sgstAmount,
-        utgstAmount: company.isCompositionScheme ? 0 : calcItem.utgstAmount,
-        igstAmount: company.isCompositionScheme ? 0 : calcItem.igstAmount,
-        cessAmount: company.isCompositionScheme ? 0 : calcItem.cessAmount,
-        totalAmount: company.isCompositionScheme ? calcItem.taxableAmount : calcItem.totalAmount,
+        gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : l.gstRate,
+        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.cgstAmount,
+        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.sgstAmount,
+        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.utgstAmount,
+        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.igstAmount,
+        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.cessAmount,
+        totalAmount: (!isGstActive || company.isCompositionScheme) ? calcItem.taxableAmount : calcItem.totalAmount,
       };
     });
 
@@ -340,7 +341,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     key={idx}
                     className="grid grid-cols-12 gap-2 items-center bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/20 shadow-sm"
                   >
-                    <div className="col-span-12 sm:col-span-4">
+                    <div className={isGstActive ? "col-span-12 sm:col-span-4" : "col-span-12 sm:col-span-6"}>
                       <input
                         type="text"
                         placeholder="Item name / description"
@@ -362,15 +363,17 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       </select>
                     </div>
 
-                    <div className="col-span-4 sm:col-span-2">
-                      <input
-                        type="text"
-                        placeholder="HSN"
-                        value={l.hsnSacCode}
-                        onChange={(e) => updateLine(idx, 'hsnSacCode', e.target.value)}
-                        className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-center outline-none font-mono"
-                      />
-                    </div>
+                    {isGstActive && (
+                      <div className="col-span-4 sm:col-span-2">
+                        <input
+                          type="text"
+                          placeholder="HSN"
+                          value={l.hsnSacCode}
+                          onChange={(e) => updateLine(idx, 'hsnSacCode', e.target.value)}
+                          className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-center outline-none font-mono"
+                        />
+                      </div>
+                    )}
 
                     <div className="col-span-4 sm:col-span-1">
                       <input
@@ -398,10 +401,10 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     </div>
 
                     <div className="col-span-5 sm:col-span-1">
-                      {company.isCompositionScheme ? (
+                      {(!isGstActive || company.isCompositionScheme) ? (
                         <div
                           className="w-full bg-surface-container border border-outline-variant/30 text-on-surface-variant px-1 py-1.5 text-xs rounded-lg text-center font-bold"
-                          title="Tax rate locked to 0% for Composition Scheme"
+                          title={!isGstActive ? "GST is disabled" : "Tax rate locked to 0% for Composition Scheme"}
                         >
                           0%
                         </div>

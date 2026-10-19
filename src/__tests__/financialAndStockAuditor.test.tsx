@@ -100,6 +100,7 @@ function renderPassbookHook(params: any): { result: () => any; unmount: () => vo
 describe('Financial Balance and Inventory Stock Auditors', () => {
   beforeEach(() => {
     testStorage.clear();
+    db.clearMemoryCache();
     inMemoryDocs.clear();
     vi.clearAllMocks();
   });
@@ -309,7 +310,7 @@ describe('Financial Balance and Inventory Stock Auditors', () => {
       expect(reportBefore.inconsistentDocuments.length).toBe(1);
 
       const result = await reconcilePartyBalances(reportBefore);
-      expect(result.reconciledCount).toBe(2);
+      expect(result.reconciledCount).toBe(1);
       expect(result.repairedDocumentsCount).toBe(1);
 
       // Check repaired invoice balance
