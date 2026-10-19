@@ -180,6 +180,69 @@ class UpdateService {
     }, 250);
   }
 
+  private async formatReleaseData(data: any, repo: string, isPwa: boolean): Promise<AppReleaseInfo> {
+    const tag = (data.tag_name || '').replace(/^v/, '');
+    const cleanVersion = tag || CURRENT_APP_VERSION;
+
+    const notes: string[] = [];
+    let parsedSha256: string | undefined;
+
+    if (data.body) {
+      const lines = data.body.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const shaMatch = trimmed.match(/sha-?256[:\s]+([a-f0-9]{64})/i);
+        if (shaMatch) {
+          parsedSha256 = shaMatch[1].toLowerCase();
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+          notes.push(trimmed.replace(/^[-*•]\s+/, '').replace(/\*\*/g, ''));
+        } else if (
+          trimmed &&
+          !trimmed.toLowerCase().includes('full changelog') &&
+          !trimmed.startsWith('http') &&
+          !trimmed.startsWith('#') &&
+          !trimmed.startsWith('---') &&
+          !trimmed.toLowerCase().startsWith('compare/')
+        ) {
+          notes.push(trimmed.replace(/\*\*/g, ''));
+        }
+      }
+    }
+
+    const apkAsset = data.assets?.find(
+      (a: any) => a.name && (a.name.endsWith('.apk') || a.name.includes('.apk'))
+    );
+    const pwaAsset = data.assets?.find(
+      (a: any) => a.name && (a.name.includes('pwa') || a.name.endsWith('.tar.gz'))
+    );
+    const shaAsset = data.assets?.find(
+      (a: any) => a.name && a.name.endsWith('.sha256')
+    );
+
+    const defaultRawApkUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`;
+    const defaultRawShaUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`;
+
+    const dynamicNotes = notes.length > 0 
+      ? notes 
+      : await this.fetchDynamicReleaseNotes(repo, cleanVersion);
+
+    return {
+      version: cleanVersion,
+      versionCode: this.calculateVersionCode(cleanVersion),
+      releaseDate: data.published_at ? data.published_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      releaseTitle: data.name || `Vyapar PRO v${cleanVersion}`,
+      releaseNotes: dynamicNotes,
+      apkUrl: apkAsset?.browser_download_url || defaultRawApkUrl,
+      apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '5.4 MB'),
+      sha256: parsedSha256,
+      sha256Url: shaAsset?.browser_download_url || defaultRawShaUrl,
+      htmlUrl: data.html_url,
+      isPwa,
+      pwaTarballUrl: pwaAsset?.browser_download_url,
+      isMandatory: false,
+    };
+  }
+
   /**
    * Checks for updates by querying:
    * 1. GitHub Releases API (releases/latest)
@@ -194,7 +257,6 @@ class UpdateService {
   }> {
     this.lastChecked = new Date().toISOString();
     const repo = this.getGitHubRepo();
-    const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
     const isPwa = this.isPwaEnvironment();
 
     // Trigger ServiceWorker check in parallel if on PWA
@@ -205,82 +267,62 @@ class UpdateService {
     }
 
     try {
-      // 1. Attempt GitHub Releases API
+      // 1. Attempt GitHub Releases API with cache-busting
+      const apiUrl = `https://api.github.com/repos/${repo}/releases/latest?_t=${Date.now()}`;
       const res = await fetch(apiUrl, {
-        headers: { Accept: 'application/vnd.github.v3+json' },
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
 
       if (res.ok) {
         const data = await res.json();
-        const tag = (data.tag_name || '').replace(/^v/, '');
-        const cleanVersion = tag || CURRENT_APP_VERSION;
+        const releaseInfo = await this.formatReleaseData(data, repo, isPwa);
 
-        const notes: string[] = [];
-        let parsedSha256: string | undefined;
+        if (this.isNewer(releaseInfo.version, CURRENT_APP_VERSION)) {
+          this.cachedRelease = releaseInfo;
+          return {
+            hasUpdate: true,
+            currentVersion: CURRENT_APP_VERSION,
+            latestRelease: releaseInfo,
+          };
+        }
+      }
 
-        if (data.body) {
-          const lines = data.body.split('\n');
-          for (const line of lines) {
-            const trimmed = line.trim();
-            const shaMatch = trimmed.match(/sha-?256[:\s]+([a-f0-9]{64})/i);
-            if (shaMatch) {
-              parsedSha256 = shaMatch[1].toLowerCase();
-            } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
-              notes.push(trimmed.replace(/^[-*•]\s+/, '').replace(/\*\*/g, ''));
-            } else if (
-              trimmed &&
-              !trimmed.toLowerCase().includes('full changelog') &&
-              !trimmed.startsWith('http') &&
-              !trimmed.startsWith('#') &&
-              !trimmed.startsWith('---') &&
-              !trimmed.toLowerCase().startsWith('compare/')
-            ) {
-              notes.push(trimmed.replace(/\*\*/g, ''));
+      // 1b. Check recent releases list if latest release wasn't newer (guards against GitHub latest tag designation delays)
+      try {
+        const listUrl = `https://api.github.com/repos/${repo}/releases?per_page=5&_t=${Date.now()}`;
+        const listRes = await fetch(listUrl, {
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        });
+
+        if (listRes.ok) {
+          const releasesList = await listRes.json();
+          if (Array.isArray(releasesList)) {
+            for (const rel of releasesList) {
+              if (rel.draft) continue;
+              const relInfo = await this.formatReleaseData(rel, repo, isPwa);
+              if (this.isNewer(relInfo.version, CURRENT_APP_VERSION)) {
+                this.cachedRelease = relInfo;
+                return {
+                  hasUpdate: true,
+                  currentVersion: CURRENT_APP_VERSION,
+                  latestRelease: relInfo,
+                };
+              }
             }
           }
         }
-
-        const apkAsset = data.assets?.find(
-          (a: any) => a.name && (a.name.endsWith('.apk') || a.name.includes('.apk'))
-        );
-        const pwaAsset = data.assets?.find(
-          (a: any) => a.name && (a.name.includes('pwa') || a.name.endsWith('.tar.gz'))
-        );
-        const shaAsset = data.assets?.find(
-          (a: any) => a.name && a.name.endsWith('.sha256')
-        );
-
-        const defaultRawApkUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`;
-        const defaultRawShaUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`;
-
-        const dynamicNotes = notes.length > 0 
-          ? notes 
-          : await this.fetchDynamicReleaseNotes(repo, cleanVersion);
-
-        const releaseInfo: AppReleaseInfo = {
-          version: cleanVersion,
-          versionCode: this.calculateVersionCode(cleanVersion),
-          releaseDate: data.published_at ? data.published_at.split('T')[0] : new Date().toISOString().split('T')[0],
-          releaseTitle: data.name || `Vyapar PRO v${cleanVersion}`,
-          releaseNotes: dynamicNotes,
-          apkUrl: apkAsset?.browser_download_url || defaultRawApkUrl,
-          apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '1.1 MB'),
-          sha256: parsedSha256,
-          sha256Url: shaAsset?.browser_download_url || defaultRawShaUrl,
-          htmlUrl: data.html_url,
-          isPwa,
-          pwaTarballUrl: pwaAsset?.browser_download_url,
-          isMandatory: false,
-        };
-
-        this.cachedRelease = releaseInfo;
-        const hasUpdate = this.isNewer(releaseInfo.version, CURRENT_APP_VERSION);
-
-        return {
-          hasUpdate,
-          currentVersion: CURRENT_APP_VERSION,
-          latestRelease: releaseInfo,
-        };
+      } catch (_err) {
+        console.warn('[UpdateService] Failed to query releases list:', _err);
       }
 
       // 2. Fallback: Query raw package.json from GitHub master branch
