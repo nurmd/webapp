@@ -602,6 +602,12 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
     expect(container.textContent).toContain('Cash Deposit Received');
     expect(container.textContent).toContain('₹ 77,100.00'); // Closing running balance
 
+    // Verify Contra transfer From -> To visual route cues
+    expect(container.textContent).toContain('CONTRA');
+    expect(container.textContent).toContain('From:');
+    expect(container.textContent).toContain('To:');
+    expect(container.textContent).toContain('Received from');
+
     // Verify Summary Footer row
     expect(container.textContent).toContain('Total Withdrawals, Deposits & Closing Balance');
     expect(container.textContent).toContain('-₹ 34,700.00');

@@ -245,6 +245,15 @@ describe('Suite 5: Cash/Bank Ledgers & Running Balances', () => {
     expect(summary.totalCashBalance).toBe(3000);
     expect(summary.totalBankBalance).toBe(27000);
     expect(summary.totalLiquidBalance).toBe(30000); // Invariant holds!
+
+    const outEntry = summary.ledgerEntries.find((e) => e.id === 'LEDGER-TXN-OUT-TXN-1');
+    const inEntry = summary.ledgerEntries.find((e) => e.id === 'LEDGER-TXN-IN-TXN-1');
+    expect(outEntry?.fromAccountName).toBe('Cash in Hand');
+    expect(outEntry?.toAccountName).toBe('HDFC Current A/C');
+    expect(outEntry?.contraType).toBe('DEPOSIT');
+    expect(inEntry?.fromAccountName).toBe('Cash in Hand');
+    expect(inEntry?.toAccountName).toBe('HDFC Current A/C');
+    expect(inEntry?.contraType).toBe('DEPOSIT');
   });
 
   it('TC-CSHB-11: Contra Cash Withdrawal (WITHDRAWAL) decreases bank, increases cash, liquid balance unchanged', () => {

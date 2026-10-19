@@ -6,6 +6,8 @@ import {
   ArrowUpRight,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
+  ArrowRightLeft,
   Search,
   Filter,
 } from 'lucide-react';
@@ -180,10 +182,13 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       }
 
       accountEntries.entries.forEach((e) => {
+        const contraDetails = e.type === 'CONTRA' && (e.fromAccountName || e.toAccountName)
+          ? ` [From: ${e.fromAccountName || (e.flow === 'OUT' ? selectedAccount.accountName : 'Cash')} ➔ To: ${e.toAccountName || (e.flow === 'IN' ? selectedAccount.accountName : 'Bank')}]`
+          : '';
         rows.push([
           e.date,
           e.type,
-          e.counterpartyOrTitle,
+          `${e.counterpartyOrTitle}${contraDetails}`,
           e.referenceNo || '-',
           e.mode,
           e.flow === 'OUT' ? e.amount : 0,
@@ -222,16 +227,21 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         formatINR(selectedAccount.openingBalance || 0),
       ];
 
-      const txnRows = accountEntries.entries.map((e) => [
-        e.date,
-        e.type,
-        e.counterpartyOrTitle,
-        e.referenceNo || '-',
-        e.mode,
-        e.flow === 'OUT' ? formatINR(e.amount) : '-',
-        e.flow === 'IN' ? formatINR(e.amount) : '-',
-        formatINR(e.calculatedRunningBalance),
-      ]);
+      const txnRows = accountEntries.entries.map((e) => {
+        const contraDetails = e.type === 'CONTRA' && (e.fromAccountName || e.toAccountName)
+          ? ` [From: ${e.fromAccountName || (e.flow === 'OUT' ? selectedAccount.accountName : 'Cash')} ➔ To: ${e.toAccountName || (e.flow === 'IN' ? selectedAccount.accountName : 'Bank')}]`
+          : '';
+        return [
+          e.date,
+          e.type,
+          `${e.counterpartyOrTitle}${contraDetails}`,
+          e.referenceNo || '-',
+          e.mode,
+          e.flow === 'OUT' ? formatINR(e.amount) : '-',
+          e.flow === 'IN' ? formatINR(e.amount) : '-',
+          formatINR(e.calculatedRunningBalance),
+        ];
+      });
 
       const rows = sortOrder === 'asc' ? [openingRow, ...txnRows] : [...txnRows, openingRow];
 
@@ -451,20 +461,89 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
               ) : (
                 accountEntries.entries.map((entry) => {
                   const isDeposit = entry.flow === 'IN';
+                  const isContra = entry.type === 'CONTRA';
+                  const fromName = entry.fromAccountName || (!isDeposit ? selectedAccount.accountName : 'Cash in Hand');
+                  const toName = entry.toAccountName || (isDeposit ? selectedAccount.accountName : 'Bank');
+
                   return (
                     <tr key={entry.id} className="hover:bg-surface-container-low/50 transition-colors">
                       <td className="py-3 px-4 whitespace-nowrap text-on-surface font-mono text-xs">
                         {entry.date}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-container text-on-surface border border-outline-variant/20">
-                          {entry.type}
-                        </span>
+                        {isContra ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                              <ArrowRightLeft size={10} className="shrink-0" />
+                              <span>CONTRA</span>
+                            </span>
+                            {entry.contraType && (
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-on-surface-variant text-center">
+                                {entry.contraType}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-container text-on-surface border border-outline-variant/20">
+                            {entry.type}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-on-surface font-medium">
-                        <div>{entry.counterpartyOrTitle}</div>
-                        {entry.description && (
-                          <div className="text-[11px] text-on-surface-variant">{entry.description}</div>
+                        {isContra ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs sm:text-sm text-on-surface">
+                                {entry.counterpartyOrTitle}
+                              </span>
+                              {/* Visual From -> To Route Pill */}
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs">
+                                <span className="text-[9px] uppercase font-bold text-blue-700 dark:text-blue-300 tracking-wider">From:</span>
+                                <span className={`text-[11px] font-bold ${
+                                  !isDeposit ? 'text-rose-700 dark:text-rose-400 underline underline-offset-2' : 'text-on-surface'
+                                }`}>
+                                  {fromName}
+                                </span>
+                                <ArrowRight size={11} className="text-blue-600 dark:text-blue-400 shrink-0 font-bold" />
+                                <span className="text-[9px] uppercase font-bold text-blue-700 dark:text-blue-300 tracking-wider">To:</span>
+                                <span className={`text-[11px] font-bold ${
+                                  isDeposit ? 'text-emerald-700 dark:text-emerald-400 underline underline-offset-2' : 'text-on-surface'
+                                }`}>
+                                  {toName}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-[11px] text-on-surface-variant flex items-center gap-1.5 flex-wrap">
+                              <span className={`inline-flex items-center gap-0.5 font-semibold ${
+                                isDeposit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                              }`}>
+                                {isDeposit ? (
+                                  <>
+                                    <ArrowDownLeft size={12} />
+                                    <span>Received from <strong>{fromName}</strong></span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <ArrowUpRight size={12} />
+                                    <span>Transferred to <strong>{toName}</strong></span>
+                                  </>
+                                )}
+                              </span>
+                              {entry.description && (
+                                <>
+                                  <span>•</span>
+                                  <span className="truncate italic text-on-surface-variant">{entry.description}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div>{entry.counterpartyOrTitle}</div>
+                            {entry.description && (
+                              <div className="text-[11px] text-on-surface-variant">{entry.description}</div>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-on-surface-variant">

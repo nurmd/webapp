@@ -617,7 +617,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                     </div>
 
                     <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
                           {entry.counterpartyOrTitle}
                         </span>
@@ -626,7 +626,44 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                             #{entry.referenceNo}
                           </span>
                         )}
+                        {isContra && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[12px]">swap_horiz</span>
+                            <span>Contra</span>
+                          </span>
+                        )}
                       </div>
+
+                      {/* Prominent Visual Route Cue for Contra Entries */}
+                      {isContra && (
+                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs">
+                            <span className="text-[9px] uppercase font-bold text-blue-700 dark:text-blue-300 tracking-wider">From:</span>
+                            <span className={`text-[11px] font-bold ${
+                              entry.flow === 'OUT' ? 'text-rose-700 dark:text-rose-400 underline underline-offset-2' : 'text-on-surface'
+                            }`}>
+                              {entry.fromAccountName || (entry.flow === 'OUT' ? entry.accountName : 'Cash in Hand')}
+                            </span>
+                            <span className="material-symbols-outlined text-[13px] text-blue-600 dark:text-blue-400 font-bold">
+                              arrow_forward
+                            </span>
+                            <span className="text-[9px] uppercase font-bold text-blue-700 dark:text-blue-300 tracking-wider">To:</span>
+                            <span className={`text-[11px] font-bold ${
+                              entry.flow === 'IN' ? 'text-emerald-700 dark:text-emerald-400 underline underline-offset-2' : 'text-on-surface'
+                            }`}>
+                              {entry.toAccountName || (entry.flow === 'IN' ? entry.accountName : 'Bank')}
+                            </span>
+                          </div>
+
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            entry.flow === 'IN'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                          }`}>
+                            {entry.flow === 'IN' ? `Deposited into ${entry.accountName}` : `Deducted from ${entry.accountName}`}
+                          </span>
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5 flex-wrap">
                         <span>{formatDate(entry.date)}</span>
@@ -641,6 +678,12 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                         <span className="px-1.5 py-0.2 rounded bg-surface-container font-semibold text-[10px]">
                           {entry.mode}
                         </span>
+                        {entry.description && (
+                          <>
+                            <span>•</span>
+                            <span className="truncate italic">{entry.description}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

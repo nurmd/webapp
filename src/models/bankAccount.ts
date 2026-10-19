@@ -50,4 +50,9 @@ export interface UnifiedLedgerEntry {
   amount: number;
   runningBalance?: number;
   description?: string;
+  fromAccountId?: string;
+  fromAccountName?: string;
+  toAccountId?: string;
+  toAccountName?: string;
+  contraType?: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
 }

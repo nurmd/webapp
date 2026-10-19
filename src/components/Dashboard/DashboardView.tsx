@@ -338,25 +338,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         : `${v.voucherType || 'Voucher'} Voucher`;
 
       const totalAmt = v.totalAmount || 0;
+      const contraRoute = v.voucherType === 'CONTRA'
+        ? (() => {
+            const fromEntry = entries.find((e) => e.credit > 0);
+            const toEntry = entries.find((e) => e.debit > 0);
+            const fromName = fromEntry?.accountName || 'Cash in Hand';
+            const toName = toEntry?.accountName || 'Bank Account';
+            return `${fromName} ➔ ${toName}`;
+          })()
+        : null;
+
       feed.push({
-        id: `vchr-${v.id || vNum || `${v.date || 'v'}-${totalAmt}-${vIdx}`}`,
-        rawId: v.id || '',
-        type: 'VOUCHER',
-        typeLabel,
-        flow,
-        partyName,
-        partyId,
-        identifier: vNum || 'VOUCHER',
-        date: v.date || '',
-        timestamp: parseDateToTimestamp(v.date, v.createdAt),
-        amount: totalAmt,
-        paidAmount: totalAmt,
-        balanceAmount: 0,
-        paymentMode: vMode,
-        paymentStatus: 'PAID',
-        description: v.narration || (isReceipt ? 'Payment Received' : 'Payment Disbursed'),
-        rawVoucher: v,
-      });
+          id: `vchr-${v.id || vNum || `${v.date || 'v'}-${totalAmt}-${vIdx}`}`,
+          rawId: v.id || '',
+          type: 'VOUCHER',
+          typeLabel,
+          flow,
+          partyName,
+          partyId,
+          identifier: vNum || 'VOUCHER',
+          date: v.date || '',
+          timestamp: parseDateToTimestamp(v.date, v.createdAt),
+          amount: totalAmt,
+          paidAmount: totalAmt,
+          balanceAmount: 0,
+          paymentMode: vMode,
+          paymentStatus: 'PAID',
+          description: contraRoute
+            ? (v.narration ? `${contraRoute} • ${v.narration}` : contraRoute)
+            : v.narration || (isReceipt ? 'Payment Received' : 'Payment Disbursed'),
+          rawVoucher: v,
+        });
     });
 
     // D. Business Expenses (Money Out - Rose/Amber)

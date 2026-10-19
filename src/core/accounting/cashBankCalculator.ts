@@ -344,6 +344,64 @@ export function computeCashBankSummary(params: {
           description: v.narration || `Payment Voucher #${v.voucherNumber}`,
         });
       });
+    } else if (v.voucherType === 'CONTRA') {
+      const creditEntry = v.entries.find((e) => e.credit > 0);
+      const debitEntry = v.entries.find((e) => e.debit > 0);
+      if (creditEntry && debitEntry) {
+        const fromAccId = creditEntry.accountId || 'ACC_CASH';
+        const toAccId = debitEntry.accountId || defaultBank.id;
+        const fromAcc = accounts.find((a) => a.id === fromAccId);
+        const toAcc = accounts.find((a) => a.id === toAccId);
+        const fromName = fromAcc?.accountName || creditEntry.accountName || (fromAccId === 'ACC_CASH' ? 'Cash in Hand' : 'Cash');
+        const toName = toAcc?.accountName || debitEntry.accountName || defaultBank.accountName;
+        const amt = debitEntry.debit || creditEntry.credit || v.totalAmount;
+        const dateStr = v.date || todayStr;
+
+        balances[fromAccId] = (balances[fromAccId] || 0) - amt;
+        balances[toAccId] = (balances[toAccId] || 0) + amt;
+
+        const contraType = fromAccId === 'ACC_CASH' ? 'DEPOSIT' : (toAccId === 'ACC_CASH' ? 'WITHDRAWAL' : 'TRANSFER');
+
+        entries.push({
+          id: `LEDGER-VCH-OUT-${v.id}`,
+          date: dateStr,
+          type: 'CONTRA',
+          category: fromAccId === 'ACC_CASH' ? 'CASH' : 'BANK',
+          accountId: fromAccId,
+          accountName: fromName,
+          counterpartyOrTitle: `Transfer to ${toName}`,
+          referenceNo: v.voucherNumber,
+          mode: 'CONTRA',
+          flow: 'OUT',
+          amount: amt,
+          description: v.narration || `Contra Transfer: ${fromName} ➔ ${toName}`,
+          fromAccountId: fromAccId,
+          fromAccountName: fromName,
+          toAccountId: toAccId,
+          toAccountName: toName,
+          contraType,
+        });
+
+        entries.push({
+          id: `LEDGER-VCH-IN-${v.id}`,
+          date: dateStr,
+          type: 'CONTRA',
+          category: toAccId === 'ACC_CASH' ? 'CASH' : 'BANK',
+          accountId: toAccId,
+          accountName: toName,
+          counterpartyOrTitle: `Transfer from ${fromName}`,
+          referenceNo: v.voucherNumber,
+          mode: 'CONTRA',
+          flow: 'IN',
+          amount: amt,
+          description: v.narration || `Contra Transfer: ${fromName} ➔ ${toName}`,
+          fromAccountId: fromAccId,
+          fromAccountName: fromName,
+          toAccountId: toAccId,
+          toAccountName: toName,
+          contraType,
+        });
+      }
     }
   });
 
@@ -362,19 +420,29 @@ export function computeCashBankSummary(params: {
       balances[fromId] = (balances[fromId] || 0) - amt;
       balances[toId] = (balances[toId] || 0) + amt;
 
+      const fromAcc = accounts.find((a) => a.id === fromId);
+      const toAcc = accounts.find((a) => a.id === toId);
+      const fromName = fromAcc?.accountName || (fromId === 'ACC_CASH' ? 'Cash in Hand' : 'Cash');
+      const toName = toAcc?.accountName || defaultBank.accountName;
+
       entries.push({
         id: `LEDGER-TXN-OUT-${txn.id}`,
         date: dateStr,
         type: 'CONTRA',
         category: 'CASH',
         accountId: fromId,
-        accountName: 'Cash in Hand',
+        accountName: fromName,
         counterpartyOrTitle: 'Cash Deposit to Bank',
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'OUT',
         amount: amt,
-        description: txn.description || 'Cash deposited into bank',
+        description: txn.description || `Cash deposited into ${toName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'DEPOSIT',
       });
 
       entries.push({
@@ -383,13 +451,18 @@ export function computeCashBankSummary(params: {
         type: 'CONTRA',
         category: 'BANK',
         accountId: toId,
-        accountName: defaultBank.accountName,
+        accountName: toName,
         counterpartyOrTitle: 'Cash Deposit Received',
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'IN',
         amount: amt,
-        description: txn.description || 'Cash deposit from counter',
+        description: txn.description || `Cash deposit received from ${fromName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'DEPOSIT',
       });
     } else if (txn.type === 'WITHDRAWAL') {
       // Bank -> Cash
@@ -399,19 +472,29 @@ export function computeCashBankSummary(params: {
       balances[fromId] = (balances[fromId] || 0) - amt;
       balances[toId] = (balances[toId] || 0) + amt;
 
+      const fromAcc = accounts.find((a) => a.id === fromId);
+      const toAcc = accounts.find((a) => a.id === toId);
+      const fromName = fromAcc?.accountName || defaultBank.accountName;
+      const toName = toAcc?.accountName || (toId === 'ACC_CASH' ? 'Cash in Hand' : 'Cash');
+
       entries.push({
         id: `LEDGER-TXN-OUT-${txn.id}`,
         date: dateStr,
         type: 'CONTRA',
         category: 'BANK',
         accountId: fromId,
-        accountName: defaultBank.accountName,
+        accountName: fromName,
         counterpartyOrTitle: 'Cash Withdrawn from Bank',
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'OUT',
         amount: amt,
-        description: txn.description || 'Cash withdrawal for counter',
+        description: txn.description || `Cash withdrawal for ${toName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'WITHDRAWAL',
       });
 
       entries.push({
@@ -420,13 +503,18 @@ export function computeCashBankSummary(params: {
         type: 'CONTRA',
         category: 'CASH',
         accountId: toId,
-        accountName: 'Cash in Hand',
+        accountName: toName,
         counterpartyOrTitle: 'Cash Withdrawal Received',
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'IN',
         amount: amt,
-        description: txn.description || 'Cash received from bank',
+        description: txn.description || `Cash received from ${fromName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'WITHDRAWAL',
       });
     } else if (txn.type === 'TRANSFER') {
       // Bank A -> Bank B
@@ -438,6 +526,8 @@ export function computeCashBankSummary(params: {
 
       const fromAcc = accounts.find((a) => a.id === fromId);
       const toAcc = accounts.find((a) => a.id === toId);
+      const fromName = fromAcc?.accountName || 'Bank Account';
+      const toName = toAcc?.accountName || 'Bank Account';
 
       entries.push({
         id: `LEDGER-TXN-OUT-${txn.id}`,
@@ -445,13 +535,18 @@ export function computeCashBankSummary(params: {
         type: 'CONTRA',
         category: 'BANK',
         accountId: fromId,
-        accountName: fromAcc?.accountName || 'Bank Account',
-        counterpartyOrTitle: `Transfer to ${toAcc?.accountName || 'Bank'}`,
+        accountName: fromName,
+        counterpartyOrTitle: `Transfer to ${toName}`,
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'NEFT/RTGS',
         flow: 'OUT',
         amount: amt,
-        description: txn.description || 'Inter-bank fund transfer',
+        description: txn.description || `Inter-bank fund transfer to ${toName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'TRANSFER',
       });
 
       entries.push({
@@ -460,13 +555,18 @@ export function computeCashBankSummary(params: {
         type: 'CONTRA',
         category: 'BANK',
         accountId: toId,
-        accountName: toAcc?.accountName || 'Bank Account',
-        counterpartyOrTitle: `Transfer from ${fromAcc?.accountName || 'Bank'}`,
+        accountName: toName,
+        counterpartyOrTitle: `Transfer from ${fromName}`,
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'NEFT/RTGS',
         flow: 'IN',
         amount: amt,
-        description: txn.description || 'Inter-bank fund transfer',
+        description: txn.description || `Inter-bank fund transfer from ${fromName}`,
+        fromAccountId: fromId,
+        fromAccountName: fromName,
+        toAccountId: toId,
+        toAccountName: toName,
+        contraType: 'TRANSFER',
       });
     } else if (txn.type === 'ADD_MONEY') {
       // Direct Inflow
