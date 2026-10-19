@@ -221,13 +221,16 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     }
   };
 
-  // Hardware Scanner Gun Listener
+  const handleBarcodeScannedRef = useRef(handleBarcodeScanned);
+  handleBarcodeScannedRef.current = handleBarcodeScanned;
+
+  // Hardware Scanner Gun Listener (Subscribed once on mount, 0 churn on cart/item updates)
   useEffect(() => {
     const unsub = hardwareScanner.subscribe((code) => {
-      handleBarcodeScanned(code);
+      handleBarcodeScannedRef.current(code);
     });
     return unsub;
-  }, [items, cart]);
+  }, []);
 
   // POS Keyboard Shortcuts Handler
   useEffect(() => {
@@ -297,16 +300,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
   // Cart operations
   const addToCart = (item: InventoryItem, initialQty = 1) => {
-    const existing = cart.find((c) => c.item.id === item.id);
-    if (existing) {
-      setCart(
-        cart.map((c) =>
+    setCart((prevCart) => {
+      const existing = prevCart.find((c) => c.item.id === item.id);
+      if (existing) {
+        return prevCart.map((c) =>
           c.item.id === item.id ? { ...c, qty: c.qty + initialQty } : c
-        )
-      );
-    } else {
-      setCart([
-        ...cart,
+        );
+      }
+      return [
+        ...prevCart,
         {
           item,
           qty: initialQty,
@@ -314,8 +316,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           discountPercent: 0,
           discountAmount: 0,
         },
-      ]);
-    }
+      ];
+    });
   };
 
   const updateCartQty = (itemId: string, qty: number) => {

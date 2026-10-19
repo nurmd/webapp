@@ -5,13 +5,14 @@
  * - Deterministic RFC 8785 canonical JSON serialization
  * - SHA-256 cryptographic hash chaining with 64-zero genesis anchor
  * - FIFO Promise mutex queue for race-condition-free concurrent mutations
- * - Dual-tier storage (PouchDB doc type 'audit_log' + localStorage cache 'gst_audit_logs')
+ * - In-memory cache with PouchDB IndexedDB persistence (doc type 'audit_log')
  * - 3-stage chain integrity validation (sequence contiguity, hash link, payload parity)
  * - Strict immutability protection (rejects/throws on any update or deletion attempt)
  */
 
 import { pouch } from './pouchdb.ts';
 import { rbac, UserRole } from './rbac.ts';
+import { sha256Hex } from '../core/utils/crypto.ts';
 
 export type AuditActionType =
   | 'INVOICE_CREATE'
@@ -144,19 +145,10 @@ export function buildPreimage(record: {
 
 /**
  * Compute SHA-256 digest returning a 64-character lowercase hex string.
- * Uses Web Crypto API (`crypto.subtle`) with Node.js crypto fallback.
+ * Uses Web Crypto API with pure-JS fallback for non-secure environments.
  */
 export async function computeSha256Hex(data: string): Promise<string> {
-  const enc = new TextEncoder().encode(data);
-  if (globalThis.crypto?.subtle) {
-    const buffer = await globalThis.crypto.subtle.digest('SHA-256', enc);
-    return Array.from(new Uint8Array(buffer))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  // Fallback for Node.js environments without global crypto.subtle
-  const cryptoModule = await import('crypto');
-  return cryptoModule.createHash('sha256').update(data).digest('hex');
+  return sha256Hex(data);
 }
 
 /**
@@ -190,46 +182,56 @@ export class AuditTrailService {
   private appendQueue: Promise<any> = Promise.resolve();
 
   constructor() {
-    this.hydrateFromStorageSync();
+    this.reclaimLegacyLocalStorage();
   }
 
   /**
-   * Synchronously reads Tier 1 localStorage cache if available
+   * Reclaims browser quota by clearing gst_audit_logs from localStorage.
+   * If any legacy records exist, loads them into memory and persists them to PouchDB.
    */
-  private hydrateFromStorageSync(): void {
-    try {
-      if (typeof localStorage !== 'undefined') {
+  private reclaimLegacyLocalStorage(): void {
+    if (typeof localStorage !== 'undefined') {
+      try {
         const raw = localStorage.getItem(STORAGE_KEY_AUDIT_LOGS);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            this.records = parsed.sort((a, b) => a.sequence - b.sequence);
-            this.loaded = true;
+        if (raw !== null) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0 && this.records.length === 0) {
+              this.records = parsed.sort((a, b) => a.sequence - b.sequence);
+              parsed.forEach((rec) => {
+                pouch.putDoc('audit_log', rec).catch(() => {});
+              });
+            }
+          } catch (err) {
+            console.warn('AuditTrailService: Failed to parse legacy localStorage logs', err);
           }
+          localStorage.removeItem(STORAGE_KEY_AUDIT_LOGS);
         }
+      } catch (e) {
+        console.warn('AuditTrailService: Failed to reclaim legacy localStorage quota', e);
       }
-    } catch (e) {
-      console.warn('AuditTrailService: Failed to parse sync cache', e);
     }
   }
 
   /**
-   * Ensures storage is loaded and hydrated from Tier 1 (localStorage) or Tier 2 (PouchDB).
+   * Ensures storage is loaded and hydrated from memory or PouchDB IndexedDB.
    */
   private async ensureLoaded(): Promise<void> {
-    if (this.loaded && this.records.length > 0) return;
+    this.reclaimLegacyLocalStorage();
 
-    this.hydrateFromStorageSync();
-    if (this.records.length > 0) {
-      this.loaded = true;
-      return;
-    }
+    if (this.loaded && this.records.length > 0) return;
 
     try {
       const pouchDocs = await pouch.getAllDocs<AuditRecord>('audit_log');
       if (pouchDocs && pouchDocs.length > 0) {
-        this.records = pouchDocs.sort((a, b) => a.sequence - b.sequence);
-        this.syncToLocalStorage();
+        if (this.records.length === 0) {
+          this.records = pouchDocs.sort((a, b) => a.sequence - b.sequence);
+        } else {
+          const map = new Map<string, AuditRecord>();
+          pouchDocs.forEach((r) => map.set(r.id, r));
+          this.records.forEach((r) => map.set(r.id, r));
+          this.records = Array.from(map.values()).sort((a, b) => a.sequence - b.sequence);
+        }
       }
     } catch (e) {
       // PouchDB unavailable or empty
@@ -237,14 +239,11 @@ export class AuditTrailService {
     this.loaded = true;
   }
 
-  private syncToLocalStorage(): void {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY_AUDIT_LOGS, JSON.stringify(this.records));
-      } catch (e) {
-        console.warn('AuditTrailService: localStorage write failed', e);
-      }
-    }
+  /**
+   * Synchronously returns a snapshot of in-memory audit records.
+   */
+  public getRecordsSync(): AuditRecord[] {
+    return this.records.map((r) => ({ ...r }));
   }
 
   /**
@@ -311,12 +310,17 @@ export class AuditTrailService {
     };
 
     this.records.push(record);
-    this.syncToLocalStorage();
 
-    // Persist to Tier 2 PouchDB doc asynchronously
-    pouch.putDoc('audit_log', record).catch((err) => {
+    // Keep in memory and persist directly to PouchDB IndexedDB
+    try {
+      await pouch.putDoc('audit_log', record);
+    } catch (err) {
       console.error('AuditTrailService: PouchDB putDoc error:', err);
-    });
+    }
+
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY_AUDIT_LOGS) !== null) {
+      localStorage.removeItem(STORAGE_KEY_AUDIT_LOGS);
+    }
 
     return { ...record };
   }
@@ -554,7 +558,6 @@ export class AuditTrailService {
 
   public _setRecordsForTesting(records: AuditRecord[]): void {
     this.records = records.map((r) => ({ ...r }));
-    this.syncToLocalStorage();
   }
 }
 

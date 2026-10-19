@@ -899,8 +899,19 @@ class StorageService {
   private set<T>(key: string, value: T): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error('Local storage write error:', e);
+    } catch (e: any) {
+      const isQuotaExceeded =
+        (typeof DOMException !== 'undefined' && e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) ||
+        e?.name === 'QuotaExceededError' ||
+        e?.code === 22 ||
+        e?.number === -2147024882 ||
+        (typeof e?.message === 'string' && e.message.toLowerCase().includes('quota'));
+
+      if (isQuotaExceeded) {
+        console.warn(`StorageService.set: QuotaExceededError encountered for key "${key}". Write skipped in localStorage without failing unhandled.`, e);
+      } else {
+        console.error('Local storage write error:', e);
+      }
     }
   }
 
@@ -1264,11 +1275,177 @@ class StorageService {
     return netBalance;
   }
 
-  // Synchronize balances for all parties
+  // Synchronize balances for all parties in linear O(P + I + V + U) time
   syncAllPartyBalances(): void {
     const parties = this.getParties();
-    for (const party of parties) {
-      this.recalculatePartyBalance(party.id);
+    if (!parties.length) return;
+
+    const invoices = this.getInvoices();
+    const purchases = this.getPurchases();
+    const vouchers = this.getVouchers();
+
+    // 1. Build lookup and accumulator maps: O(P)
+    interface PartyAccumulator {
+      unpaidInvoicesDelta: number;
+      totalInvoicePaid: number;
+      unpaidPurchasesDelta: number;
+      totalPurchasePaid: number;
+      totalReceipts: number;
+      totalPayments: number;
+    }
+
+    const partyById = new Map<string, Party>();
+    const partyByName = new Map<string, Party>();
+    const accMap = new Map<string, PartyAccumulator>();
+
+    for (const p of parties) {
+      partyById.set(p.id, p);
+      if (p.name) {
+        partyByName.set(p.name.trim().toLowerCase(), p);
+      }
+      accMap.set(p.id, {
+        unpaidInvoicesDelta: 0,
+        totalInvoicePaid: 0,
+        unpaidPurchasesDelta: 0,
+        totalPurchasePaid: 0,
+        totalReceipts: 0,
+        totalPayments: 0,
+      });
+    }
+
+    // 2. Single pass over invoices: O(I)
+    for (const inv of invoices) {
+      if (inv.isCancelled) continue;
+      let party = inv.partyId ? partyById.get(inv.partyId) : undefined;
+      if (!party && inv.partyName) {
+        party = partyByName.get(inv.partyName.trim().toLowerCase());
+      }
+      if (!party || party.type !== 'CUSTOMER') continue;
+
+      const acc = accMap.get(party.id);
+      if (!acc) continue;
+
+      acc.totalInvoicePaid += (inv.paidAmount || 0);
+
+      if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
+        continue;
+      }
+
+      const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
+      if (inv.invoiceType === 'CREDIT_NOTE') {
+        acc.unpaidInvoicesDelta -= unpaid;
+      } else {
+        acc.unpaidInvoicesDelta += unpaid;
+      }
+    }
+
+    // 3. Single pass over purchases: O(U)
+    for (const pur of purchases) {
+      let supplier = pur.supplierId ? partyById.get(pur.supplierId) : undefined;
+      if (!supplier && pur.supplierName) {
+        supplier = partyByName.get(pur.supplierName.trim().toLowerCase());
+      }
+      if (!supplier || supplier.type === 'CUSTOMER') continue;
+
+      const acc = accMap.get(supplier.id);
+      if (!acc) continue;
+
+      acc.totalPurchasePaid += (pur.paidAmount || 0);
+
+      if (pur.purchaseType === 'PO') continue;
+
+      const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
+      if (pur.purchaseType === 'RETURN') {
+        acc.unpaidPurchasesDelta += unpaid;
+      } else {
+        acc.unpaidPurchasesDelta -= unpaid;
+      }
+    }
+
+    // 4. Single pass over vouchers: O(V * E)
+    for (const v of vouchers) {
+      const isReceipt = v.voucherType === 'RECEIPT';
+      const isPayment = v.voucherType === 'PAYMENT';
+      if (!isReceipt && !isPayment) continue;
+
+      const matchedPartiesThisVoucher = new Set<string>();
+
+      for (const e of v.entries) {
+        let party = e.accountId ? partyById.get(e.accountId) : undefined;
+        if (!party && e.accountName) {
+          party = partyByName.get(e.accountName.trim().toLowerCase());
+        }
+        if (!party) continue;
+
+        if (matchedPartiesThisVoucher.has(party.id)) continue;
+        matchedPartiesThisVoucher.add(party.id);
+
+        const acc = accMap.get(party.id);
+        if (!acc) continue;
+
+        if (isReceipt && party.type === 'CUSTOMER') {
+          acc.totalReceipts += v.totalAmount;
+        } else if (isPayment && party.type !== 'CUSTOMER') {
+          acc.totalPayments += v.totalAmount;
+        }
+      }
+    }
+
+    // 5. Compute balances and update changed parties in a single pass: O(P)
+    let hasChanges = false;
+    const changedParties: Party[] = [];
+
+    for (let i = 0; i < parties.length; i++) {
+      const party = parties[i];
+      const isCustomer = party.type === 'CUSTOMER';
+      const acc = accMap.get(party.id)!;
+
+      let balance = 0;
+      if (typeof party.openingBalance === 'number' && party.openingBalance !== 0) {
+        const absAmt = Math.abs(party.openingBalance);
+        let opType = party.openingBalanceType;
+        if (!opType) {
+          opType = party.openingBalance > 0
+            ? (isCustomer ? 'TO_RECEIVE' : 'TO_PAY')
+            : (isCustomer ? 'TO_PAY' : 'TO_RECEIVE');
+        }
+        if (opType === 'TO_RECEIVE') {
+          balance += absAmt;
+        } else {
+          balance -= absAmt;
+        }
+      }
+
+      if (isCustomer) {
+        balance += acc.unpaidInvoicesDelta;
+        if (acc.totalReceipts > acc.totalInvoicePaid) {
+          balance -= (acc.totalReceipts - acc.totalInvoicePaid);
+        }
+      } else {
+        balance += acc.unpaidPurchasesDelta;
+        if (acc.totalPayments > acc.totalPurchasePaid) {
+          balance += (acc.totalPayments - acc.totalPurchasePaid);
+        }
+      }
+
+      const netBalance = Math.round(balance * 100) / 100;
+      if (party.currentBalance !== netBalance) {
+        party.currentBalance = netBalance;
+        party.updatedAt = new Date().toISOString();
+        parties[i] = party;
+        changedParties.push(party);
+        hasChanges = true;
+      }
+    }
+
+    // 6. Single atomic persist and notification
+    if (hasChanges) {
+      this.set(STORAGE_KEYS.PARTIES, parties);
+      changedParties.forEach((p) => {
+        pouch.putDoc('party', p);
+        this.broadcastChange('party', 'save', p.id, p);
+      });
+      this.notifyListeners();
     }
   }
 
@@ -2069,9 +2246,11 @@ class StorageService {
     const adjustments = this.getStockAdjustments();
     const bankAccounts = this.getBankAccounts();
     const cashBankTransactions = this.getCashBankTransactions();
-    const auditLogs = typeof localStorage !== 'undefined'
-      ? JSON.parse(localStorage.getItem('gst_audit_logs') || '[]')
-      : [];
+    const auditLogs = typeof auditTrail?.getRecordsSync === 'function'
+      ? auditTrail.getRecordsSync()
+      : (typeof localStorage !== 'undefined'
+          ? JSON.parse(localStorage.getItem('gst_audit_logs') || '[]')
+          : []);
     const categories = this.getCategories();
     const allowNegativeStock = this.getAllowNegativeStock();
     const hideBuyPrices = !this.getBuyPriceVisibility();

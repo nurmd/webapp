@@ -23,21 +23,15 @@ export interface LockoutState {
   lastFailedAt?: number;
 }
 
+import { sha256Hex, generateRandomSalt } from '../core/utils/crypto.ts';
+
 export function generateSalt(byteLength: number = 16): string {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return generateRandomSalt(byteLength);
 }
 
 export async function hashPin(pin: string, salt: string): Promise<string> {
   const normalizedPin = pin.trim();
-  const data = new TextEncoder().encode(salt + normalizedPin);
-  const digestBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digestBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return sha256Hex(salt + normalizedPin);
 }
 
 export function timingSafeEqual(a: string, b: string): boolean {

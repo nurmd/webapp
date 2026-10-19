@@ -38,6 +38,7 @@ export interface OtaDownloadOptions {
 }
 
 import packageJson from '../../package.json';
+import { sha256Hex } from '../core/utils/crypto.ts';
 
 export const CURRENT_APP_VERSION = packageJson.version || '1.0.35';
 export const CURRENT_VERSION_CODE = (() => {
@@ -476,12 +477,7 @@ class UpdateService {
   }
 
   public async calculateSha256(data: ArrayBuffer): Promise<string> {
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-    }
-    return '';
+    return sha256Hex(data);
   }
 
   public startInternalDownload(options: OtaDownloadOptions): () => void {

@@ -156,20 +156,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [paymentTarget, setPaymentTarget] = useState<DashboardPaymentTarget | null>(null);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
 
-  // Financial Overview Aggregates
-  const totalSales = activeInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+  // Financial Overview Aggregates (Memoized to prevent recalculation on search/filter changes)
+  const totalSales = useMemo(() => {
+    return activeInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+  }, [activeInvoices]);
 
-  const totalReceivables = activeParties
-    .filter((p) => p.currentBalance > 0)
-    .reduce((sum, p) => sum + p.currentBalance, 0);
+  const { totalReceivables, totalPayables, debtorParties, creditorParties } = useMemo(() => {
+    let rec = 0;
+    let pay = 0;
+    const debtors: Party[] = [];
+    const creditors: Party[] = [];
 
-  const totalPayables = activeParties
-    .filter((p) => p.currentBalance < 0)
-    .reduce((sum, p) => sum + Math.abs(p.currentBalance), 0);
+    for (const p of activeParties) {
+      if (p.currentBalance > 0) {
+        rec += p.currentBalance;
+        debtors.push(p);
+      } else if (p.currentBalance < 0) {
+        pay += Math.abs(p.currentBalance);
+        creditors.push(p);
+      }
+    }
 
-  const debtorParties = activeParties.filter((p) => p.currentBalance > 0);
-  const creditorParties = activeParties.filter((p) => p.currentBalance < 0);
-  const lowStockItems = activeItems.filter((i) => i.currentStock <= i.minStockAlert);
+    return {
+      totalReceivables: rec,
+      totalPayables: pay,
+      debtorParties: debtors,
+      creditorParties: creditors,
+    };
+  }, [activeParties]);
+
+  const lowStockItems = useMemo(() => {
+    return activeItems.filter((i) => i.currentStock <= i.minStockAlert);
+  }, [activeItems]);
 
   // 1. Build Consolidated Multi-Entity Activity Timeline (R1)
   const allActivities = useMemo(() => {
