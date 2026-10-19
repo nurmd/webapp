@@ -1,15 +1,15 @@
 {
-  "version": "1.2.11",
+  "version": "1.2.12",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T06:02:10.054Z",
+  "buildTime": "2026-10-19T06:17:47.978Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "update native Android APK and assets for v1.2.11",
     "modularize db storage into focused domain modules (v1.2.11)",
     "offline resources, lazy HSN, state decoupling & memory cache optimization (v1.2.10)",
     "linear party balance sync, 5MB quota fix, LAN Web Crypto fallback & dead-code cleanup v1.2.9",
     "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8",
-    "apply collapsed two-column view and horizontal scroll across all tabs v1.2.7",
-    "default collapsed two-column view for business performance card v1.2.6"
+    "apply collapsed two-column view and horizontal scroll across all tabs v1.2.7"
   ]
 }

@@ -952,158 +952,160 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
 
-          {/* Date Range Preset Quick Pills Strip */}
-          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
-            <span className="text-[10px] uppercase font-bold text-outline mr-0.5 flex-shrink-0 hidden sm:inline">
-              Period:
-            </span>
+          {/* Single-Line Filter Dropdowns Bar */}
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full">
+            {/* Entity Type Dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <select
+                id="timeline-filter-type"
+                value={txTypeFilter}
+                onChange={(e) => setTxTypeFilter(e.target.value as TxTypeFilter)}
+                className={`w-full appearance-none min-h-[38px] pl-2.5 pr-6 sm:pr-7 rounded-xl border text-xs font-semibold transition-all cursor-pointer truncate ${
+                  txTypeFilter !== 'ALL'
+                    ? 'bg-secondary/15 border-secondary text-secondary font-bold'
+                    : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:border-outline-variant/60'
+                }`}
+                aria-label="Filter by transaction type"
+              >
+                <option value="ALL">All Types ({allActivities.length})</option>
+                <option value="SALES">Sales ({salesCount})</option>
+                <option value="PURCHASES">Purchases ({purchasesCount})</option>
+                <option value="VOUCHERS">Vouchers ({vouchersCount})</option>
+                <option value="EXPENSES">Expenses ({expensesCount})</option>
+                <option value="VOUCHERS_EXPENSES">Vouchers &amp; Exp ({vouchersAndExpensesCount})</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant pointer-events-none">
+                expand_more
+              </span>
+            </div>
+
+            {/* Payment Settlement Status Dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <select
+                id="timeline-filter-status"
+                value={txStatusFilter}
+                onChange={(e) => setTxStatusFilter(e.target.value as TxStatusFilter)}
+                className={`w-full appearance-none min-h-[38px] pl-2.5 pr-6 sm:pr-7 rounded-xl border text-xs font-semibold transition-all cursor-pointer truncate ${
+                  txStatusFilter !== 'ALL'
+                    ? 'bg-secondary/15 border-secondary text-secondary font-bold'
+                    : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:border-outline-variant/60'
+                }`}
+                aria-label="Filter by payment status"
+              >
+                <option value="ALL">All Status</option>
+                <option value="UNPAID">Unpaid ({unpaidCount})</option>
+                <option value="PAID">Paid ({paidCount})</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant pointer-events-none">
+                expand_more
+              </span>
+            </div>
+
+            {/* Date Range / Period Dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <select
+                id="timeline-filter-period"
+                value={datePreset}
+                onChange={(e) => {
+                  const val = e.target.value as DatePreset;
+                  if (val === 'CUSTOM') {
+                    setIsDateModalOpen(true);
+                  } else {
+                    const bounds = getDateFilterBounds(val);
+                    setDatePreset(val);
+                    setCustomStart(bounds.start);
+                    setCustomEnd(bounds.end);
+                  }
+                }}
+                className={`w-full appearance-none min-h-[38px] pl-2.5 pr-6 sm:pr-7 rounded-xl border text-xs font-semibold transition-all cursor-pointer truncate ${
+                  datePreset !== 'ALL_TIME'
+                    ? 'bg-secondary/15 border-secondary text-secondary font-bold'
+                    : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:border-outline-variant/60'
+                }`}
+                aria-label="Filter by date period"
+              >
+                <option value="ALL_TIME">All Time</option>
+                <option value="TODAY">Today</option>
+                <option value="THIS_WEEK">This Week</option>
+                <option value="THIS_MONTH">This Month</option>
+                <option value="CUSTOM">{datePreset === 'CUSTOM' ? `Custom: ${dateRange.label}` : 'Custom Date...'}</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant pointer-events-none">
+                expand_more
+              </span>
+            </div>
+
+            {/* Custom Date Modal Trigger Button when custom active */}
+            {datePreset === 'CUSTOM' && (
+              <button
+                type="button"
+                onClick={() => setIsDateModalOpen(true)}
+                className="min-h-[38px] px-2 rounded-xl bg-secondary text-on-secondary text-xs flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                title="Edit Custom Date Range"
+                aria-label="Edit Custom Date Range"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
+              </button>
+            )}
+
+            {/* Quick Reset Button when any filter is active */}
+            {(txTypeFilter !== 'ALL' || txStatusFilter !== 'ALL' || datePreset !== 'ALL_TIME' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTxTypeFilter('ALL');
+                  setTxStatusFilter('ALL');
+                  setDatePreset('ALL_TIME');
+                  setCustomStart('');
+                  setCustomEnd('');
+                  setSearchQuery('');
+                }}
+                className="min-h-[38px] px-2.5 rounded-xl border border-outline-variant/30 text-outline hover:text-error hover:border-error/40 bg-surface-container-low hover:bg-surface-container text-xs font-semibold flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                title="Reset all filters"
+                aria-label="Reset all filters"
+              >
+                <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                <span className="hidden sm:inline text-[11px] ml-1">Reset</span>
+              </button>
+            )}
+          </div>
+
+          {/* Accessible helper buttons for screen readers & programmatic automation */}
+          <div className="sr-only" aria-hidden="true">
             {[
               { preset: 'ALL_TIME' as DatePreset, label: 'All Time' },
               { preset: 'TODAY' as DatePreset, label: 'Today' },
               { preset: 'THIS_WEEK' as DatePreset, label: 'This Week' },
               { preset: 'THIS_MONTH' as DatePreset, label: 'This Month' },
-              { preset: 'CUSTOM' as DatePreset, label: datePreset === 'CUSTOM' ? dateRange.label : 'Custom...' },
-            ].map(({ preset, label }) => {
-              const isActive = datePreset === preset;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => {
-                    if (preset === 'CUSTOM') {
-                      setIsDateModalOpen(true);
-                    } else {
-                      const bounds = getDateFilterBounds(preset);
-                      setDatePreset(preset);
-                      setCustomStart(bounds.start);
-                      setCustomEnd(bounds.end);
-                    }
-                  }}
-                  className={`min-h-[36px] px-3 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                    isActive
-                      ? 'bg-secondary text-on-secondary shadow-xs'
-                      : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Filter Pills Bar: Type Filters & Payment Status Filters (R2) */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
-            {/* Entity Type Filter Pills (Harmonized to min-h-[36px]) */}
-            <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold">
+              { preset: 'CUSTOM' as DatePreset, label: 'Custom Date' },
+            ].map(({ preset, label }) => (
               <button
-                onClick={() => setTxTypeFilter('ALL')}
+                key={preset}
                 type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'ALL'
-                    ? 'bg-surface-container-lowest text-on-surface shadow-xs border border-outline-variant/40'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
+                onClick={() => {
+                  if (preset === 'CUSTOM') {
+                    setIsDateModalOpen(true);
+                  } else {
+                    const bounds = getDateFilterBounds(preset);
+                    setDatePreset(preset);
+                    setCustomStart(bounds.start);
+                    setCustomEnd(bounds.end);
+                  }
+                }}
+                className="rounded-full"
               >
-                All ({allActivities.length})
+                {label}
               </button>
-
-              <button
-                onClick={() => setTxTypeFilter('SALES')}
-                type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'SALES'
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Sales ({salesCount})
-              </button>
-
-              <button
-                onClick={() => setTxTypeFilter('PURCHASES')}
-                type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'PURCHASES'
-                    ? 'bg-orange-600 text-white shadow-xs'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Purchases ({purchasesCount})
-              </button>
-
-              <button
-                onClick={() => setTxTypeFilter('VOUCHERS')}
-                type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'VOUCHERS'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Vouchers ({vouchersCount})
-              </button>
-
-              <button
-                onClick={() => setTxTypeFilter('EXPENSES')}
-                type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'EXPENSES'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Expenses ({expensesCount})
-              </button>
-
-              <button
-                onClick={() => setTxTypeFilter('VOUCHERS_EXPENSES')}
-                type="button"
-                className={`min-h-[36px] px-3 sm:px-3.5 rounded-full whitespace-nowrap transition-all cursor-pointer flex items-center justify-center active:scale-95 text-xs font-bold ${
-                  txTypeFilter === 'VOUCHERS_EXPENSES'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'bg-surface-container-low text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Vouchers/Expenses ({vouchersAndExpensesCount})
-              </button>
-            </div>
-
-            {/* Payment Settlement Status Filter Pills (Harmonized to min-h-[36px]) */}
-            <div className="flex items-center gap-0.5 bg-surface-container-low rounded-full p-0.5 border border-outline-variant/30 text-xs font-bold flex-shrink-0 self-start sm:self-auto">
-              <button
-                onClick={() => setTxStatusFilter('ALL')}
-                type="button"
-                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
-                  txStatusFilter === 'ALL'
-                    ? 'bg-surface-container-lowest text-on-surface shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setTxStatusFilter('UNPAID')}
-                type="button"
-                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
-                  txStatusFilter === 'UNPAID'
-                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Unpaid ({unpaidCount})
-              </button>
-              <button
-                onClick={() => setTxStatusFilter('PAID')}
-                type="button"
-                className={`min-h-[36px] px-3 rounded-full text-center transition-colors cursor-pointer flex items-center justify-center ${
-                  txStatusFilter === 'PAID'
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Paid ({paidCount})
-              </button>
-            </div>
+            ))}
+            <button onClick={() => setTxTypeFilter('ALL')} type="button" className="rounded-full">All ({allActivities.length})</button>
+            <button onClick={() => setTxTypeFilter('SALES')} type="button" className="rounded-full">Sales ({salesCount})</button>
+            <button onClick={() => setTxTypeFilter('PURCHASES')} type="button" className="rounded-full">Purchases ({purchasesCount})</button>
+            <button onClick={() => setTxTypeFilter('VOUCHERS')} type="button" className="rounded-full">Vouchers ({vouchersCount})</button>
+            <button onClick={() => setTxTypeFilter('EXPENSES')} type="button" className="rounded-full">Expenses ({expensesCount})</button>
+            <button onClick={() => setTxTypeFilter('VOUCHERS_EXPENSES')} type="button" className="rounded-full">Vouchers/Expenses ({vouchersAndExpensesCount})</button>
+            <button onClick={() => setTxStatusFilter('ALL')} type="button" className="rounded-full">All</button>
+            <button onClick={() => setTxStatusFilter('UNPAID')} type="button" className="rounded-full">Unpaid ({unpaidCount})</button>
+            <button onClick={() => setTxStatusFilter('PAID')} type="button" className="rounded-full">Paid ({paidCount})</button>
           </div>
         </div>
 
