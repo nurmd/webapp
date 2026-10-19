@@ -233,6 +233,11 @@ export function generateReportHtml(config: ReportPdfConfig): string {
       cursor: pointer;
       border: none;
     }
+    .btn-back {
+      background: #475569;
+      color: #ffffff;
+      margin-right: 8px;
+    }
     .btn-print {
       background: #2563eb;
       color: #ffffff;
@@ -365,12 +370,13 @@ export function generateReportHtml(config: ReportPdfConfig): string {
 </head>
 <body>
   <div class="no-print">
-    <div>
-      <strong>Print Preview</strong> — Ready for A4 ${orientation}. Use "Save as PDF" in your print dialog.
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="btn-back" onclick="handleGoBack()" title="Back to reports">← Back</button>
+      <span><strong>Print Preview</strong> — Ready for A4 ${orientation}. Use "Save as PDF" in your print dialog.</span>
     </div>
     <div>
       <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
-      <button class="btn-close" onclick="window.close()">Close</button>
+      <button class="btn-close" onclick="handleGoBack()">Close</button>
     </div>
   </div>
 
@@ -410,6 +416,56 @@ export function generateReportHtml(config: ReportPdfConfig): string {
   </div>
 
   <script>
+    function handleGoBack() {
+      // 1. AndroidBridge native back
+      try {
+        if (window.AndroidBridge && typeof window.AndroidBridge.goBack === 'function') {
+          window.AndroidBridge.goBack();
+          return;
+        }
+      } catch (e) {}
+
+      // 2. Window opened with opener
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.close();
+          return;
+        }
+      } catch (e) {}
+
+      // 3. Browser history back
+      if (window.history && window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+
+      // 4. Default window.close fallback
+      try {
+        window.close();
+      } catch (e) {}
+    }
+
+    // Android hardware back button integration
+    window.__handleAndroidBack = function() {
+      handleGoBack();
+      return true;
+    };
+
+    // Keyboard Escape key support
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        handleGoBack();
+      }
+    });
+
+    // Browser popstate navigation
+    try {
+      history.pushState({ reportPreview: true }, '');
+      window.addEventListener('popstate', function() {
+        handleGoBack();
+      });
+    } catch (e) {}
+
     window.onload = function() {
       // Auto-trigger print dialog cleanly
       setTimeout(function() {
@@ -425,10 +481,19 @@ export function generateReportHtml(config: ReportPdfConfig): string {
 </html>`;
 }
 
+// Global in-app report preview handler delegation
+let customReportPreviewHandler: ((config: ReportPdfConfig) => void) | null = null;
+
+export function registerReportPreviewHandler(
+  handler: ((config: ReportPdfConfig) => void) | null
+): void {
+  customReportPreviewHandler = handler;
+}
+
 /**
- * Printable PDF Generator with fallback to hidden <iframe> if window.open is blocked.
+ * Direct printable PDF Generator with fallback to hidden <iframe> if window.open is blocked.
  */
-export function printReportDocument(config: ReportPdfConfig): void {
+export function printReportDocumentDirect(config: ReportPdfConfig): void {
   const htmlContent = generateReportHtml(config);
 
   try {
@@ -488,4 +553,15 @@ export function printReportDocument(config: ReportPdfConfig): void {
       window.print();
     }
   }
+}
+
+/**
+ * Printable PDF Generator: delegates to in-app preview modal if registered, or direct print window.
+ */
+export function printReportDocument(config: ReportPdfConfig): void {
+  if (customReportPreviewHandler) {
+    customReportPreviewHandler(config);
+    return;
+  }
+  printReportDocumentDirect(config);
 }

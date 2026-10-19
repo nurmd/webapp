@@ -718,6 +718,28 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     showAppToast('Draft discarded');
   }, [initialParty]);
 
+  // Restore draft from storage
+  const handleRestoreDraft = useCallback(() => {
+    const draft = draftService.getInvoiceDraft();
+    if (!draft) {
+      showAppToast('No saved draft found');
+      return;
+    }
+    if (draft.selectedParty) setSelectedParty(draft.selectedParty);
+    if (draft.posStateCode) setPosStateCode(draft.posStateCode);
+    if (draft.manualInvoiceType) setManualInvoiceType(draft.manualInvoiceType);
+    if (typeof draft.isRcm === 'boolean') setIsRcm(draft.isRcm);
+    if (typeof draft.overallDiscountPercent === 'number') setOverallDiscountPercent(draft.overallDiscountPercent);
+    if (typeof draft.shippingAmount === 'number') setShippingAmount(draft.shippingAmount);
+    if (draft.shippingAddress) setShippingAddress(draft.shippingAddress);
+    if (draft.shippingPincode) setShippingPincode(draft.shippingPincode);
+    if (draft.rows && draft.rows.length > 0) {
+      setRows(draft.rows);
+    }
+    setHasRestoredDraft(true);
+    showAppToast('Draft restored');
+  }, []);
+
   // "Save & Print" from Action Dock: saves bill as UNPAID and triggers print
   const handleSaveAndPrint = useCallback(() => {
     if (!validateInvoice()) return;
@@ -838,46 +860,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               setInvoiceNumber(newNum);
               setInvoiceConflictError(null);
             }}
+            hasRestoredDraft={hasRestoredDraft}
+            hasDraftInStorage={!initialInvoice && draftService.hasInvoiceDraft()}
+            onSaveDraft={!initialInvoice ? handleSaveDraft : undefined}
+            onRestoreDraft={!initialInvoice ? handleRestoreDraft : undefined}
+            onDiscardDraft={!initialInvoice ? handleDiscardDraft : undefined}
           />
-
-          {/* Restored Unsaved Draft Alert Banner */}
-          {hasRestoredDraft && (
-            <div
-              data-testid="invoice-draft-banner"
-              className="p-3 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-center justify-between gap-3 animate-fadeIn"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="material-symbols-outlined text-[20px] text-amber-600 dark:text-amber-400 shrink-0">
-                  restore_page
-                </span>
-                <div className="min-w-0">
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 block">
-                    Restored Unsaved Draft
-                  </span>
-                  <span className="text-[11px] text-amber-800/80 dark:text-amber-300/80 truncate block">
-                    Auto-saved progress ({rows.length} {rows.length === 1 ? 'item' : 'items'}{selectedParty ? ` • ${selectedParty.name}` : ''}) was restored.
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleDiscardDraft}
-                  className="px-2.5 py-1 text-xs font-bold rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 active:scale-95 transition-all cursor-pointer"
-                >
-                  Discard Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHasRestoredDraft(false)}
-                  className="p-1 rounded-lg text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 active:scale-95 transition-all cursor-pointer"
-                  title="Dismiss banner"
-                >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           <InvoiceLineItemsGrid
             rows={rows}
@@ -922,7 +910,6 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onSaveAndPrint={handleSaveAndPrint}
         onSaveInvoice={handleSaveInvoiceDirect}
         onPayAndSave={handleOpenPaymentModal}
-        onSaveDraft={!initialInvoice ? handleSaveDraft : undefined}
       />
 
       {/* Select Party Modal */}

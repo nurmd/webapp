@@ -1,15 +1,15 @@
 {
-  "version": "1.2.13",
+  "version": "1.2.14",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T07:01:01.262Z",
+  "buildTime": "2026-10-19T07:35:31.546Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "persistent auto-saving and restoration for new invoices & purchase bills with discard draft support (v1.2.13)",
+    "move draft save & restore to top bar, fix reports PDF preview back navigation (v1.2.14)",
+    "add draft auto-save and restore for new invoices and bills (v1.2.13)",
     "restore business activity timeline filter to 3 dropdown filters (v1.2.12)",
     "update native Android APK and assets for v1.2.11",
     "modularize db storage into focused domain modules (v1.2.11)",
-    "offline resources, lazy HSN, state decoupling & memory cache optimization (v1.2.10)",
-    "linear party balance sync, 5MB quota fix, LAN Web Crypto fallback & dead-code cleanup v1.2.9"
+    "offline resources, lazy HSN, state decoupling & memory cache optimization (v1.2.10)"
   ]
 }

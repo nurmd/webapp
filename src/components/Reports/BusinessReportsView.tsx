@@ -29,6 +29,8 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { BusinessPerformanceCard } from './BusinessPerformanceCard.tsx';
 import { ReportsNavList, ReportCategoryKey } from './ReportsNavList.tsx';
 import { DedicatedReportPageHeader, SubReportTabOption } from './DedicatedReportPageHeader.tsx';
+import { ReportPdfPreviewModal } from './ReportPdfPreviewModal.tsx';
+import { registerReportPreviewHandler, ReportPdfConfig } from './utils/reportExportUtils.ts';
 
 // 5 Operations & Tax Dedicated Category Views
 import { GstTaxComplianceCategory } from './categories/GstTaxComplianceCategory.tsx';
@@ -216,6 +218,18 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   // Child export handlers ref
   const exportHandlersRef = useRef<{ exportCsv?: () => void; exportPdf?: () => void }>({});
 
+  // Active Report PDF preview modal state
+  const [activePdfPreviewConfig, setActivePdfPreviewConfig] = useState<ReportPdfConfig | null>(null);
+
+  React.useEffect(() => {
+    registerReportPreviewHandler((config) => {
+      setActivePdfPreviewConfig(config);
+    });
+    return () => {
+      registerReportPreviewHandler(null);
+    };
+  }, []);
+
   const handleDateRangeChange = (preset: DatePreset, start?: string, end?: string) => {
     setDatePreset(preset);
     if (start) setCustomStart(start);
@@ -356,6 +370,13 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
         <ReportsNavList
           onSelectReport={handleNavigateToReport}
           metrics={hubMetrics}
+        />
+
+        {/* In-App Report PDF Preview Modal with Hardware & UI Back Navigation */}
+        <ReportPdfPreviewModal
+          isOpen={Boolean(activePdfPreviewConfig)}
+          config={activePdfPreviewConfig}
+          onClose={() => setActivePdfPreviewConfig(null)}
         />
       </div>
     );
@@ -535,6 +556,13 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
           <DaybookView vouchers={vouchers} />
         )}
       </main>
+
+      {/* In-App Report PDF Preview Modal with Hardware & UI Back Navigation */}
+      <ReportPdfPreviewModal
+        isOpen={Boolean(activePdfPreviewConfig)}
+        config={activePdfPreviewConfig}
+        onClose={() => setActivePdfPreviewConfig(null)}
+      />
     </div>
   );
 };

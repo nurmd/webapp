@@ -38,6 +38,13 @@ export interface InvoiceHeaderMetaProps {
   shippingPincode?: string;
   onShippingAddressChange?: (address: string) => void;
   onShippingPincodeChange?: (pincode: string) => void;
+
+  // Draft props for top bar
+  hasRestoredDraft?: boolean;
+  hasDraftInStorage?: boolean;
+  onSaveDraft?: () => void;
+  onRestoreDraft?: () => void;
+  onDiscardDraft?: () => void;
 }
 
 function formatDateDisplay(dateStr: string): string {
@@ -80,6 +87,11 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   shippingPincode,
   onShippingAddressChange,
   onShippingPincodeChange,
+  hasRestoredDraft = false,
+  hasDraftInStorage = false,
+  onSaveDraft,
+  onRestoreDraft,
+  onDiscardDraft,
 }) => {
   const [isShippingExpanded, setIsShippingExpanded] = React.useState<boolean>(() => {
     return Boolean(shippingAddress || shippingPincode || initialInvoice?.shippingAddress || initialInvoice?.shippingPincode);
@@ -88,7 +100,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
     <>
       {/* Fixed Top Shell Header */}
       <header className="fixed top-0 left-0 right-0 w-full z-40 bg-surface-container-lowest/95 backdrop-blur-xl shadow-xs border-b border-outline-variant/30 pt-safe">
-        <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-3 w-full">
+        <div className="h-14 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-3 w-full">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <button
               onClick={onClose}
@@ -127,7 +139,69 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Top Bar Actions: Save Draft & Restore & Close */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {!initialInvoice && (
+              <>
+                {/* Restored Draft Status / Discard Pill */}
+                {hasRestoredDraft && (
+                  <div
+                    data-testid="invoice-draft-banner"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-semibold animate-fadeIn"
+                    title="Draft auto-restored"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400 shrink-0">
+                      restore_page
+                    </span>
+                    <span className="hidden sm:inline">Restored Unsaved Draft</span>
+                    <span className="sm:hidden">Restored</span>
+                    {onDiscardDraft && (
+                      <button
+                        type="button"
+                        onClick={onDiscardDraft}
+                        className="ml-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                        title="Discard this draft"
+                      >
+                        Discard Draft
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Restore Draft Button (when not currently restored, but draft exists in storage) */}
+                {!hasRestoredDraft && hasDraftInStorage && onRestoreDraft && (
+                  <button
+                    type="button"
+                    onClick={onRestoreDraft}
+                    data-testid="invoice-restore-draft-btn"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+                    title="Restore previously saved draft"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">
+                      restore
+                    </span>
+                    <span>Restore Draft</span>
+                  </button>
+                )}
+
+                {/* Save Draft Button */}
+                {onSaveDraft && (
+                  <button
+                    type="button"
+                    onClick={onSaveDraft}
+                    data-testid="invoice-save-draft-btn"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/40 text-xs font-semibold active:scale-95 transition-all cursor-pointer shadow-2xs"
+                    title="Save current progress as draft"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">
+                      bookmark
+                    </span>
+                    <span className="hidden xs:inline">Save Draft</span>
+                  </button>
+                )}
+              </>
+            )}
+
             <button
               type="button"
               onClick={onClose}
