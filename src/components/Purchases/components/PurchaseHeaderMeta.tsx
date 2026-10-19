@@ -6,6 +6,7 @@ import { formatINR } from '../../../core/utils/formatters.ts';
 export interface PurchaseHeaderMetaProps {
   onClose: () => void;
   isEditing: boolean;
+  purchaseType?: 'BILL' | 'PO' | 'RETURN';
   selectedSupplier: Party | null;
   billNumber: string;
   billDate: string;
@@ -21,6 +22,17 @@ export interface PurchaseHeaderMetaProps {
   onOpenBillNoModal: () => void;
   onOpenDueDateModal: () => void;
 
+  // Return / Reference fields
+  originalBillNumber?: string;
+  onOriginalBillNumberChange?: (val: string) => void;
+  originalBillDate?: string;
+  onOriginalBillDateChange?: (val: string) => void;
+  returnReason?: string;
+  onReturnReasonChange?: (val: string) => void;
+
+  // Order status
+  orderStatus?: string;
+
   // Draft props for top bar
   hasRestoredDraft?: boolean;
   hasDraftInStorage?: boolean;
@@ -32,6 +44,7 @@ export interface PurchaseHeaderMetaProps {
 export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
   onClose,
   isEditing,
+  purchaseType = 'BILL',
   selectedSupplier,
   billNumber,
   billDate,
@@ -46,12 +59,44 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
   onClearSupplier,
   onOpenBillNoModal,
   onOpenDueDateModal,
+  originalBillNumber,
+  onOriginalBillNumberChange,
+  originalBillDate,
+  onOriginalBillDateChange,
+  returnReason,
+  onReturnReasonChange,
+  orderStatus,
   hasRestoredDraft = false,
   hasDraftInStorage = false,
   onSaveDraft,
   onRestoreDraft,
   onDiscardDraft,
 }) => {
+  const isPo = purchaseType === 'PO';
+  const isReturn = purchaseType === 'RETURN';
+
+  const titleText = isPo
+    ? isEditing
+      ? `Edit Purchase Order #${billNumber}`
+      : 'New Purchase Order'
+    : isReturn
+    ? isEditing
+      ? `Edit Purchase Return #${billNumber}`
+      : 'New Purchase Return (Debit Note)'
+    : isEditing
+    ? 'Edit Purchase Bill'
+    : 'Record Purchase Bill';
+
+  const badgeText = isPo ? 'Purchase Order' : isReturn ? 'Debit Note (Return)' : 'Purchase (Inward)';
+  const badgeClass = isPo
+    ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25'
+    : isReturn
+    ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30'
+    : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20';
+
+  const iconName = isPo ? 'add_shopping_cart' : isReturn ? 'assignment_turned_in' : 'shopping_bag';
+  const iconBgClass = isPo ? 'bg-indigo-600' : isReturn ? 'bg-amber-600' : 'bg-orange-600';
+
   return (
     <>
       {/* Fixed Top Shell Header */}
@@ -66,15 +111,15 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             >
               <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             </button>
-            <div className="w-8 h-8 rounded-xl bg-orange-600 text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
-              <span className="material-symbols-outlined text-[19px]">shopping_bag</span>
+            <div className={`w-8 h-8 rounded-xl ${iconBgClass} text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0`}>
+              <span className="material-symbols-outlined text-[19px]">{iconName}</span>
             </div>
             <div className="min-w-0 flex items-center gap-2">
               <span className="font-bold text-sm sm:text-base text-on-surface truncate">
-                {isEditing ? 'Edit Purchase Bill' : 'Record Purchase Bill'}
+                {titleText}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 shrink-0">
-                Purchase (Inward)
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${badgeClass}`}>
+                {badgeText}
               </span>
             </div>
           </div>
@@ -252,9 +297,11 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             type="button"
             onClick={onOpenBillNoModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title="Change Bill Number"
+            title={isPo ? 'Change Purchase Order Number' : isReturn ? 'Change Debit Note Number' : 'Change Bill Number'}
           >
-            <span className="text-[9px] uppercase font-bold text-outline">Bill #:</span>
+            <span className="text-[9px] uppercase font-bold text-outline">
+              {isPo ? 'PO #:' : isReturn ? 'DN #:' : 'Bill #:'}
+            </span>
             <span className="font-bold text-on-surface truncate max-w-[120px]">{billNumber}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">edit</span>
           </button>
@@ -264,26 +311,78 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             type="button"
             onClick={onOpenBillNoModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title="Change Bill Date"
+            title={isPo ? 'Change PO Date' : isReturn ? 'Change Debit Note Date' : 'Change Bill Date'}
           >
             <span className="material-symbols-outlined text-[13px] text-outline">calendar_today</span>
             <span>{billDate}</span>
           </button>
 
-          {/* Due Date */}
+          {/* Due / Expected Date */}
           <button
             type="button"
             onClick={onOpenDueDateModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title="Change Payment Due Date"
+            title={isPo ? 'Change Promised Delivery Date' : 'Change Payment Due Date'}
           >
-            <span className="text-[9px] uppercase font-bold text-outline">Due:</span>
+            <span className="text-[9px] uppercase font-bold text-outline">
+              {isPo ? 'Expected:' : 'Due:'}
+            </span>
             <span>{dueDate}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">event</span>
           </button>
 
+          {/* PO Status Badge */}
+          {isPo && (
+            <div className="h-7 px-2 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] flex items-center gap-1 border border-indigo-500/25">
+              <span className="material-symbols-outlined text-[13px]">pending_actions</span>
+              <span>Status: {orderStatus || 'PENDING'}</span>
+            </div>
+          )}
+
+          {/* Purchase Return (Debit Note) Reference Fields */}
+          {isReturn && (
+            <>
+              <div className="h-7 px-2 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300 font-medium text-xs flex items-center gap-1 border border-amber-500/30">
+                <span className="text-[9px] uppercase font-bold text-amber-700 dark:text-amber-400">Orig Bill #:</span>
+                <input
+                  type="text"
+                  value={originalBillNumber || ''}
+                  onChange={(e) => onOriginalBillNumberChange?.(e.target.value)}
+                  placeholder="e.g. PB-001"
+                  className="bg-transparent font-bold text-xs text-amber-900 dark:text-amber-200 outline-none w-20 sm:w-24 placeholder:text-amber-400/60"
+                  title="Original Supplier Invoice Number"
+                />
+              </div>
+              <div className="h-7 px-2 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300 font-medium text-xs flex items-center gap-1 border border-amber-500/30">
+                <span className="text-[9px] uppercase font-bold text-amber-700 dark:text-amber-400">Orig Date:</span>
+                <input
+                  type="date"
+                  value={originalBillDate || ''}
+                  onChange={(e) => onOriginalBillDateChange?.(e.target.value)}
+                  className="bg-transparent font-medium text-xs text-amber-900 dark:text-amber-200 outline-none cursor-pointer"
+                  title="Original Supplier Invoice Date"
+                />
+              </div>
+              <div className="h-7 px-2 rounded-lg bg-amber-500/10 text-amber-800 dark:text-amber-300 font-medium text-xs flex items-center gap-1 border border-amber-500/30">
+                <span className="text-[9px] uppercase font-bold text-amber-700 dark:text-amber-400">Reason:</span>
+                <select
+                  aria-label="Return Reason"
+                  value={returnReason || '01-Defective Goods'}
+                  onChange={(e) => onReturnReasonChange?.(e.target.value)}
+                  className="bg-transparent font-bold text-xs text-amber-900 dark:text-amber-200 outline-none cursor-pointer"
+                >
+                  <option value="01-Defective Goods" className="bg-surface text-on-surface">Defective Goods</option>
+                  <option value="02-Quality Rejection" className="bg-surface text-on-surface">Quality Rejection</option>
+                  <option value="03-Rate Difference" className="bg-surface text-on-surface">Rate Difference</option>
+                  <option value="04-Wrong Shipment" className="bg-surface text-on-surface">Wrong Shipment</option>
+                  <option value="05-Other" className="bg-surface text-on-surface">Other</option>
+                </select>
+              </div>
+            </>
+          )}
+
           {/* ITC Eligibility Selector */}
-          {isGstActive && (
+          {isGstActive && !isReturn && (
             <div className="h-7 px-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 border border-orange-500/20">
               <span className="material-symbols-outlined text-[14px]">verified</span>
               <span>

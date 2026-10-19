@@ -1,10 +1,11 @@
 {
-  "version": "1.2.18",
+  "version": "1.2.19",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T12:45:08.436Z",
+  "buildTime": "2026-10-19T13:59:13.685Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "dedicated visual and functional workflows for Sales Order, Purchase Order, Sales Return (Credit Note), and Purchase Return (Debit Note) with isolated document draft storage (v1.2.19)",
     "add clear From ➔ To visual route cues and badges for Contra transactions",
     "resolve inaccurate bank statement running balance and table rendering",
     "responsive mobile card previews & auto-fit A4 scaling for invoice and reports (v1.2.15)",

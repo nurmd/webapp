@@ -39,6 +39,17 @@ export interface InvoiceHeaderMetaProps {
   onShippingAddressChange?: (address: string) => void;
   onShippingPincodeChange?: (pincode: string) => void;
 
+  // Credit Note / Return Reference fields
+  originalInvoiceNumber?: string;
+  onOriginalInvoiceNumberChange?: (val: string) => void;
+  originalInvoiceDate?: string;
+  onOriginalInvoiceDateChange?: (val: string) => void;
+  returnReason?: string;
+  onReturnReasonChange?: (val: string) => void;
+
+  // Order status
+  orderStatus?: string;
+
   // Draft props for top bar
   hasRestoredDraft?: boolean;
   hasDraftInStorage?: boolean;
@@ -87,6 +98,13 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   shippingPincode,
   onShippingAddressChange,
   onShippingPincodeChange,
+  originalInvoiceNumber,
+  onOriginalInvoiceNumberChange,
+  originalInvoiceDate,
+  onOriginalInvoiceDateChange,
+  returnReason,
+  onReturnReasonChange,
+  orderStatus,
   hasRestoredDraft = false,
   hasDraftInStorage = false,
   onSaveDraft,
@@ -96,6 +114,65 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   const [isShippingExpanded, setIsShippingExpanded] = React.useState<boolean>(() => {
     return Boolean(shippingAddress || shippingPincode || initialInvoice?.shippingAddress || initialInvoice?.shippingPincode);
   });
+
+  const isSalesOrder = invoiceType === 'SALES_ORDER';
+  const isCreditNote = invoiceType === 'CREDIT_NOTE';
+  const isDebitNote = invoiceType === 'DEBIT_NOTE';
+  const isQuotation = invoiceType === 'ESTIMATE';
+  const isDeliveryChallan = invoiceType === 'DELIVERY_CHALLAN';
+
+  let titleText = 'New Invoice';
+  let badgeText = '';
+  let badgeClass = '';
+  let iconSymbol = '₹';
+  let iconBg = 'bg-secondary text-on-secondary';
+
+  if (isSalesOrder) {
+    titleText = initialInvoice ? `Edit Sales Order #${invoiceNumber}` : 'New Sales Order';
+    badgeText = 'Sales Order';
+    badgeClass = 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30';
+    iconSymbol = 'assignment';
+    iconBg = 'bg-blue-600 text-white';
+  } else if (isCreditNote) {
+    titleText = initialInvoice ? `Edit Sales Return #${invoiceNumber}` : 'New Sales Return (Credit Note)';
+    badgeText = 'Credit Note (Return)';
+    badgeClass = 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
+    iconSymbol = 'assignment_return';
+    iconBg = 'bg-rose-600 text-white';
+  } else if (isDebitNote) {
+    titleText = initialInvoice ? `Edit Debit Note #${invoiceNumber}` : 'New Debit Note';
+    badgeText = 'Debit Note';
+    badgeClass = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
+    iconSymbol = 'assignment_returned';
+    iconBg = 'bg-amber-600 text-white';
+  } else if (isQuotation) {
+    titleText = initialInvoice ? `Edit Quotation #${invoiceNumber}` : 'New Quotation / Estimate';
+    badgeText = 'Estimate / Quote';
+    badgeClass = 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
+    iconSymbol = 'description';
+    iconBg = 'bg-amber-600 text-white';
+  } else if (isDeliveryChallan) {
+    titleText = initialInvoice ? `Edit Delivery Challan #${invoiceNumber}` : 'New Delivery Challan';
+    badgeText = 'Delivery Challan';
+    badgeClass = 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30';
+    iconSymbol = 'local_shipping';
+    iconBg = 'bg-indigo-600 text-white';
+  } else if (isCompositionScheme) {
+    titleText = initialInvoice ? `Edit Bill of Supply #${invoiceNumber}` : 'New Bill of Supply';
+    badgeText = 'Composition Scheme';
+    badgeClass = 'bg-secondary/15 text-secondary border-secondary/25';
+    iconSymbol = '₹';
+    iconBg = 'bg-secondary text-on-secondary';
+  } else {
+    titleText = initialInvoice ? `Edit Invoice #${invoiceNumber}` : 'New Invoice';
+    if (isGstActive) {
+      badgeText = isIntraState ? 'Intra-State GST' : 'Inter-State IGST';
+      badgeClass = 'bg-secondary/10 text-secondary border border-secondary/20';
+    }
+    iconSymbol = '₹';
+    iconBg = 'bg-secondary text-on-secondary';
+  }
+
   return (
     <>
       {/* Fixed Top Shell Header */}
@@ -111,30 +188,18 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
               <span className="material-symbols-outlined text-[22px]">arrow_back</span>
             </button>
 
-            <div className="w-8 h-8 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
-              ₹
+            <div className={`w-8 h-8 rounded-xl ${iconBg} flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0`}>
+              {iconSymbol === '₹' ? '₹' : <span className="material-symbols-outlined text-[19px]">{iconSymbol}</span>}
             </div>
 
             <div className="flex items-center gap-2 min-w-0">
               <h1 className="font-bold text-sm sm:text-base text-on-surface truncate">
-                {isCompositionScheme
-                  ? initialInvoice
-                    ? `Edit Bill of Supply #${invoiceNumber}`
-                    : `New Bill of Supply`
-                  : initialInvoice
-                  ? `Edit Invoice #${invoiceNumber}`
-                  : `New Invoice`}
+                {titleText}
               </h1>
-              {isCompositionScheme ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/15 text-secondary border border-secondary/25">
-                  Composition Scheme
+              {badgeText && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${badgeClass}`}>
+                  {badgeText}
                 </span>
-              ) : (
-                isGstActive && (
-                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-secondary/10 text-secondary border border-secondary/20">
-                    {isIntraState ? 'Intra-State GST' : 'Inter-State IGST'}
-                  </span>
-                )
               )}
             </div>
           </div>
@@ -321,17 +386,70 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
             <span>{formatDateDisplay(invoiceDate)}</span>
           </button>
 
-          {/* Due Date */}
+          {/* Due / Delivery Date */}
           <button
             type="button"
             onClick={onOpenDueDateModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title="Change Due Date"
+            title={isSalesOrder ? 'Change Expected Delivery Date' : isQuotation ? 'Change Validity Date' : 'Change Due Date'}
           >
-            <span className="text-[9px] uppercase font-bold text-outline">Due:</span>
+            <span className="text-[9px] uppercase font-bold text-outline">
+              {isSalesOrder ? 'Delivery:' : isQuotation ? 'Valid:' : 'Due:'}
+            </span>
             <span>{formatDateDisplay(dueDate)}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">event</span>
           </button>
+
+          {/* Sales Order Status Badge */}
+          {isSalesOrder && (
+            <div className="h-7 px-2 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 font-bold text-[11px] flex items-center gap-1 border border-blue-500/25">
+              <span className="material-symbols-outlined text-[13px]">pending_actions</span>
+              <span>Status: {orderStatus || 'PENDING'}</span>
+            </div>
+          )}
+
+          {/* Credit / Debit Note Return Reference Fields */}
+          {(isCreditNote || isDebitNote) && (
+            <>
+              <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
+                <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Inv #:</span>
+                <input
+                  type="text"
+                  value={originalInvoiceNumber || ''}
+                  onChange={(e) => onOriginalInvoiceNumberChange?.(e.target.value)}
+                  placeholder="e.g. INV-001"
+                  className="bg-transparent font-bold text-xs text-rose-800 dark:text-rose-200 outline-none w-20 sm:w-24 placeholder:text-rose-400/60"
+                  title="Original Invoice Number for GSTR Table 9B"
+                />
+              </div>
+              <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
+                <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Date:</span>
+                <input
+                  type="date"
+                  value={originalInvoiceDate || ''}
+                  onChange={(e) => onOriginalInvoiceDateChange?.(e.target.value)}
+                  className="bg-transparent font-medium text-xs text-rose-800 dark:text-rose-200 outline-none cursor-pointer"
+                  title="Original Invoice Date"
+                />
+              </div>
+              <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
+                <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Reason:</span>
+                <select
+                  aria-label="Return Reason"
+                  value={returnReason || '01-Sales Return'}
+                  onChange={(e) => onReturnReasonChange?.(e.target.value)}
+                  className="bg-transparent font-bold text-xs text-rose-800 dark:text-rose-200 outline-none cursor-pointer"
+                >
+                  <option value="01-Sales Return" className="bg-surface text-on-surface">Sales Return</option>
+                  <option value="02-Defective Goods" className="bg-surface text-on-surface">Defective / Damaged</option>
+                  <option value="03-Post Sale Discount" className="bg-surface text-on-surface">Post Sale Discount</option>
+                  <option value="04-Deficiency in Services" className="bg-surface text-on-surface">Deficiency in Services</option>
+                  <option value="05-Price Difference" className="bg-surface text-on-surface">Price Difference</option>
+                  <option value="06-Other" className="bg-surface text-on-surface">Other</option>
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Mode & PoS */}
           {isGstActive && (
@@ -363,8 +481,11 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
                 <option value="B2CL" className="bg-surface text-on-surface">B2C Large (&gt; ₹2.5L)</option>
                 <option value="EXPORT" className="bg-surface text-on-surface">Export</option>
                 <option value="SEZ" className="bg-surface text-on-surface">SEZ Supply</option>
-                <option value="CREDIT_NOTE" className="bg-surface text-on-surface">Credit Note</option>
+                <option value="CREDIT_NOTE" className="bg-surface text-on-surface">Credit Note (Sales Return)</option>
                 <option value="DEBIT_NOTE" className="bg-surface text-on-surface">Debit Note</option>
+                <option value="SALES_ORDER" className="bg-surface text-on-surface">Sales Order</option>
+                <option value="ESTIMATE" className="bg-surface text-on-surface">Quotation / Estimate</option>
+                <option value="DELIVERY_CHALLAN" className="bg-surface text-on-surface">Delivery Challan</option>
               </select>
               {isManualTypeOverride && (
                 <span className="text-[9px] font-bold text-secondary uppercase bg-secondary/10 px-1 py-0.5 rounded">

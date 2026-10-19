@@ -63,7 +63,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onPartyCreated,
 }) => {
   // Draft state for new invoice restoration
-  const initialDraft = useMemo(() => (!initialInvoice ? draftService.getInvoiceDraft() : null), [initialInvoice]);
+  const initialDraft = useMemo(
+    () => (!initialInvoice ? draftService.getInvoiceDraft(defaultInvoiceType) : null),
+    [initialInvoice, defaultInvoiceType]
+  );
   const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(() => Boolean(initialDraft));
 
   // Parties synchronized with direct additions
@@ -214,6 +217,17 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [shippingAddress, setShippingAddress] = useState<string>(() => initialInvoice?.shippingAddress || initialDraft?.shippingAddress || '');
   const [shippingPincode, setShippingPincode] = useState<string>(() => initialInvoice?.shippingPincode || initialDraft?.shippingPincode || '');
   const [isExtraDiscountModalOpen, setIsExtraDiscountModalOpen] = useState(false);
+
+  // Credit Note / Return References
+  const [originalInvoiceNumber, setOriginalInvoiceNumber] = useState<string>(
+    () => initialInvoice?.originalInvoiceNumber || initialDraft?.originalInvoiceNumber || ''
+  );
+  const [originalInvoiceDate, setOriginalInvoiceDate] = useState<string>(
+    () => initialInvoice?.originalInvoiceDate || initialDraft?.originalInvoiceDate || ''
+  );
+  const [returnReason, setReturnReason] = useState<string>(
+    () => initialInvoice?.returnReason || initialDraft?.returnReason || '01-Sales Return'
+  );
 
   // Scanner modal
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -516,10 +530,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       ? (paymentOverride.paymentNotes || initialInvoice?.notes)
       : initialInvoice?.notes;
 
+    const isSpecialDoc = ['SALES_ORDER', 'ESTIMATE', 'DELIVERY_CHALLAN', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(effectiveInvoiceType);
+    const resolvedInvoiceType = (company.isCompositionScheme && !isSpecialDoc) ? 'B2CS' : effectiveInvoiceType;
+
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
       invoiceNumber: invoiceNumber.trim(),
-      invoiceType: company.isCompositionScheme ? 'B2CS' : effectiveInvoiceType,
+      invoiceType: resolvedInvoiceType,
       isRcm: isRcm,
       isGstInvoice: isGstActive,
       date: invoiceDate,
@@ -555,6 +572,19 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       balanceAmount: balanceDue,
       paymentSplits: savedSplits,
       notes: finalNotes,
+      originalInvoiceNumber: (effectiveInvoiceType === 'CREDIT_NOTE' || effectiveInvoiceType === 'DEBIT_NOTE')
+        ? (originalInvoiceNumber.trim() || undefined)
+        : undefined,
+      originalInvoiceDate: (effectiveInvoiceType === 'CREDIT_NOTE' || effectiveInvoiceType === 'DEBIT_NOTE')
+        ? (originalInvoiceDate || undefined)
+        : undefined,
+      noteType: effectiveInvoiceType === 'CREDIT_NOTE' ? 'C' : effectiveInvoiceType === 'DEBIT_NOTE' ? 'D' : undefined,
+      returnReason: (effectiveInvoiceType === 'CREDIT_NOTE' || effectiveInvoiceType === 'DEBIT_NOTE')
+        ? returnReason
+        : undefined,
+      orderStatus: effectiveInvoiceType === 'SALES_ORDER'
+        ? (initialInvoice?.orderStatus || 'PENDING')
+        : undefined,
       createdAt: initialInvoice ? initialInvoice.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -613,7 +643,11 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       shippingAddress,
       shippingPincode,
       rows,
-    });
+      originalInvoiceNumber,
+      originalInvoiceDate,
+      returnReason,
+      orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
+    }, effectiveInvoiceType);
   }, [
     initialInvoice,
     invoiceNumber,
@@ -628,6 +662,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceNumber,
+    originalInvoiceDate,
+    returnReason,
+    effectiveInvoiceType,
   ]);
 
   // Safe close handler saving draft if unsaved progress exists
@@ -646,10 +684,14 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         shippingAddress,
         shippingPincode,
         rows,
+        originalInvoiceNumber,
+        originalInvoiceDate,
+        returnReason,
+        orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
       };
       if (draftService.isInvoiceDraftNotEmpty(draftData)) {
-        draftService.saveInvoiceDraft(draftData);
-        showAppToast('Invoice progress saved as draft');
+        draftService.saveInvoiceDraft(draftData, effectiveInvoiceType);
+        showAppToast('Progress saved as draft');
       }
     }
     onClose();
@@ -667,6 +709,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceNumber,
+    originalInvoiceDate,
+    returnReason,
+    effectiveInvoiceType,
     onClose,
   ]);
 
@@ -685,9 +731,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       shippingAddress,
       shippingPincode,
       rows,
+      originalInvoiceNumber,
+      originalInvoiceDate,
+      returnReason,
+      orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
     };
-    draftService.saveInvoiceDraft(draftData);
-    showAppToast('Invoice progress saved as draft');
+    draftService.saveInvoiceDraft(draftData, effectiveInvoiceType);
+    showAppToast('Progress saved as draft');
   }, [
     invoiceNumber,
     invoiceDate,
@@ -701,11 +751,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceNumber,
+    originalInvoiceDate,
+    returnReason,
+    effectiveInvoiceType,
   ]);
 
   // Discard draft and reset form
   const handleDiscardDraft = useCallback(() => {
-    draftService.clearInvoiceDraft();
+    draftService.clearInvoiceDraft(effectiveInvoiceType);
     setRows([]);
     if (!initialParty) {
       setSelectedParty(null);
@@ -714,13 +768,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     setShippingAddress('');
     setShippingPincode('');
     setOverallDiscountPercent(0);
+    setOriginalInvoiceNumber('');
+    setOriginalInvoiceDate('');
+    setReturnReason('01-Sales Return');
     setHasRestoredDraft(false);
     showAppToast('Draft discarded');
-  }, [initialParty]);
+  }, [initialParty, effectiveInvoiceType]);
 
   // Restore draft from storage
   const handleRestoreDraft = useCallback(() => {
-    const draft = draftService.getInvoiceDraft();
+    const draft = draftService.getInvoiceDraft(effectiveInvoiceType);
     if (!draft) {
       showAppToast('No saved draft found');
       return;
@@ -733,33 +790,36 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     if (typeof draft.shippingAmount === 'number') setShippingAmount(draft.shippingAmount);
     if (draft.shippingAddress) setShippingAddress(draft.shippingAddress);
     if (draft.shippingPincode) setShippingPincode(draft.shippingPincode);
+    if (draft.originalInvoiceNumber) setOriginalInvoiceNumber(draft.originalInvoiceNumber);
+    if (draft.originalInvoiceDate) setOriginalInvoiceDate(draft.originalInvoiceDate);
+    if (draft.returnReason) setReturnReason(draft.returnReason);
     if (draft.rows && draft.rows.length > 0) {
       setRows(draft.rows);
     }
     setHasRestoredDraft(true);
     showAppToast('Draft restored');
-  }, []);
+  }, [effectiveInvoiceType]);
 
   // "Save & Print" from Action Dock: saves bill as UNPAID and triggers print
   const handleSaveAndPrint = useCallback(() => {
     if (!validateInvoice()) return;
     const unpaidInvoice = constructInvoiceObject();
     if (!initialInvoice) {
-      draftService.clearInvoiceDraft();
+      draftService.clearInvoiceDraft(effectiveInvoiceType);
     }
     onSave(unpaidInvoice, { openPrint: true });
     setPreviewInvoiceData(unpaidInvoice);
-  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice]);
+  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice, effectiveInvoiceType]);
 
   // "Save Invoice" from Action Dock: saves bill directly as UNPAID (Credit)
   const handleSaveInvoiceDirect = useCallback(() => {
     if (!validateInvoice()) return;
     const unpaidInvoice = constructInvoiceObject();
     if (!initialInvoice) {
-      draftService.clearInvoiceDraft();
+      draftService.clearInvoiceDraft(effectiveInvoiceType);
     }
     onSave(unpaidInvoice);
-  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice]);
+  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice, effectiveInvoiceType]);
 
   // "Pay & Save" from Action Dock: opens Payment Modal
   const handleOpenPaymentModal = useCallback(() => {
@@ -782,7 +842,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     ) => {
       const paidInvoice = constructInvoiceObject(paymentData);
       if (!initialInvoice) {
-        draftService.clearInvoiceDraft();
+        draftService.clearInvoiceDraft(effectiveInvoiceType);
       }
       setIsPaymentModalOpen(false);
       onSave(paidInvoice, { openPrint: andPrint });
@@ -790,7 +850,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         setPreviewInvoiceData(paidInvoice);
       }
     },
-    [constructInvoiceObject, onSave, initialInvoice]
+    [constructInvoiceObject, onSave, initialInvoice, effectiveInvoiceType]
   );
 
   // Global POS Keyboard Shortcuts (F2: Scanner, F8: Add Item, F9: Save, F10: Pay & Save, F12: Party Selector)
@@ -860,8 +920,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               setInvoiceNumber(newNum);
               setInvoiceConflictError(null);
             }}
+            originalInvoiceNumber={originalInvoiceNumber}
+            onOriginalInvoiceNumberChange={setOriginalInvoiceNumber}
+            originalInvoiceDate={originalInvoiceDate}
+            onOriginalInvoiceDateChange={setOriginalInvoiceDate}
+            returnReason={returnReason}
+            onReturnReasonChange={setReturnReason}
+            orderStatus={initialInvoice?.orderStatus || 'PENDING'}
             hasRestoredDraft={hasRestoredDraft}
-            hasDraftInStorage={!initialInvoice && draftService.hasInvoiceDraft()}
+            hasDraftInStorage={!initialInvoice && draftService.hasInvoiceDraft(effectiveInvoiceType)}
             onSaveDraft={!initialInvoice ? handleSaveDraft : undefined}
             onRestoreDraft={!initialInvoice ? handleRestoreDraft : undefined}
             onDiscardDraft={!initialInvoice ? handleDiscardDraft : undefined}
@@ -910,6 +977,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onSaveAndPrint={handleSaveAndPrint}
         onSaveInvoice={handleSaveInvoiceDirect}
         onPayAndSave={handleOpenPaymentModal}
+        invoiceType={effectiveInvoiceType}
       />
 
       {/* Select Party Modal */}

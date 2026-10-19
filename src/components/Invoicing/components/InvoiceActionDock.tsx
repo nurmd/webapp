@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR } from '../../../core/utils/formatters.ts';
+import { InvoiceType } from '../../../models/invoice.ts';
 
 export interface InvoiceActionDockProps {
   finalGrandTotal: number;
@@ -9,6 +10,7 @@ export interface InvoiceActionDockProps {
   onSaveDraft?: () => void;
   /** Optional legacy alias for tests */
   onPrintThermal?: () => void;
+  invoiceType?: InvoiceType;
 }
 
 export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
@@ -18,7 +20,46 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
   onPayAndSave,
   onSaveDraft,
   onPrintThermal,
+  invoiceType,
 }) => {
+  const isSalesOrder = invoiceType === 'SALES_ORDER';
+  const isCreditNote = invoiceType === 'CREDIT_NOTE';
+  const isDebitNote = invoiceType === 'DEBIT_NOTE';
+  const isQuotation = invoiceType === 'ESTIMATE';
+  const isDeliveryChallan = invoiceType === 'DELIVERY_CHALLAN';
+
+  const totalLabel = isSalesOrder
+    ? 'Total Order Value'
+    : isCreditNote
+    ? 'Total Return Value'
+    : isDebitNote
+    ? 'Total Debit Value'
+    : isQuotation
+    ? 'Quotation Value'
+    : isDeliveryChallan
+    ? 'Challan Value'
+    : 'Net Payable';
+
+  const saveButtonLabel = isSalesOrder
+    ? 'Save Sales Order'
+    : isCreditNote
+    ? 'Save Credit Note'
+    : isDebitNote
+    ? 'Save Debit Note'
+    : isQuotation
+    ? 'Save Quotation'
+    : isDeliveryChallan
+    ? 'Save Challan'
+    : 'Save Invoice';
+
+  const payButtonLabel = isSalesOrder
+    ? 'Advance & Save'
+    : isCreditNote
+    ? 'Refund & Save'
+    : isQuotation
+    ? 'Accept & Save'
+    : 'Pay & Save';
+
   return (
     <aside
       aria-label="Invoice Actions"
@@ -31,13 +72,13 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
             type="button"
             onClick={onSaveAndPrint || onPrintThermal}
             className="h-10 px-3.5 sm:px-4 rounded-xl bg-surface-container font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 active:scale-95"
-            title="Save bill as Unpaid and Print Thermal Receipt"
+            title={isSalesOrder ? 'Save Sales Order and Print Preview' : 'Save bill as Unpaid and Print Thermal Receipt'}
           >
             <span className="material-symbols-outlined text-[18px]">print</span>
             <span>Save &amp; Print</span>
           </button>
           <div className="hidden sm:flex flex-col pl-2 border-l border-outline-variant/30">
-            <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">Net Payable</span>
+            <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">{totalLabel}</span>
             <span className="font-tabular-data font-black text-sm text-secondary">{formatINR(finalGrandTotal)}</span>
           </div>
         </div>
@@ -59,21 +100,23 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
           <button
             type="button"
             onClick={onSaveInvoice}
+            data-testid="invoice-save-btn"
             className="h-10 px-3.5 sm:px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95"
-            title="Save bill as Unpaid directly"
+            title={isSalesOrder ? 'Save Sales Order directly' : isCreditNote ? 'Save Credit Note directly' : 'Save bill as Unpaid directly'}
           >
             <span className="material-symbols-outlined text-[18px]">save</span>
-            <span>Save Invoice</span>
+            <span>{saveButtonLabel}</span>
           </button>
 
           <button
             type="button"
             onClick={onPayAndSave}
+            data-testid="invoice-pay-save-btn"
             className="h-10 px-4 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer"
-            title="Open Payment Modal to settle tender and save"
+            title={isSalesOrder ? 'Record booking advance and save' : 'Open Payment Modal to settle tender and save'}
           >
             <span className="material-symbols-outlined text-[18px]">payments</span>
-            <span>Pay &amp; Save</span>
+            <span>{payButtonLabel}</span>
           </button>
         </div>
       </div>

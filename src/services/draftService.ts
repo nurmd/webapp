@@ -18,6 +18,10 @@ export interface InvoiceDraft {
   shippingPincode?: string;
   rows: GridRow[];
   updatedAt: string;
+  originalInvoiceNumber?: string;
+  originalInvoiceDate?: string;
+  returnReason?: string;
+  orderStatus?: string;
 }
 
 export interface PurchaseDraft {
@@ -32,10 +36,26 @@ export interface PurchaseDraft {
   rows: PurchaseGridRow[];
   paymentSplits?: PaymentSplit[];
   updatedAt: string;
+  originalBillNumber?: string;
+  originalBillDate?: string;
+  returnReason?: string;
+  orderStatus?: string;
 }
 
-const INVOICE_DRAFT_KEY = 'gst_draft_new_invoice';
-const PURCHASE_DRAFT_KEY = 'gst_draft_new_purchase';
+export const getInvoiceDraftKey = (docType?: string | null): string => {
+  if (docType === 'SALES_ORDER') return 'gst_draft_sales_order';
+  if (docType === 'CREDIT_NOTE') return 'gst_draft_credit_note';
+  if (docType === 'DEBIT_NOTE') return 'gst_draft_debit_note';
+  if (docType === 'ESTIMATE') return 'gst_draft_quotation';
+  if (docType === 'DELIVERY_CHALLAN') return 'gst_draft_delivery_challan';
+  return 'gst_draft_new_invoice';
+};
+
+export const getPurchaseDraftKey = (docType?: string | null): string => {
+  if (docType === 'PO') return 'gst_draft_purchase_order';
+  if (docType === 'RETURN') return 'gst_draft_purchase_return';
+  return 'gst_draft_new_purchase';
+};
 
 export const draftService = {
   /**
@@ -44,6 +64,7 @@ export const draftService = {
   isInvoiceDraftNotEmpty(draft: Partial<InvoiceDraft> | null | undefined): boolean {
     if (!draft) return false;
     if (draft.selectedParty) return true;
+    if (draft.originalInvoiceNumber && draft.originalInvoiceNumber.trim().length > 0) return true;
     if (
       Array.isArray(draft.rows) &&
       draft.rows.some(
@@ -63,10 +84,11 @@ export const draftService = {
   /**
    * Save invoice draft to persistent storage
    */
-  saveInvoiceDraft(draft: Omit<InvoiceDraft, 'updatedAt'>): void {
+  saveInvoiceDraft(draft: Omit<InvoiceDraft, 'updatedAt'>, docType?: string | null): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    const key = getInvoiceDraftKey(docType || draft.manualInvoiceType);
     if (!this.isInvoiceDraftNotEmpty(draft)) {
-      this.clearInvoiceDraft();
+      this.clearInvoiceDraft(docType || draft.manualInvoiceType);
       return;
     }
     try {
@@ -74,7 +96,7 @@ export const draftService = {
         ...draft,
         updatedAt: new Date().toISOString(),
       };
-      localStorage.setItem(INVOICE_DRAFT_KEY, JSON.stringify(payload));
+      localStorage.setItem(key, JSON.stringify(payload));
     } catch (e) {
       console.warn('[DraftService] Failed to save invoice draft:', e);
     }
@@ -83,10 +105,11 @@ export const draftService = {
   /**
    * Retrieve active invoice draft
    */
-  getInvoiceDraft(): InvoiceDraft | null {
+  getInvoiceDraft(docType?: string | null): InvoiceDraft | null {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+    const key = getInvoiceDraftKey(docType);
     try {
-      const raw = localStorage.getItem(INVOICE_DRAFT_KEY);
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (this.isInvoiceDraftNotEmpty(parsed)) {
@@ -101,18 +124,19 @@ export const draftService = {
   /**
    * Clear invoice draft
    */
-  clearInvoiceDraft(): void {
+  clearInvoiceDraft(docType?: string | null): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    const key = getInvoiceDraftKey(docType);
     try {
-      localStorage.removeItem(INVOICE_DRAFT_KEY);
+      localStorage.removeItem(key);
     } catch {}
   },
 
   /**
    * Check if invoice draft exists
    */
-  hasInvoiceDraft(): boolean {
-    return this.getInvoiceDraft() !== null;
+  hasInvoiceDraft(docType?: string | null): boolean {
+    return this.getInvoiceDraft(docType) !== null;
   },
 
   /**
@@ -121,6 +145,7 @@ export const draftService = {
   isPurchaseDraftNotEmpty(draft: Partial<PurchaseDraft> | null | undefined): boolean {
     if (!draft) return false;
     if (draft.selectedSupplier) return true;
+    if (draft.originalBillNumber && draft.originalBillNumber.trim().length > 0) return true;
     if (
       Array.isArray(draft.rows) &&
       draft.rows.some(
@@ -138,10 +163,11 @@ export const draftService = {
   /**
    * Save purchase draft to persistent storage
    */
-  savePurchaseDraft(draft: Omit<PurchaseDraft, 'updatedAt'>): void {
+  savePurchaseDraft(draft: Omit<PurchaseDraft, 'updatedAt'>, docType?: string | null): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    const key = getPurchaseDraftKey(docType);
     if (!this.isPurchaseDraftNotEmpty(draft)) {
-      this.clearPurchaseDraft();
+      this.clearPurchaseDraft(docType);
       return;
     }
     try {
@@ -149,7 +175,7 @@ export const draftService = {
         ...draft,
         updatedAt: new Date().toISOString(),
       };
-      localStorage.setItem(PURCHASE_DRAFT_KEY, JSON.stringify(payload));
+      localStorage.setItem(key, JSON.stringify(payload));
     } catch (e) {
       console.warn('[DraftService] Failed to save purchase draft:', e);
     }
@@ -158,10 +184,11 @@ export const draftService = {
   /**
    * Retrieve active purchase draft
    */
-  getPurchaseDraft(): PurchaseDraft | null {
+  getPurchaseDraft(docType?: string | null): PurchaseDraft | null {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+    const key = getPurchaseDraftKey(docType);
     try {
-      const raw = localStorage.getItem(PURCHASE_DRAFT_KEY);
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (this.isPurchaseDraftNotEmpty(parsed)) {
@@ -176,17 +203,18 @@ export const draftService = {
   /**
    * Clear purchase draft
    */
-  clearPurchaseDraft(): void {
+  clearPurchaseDraft(docType?: string | null): void {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    const key = getPurchaseDraftKey(docType);
     try {
-      localStorage.removeItem(PURCHASE_DRAFT_KEY);
+      localStorage.removeItem(key);
     } catch {}
   },
 
   /**
    * Check if purchase draft exists
    */
-  hasPurchaseDraft(): boolean {
-    return this.getPurchaseDraft() !== null;
+  hasPurchaseDraft(docType?: string | null): boolean {
+    return this.getPurchaseDraft(docType) !== null;
   },
 };
