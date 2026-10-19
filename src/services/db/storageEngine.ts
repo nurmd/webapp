@@ -1,0 +1,331 @@
+import { CompanyProfile } from '../../models/company.ts';
+import { Party } from '../../models/party.ts';
+import { InventoryItem, StockAdjustment, ItemCategory, DEFAULT_ITEM_CATEGORIES } from '../../models/item.ts';
+import { Invoice } from '../../models/invoice.ts';
+import { PurchaseBill } from '../../models/purchase.ts';
+import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Expense } from '../../models/expense.ts';
+import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
+import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
+import { rbac, UserRole } from '../rbac.ts';
+
+export const STORAGE_KEYS = {
+  COMPANY: 'gst_company_profile',
+  PARTIES: 'gst_parties',
+  ITEMS: 'gst_items',
+  CATEGORIES: 'gst_item_categories',
+  INVOICES: 'gst_invoices',
+  PURCHASES: 'gst_purchases',
+  EXPENSES: 'gst_expenses',
+  ADJUSTMENTS: 'gst_stock_adjustments',
+  VOUCHERS: 'gst_vouchers',
+  SETTINGS: 'gst_app_settings',
+  BANK_ACCOUNTS: 'gst_bank_accounts',
+  CASH_BANK_TXNS: 'gst_cash_bank_transactions',
+  LOANS: 'gst_loans',
+  LOAN_TXNS: 'gst_loan_transactions',
+  LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
+};
+
+export interface SyncedSettings {
+  id: string; // 'app_settings'
+  company: CompanyProfile;
+  isGstEnabled?: boolean;
+  appLanguage?: string;
+  isAppLockEnabled?: boolean;
+  defaultGstRate?: number;
+  enableEwayBill?: boolean;
+  ewayBillThreshold?: number;
+  autoWhatsAppAlerts?: boolean;
+  allowNegativeStock?: boolean;
+  defaultDueDays?: number;
+  autoRoundOff?: boolean;
+  updatedAt: string;
+}
+
+// Clean Initial Seed Data for Production Use
+export const DEFAULT_COMPANY: CompanyProfile = {
+  id: 'COMP-001',
+  businessName: 'My Store',
+  tradeName: 'My Store',
+  gstin: '',
+  pan: '',
+  stateCode: '27',
+  address: '',
+  pincode: '',
+  phone: '',
+  email: '',
+  website: '',
+  bankName: '',
+  accountNumber: '',
+  ifscCode: '',
+  branchName: '',
+  upiId: '',
+  termsAndConditions: '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction.',
+  invoicePrefix: 'INV-',
+  isGstEnabled: true,
+  isCompositionScheme: false,
+};
+
+export const DEFAULT_PARTIES: Party[] = [];
+export const DEFAULT_ITEMS: InventoryItem[] = [];
+export const DEFAULT_INVOICES: Invoice[] = [];
+
+export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
+  {
+    id: 'ACC_CASH',
+    accountName: 'Cash in Hand',
+    accountType: 'CASH',
+    openingBalance: 0,
+    openingBalanceDate: new Date().toISOString().split('T')[0],
+    isDefault: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [];
+
+export const DEMO_PARTY_IDS = new Set(['PTY-101', 'PTY-102', 'PTY-103']);
+export const DEMO_ITEM_IDS = new Set(['ITM-001', 'ITM-002', 'ITM-003', 'ITM-004']);
+export const DEMO_INVOICE_IDS = new Set(['INV-SAMPLE-001']);
+export const DEMO_PURCHASE_IDS = new Set(['PUR-001']);
+export const DEMO_EXPENSE_IDS = new Set(['EXP-001', 'EXP-002', 'EXP-003', 'EXP-004']);
+export const DEMO_BANK_IDS = new Set(['ACC_BANK_SBI']);
+export const DEMO_TXN_IDS = new Set(['TXN-INIT-001']);
+
+/**
+ * Foundation Storage Engine providing synchronous localStorage persistence,
+ * in-memory O(1) heap cache, cross-tab BroadcastChannel, and reactive subscriptions.
+ */
+export class StorageEngine {
+  protected listeners: Set<() => void> = new Set();
+  protected batchNotifyTimeout: any = null;
+  public broadcastChannel: BroadcastChannel | null = null;
+  protected memoryCache: Map<string, any> = new Map<string, any>();
+  protected rawCache: Map<string, string | null> = new Map<string, string | null>();
+  protected quotaExceededKeys: Set<string> = new Set<string>();
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  public notifyListeners(): void {
+    if (this.batchNotifyTimeout) return;
+    this.batchNotifyTimeout = setTimeout(() => {
+      this.batchNotifyTimeout = null;
+      this.listeners.forEach((listener) => {
+        try {
+          listener();
+        } catch (e) {
+          console.error('DB listener error:', e);
+        }
+      });
+    }, 16);
+  }
+
+  public notify(): void {
+    if (this.batchNotifyTimeout) {
+      clearTimeout(this.batchNotifyTimeout);
+      this.batchNotifyTimeout = null;
+    }
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (e) {
+        console.error('DB listener error:', e);
+      }
+    });
+  }
+
+  public broadcastChange(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        if (!this.broadcastChannel) {
+          this.broadcastChannel = new BroadcastChannel('vyapar_multi_device_sync');
+        }
+        this.broadcastChannel.postMessage({
+          type: 'ENTITY_MUTATION',
+          entity,
+          action,
+          id,
+          data,
+          timestamp: Date.now(),
+        });
+      } catch (e) {}
+    }
+  }
+
+  public get<T>(key: string, defaultValue: T): T {
+    try {
+      if (typeof localStorage === 'undefined' || this.quotaExceededKeys.has(key)) {
+        if (this.memoryCache.has(key)) {
+          return this.memoryCache.get(key);
+        }
+        const initialValue = Array.isArray(defaultValue)
+          ? ([...defaultValue] as unknown as T)
+          : typeof defaultValue === 'object' && defaultValue !== null
+          ? ({ ...defaultValue } as unknown as T)
+          : defaultValue;
+        this.memoryCache.set(key, initialValue);
+        return initialValue;
+      }
+
+      const raw = localStorage.getItem(key);
+
+      if (this.memoryCache.has(key) && this.rawCache.get(key) === raw) {
+        return this.memoryCache.get(key);
+      }
+
+      if (raw === null) {
+        const initialValue = Array.isArray(defaultValue)
+          ? ([...defaultValue] as unknown as T)
+          : typeof defaultValue === 'object' && defaultValue !== null
+          ? ({ ...defaultValue } as unknown as T)
+          : defaultValue;
+        this.memoryCache.set(key, initialValue);
+        this.rawCache.set(key, null);
+        return initialValue;
+      }
+
+      const parsed = JSON.parse(raw);
+      this.memoryCache.set(key, parsed);
+      this.rawCache.set(key, raw);
+      return parsed;
+    } catch {
+      const fallback = Array.isArray(defaultValue)
+        ? ([...defaultValue] as unknown as T)
+        : typeof defaultValue === 'object' && defaultValue !== null
+        ? ({ ...defaultValue } as unknown as T)
+        : defaultValue;
+      return fallback;
+    }
+  }
+
+  public set<T>(key: string, value: T): void {
+    const raw = JSON.stringify(value);
+    const cached = Array.isArray(value)
+      ? ([...value] as unknown as T)
+      : typeof value === 'object' && value !== null
+      ? ({ ...value } as unknown as T)
+      : value;
+    this.memoryCache.set(key, cached);
+    this.rawCache.set(key, raw);
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, raw);
+        this.quotaExceededKeys.delete(key);
+      }
+    } catch (e: any) {
+      const isQuotaExceeded =
+        (typeof DOMException !== 'undefined' && e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) ||
+        e?.name === 'QuotaExceededError' ||
+        e?.code === 22 ||
+        e?.number === -2147024882 ||
+        (typeof e?.message === 'string' && e.message.toLowerCase().includes('quota'));
+
+      if (isQuotaExceeded) {
+        this.quotaExceededKeys.add(key);
+        console.warn(`StorageService.set: QuotaExceededError encountered for key "${key}". Write skipped in localStorage without failing unhandled.`, e);
+      } else {
+        console.error('Local storage write error:', e);
+      }
+    }
+  }
+
+  public remove(key: string): void {
+    this.memoryCache.delete(key);
+    this.rawCache.delete(key);
+    this.quotaExceededKeys.delete(key);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch {}
+  }
+
+  public invalidateCache(key?: string): void {
+    if (key) {
+      this.memoryCache.delete(key);
+      this.rawCache.delete(key);
+      this.quotaExceededKeys.delete(key);
+    } else {
+      this.memoryCache.clear();
+      this.rawCache.clear();
+      this.quotaExceededKeys.clear();
+    }
+  }
+
+  public clearMemoryCache(): void {
+    this.invalidateCache();
+  }
+
+  protected getAuditUser(): { userId: string; userName: string; userRole: UserRole } {
+    try {
+      const u = rbac.getActiveUser();
+      return {
+        userId: u.id || 'usr_sys',
+        userName: u.name || 'System',
+        userRole: (u.role || 'OWNER') as UserRole,
+      };
+    } catch {
+      return {
+        userId: 'usr_sys',
+        userName: 'System',
+        userRole: 'OWNER' as UserRole,
+      };
+    }
+  }
+
+  // Baseline Collection Getters
+  getInvoices(): Invoice[] {
+    return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
+  }
+
+  getPurchases(): PurchaseBill[] {
+    return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, []);
+  }
+
+  getVouchers(): Voucher[] {
+    return this.get<Voucher[]>(STORAGE_KEYS.VOUCHERS, []);
+  }
+
+  getItems(): InventoryItem[] {
+    return this.get<InventoryItem[]>(STORAGE_KEYS.ITEMS, DEFAULT_ITEMS);
+  }
+
+  getParties(): Party[] {
+    return this.get<Party[]>(STORAGE_KEYS.PARTIES, DEFAULT_PARTIES);
+  }
+
+  getStockAdjustments(): StockAdjustment[] {
+    return this.get<StockAdjustment[]>(STORAGE_KEYS.ADJUSTMENTS, []);
+  }
+
+  getExpenses(): Expense[] {
+    return this.get<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+  }
+
+  getBankAccounts(): BankAccount[] {
+    return this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, DEFAULT_BANK_ACCOUNTS);
+  }
+
+  getCashBankTransactions(): CashBankTransaction[] {
+    return this.get<CashBankTransaction[]>(STORAGE_KEYS.CASH_BANK_TXNS, DEFAULT_CASH_BANK_TXNS);
+  }
+
+  getLoans(): LoanAccount[] {
+    return this.get<LoanAccount[]>(STORAGE_KEYS.LOANS, []);
+  }
+
+  getLoanTransactions(loanId?: string): LoanTransaction[] {
+    const all = this.get<LoanTransaction[]>(STORAGE_KEYS.LOAN_TXNS, []);
+    return loanId ? all.filter((t) => t.loanId === loanId) : all;
+  }
+
+  getCategories(): ItemCategory[] {
+    return this.get<ItemCategory[]>(STORAGE_KEYS.CATEGORIES, DEFAULT_ITEM_CATEGORIES);
+  }
+}

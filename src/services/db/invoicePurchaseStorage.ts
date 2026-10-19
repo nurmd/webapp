@@ -1,0 +1,413 @@
+import { Invoice } from '../../models/invoice.ts';
+import { PurchaseBill } from '../../models/purchase.ts';
+import { StockAdjustment, InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
+import { pouch } from '../pouchdb.ts';
+import { auditTrail } from '../auditTrail.ts';
+import { getFinancialYear } from '../../core/utils/dateFilters.ts';
+import { createRcmJournalVoucher } from '../../core/accounting/ledger.ts';
+import {
+  applyInvoiceStockDecrement,
+  revertInvoiceStockAdjustment,
+  restoreInvoiceStock,
+  applyPurchaseStockIncrement,
+  applyPurchaseStockDecrement,
+  revertPurchaseStockAdjustment,
+  applyStockAdjustmentRecord,
+  findMatchingItem,
+} from '../../core/inventory/stockEngine.ts';
+import { STORAGE_KEYS, DEFAULT_INVOICES } from './storageEngine.ts';
+import { FinancialStorage } from './financialStorage.ts';
+
+/**
+ * Invoicing, Purchases, and Stock Adjustment domain storage.
+ * Handles Sales Invoices, Credit Notes, Purchase Bills, Debit Notes,
+ * statutory financial year enforcement, automated RCM double-entry journal vouchers,
+ * and stock engine integration.
+ */
+export class InvoicePurchaseStorage extends FinancialStorage {
+  // Invoices
+  getInvoices(): Invoice[] {
+    return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
+  }
+
+  saveInvoice(invoice: Invoice): void {
+    const list = [...this.getInvoices()];
+    // Enforce unique invoice number under GST compliance
+    const norm = (invoice.invoiceNumber || '').trim().toUpperCase();
+    const conflict = list.find(
+      (inv) => inv.id !== invoice.id && (inv.invoiceNumber || '').trim().toUpperCase() === norm
+    );
+    if (conflict) {
+      throw new Error(`Invoice number "${invoice.invoiceNumber}" is already in use by invoice for ${conflict.partyName}. Invoices must have unique numbers.`);
+    }
+
+    // Enforce statutory financial year (e.g. 2026-27)
+    if (!invoice.financialYear) {
+      invoice.financialYear = getFinancialYear(invoice.date);
+    }
+
+    const idx = list.findIndex((inv) => inv.id === invoice.id);
+    const prevInvoice = idx >= 0 ? list[idx] : null;
+
+    if (idx >= 0) {
+      list[idx] = invoice;
+    } else {
+      list.unshift(invoice);
+    }
+    this.set(STORAGE_KEYS.INVOICES, list);
+    pouch.putDoc('invoice', invoice);
+    this.broadcastChange('invoice', 'save', invoice.id, invoice);
+
+    // Update stock levels via pure domain stockEngine
+    const isQuoteOrOrder = invoice.invoiceType === 'ESTIMATE' || invoice.invoiceType === 'SALES_ORDER';
+    const isCreditNote = invoice.invoiceType === 'CREDIT_NOTE';
+    if (!isQuoteOrOrder) {
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const currentItems = this.getItems();
+      let updatedItems: InventoryItem[];
+      if (isCreditNote) {
+        // Sales Return / Credit Note: restores returned goods to inventory
+        updatedItems = prevInvoice
+          ? revertInvoiceStockAdjustment(currentItems, invoice.items, prevInvoice.items, allowNegativeStock)
+          : restoreInvoiceStock(currentItems, invoice.items);
+      } else {
+        updatedItems = prevInvoice
+          ? revertInvoiceStockAdjustment(currentItems, prevInvoice.items, invoice.items, allowNegativeStock)
+          : applyInvoiceStockDecrement(currentItems, invoice.items, allowNegativeStock);
+      }
+
+      this.persistStockUpdates(currentItems, updatedItems);
+    }
+
+    const targetPartyId =
+      invoice.partyId ||
+      (invoice.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === invoice.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (targetPartyId) {
+      this.recalculatePartyBalance(targetPartyId);
+    }
+    const prevPartyId =
+      prevInvoice?.partyId ||
+      (prevInvoice?.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === prevInvoice.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (prevPartyId && prevPartyId !== targetPartyId) {
+      this.recalculatePartyBalance(prevPartyId);
+    }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    let actionType: 'INVOICE_CREATE' | 'INVOICE_UPDATE' | 'INVOICE_CANCEL' = 'INVOICE_CREATE';
+    let summary = `Created invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+    if (prevInvoice) {
+      const isNowCancelled = Boolean(invoice.isCancelled);
+      const wasCancelled = Boolean(prevInvoice.isCancelled);
+      if (isNowCancelled && !wasCancelled) {
+        actionType = 'INVOICE_CANCEL';
+        summary = `Cancelled invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+      } else {
+        actionType = 'INVOICE_UPDATE';
+        summary = `Updated invoice #${invoice.invoiceNumber} for ${invoice.partyName}`;
+      }
+    }
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: invoice.id,
+        documentType: 'INVOICE',
+        previousSnapshot: prevInvoice ? JSON.parse(JSON.stringify(prevInvoice)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(invoice)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for saveInvoice:', err));
+
+    this.notifyListeners();
+  }
+
+  deleteInvoice(id: string): void {
+    const inv = this.getInvoices().find((i) => i.id === id);
+    const list = this.getInvoices().filter((i) => i.id !== id);
+    this.set(STORAGE_KEYS.INVOICES, list);
+    pouch.deleteDoc('invoice', id);
+    this.broadcastChange('invoice', 'delete', id);
+
+    // Restore stock upon invoice deletion via pure domain stockEngine
+    if (inv && inv.invoiceType !== 'ESTIMATE' && inv.invoiceType !== 'SALES_ORDER') {
+      const currentItems = this.getItems();
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const updatedItems = inv.invoiceType === 'CREDIT_NOTE'
+        ? applyInvoiceStockDecrement(currentItems, inv.items, allowNegativeStock)
+        : restoreInvoiceStock(currentItems, inv.items);
+      this.persistStockUpdates(currentItems, updatedItems);
+    }
+
+    const partyIdToRecalc =
+      inv?.partyId ||
+      (inv?.partyName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === inv.partyName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (partyIdToRecalc) {
+      this.recalculatePartyBalance(partyIdToRecalc);
+    }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'INVOICE_DELETE',
+        documentId: id,
+        documentType: 'INVOICE',
+        previousSnapshot: inv ? JSON.parse(JSON.stringify(inv)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted invoice #${inv?.invoiceNumber || id} for ${inv?.partyName || 'Unknown Party'}`,
+      })
+      .catch((err) => console.error('Audit log failed for deleteInvoice:', err));
+
+    this.notifyListeners();
+  }
+
+  // Purchases
+  getPurchases(): PurchaseBill[] {
+    return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, []);
+  }
+
+  savePurchase(bill: PurchaseBill): void {
+    const list = [...this.getPurchases()];
+    const idx = list.findIndex((b) => b.id === bill.id);
+    const prevBill = idx >= 0 ? list[idx] : null;
+
+    if (idx >= 0) {
+      list[idx] = bill;
+    } else {
+      list.unshift(bill);
+    }
+    this.set(STORAGE_KEYS.PURCHASES, list);
+    pouch.putDoc('purchase', bill);
+    this.broadcastChange('purchase', 'save', bill.id, bill);
+
+    // Adjust stock levels and update purchase prices via pure domain stockEngine
+    const isPo = bill.purchaseType === 'PO';
+    const isReturn = bill.purchaseType === 'RETURN';
+    if (!isPo) {
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const currentItems = this.getItems();
+      let updatedItems: InventoryItem[];
+      if (isReturn) {
+        // Purchase Return / Debit Note: deducts returned items from inventory
+        updatedItems = prevBill
+          ? revertPurchaseStockAdjustment(currentItems, bill.items, prevBill.items, allowNegativeStock)
+          : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+      } else {
+        updatedItems = prevBill
+          ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
+          : applyPurchaseStockIncrement(currentItems, bill.items);
+      }
+
+      // Auto-register any brand new purchased items not yet in catalog (only for regular inward bills)
+      const finalItems = [...updatedItems];
+      if (!isReturn) {
+        for (const line of bill.items) {
+          const exists = findMatchingItem(finalItems, line);
+          if (!exists && line.name && line.name.trim()) {
+            const newId = line.itemId || `ITM-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            line.itemId = newId;
+            const newItem: InventoryItem = {
+              id: newId,
+              name: line.name.trim(),
+              hsnSacCode: line.hsnSacCode || '844332',
+              category: 'General',
+              unit: (line.unit as UnitOfMeasurement) || 'PCS',
+              salePrice: Number(((line.unitPrice || 0) * 1.2).toFixed(2)),
+              purchasePrice: line.unitPrice || 0,
+              gstRate: line.gstRate || 0,
+              currentStock: Math.max(0, line.quantity || 0),
+              minStockAlert: 5,
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            finalItems.push(newItem);
+          }
+        }
+      }
+
+      this.persistStockUpdates(currentItems, finalItems);
+    }
+
+    const targetSupplierId =
+      bill.supplierId ||
+      (bill.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (targetSupplierId) {
+      this.recalculatePartyBalance(targetSupplierId);
+    }
+    const prevSupplierId =
+      prevBill?.supplierId ||
+      (prevBill?.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === prevBill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (prevSupplierId && prevSupplierId !== targetSupplierId) {
+      this.recalculatePartyBalance(prevSupplierId);
+    }
+
+    // Reverse Charge Mechanism (RCM): Paired Double-Entry Journal Voucher
+    const rcmVoucherId = `VCH-RCM-${bill.id}`;
+    if (bill.isRcm && (bill.totalTax || 0) > 0) {
+      const rcmVoucher = createRcmJournalVoucher({
+        billId: bill.id,
+        billNumber: bill.billNumber,
+        date: bill.date,
+        supplierName: bill.supplierName,
+        supplierId: bill.supplierId,
+        cgstAmount: bill.totalCgst,
+        sgstAmount: bill.totalSgst,
+        igstAmount: bill.totalIgst,
+        cessAmount: bill.totalCess,
+        totalTax: bill.totalTax,
+      });
+      this.saveVoucher(rcmVoucher);
+    } else {
+      // If purchase is not RCM or has 0 tax, clean up any existing RCM voucher
+      const existingRcm = this.getVouchers().find(
+        (v) => v.id === rcmVoucherId || (v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+      );
+      if (existingRcm) {
+        this.deleteVoucher(existingRcm.id);
+      }
+    }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const actionType = prevBill ? 'PURCHASE_UPDATE' : 'PURCHASE_CREATE';
+    const summary = `${prevBill ? 'Updated' : 'Created'} purchase bill #${bill.billNumber} from ${bill.supplierName}`;
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: bill.id,
+        documentType: 'PURCHASE',
+        previousSnapshot: prevBill ? JSON.parse(JSON.stringify(prevBill)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(bill)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for savePurchase:', err));
+
+    this.notifyListeners();
+  }
+
+  deletePurchase(id: string): void {
+    const bill = this.getPurchases().find((b) => b.id === id);
+    const list = this.getPurchases().filter((b) => b.id !== id);
+    this.set(STORAGE_KEYS.PURCHASES, list);
+    pouch.deleteDoc('purchase', id);
+    this.broadcastChange('purchase', 'delete', id);
+
+    // Clean up paired RCM journal voucher upon bill deletion
+    const rcmVoucherId = `VCH-RCM-${id}`;
+    const pairedRcmVoucher = this.getVouchers().find(
+      (v) => v.id === rcmVoucherId || (bill && v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+    );
+    if (pairedRcmVoucher) {
+      this.deleteVoucher(pairedRcmVoucher.id);
+    }
+
+    // Revert stock upon bill deletion via pure domain stockEngine
+    if (bill && bill.purchaseType !== 'PO') {
+      const allowNegativeStock = this.getAllowNegativeStock();
+      const currentItems = this.getItems();
+      const updatedItems = bill.purchaseType === 'RETURN'
+        ? applyPurchaseStockIncrement(currentItems, bill.items)
+        : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+      this.persistStockUpdates(currentItems, updatedItems);
+    }
+
+    const supplierIdToRecalc =
+      bill?.supplierId ||
+      (bill?.supplierName
+        ? this.getParties().find(
+            (p) => p.name.trim().toLowerCase() === bill.supplierName.trim().toLowerCase()
+          )?.id
+        : undefined);
+    if (supplierIdToRecalc) {
+      this.recalculatePartyBalance(supplierIdToRecalc);
+    }
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'PURCHASE_DELETE',
+        documentId: id,
+        documentType: 'PURCHASE',
+        previousSnapshot: bill ? JSON.parse(JSON.stringify(bill)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted purchase bill #${bill?.billNumber || id} from ${bill?.supplierName || 'Unknown Supplier'}`,
+      })
+      .catch((err) => console.error('Audit log failed for deletePurchase:', err));
+
+    this.notifyListeners();
+  }
+
+  // Stock Adjustments
+  getStockAdjustments(): StockAdjustment[] {
+    return this.get<StockAdjustment[]>(STORAGE_KEYS.ADJUSTMENTS, []);
+  }
+
+  saveStockAdjustment(adj: StockAdjustment): void {
+    const list = [...this.getStockAdjustments()];
+    list.unshift(adj);
+    this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+    pouch.putDoc('adjustment', adj);
+    this.broadcastChange('adjustment', 'save', adj.id, adj);
+
+    // Update item stock using pure domain stockEngine
+    const allowNegativeStock = this.getAllowNegativeStock();
+    const currentItems = this.getItems();
+    const item = currentItems.find((i) => i.id === adj.itemId);
+    const prevStock = item?.currentStock ?? 0;
+    const delta = adj.type === 'STOCK_IN' ? adj.quantity : -adj.quantity;
+    const resultingStock = allowNegativeStock ? prevStock + delta : Math.max(0, prevStock + delta);
+
+    const updatedItems = applyStockAdjustmentRecord(currentItems, adj, allowNegativeStock);
+    this.persistStockUpdates(currentItems, updatedItems);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'STOCK_ADJUSTMENT',
+        documentId: adj.id,
+        documentType: 'ITEM',
+        previousSnapshot: item ? { itemId: item.id, itemName: item.name, currentStock: prevStock, unit: item.unit } : undefined,
+        newSnapshot: { ...JSON.parse(JSON.stringify(adj)), previousStock: prevStock, resultingStock },
+        summary: `Stock adjustment (${adj.type}): ${adj.quantity} units for "${adj.itemName}". Reason: ${adj.reason || 'None'}`,
+      })
+      .catch((err) => console.error('Audit log failed for saveStockAdjustment:', err));
+  }
+}
