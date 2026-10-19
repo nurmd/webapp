@@ -11,11 +11,9 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="description" content="Cross-platform GST Billing & Accounting Application - Vyapar Books PRO" />
     <link rel="manifest" href="./manifest.json" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Offline-First Local Self-Hosted Web Fonts -->
+    <link rel="preload" href="./fonts/material-symbols-outlined.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
     <title>Vyapar Books PRO - GST Billing & Accounting</title>
     <script>
       // Only register ServiceWorker in PWA web browser environments, not inside native Android WebView
@@ -49,6 +47,25 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+      }
+      .material-symbols-outlined {
+        font-family: 'Material Symbols Outlined';
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+        overflow: hidden;
+        width: 1em;
+        height: 1em;
+        vertical-align: middle;
       }
       .app-splash-overlay {
         position: fixed;
@@ -163,22 +180,32 @@
             '</div>';
         }
       });
-      // Safety auto-dismiss fallback for splashscreen in case app takes longer to load
+      // Safety auto-dismiss fallback for splashscreen synchronized with font readiness
       window.addEventListener('load', function() {
-        setTimeout(function() {
+        function dismiss() {
           var splash = document.getElementById('app-splash');
           if (splash && !splash.classList.contains('fade-out')) {
             splash.classList.add('fade-out');
             setTimeout(function() { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
           }
-        }, 2500);
+        }
+        if (document.fonts && document.fonts.ready) {
+          Promise.race([
+            document.fonts.ready,
+            new Promise(function(res) { setTimeout(res, 2000); })
+          ]).then(function() {
+            setTimeout(dismiss, 60);
+          }).catch(dismiss);
+        } else {
+          setTimeout(dismiss, 1500);
+        }
       });
     </script>
-    <script type="module" crossorigin src="./assets/index-CrJdDGe5.js"></script>
+    <script type="module" crossorigin src="./assets/index-BXY0nmRh.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/vendor-react-BmrtlWLx.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-capacitor-BjPRKokX.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-pouchdb-cVEZlOt_.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-DLWXgglH.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-CVdAOUGk.css">
   </head>
   <body class="bg-surface font-body-md text-body-md text-on-surface antialiased">
     <!-- App Splashscreen Overlay: Covers viewport until React finishes initial paint -->

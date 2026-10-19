@@ -1,15 +1,15 @@
 {
-  "version": "1.2.8",
+  "version": "1.2.11",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-18T18:08:41.783Z",
+  "buildTime": "2026-10-19T06:02:10.054Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "modularize db storage into focused domain modules (v1.2.11)",
+    "offline resources, lazy HSN, state decoupling & memory cache optimization (v1.2.10)",
+    "linear party balance sync, 5MB quota fix, LAN Web Crypto fallback & dead-code cleanup v1.2.9",
     "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8",
     "apply collapsed two-column view and horizontal scroll across all tabs v1.2.7",
-    "default collapsed two-column view for business performance card v1.2.6",
-    "v1.2.5 business performance card redesign, dual-axis gesture disambiguation & release APK",
-    "v1.2.4 commercial orders, returns, WhatsApp sharing & bulk operations",
-    "v1.2.3 comprehensive reporting hub with 5 categories & 1-click PDF/Excel export"
+    "default collapsed two-column view for business performance card v1.2.6"
   ]
 }

@@ -1,14 +1,15 @@
 {
-  "version": "1.2.10",
+  "version": "1.2.11",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T05:38:00.000Z",
+  "buildTime": "2026-10-19T06:02:10.054Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Full offline PWA resources (local Material Symbols & Inter/Plus Jakarta Sans fonts, local vector SVG QR codes) eliminating FOUT / ligature text flash",
-    "On-demand lazy loaded 448 kB HSN catalog chunk with conditional hide when GST is disabled across invoice & item modals",
-    "In-memory O(1) heap cache with reactive broadcast invalidation across all collections & settings",
-    "Granular state decoupling with React 18 useSyncExternalStore eliminating whole-tree re-render cascades in App.tsx",
-    "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8"
+    "modularize db storage into focused domain modules (v1.2.11)",
+    "offline resources, lazy HSN, state decoupling & memory cache optimization (v1.2.10)",
+    "linear party balance sync, 5MB quota fix, LAN Web Crypto fallback & dead-code cleanup v1.2.9",
+    "comprehensive Android hardware and gesture back navigation hardening across views, modals, and tabs v1.2.8",
+    "apply collapsed two-column view and horizontal scroll across all tabs v1.2.7",
+    "default collapsed two-column view for business performance card v1.2.6"
   ]
 }
