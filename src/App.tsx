@@ -1210,6 +1210,9 @@ export const App: React.FC = () => {
             vouchers={vouchers}
             bankAccounts={bankAccounts}
             cashBankTxns={cashBankTxns}
+            onSaveTransaction={handleSaveCashBankTxn}
+            onDeleteTransaction={handleDeleteCashBankTxn}
+            onNavigateTab={handleSelectTab}
           />
         )}
 

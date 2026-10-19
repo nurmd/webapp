@@ -55,4 +55,9 @@ export interface UnifiedLedgerEntry {
   toAccountId?: string;
   toAccountName?: string;
   contraType?: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  txnId?: string;
+  rawInvoiceId?: string;
+  rawPurchaseId?: string;
+  rawExpenseId?: string;
+  rawVoucherId?: string;
 }

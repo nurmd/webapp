@@ -122,6 +122,7 @@ export function computeCashBankSummary(params: {
               flow: 'IN',
               amount: splitAmt,
               description: `Sale Receipt #${inv.invoiceNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+              rawInvoiceId: inv.id,
             });
           });
         } else {
@@ -149,6 +150,7 @@ export function computeCashBankSummary(params: {
             flow: 'IN',
             amount: unvoucheredPaid,
             description: `Sale Receipt #${inv.invoiceNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            rawInvoiceId: inv.id,
           });
         }
       }
@@ -223,6 +225,7 @@ export function computeCashBankSummary(params: {
               flow: 'OUT',
               amount: splitAmt,
               description: `Purchase Payment #${pur.billNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+              rawPurchaseId: pur.id,
             });
           });
         } else {
@@ -250,6 +253,7 @@ export function computeCashBankSummary(params: {
             flow: 'OUT',
             amount: unvoucheredPaid,
             description: `Purchase Payment #${pur.billNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            rawPurchaseId: pur.id,
           });
         }
       }
@@ -283,6 +287,7 @@ export function computeCashBankSummary(params: {
         flow: 'OUT',
         amount: exp.amount,
         description: `${exp.category} Expense: ${exp.title}`,
+        rawExpenseId: exp.id,
       });
     }
   });
@@ -315,6 +320,7 @@ export function computeCashBankSummary(params: {
           flow: 'IN',
           amount: amt,
           description: v.narration || `Receipt Voucher #${v.voucherNumber}`,
+          rawVoucherId: v.id,
         });
       });
     } else if (v.voucherType === 'PAYMENT') {
@@ -342,6 +348,7 @@ export function computeCashBankSummary(params: {
           flow: 'OUT',
           amount: amt,
           description: v.narration || `Payment Voucher #${v.voucherNumber}`,
+          rawVoucherId: v.id,
         });
       });
     } else if (v.voucherType === 'CONTRA') {
@@ -380,6 +387,7 @@ export function computeCashBankSummary(params: {
           toAccountId: toAccId,
           toAccountName: toName,
           contraType,
+          rawVoucherId: v.id,
         });
 
         entries.push({
@@ -400,6 +408,7 @@ export function computeCashBankSummary(params: {
           toAccountId: toAccId,
           toAccountName: toName,
           contraType,
+          rawVoucherId: v.id,
         });
       }
     }
@@ -443,6 +452,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'DEPOSIT',
+        txnId: txn.id,
       });
 
       entries.push({
@@ -463,6 +473,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'DEPOSIT',
+        txnId: txn.id,
       });
     } else if (txn.type === 'WITHDRAWAL') {
       // Bank -> Cash
@@ -495,6 +506,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'WITHDRAWAL',
+        txnId: txn.id,
       });
 
       entries.push({
@@ -515,6 +527,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'WITHDRAWAL',
+        txnId: txn.id,
       });
     } else if (txn.type === 'TRANSFER') {
       // Bank A -> Bank B
@@ -547,6 +560,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'TRANSFER',
+        txnId: txn.id,
       });
 
       entries.push({
@@ -567,6 +581,7 @@ export function computeCashBankSummary(params: {
         toAccountId: toId,
         toAccountName: toName,
         contraType: 'TRANSFER',
+        txnId: txn.id,
       });
     } else if (txn.type === 'ADD_MONEY') {
       // Direct Inflow
@@ -590,6 +605,7 @@ export function computeCashBankSummary(params: {
         flow: 'IN',
         amount: amt,
         description: txn.description || 'Direct Inflow to Account',
+        txnId: txn.id,
       });
     } else if (txn.type === 'REDUCE_MONEY') {
       // Direct Outflow
@@ -613,6 +629,7 @@ export function computeCashBankSummary(params: {
         flow: 'OUT',
         amount: amt,
         description: txn.description || 'Direct Outflow from Account',
+        txnId: txn.id,
       });
     }
   });

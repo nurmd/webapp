@@ -1,15 +1,15 @@
 {
-  "version": "1.2.17",
+  "version": "1.2.18",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T12:07:41.692Z",
+  "buildTime": "2026-10-19T12:45:08.436Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "add clear From ➔ To visual route cues and badges for Contra transactions",
     "resolve inaccurate bank statement running balance and table rendering",
     "responsive mobile card previews & auto-fit A4 scaling for invoice and reports (v1.2.15)",
     "move draft save & restore to top bar, fix reports PDF preview back navigation (v1.2.14)",
     "add draft auto-save and restore for new invoices and bills (v1.2.13)",
-    "restore business activity timeline filter to 3 dropdown filters (v1.2.12)",
-    "update native Android APK and assets for v1.2.11"
+    "restore business activity timeline filter to 3 dropdown filters (v1.2.12)"
   ]
 }

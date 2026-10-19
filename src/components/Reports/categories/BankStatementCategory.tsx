@@ -20,6 +20,8 @@ import type { Voucher } from '../../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { computeCashBankSummary } from '../../../core/accounting/cashBankCalculator.ts';
 import { exportReportToCsv, printReportDocument } from '../utils/reportExportUtils.ts';
+import { CashBankTransactionDetailModal } from '../../CashBank/CashBankTransactionDetailModal.tsx';
+import type { AppTab } from '../../Shell/Drawer.tsx';
 
 interface BankStatementCategoryProps {
   company: CompanyProfile;
@@ -32,6 +34,9 @@ interface BankStatementCategoryProps {
   searchQuery?: string;
   dateRangeLabel: string;
   onRegisterExportHandlers?: (handlers: { exportCsv?: () => void; exportPdf?: () => void }) => void;
+  onSaveTransaction?: (txn: CashBankTransaction) => void;
+  onDeleteTransaction?: (id: string) => void;
+  onNavigateTab?: (tab: AppTab) => void;
 }
 
 export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
@@ -45,6 +50,9 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
   searchQuery = '',
   dateRangeLabel,
   onRegisterExportHandlers,
+  onSaveTransaction,
+  onDeleteTransaction,
+  onNavigateTab,
 }) => {
   // Find default or first bank account
   const defaultAccount = accounts.find((a) => a.accountType === 'BANK' && a.isDefault) ||
@@ -61,6 +69,24 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
   const [selectedAccountId, setSelectedAccountId] = useState<string>(defaultAccount.id);
   // Default to chronological ascending order (standard banking passbook format)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Detail Modal State
+  const [selectedEntry, setSelectedEntry] = useState<UnifiedLedgerEntry | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const selectedRawTxn = useMemo(() => {
+    if (!selectedEntry) return null;
+    if (selectedEntry.txnId) {
+      return transactions.find((t) => t.id === selectedEntry.txnId) || null;
+    }
+    const cleanId = selectedEntry.id.replace(/^LEDGER-TXN-(OUT|IN)-/, '');
+    return transactions.find((t) => t.id === cleanId || t.id === selectedEntry.id) || null;
+  }, [selectedEntry, transactions]);
+
+  const handleEntryClick = (entry: UnifiedLedgerEntry) => {
+    setSelectedEntry(entry);
+    setIsDetailModalOpen(true);
+  };
 
   const selectedAccount = useMemo(() => {
     return accounts.find((a) => a.id === selectedAccountId) || defaultAccount;
@@ -466,7 +492,12 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
                   const toName = entry.toAccountName || (isDeposit ? selectedAccount.accountName : 'Bank');
 
                   return (
-                    <tr key={entry.id} className="hover:bg-surface-container-low/50 transition-colors">
+                    <tr
+                      key={entry.id}
+                      onClick={() => handleEntryClick(entry)}
+                      className="hover:bg-surface-container-low/70 transition-colors cursor-pointer group"
+                      title="Click to view/edit transaction details"
+                    >
                       <td className="py-3 px-4 whitespace-nowrap text-on-surface font-mono text-xs">
                         {entry.date}
                       </td>
@@ -585,6 +616,20 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
           </table>
         </div>
       </div>
+
+      <CashBankTransactionDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedEntry(null);
+        }}
+        entry={selectedEntry}
+        rawTransaction={selectedRawTxn}
+        accounts={accounts}
+        onSaveTransaction={onSaveTransaction}
+        onDeleteTransaction={onDeleteTransaction}
+        onNavigateTab={onNavigateTab}
+      />
     </div>
   );
 };

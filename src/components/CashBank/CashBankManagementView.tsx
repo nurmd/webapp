@@ -10,6 +10,7 @@ import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator
 import { CashBankTransferModal } from './CashBankTransferModal.tsx';
 import { DirectCashBankModal } from './DirectCashBankModal.tsx';
 import { AddEditBankAccountModal } from './AddEditBankAccountModal.tsx';
+import { CashBankTransactionDetailModal } from './CashBankTransactionDetailModal.tsx';
 import { AppTab } from '../Shell/Drawer.tsx';
 
 interface CashBankManagementViewProps {
@@ -38,7 +39,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onSaveAccount,
   onDeleteAccount,
   onSaveTransaction,
-  onDeleteTransaction: _onDeleteTransaction,
+  onDeleteTransaction,
   onNavigateTab,
 }) => {
   // Navigation / Modal States
@@ -51,6 +52,10 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
 
   const [isAddAccountModalOpen, setIsAddAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+
+  // Transaction Detail Modal State
+  const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Filters
   const [accountFilter, setAccountFilter] = useState<'ALL' | 'CASH' | 'BANK'>('ALL');
@@ -98,6 +103,20 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
       return true;
     });
   }, [summary.ledgerEntries, accountFilter, selectedAccountId, flowFilter, searchQuery]);
+
+  const selectedRawTxn = useMemo(() => {
+    if (!selectedLedgerEntry) return null;
+    if (selectedLedgerEntry.txnId) {
+      return transactions.find((t) => t.id === selectedLedgerEntry.txnId) || null;
+    }
+    const cleanId = selectedLedgerEntry.id.replace(/^LEDGER-TXN-(OUT|IN)-/, '');
+    return transactions.find((t) => t.id === cleanId || t.id === selectedLedgerEntry.id) || null;
+  }, [selectedLedgerEntry, transactions]);
+
+  const handleOpenDetailModal = (entry: UnifiedLedgerEntry) => {
+    setSelectedLedgerEntry(entry);
+    setIsDetailModalOpen(true);
+  };
 
   const bankAccounts = accounts.filter((a) => a.accountType === 'BANK');
   const cashAccount = accounts.find((a) => a.accountType === 'CASH') || {
@@ -594,7 +613,16 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               return (
                 <div
                   key={entry.id}
-                  className="px-3.5 py-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs flex items-center justify-between gap-3 hover:border-outline-variant/60 transition-colors"
+                  onClick={() => handleOpenDetailModal(entry)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleOpenDetailModal(entry);
+                    }
+                  }}
+                  className="px-3.5 py-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs flex items-center justify-between gap-3 hover:border-outline-variant/70 hover:bg-surface-container-low/50 transition-all cursor-pointer group"
                 >
                   {/* Left: Direction Icon & Details */}
                   <div className="flex items-center gap-3 min-w-0">
@@ -618,7 +646,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
 
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                        <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-primary transition-colors">
                           {entry.counterpartyOrTitle}
                         </span>
                         {entry.referenceNo && (
@@ -688,25 +716,30 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: Flow Amount */}
-                  <div className="flex flex-col items-end flex-shrink-0">
-                    <span
-                      className={`font-tabular-data text-xs sm:text-sm font-black tracking-tight ${
-                        isContra
-                          ? 'text-blue-700 dark:text-blue-400'
+                  {/* Right: Flow Amount & Click Cue */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-col items-end">
+                      <span
+                        className={`font-tabular-data text-xs sm:text-sm font-black tracking-tight ${
+                          isContra
+                            ? 'text-blue-700 dark:text-blue-400'
+                            : isInflow
+                            ? 'text-emerald-700 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {isInflow ? '+' : isOutflow ? '-' : '⇄'} {formatINR(entry.amount)}
+                      </span>
+                      <span className="text-[10px] text-on-surface-variant font-semibold">
+                        {isContra
+                          ? (entry.flow === 'IN' ? 'Deposited' : 'Deducted')
                           : isInflow
-                          ? 'text-emerald-700 dark:text-emerald-400'
-                          : 'text-rose-600 dark:text-rose-400'
-                      }`}
-                    >
-                      {isInflow ? '+' : isOutflow ? '-' : '⇄'} {formatINR(entry.amount)}
-                    </span>
-                    <span className="text-[10px] text-on-surface-variant font-semibold">
-                      {isContra
-                        ? (entry.flow === 'IN' ? 'Deposited' : 'Deducted')
-                        : isInflow
-                        ? 'Received'
-                        : 'Paid'}
+                          ? 'Received'
+                          : 'Paid'}
+                      </span>
+                    </div>
+                    <span className="material-symbols-outlined text-[18px] text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all">
+                      chevron_right
                     </span>
                   </div>
                 </div>
@@ -744,6 +777,20 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         }}
         onSaveAccount={onSaveAccount}
         editingAccount={editingAccount}
+      />
+
+      <CashBankTransactionDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setSelectedLedgerEntry(null);
+        }}
+        entry={selectedLedgerEntry}
+        rawTransaction={selectedRawTxn}
+        accounts={accounts}
+        onSaveTransaction={onSaveTransaction}
+        onDeleteTransaction={onDeleteTransaction}
+        onNavigateTab={onNavigateTab}
       />
     </div>
   );

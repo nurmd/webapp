@@ -67,6 +67,9 @@ export interface BusinessReportsViewProps {
   loans?: LoanAccount[];
   loanTransactions?: LoanTransaction[];
   initialReportPage?: ReportCategoryKey | null;
+  onSaveTransaction?: (txn: CashBankTransaction) => void;
+  onDeleteTransaction?: (id: string) => void;
+  onNavigateTab?: (tab: any) => void;
 }
 
 const SUB_REPORTS_MAP: Record<string, SubReportTabOption[]> = {
@@ -167,6 +170,9 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   loans,
   loanTransactions,
   initialReportPage = null,
+  onSaveTransaction,
+  onDeleteTransaction,
+  onNavigateTab,
 }) => {
   // Navigation State: 'hub' or a specific dedicated report category
   const [activeReportPage, setActiveReportPage] = useState<ReportCategoryKey | 'hub'>(
@@ -534,6 +540,9 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             onRegisterExportHandlers={(handlers) => {
               exportHandlersRef.current = handlers;
             }}
+            onSaveTransaction={onSaveTransaction || ((txn) => db.saveCashBankTransaction(txn))}
+            onDeleteTransaction={onDeleteTransaction || ((id) => db.deleteCashBankTransaction(id))}
+            onNavigateTab={onNavigateTab}
           />
         )}
 
