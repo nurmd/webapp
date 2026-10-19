@@ -4,6 +4,8 @@ import {
   CreditCard,
   ArrowDownLeft,
   ArrowUpRight,
+  ArrowUp,
+  ArrowDown,
   Search,
   Filter,
 } from 'lucide-react';
@@ -55,6 +57,8 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
     };
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>(defaultAccount.id);
+  // Default to chronological ascending order (standard banking passbook format)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const selectedAccount = useMemo(() => {
     return accounts.find((a) => a.id === selectedAccountId) || defaultAccount;
@@ -84,16 +88,20 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       return e.category === 'BANK' && (e.accountId === selectedAccount.id || e.accountId === 'ACC_BANK_DEFAULT');
     });
 
-    // Sort chronologically ascending to compute accurate running balance
-    entries.sort((a, b) => a.date.localeCompare(b.date));
+    // 1. Sort chronologically ascending with deterministic tie-breaker to compute accurate running balance
+    entries.sort((a, b) => {
+      const dateDiff = a.date.localeCompare(b.date);
+      if (dateDiff !== 0) return dateDiff;
+      return a.id.localeCompare(b.id);
+    });
 
     let currentBalance = selectedAccount.openingBalance || 0;
-    const entriesWithRunningBalance: Array<UnifiedLedgerEntry & { calculatedRunningBalance: number }> = [];
+    const entriesWithRunningBalance: Array<UnifiedLedgerEntry & { calculatedRunningBalance: number; chronoIndex: number }> = [];
 
     let totalDeposits = 0;
     let totalWithdrawals = 0;
 
-    for (const entry of entries) {
+    entries.forEach((entry, idx) => {
       if (entry.flow === 'IN') {
         currentBalance += entry.amount;
         totalDeposits += entry.amount;
@@ -104,15 +112,21 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
 
       entriesWithRunningBalance.push({
         ...entry,
+        chronoIndex: idx,
         calculatedRunningBalance: Math.round(currentBalance * 100) / 100,
       });
+    });
+
+    // 2. Order for display based on selected sortOrder
+    const displayList = [...entriesWithRunningBalance];
+    if (sortOrder === 'desc') {
+      displayList.sort((a, b) => b.chronoIndex - a.chronoIndex);
+    } else {
+      displayList.sort((a, b) => a.chronoIndex - b.chronoIndex);
     }
 
-    // Now sort descending for table display
-    entriesWithRunningBalance.sort((a, b) => b.date.localeCompare(a.date));
-
-    // Apply search filter if any
-    let filtered = entriesWithRunningBalance;
+    // 3. Apply search filter if any
+    let filtered = displayList;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -120,7 +134,8 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
           e.counterpartyOrTitle.toLowerCase().includes(q) ||
           e.referenceNo?.toLowerCase().includes(q) ||
           e.description?.toLowerCase().includes(q) ||
-          e.mode.toLowerCase().includes(q)
+          e.mode.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q)
       );
     }
 
@@ -130,7 +145,16 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       totalWithdrawals: Math.round(totalWithdrawals * 100) / 100,
       closingBalance: Math.round(currentBalance * 100) / 100,
     };
-  }, [financialSummary, selectedAccount, searchQuery]);
+  }, [financialSummary, selectedAccount, sortOrder, searchQuery]);
+
+  const showOpeningRow = useMemo(() => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      'opening balance brought forward b/f'.includes(q) ||
+      (selectedAccount.openingBalanceDate && selectedAccount.openingBalanceDate.includes(q))
+    );
+  }, [searchQuery, selectedAccount.openingBalanceDate]);
 
   // Register Export Handlers
   useEffect(() => {
@@ -138,20 +162,79 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
 
     const exportCsv = () => {
       const headers = ['Date', 'Type', 'Description / Counterparty', 'Ref No', 'Mode', 'Withdrawal (Debit)', 'Deposit (Credit)', 'Balance (INR)'];
-      const rows = accountEntries.entries.map((e) => [
+      const rows: (string | number)[][] = [];
+
+      const openingRow = [
+        selectedAccount.openingBalanceDate || 'Opening',
+        'OPENING',
+        'Opening Balance Brought Forward (B/F)',
+        '-',
+        'OPENING',
+        0,
+        0,
+        selectedAccount.openingBalance || 0,
+      ];
+
+      if (sortOrder === 'asc') {
+        rows.push(openingRow);
+      }
+
+      accountEntries.entries.forEach((e) => {
+        rows.push([
+          e.date,
+          e.type,
+          e.counterpartyOrTitle,
+          e.referenceNo || '-',
+          e.mode,
+          e.flow === 'OUT' ? e.amount : 0,
+          e.flow === 'IN' ? e.amount : 0,
+          e.calculatedRunningBalance,
+        ]);
+      });
+
+      if (sortOrder === 'desc') {
+        rows.push(openingRow);
+      }
+
+      const summaryRow = [
+        'Total / Closing Balance',
+        '',
+        '',
+        '',
+        '',
+        accountEntries.totalWithdrawals,
+        accountEntries.totalDeposits,
+        accountEntries.closingBalance,
+      ];
+
+      exportReportToCsv(`BankStatement_${selectedAccount.accountName.replace(/\s+/g, '_')}_${Date.now()}`, headers, rows, summaryRow);
+    };
+
+    const exportPdf = () => {
+      const openingRow = [
+        selectedAccount.openingBalanceDate || 'Opening',
+        'OPENING',
+        'Opening Balance Brought Forward (B/F)',
+        '-',
+        '-',
+        '-',
+        '-',
+        formatINR(selectedAccount.openingBalance || 0),
+      ];
+
+      const txnRows = accountEntries.entries.map((e) => [
         e.date,
         e.type,
         e.counterpartyOrTitle,
         e.referenceNo || '-',
         e.mode,
-        e.flow === 'OUT' ? e.amount : 0,
-        e.flow === 'IN' ? e.amount : 0,
-        e.calculatedRunningBalance,
+        e.flow === 'OUT' ? formatINR(e.amount) : '-',
+        e.flow === 'IN' ? formatINR(e.amount) : '-',
+        formatINR(e.calculatedRunningBalance),
       ]);
-      exportReportToCsv(`BankStatement_${selectedAccount.accountName}_${Date.now()}`, headers, rows);
-    };
 
-    const exportPdf = () => {
+      const rows = sortOrder === 'asc' ? [openingRow, ...txnRows] : [...txnRows, openingRow];
+
       printReportDocument({
         title: `Bank Statement: ${selectedAccount.accountName}`,
         subtitle: `Account Passbook & Transaction Ledger • ${dateRangeLabel}`,
@@ -164,22 +247,46 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
           { label: 'Closing Balance', value: formatINR(accountEntries.closingBalance) },
         ],
         headers: ['Date', 'Type', 'Description / Details', 'Ref No', 'Mode', 'Debit (-)', 'Credit (+)', 'Balance (INR)'],
-        rows: accountEntries.entries.map((e) => [
-          e.date,
-          e.type,
-          e.counterpartyOrTitle,
-          e.referenceNo || '-',
-          e.mode,
-          e.flow === 'OUT' ? formatINR(e.amount) : '-',
-          e.flow === 'IN' ? formatINR(e.amount) : '-',
-          formatINR(e.calculatedRunningBalance),
-        ]),
+        rows,
+        summaryRow: [
+          'Total / Closing Balance',
+          '',
+          '',
+          '',
+          '',
+          `-${formatINR(accountEntries.totalWithdrawals)}`,
+          `+${formatINR(accountEntries.totalDeposits)}`,
+          formatINR(accountEntries.closingBalance),
+        ],
         columnAlignments: ['left', 'left', 'left', 'left', 'left', 'right', 'right', 'right'],
       });
     };
 
     onRegisterExportHandlers({ exportCsv, exportPdf });
-  }, [accountEntries, selectedAccount, company, dateRangeLabel, onRegisterExportHandlers]);
+  }, [accountEntries, selectedAccount, company, dateRangeLabel, onRegisterExportHandlers, sortOrder]);
+
+  const openingRowNode = (
+    <tr key="opening-balance-row" className="bg-surface-container-low/60 font-medium border-b border-outline-variant/30 text-on-surface">
+      <td className="py-3 px-4 whitespace-nowrap text-on-surface-variant font-mono text-xs">
+        {selectedAccount.openingBalanceDate || 'Opening'}
+      </td>
+      <td className="py-3 px-4">
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+          OPENING
+        </span>
+      </td>
+      <td className="py-3 px-4 text-on-surface">
+        <div className="font-bold text-xs sm:text-sm">Opening Balance Brought Forward (B/F)</div>
+        <div className="text-[11px] text-on-surface-variant">Baseline account balance</div>
+      </td>
+      <td className="py-3 px-4 font-mono text-xs text-on-surface-variant">-</td>
+      <td className="py-3 px-4 text-right font-mono text-on-surface-variant">-</td>
+      <td className="py-3 px-4 text-right font-mono text-on-surface-variant">-</td>
+      <td className="py-3 px-4 text-right font-mono font-bold text-on-surface">
+        {formatINR(selectedAccount.openingBalance || 0)}
+      </td>
+    </tr>
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -229,7 +336,7 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
             {formatINR(selectedAccount.openingBalance || 0)}
           </div>
           <div className="text-[10px] sm:text-[11px] text-on-surface-variant">
-            Start balance
+            Start balance (B/F)
           </div>
         </div>
 
@@ -270,6 +377,51 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         </div>
       </div>
 
+      {/* Table Header Bar with Passbook Sort Order Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+        <div>
+          <h3 className="text-sm sm:text-base font-bold text-on-surface flex items-center gap-2">
+            <span>Passbook Ledger & Statement</span>
+            <span className="text-[11px] font-normal text-on-surface-variant px-2 py-0.5 rounded-full bg-surface-container border border-outline-variant/30">
+              {accountEntries.entries.length} {accountEntries.entries.length === 1 ? 'transaction' : 'transactions'}
+            </span>
+          </h3>
+          <p className="text-[11px] sm:text-xs text-on-surface-variant mt-0.5">
+            {sortOrder === 'asc' ? 'Chronological passbook order (Oldest first) • Monotonic running balance' : 'Recent transactions first (Newest first)'}
+          </p>
+        </div>
+
+        {/* Sort Order Toggle */}
+        <div className="flex items-center gap-1.5 self-start sm:self-auto bg-surface-container-low p-1 rounded-xl border border-outline-variant/30 text-xs">
+          <button
+            type="button"
+            onClick={() => setSortOrder('asc')}
+            className={`px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              sortOrder === 'asc'
+                ? 'bg-primary text-on-primary shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+            title="Chronological passbook order: Opening balance on top, running balance increments sequentially"
+          >
+            <ArrowUp size={13} />
+            <span>Oldest First (Passbook)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortOrder('desc')}
+            className={`px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              sortOrder === 'desc'
+                ? 'bg-primary text-on-primary shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+            title="Recent transactions first"
+          >
+            <ArrowDown size={13} />
+            <span>Newest First</span>
+          </button>
+        </div>
+      </div>
+
       {/* Statement Table */}
       <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -286,10 +438,14 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
+              {sortOrder === 'asc' && showOpeningRow && openingRowNode}
+
               {accountEntries.entries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-on-surface-variant">
-                    No transactions recorded for {selectedAccount.accountName} in this period.
+                  <td colSpan={7} className="py-8 text-center text-on-surface-variant italic">
+                    {searchQuery.trim()
+                      ? 'No transactions matching your search query.'
+                      : `No transactions recorded for ${selectedAccount.accountName} in this period.`}
                   </td>
                 </tr>
               ) : (
@@ -327,7 +483,26 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
                   );
                 })
               )}
+
+              {sortOrder === 'desc' && showOpeningRow && openingRowNode}
             </tbody>
+            <tfoot>
+              <tr className="bg-surface-container-low font-bold text-on-surface border-t-2 border-outline-variant/40">
+                <td className="py-3 px-4 font-bold" colSpan={4}>
+                  <span className="text-[10px] uppercase tracking-wider text-on-surface-variant block">Summary</span>
+                  <span>Total Withdrawals, Deposits & Closing Balance</span>
+                </td>
+                <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 dark:text-rose-400 text-xs sm:text-sm">
+                  -{formatINR(accountEntries.totalWithdrawals)}
+                </td>
+                <td className="py-3 px-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm">
+                  +{formatINR(accountEntries.totalDeposits)}
+                </td>
+                <td className="py-3 px-4 text-right font-mono font-extrabold text-primary text-sm sm:text-base">
+                  {formatINR(accountEntries.closingBalance)}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

@@ -593,6 +593,40 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
     expect(container.textContent).toContain('State Bank of India');
     expect(container.textContent).toContain('Total Deposits (Credit)');
     expect(container.textContent).toContain('Total Withdrawals (Debit)');
+
+    // Verify Opening Balance Brought Forward (B/F) baseline row is rendered
+    expect(container.textContent).toContain('Opening Balance Brought Forward (B/F)');
+    expect(container.textContent).toContain('₹ 1,00,000.00'); // SBI opening balance
+
+    // Verify transactions and sequential running balance
+    expect(container.textContent).toContain('Cash Deposit Received');
+    expect(container.textContent).toContain('₹ 77,100.00'); // Closing running balance
+
+    // Verify Summary Footer row
+    expect(container.textContent).toContain('Total Withdrawals, Deposits & Closing Balance');
+    expect(container.textContent).toContain('-₹ 34,700.00');
+    expect(container.textContent).toContain('+₹ 11,800.00');
+
+    // Verify Sort Order buttons exist and toggle works
+    const newestFirstBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Newest First')
+    );
+    expect(newestFirstBtn).toBeDefined();
+
+    await act(async () => {
+      newestFirstBtn?.click();
+    });
+    expect(container.textContent).toContain('Recent transactions first (Newest first)');
+
+    const oldestFirstBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Oldest First (Passbook)')
+    );
+    expect(oldestFirstBtn).toBeDefined();
+
+    await act(async () => {
+      oldestFirstBtn?.click();
+    });
+    expect(container.textContent).toContain('Chronological passbook order (Oldest first)');
   });
 
   it('8. Navigates to dedicated Loan Statement page and renders borrowings overview and EMI schedule', async () => {
