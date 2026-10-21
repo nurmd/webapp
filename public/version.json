@@ -1,16 +1,15 @@
 {
-  "version": "1.2.19",
+  "version": "1.2.20",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-19T13:59:13.685Z",
+  "buildTime": "2026-10-21T13:14:51.805Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "dedicated visual and functional workflows for Sales Order, Purchase Order, Sales Return (Credit Note), and Purchase Return (Debit Note) with isolated document draft storage (v1.2.19)",
+    "Bank account selection dropdown in Payment In / Payment Out when Bank mode is selected (v1.2.20)",
+    "Payment Mode converted to space-saving dropdown sitting side-by-side with Bank Account",
+    "Removed Full Due and 50% quick chips to streamline modal space on mobile screens",
+    "dedicated visual and functional workflows for Sales Order, Purchase Order, Sales Return, and Purchase Return (v1.2.19)",
     "add clear From ➔ To visual route cues and badges for Contra transactions",
-    "resolve inaccurate bank statement running balance and table rendering",
-    "responsive mobile card previews & auto-fit A4 scaling for invoice and reports (v1.2.15)",
-    "move draft save & restore to top bar, fix reports PDF preview back navigation (v1.2.14)",
-    "add draft auto-save and restore for new invoices and bills (v1.2.13)",
-    "restore business activity timeline filter to 3 dropdown filters (v1.2.12)"
+    "resolve inaccurate bank statement running balance and table rendering"
   ]
 }
