@@ -296,11 +296,19 @@ export function computeCashBankSummary(params: {
   vouchers.forEach((v) => {
     // Process explicit receipt / payment vouchers that affect cash or bank
     if (v.voucherType === 'RECEIPT') {
-      const cashOrBankEntries = v.entries.filter((e) => (e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK') && e.debit > 0);
+      const bankIds = new Set(accounts.map((a) => a.id));
+      bankIds.add('ACC_BANK');
+      bankIds.add('ACC_BANK_SBI');
+      bankIds.add('ACC_BANK_DEFAULT');
+
+      const cashOrBankEntries = v.entries.filter(
+        (e) => (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.debit > 0
+      );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
-        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+        const matchedAcc = accounts.find((a) => a.id === entry.accountId);
+        const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
+        const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
         const amt = entry.debit;
 
         balances[targetAccId] = (balances[targetAccId] || 0) + amt;
@@ -324,11 +332,19 @@ export function computeCashBankSummary(params: {
         });
       });
     } else if (v.voucherType === 'PAYMENT') {
-      const cashOrBankEntries = v.entries.filter((e) => (e.accountId === 'ACC_CASH' || e.accountId === 'ACC_BANK') && e.credit > 0);
+      const bankIds = new Set(accounts.map((a) => a.id));
+      bankIds.add('ACC_BANK');
+      bankIds.add('ACC_BANK_SBI');
+      bankIds.add('ACC_BANK_DEFAULT');
+
+      const cashOrBankEntries = v.entries.filter(
+        (e) => (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.credit > 0
+      );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
-        const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-        const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+        const matchedAcc = accounts.find((a) => a.id === entry.accountId);
+        const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
+        const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
         const amt = entry.credit;
 
         balances[targetAccId] = (balances[targetAccId] || 0) - amt;

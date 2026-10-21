@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -47,6 +47,28 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
   const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
 
+  const availableBankAccounts = useMemo(() => {
+    const all = db.getBankAccounts() || [];
+    const banks = all.filter((a) => a.accountType === 'BANK');
+    if (banks.length > 0) return banks;
+    return [
+      {
+        id: 'ACC_BANK',
+        accountName: 'Primary Bank Account',
+        accountType: 'BANK' as const,
+        openingBalance: 0,
+        createdAt: '',
+        updatedAt: '',
+      },
+    ];
+  }, []);
+
+  const [editBankAccountId, setEditBankAccountId] = useState<string>(() => {
+    const banks = db.getBankAccounts().filter((a) => a.accountType === 'BANK');
+    const def = banks.find((a) => a.isDefault) || banks[0];
+    return def?.id || 'ACC_BANK';
+  });
+
   useEffect(() => {
     if (!editingLedgerEntry) return;
 
@@ -64,7 +86,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       setEditDiscount(discVal > 0 ? discVal.toString() : '');
 
       const cashEntry = v.entries.find((e) => e.accountId === 'ACC_CASH');
-      const bankEntries = v.entries.filter((e) => e.accountId === 'ACC_BANK');
+      const bankEntries = v.entries.filter((e) => e.accountId !== 'ACC_CASH' && e.accountId !== party.id && (e.accountId.startsWith('BANK') || e.accountId.startsWith('ACC_BANK') || availableBankAccounts.some((a) => a.id === e.accountId)));
+      if (bankEntries.length > 0 && bankEntries[0].accountId) {
+        setEditBankAccountId(bankEntries[0].accountId);
+      }
       const cashVal = cashEntry ? (cashEntry.debit || cashEntry.credit || 0) : 0;
       const bankVal = bankEntries.reduce((sum, e) => sum + (e.debit || e.credit || 0), 0);
       const paymentVal = cashVal + bankVal;
@@ -178,15 +203,16 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           if (disc > 0) entries.push({ accountId: 'ACC_INCOME_DISCOUNT', accountName: 'Discount Received', debit: 0, credit: disc, narration: 'Cash discount received' });
         }
       } else {
-        const accId = editMode === 'CASH' ? 'ACC_CASH' : 'ACC_BANK';
-        const accName = editMode === 'CASH' ? 'Cash-in-hand' : 'Bank Account';
+        const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId) || availableBankAccounts[0];
+        const accId = editMode === 'CASH' ? 'ACC_CASH' : (selectedBank?.id || 'ACC_BANK');
+        const accName = editMode === 'CASH' ? 'Cash-in-hand' : (selectedBank?.accountName || 'Bank Account');
         if (isReceipt) {
-          entries.push({ accountId: accId, accountName: accName, debit: newAmt, credit: 0, narration: `Payment received via ${editMode}` });
+          entries.push({ accountId: accId, accountName: accName, debit: newAmt, credit: 0, narration: `Payment received via ${editMode}${selectedBank && editMode === 'BANK' ? ` (${selectedBank.accountName})` : ''}` });
           if (disc > 0) entries.push({ accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: disc, credit: 0, narration: 'Cash discount allowed' });
           entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: totalSettled, narration: editNotes || v.narration });
         } else {
           entries.push({ accountId: party.id, accountName: party.name, debit: totalSettled, credit: 0, narration: editNotes || v.narration });
-          entries.push({ accountId: accId, accountName: accName, debit: 0, credit: newAmt, narration: `Paid via ${editMode}` });
+          entries.push({ accountId: accId, accountName: accName, debit: 0, credit: newAmt, narration: `Paid via ${editMode}${selectedBank && editMode === 'BANK' ? ` (${selectedBank.accountName})` : ''}` });
           if (disc > 0) entries.push({ accountId: 'ACC_INCOME_DISCOUNT', accountName: 'Discount Received', debit: 0, credit: disc, narration: 'Cash discount received' });
         }
       }
@@ -590,34 +616,61 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             </div>
           )}
 
-          {/* Payment Mode */}
+          {/* Payment Mode & Bank Account (Side-by-Side Dropdowns) */}
           {(editingLedgerEntry.rawVoucher || editingLedgerEntry.paymentMode) && (
             <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-4 gap-1">
-                {['UPI', 'CASH', 'BANK', 'SPLIT'].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      setEditMode(m);
-                      if (m === 'SPLIT') {
-                        const total = parseFloat(editAmount) || 0;
-                        if (total > 0 && !editSplitCash && !editSplitUPI && !editSplitBank) {
-                          if (editMode === 'CASH') setEditSplitCash(total.toString());
-                          else if (editMode === 'BANK') setEditSplitBank(total.toString());
-                          else setEditSplitUPI(total.toString());
+              <div className={`grid gap-2 ${editMode === 'BANK' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="voucher-edit-mode-select" className="text-[10px] font-bold text-on-surface-variant">
+                    Payment Mode
+                  </label>
+                  <div className="relative flex items-center">
+                    <select
+                      id="voucher-edit-mode-select"
+                      value={editMode}
+                      onChange={(e) => {
+                        const m = e.target.value;
+                        setEditMode(m);
+                        if (m === 'SPLIT') {
+                          const total = parseFloat(editAmount) || 0;
+                          if (total > 0 && !editSplitCash && !editSplitUPI && !editSplitBank) {
+                            if (editMode === 'CASH') setEditSplitCash(total.toString());
+                            else if (editMode === 'BANK') setEditSplitBank(total.toString());
+                            else setEditSplitUPI(total.toString());
+                          }
                         }
-                      }
-                    }}
-                    className={`py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
-                      editMode === m
-                        ? 'bg-secondary text-on-secondary shadow-xs'
-                        : 'bg-surface-container-low text-on-surface-variant'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
+                    >
+                      <option value="UPI">UPI</option>
+                      <option value="CASH">Cash</option>
+                      <option value="BANK">Bank</option>
+                      <option value="SPLIT">Split Tender</option>
+                    </select>
+                  </div>
+                </div>
+
+                {editMode === 'BANK' && (
+                  <div className="flex flex-col gap-1 animate-in fade-in">
+                    <label htmlFor="voucher-bank-select" className="text-[10px] font-bold text-on-surface-variant truncate">
+                      {editType === 'IN' ? 'Deposit to Bank' : 'Pay from Bank'}
+                    </label>
+                    <div className="relative flex items-center">
+                      <select
+                        id="voucher-bank-select"
+                        value={editBankAccountId}
+                        onChange={(e) => setEditBankAccountId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
+                      >
+                        {availableBankAccounts.map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.accountName} {acc.accountNumber ? `(•••${acc.accountNumber.slice(-4)})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {editMode === 'SPLIT' && (() => {

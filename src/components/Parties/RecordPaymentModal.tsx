@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Party } from '../../models/party.ts';
 import { PaymentSplit } from '../../models/invoice.ts';
+import { BankAccount } from '../../models/bankAccount.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { db } from '../../services/db.ts';
 
 export interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -10,6 +12,7 @@ export interface RecordPaymentModalProps {
   party: Party;
   liveNetBalance: number;
   isCustomer: boolean;
+  bankAccounts?: BankAccount[];
   onRecordPayment: (
     party: Party,
     amount: number,
@@ -17,7 +20,8 @@ export interface RecordPaymentModalProps {
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount?: number
+    discount?: number,
+    bankAccountId?: string
   ) => void;
   onRefresh?: () => void;
 }
@@ -26,8 +30,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   isOpen,
   onClose,
   party,
-  liveNetBalance,
+  liveNetBalance: _liveNetBalance,
   isCustomer,
+  bankAccounts,
   onRecordPayment,
   onRefresh,
 }) => {
@@ -48,6 +53,36 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [paymentDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [paymentRef, setPaymentRef] = useState<string>('');
   const [paymentNotes] = useState<string>('');
+
+  const availableBankAccounts = useMemo(() => {
+    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts()) || [];
+    const banks = all.filter((a) => a.accountType === 'BANK');
+    if (banks.length > 0) return banks;
+    return [
+      {
+        id: 'ACC_BANK',
+        accountName: 'Primary Bank Account',
+        accountType: 'BANK' as const,
+        openingBalance: 0,
+        createdAt: '',
+        updatedAt: '',
+      },
+    ];
+  }, [bankAccounts]);
+
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(() => {
+    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts()) || [];
+    const banks = all.filter((a) => a.accountType === 'BANK');
+    const def = banks.find((a) => a.isDefault) || banks[0];
+    return def?.id || 'ACC_BANK';
+  });
+
+  useEffect(() => {
+    if (availableBankAccounts.length > 0 && !availableBankAccounts.some((a) => a.id === selectedBankAccountId)) {
+      const def = availableBankAccounts.find((a) => a.isDefault) || availableBankAccounts[0];
+      if (def) setSelectedBankAccountId(def.id);
+    }
+  }, [availableBankAccounts, selectedBankAccountId]);
 
   if (!isOpen) return null;
 
@@ -82,8 +117,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       splitDesc = splits.map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`).join(', ');
     }
 
+    const selectedBank = availableBankAccounts.find((a) => a.id === selectedBankAccountId) || availableBankAccounts[0];
+    const bankDesc = paymentMode === 'BANK' && selectedBank ? `Bank: ${selectedBank.accountName}` : '';
+
     const fullNotes = [
       paymentRef ? `Ref: ${paymentRef}` : '',
+      bankDesc,
       splitDesc ? `Split (${splitDesc})` : '',
       disc > 0 ? `Discount: ₹${disc.toFixed(2)}` : '',
       paymentNotes,
@@ -96,7 +135,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       fullNotes || `${paymentType === 'IN' ? 'Payment In' : 'Payment Out'} of ${formatINR(amt)} on ${paymentDate}${disc > 0 ? ` (Discount: ${formatINR(disc)})` : ''}`,
       paymentType,
       splits,
-      disc
+      disc,
+      paymentMode === 'BANK' || (paymentMode === 'SPLIT' && (splits?.some((s) => s.mode === 'BANK') ?? false))
+        ? selectedBankAccountId
+        : undefined
     );
     onClose();
     setDiscountAmount('');
@@ -161,28 +203,6 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </button>
       </div>
 
-      {/* Quick Chips */}
-      {liveNetBalance !== 0 && (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setPaymentAmount(Math.abs(liveNetBalance).toString())}
-            className="px-2 py-0.5 rounded-lg bg-secondary/15 text-secondary text-[11px] font-bold cursor-pointer hover:bg-secondary/25"
-          >
-            Full Due ({formatINR(Math.abs(liveNetBalance))})
-          </button>
-          {Math.abs(liveNetBalance) > 100 && (
-            <button
-              type="button"
-              onClick={() => setPaymentAmount(Math.round(Math.abs(liveNetBalance) / 2).toString())}
-              className="px-2 py-0.5 rounded-lg bg-surface text-on-surface text-[11px] font-medium cursor-pointer"
-            >
-              50%
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Amount & Discount Inputs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
@@ -231,15 +251,18 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
       )}
 
-      {/* Payment Mode Selector */}
-      <div className="flex flex-col gap-1">
-        <label className="text-[10px] font-bold text-on-surface-variant">Payment Mode</label>
-        <div className="grid grid-cols-4 gap-1">
-          {['UPI', 'CASH', 'BANK', 'SPLIT'].map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
+      {/* Payment Mode & Bank Account (Side-by-Side Dropdowns to Save Space) */}
+      <div className={`grid gap-2 ${paymentMode === 'BANK' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="payment-mode-select" className="text-[10px] font-bold text-on-surface-variant">
+            Payment Mode
+          </label>
+          <div className="relative flex items-center">
+            <select
+              id="payment-mode-select"
+              value={paymentMode}
+              onChange={(e) => {
+                const m = e.target.value;
                 setPaymentMode(m);
                 if (m === 'SPLIT') {
                   const total = parseFloat(paymentAmount) || 0;
@@ -250,18 +273,37 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   }
                 }
               }}
-              className={`py-1.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all min-h-[36px] flex items-center justify-center ${
-                paymentMode === m
-                  ? paymentType === 'IN'
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-surface text-on-surface-variant'
-              }`}
+              className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
             >
-              {m}
-            </button>
-          ))}
+              <option value="UPI">UPI</option>
+              <option value="CASH">Cash</option>
+              <option value="BANK">Bank</option>
+              <option value="SPLIT">Split Tender</option>
+            </select>
+          </div>
         </div>
+
+        {paymentMode === 'BANK' && (
+          <div className="flex flex-col gap-1 animate-in fade-in">
+            <label htmlFor="bank-account-select" className="text-[10px] font-bold text-on-surface-variant truncate">
+              {paymentType === 'IN' ? 'Deposit to Bank' : 'Pay from Bank'}
+            </label>
+            <div className="relative flex items-center">
+              <select
+                id="bank-account-select"
+                value={selectedBankAccountId}
+                onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
+              >
+                {availableBankAccounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.accountName} {acc.accountNumber ? `(•••${acc.accountNumber.slice(-4)})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Split Tender Allocation Box when SPLIT is selected */}
@@ -390,6 +432,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                     className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
                   />
                 </div>
+                {availableBankAccounts.length > 1 && (
+                  <select
+                    value={selectedBankAccountId}
+                    onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                    className="mt-1 w-full px-1.5 py-0.5 bg-surface rounded text-[10px] font-medium text-on-surface border border-outline-variant/20 focus:outline-none cursor-pointer"
+                  >
+                    {availableBankAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.accountName}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           </div>

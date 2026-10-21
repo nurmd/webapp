@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
+import { BankAccount } from '../../models/bankAccount.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
@@ -18,6 +19,7 @@ interface PartiesViewProps {
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
   vouchers?: Voucher[];
+  bankAccounts?: BankAccount[];
   initialSegment?: 'CUSTOMERS' | 'SUPPLIERS';
   initialStatusFilter?: 'ALL' | 'OVERDUE' | 'SETTLED';
   onSaveParty: (party: Party) => void;
@@ -29,7 +31,8 @@ interface PartiesViewProps {
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount?: number
+    discount?: number,
+    bankAccountId?: string
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -44,6 +47,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   invoices = [],
   purchases = [],
   vouchers,
+  bankAccounts,
   initialSegment = 'CUSTOMERS',
   initialStatusFilter = 'ALL',
   onSaveParty,
@@ -270,10 +274,11 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount?: number
+    discount?: number,
+    bankAccountId?: string
   ) => {
     if (onRecordPartyPayment) {
-      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount);
+      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount, bankAccountId);
     } else {
       const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
       const totalSettled = amount + (discount || 0);
@@ -299,6 +304,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           invoices={invoices}
           purchases={purchases}
           vouchers={allVouchers}
+          bankAccounts={bankAccounts}
           onBack={() => setSelectedPartyForLedger(null)}
           onEditParty={(p) => {
             setEditingParty(p);

@@ -638,7 +638,8 @@ export const App: React.FC = () => {
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount: number = 0
+    discount: number = 0,
+    bankAccountId?: string
   ) => {
     const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
     const disc = Number((discount || 0).toFixed(2));
@@ -655,6 +656,7 @@ export const App: React.FC = () => {
     db.saveParty(updatedParty);
 
     const docId = Date.now().toString().slice(-6);
+    const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
     if (isPaymentIn) {
       // 1. Create Double-Entry Receipt Voucher with Split Support and Discount Allowed
       const voucher = createPaymentReceiptVoucher({
@@ -665,6 +667,8 @@ export const App: React.FC = () => {
         amount,
         discount: disc,
         paymentMode,
+        bankAccountId,
+        bankAccountName: bankAcc?.accountName,
         paymentSplits,
         narration: notes || `Payment received from ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
       });
@@ -740,6 +744,8 @@ export const App: React.FC = () => {
         amount,
         discount: disc,
         paymentMode,
+        bankAccountId,
+        bankAccountName: bankAcc?.accountName,
         paymentSplits,
         narration: notes || `Payment disbursed to ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
       });
@@ -1164,6 +1170,7 @@ export const App: React.FC = () => {
             invoices={invoices}
             purchases={purchases}
             vouchers={vouchers}
+            bankAccounts={bankAccounts}
             initialSegment={partiesSegment}
             initialStatusFilter={partiesFilter}
             onSaveParty={handleSaveParty}

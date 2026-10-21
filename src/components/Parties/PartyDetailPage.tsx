@@ -3,6 +3,7 @@ import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
+import { BankAccount } from '../../models/bankAccount.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -26,6 +27,7 @@ export interface PartyDetailPageProps {
   invoices: Invoice[];
   purchases: PurchaseBill[];
   vouchers?: Voucher[];
+  bankAccounts?: BankAccount[];
   onBack: () => void;
   onEditParty: (party: Party) => void;
   onDeleteParty?: (id: string) => void;
@@ -36,7 +38,8 @@ export interface PartyDetailPageProps {
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount?: number
+    discount?: number,
+    bankAccountId?: string
   ) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -52,6 +55,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   invoices = [],
   purchases = [],
   vouchers = [],
+  bankAccounts,
   onBack,
   onEditParty,
   onDeleteParty,
@@ -518,6 +522,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               party={party}
               liveNetBalance={liveNetBalance}
               isCustomer={isCustomer}
+              bankAccounts={bankAccounts}
               onRecordPayment={onRecordPayment}
               onRefresh={onRefresh}
             />

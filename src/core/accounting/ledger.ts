@@ -427,6 +427,8 @@ export function createPaymentReceiptVoucher(params: {
   amount?: number;
   discount?: number;
   paymentMode?: string;
+  bankAccountId?: string;
+  bankAccountName?: string;
   mode?: string;
   referenceNo?: string;
   narration?: string;
@@ -458,14 +460,18 @@ export function createPaymentReceiptVoucher(params: {
   } else {
     const singleMode = params.paymentMode || params.mode || 'CASH';
     totalCashBank = Number(Number(params.amount || 0).toFixed(2));
-    const { accountId, accountName } = resolveAccountForSplit({ mode: singleMode });
+    const { accountId, accountName } = resolveAccountForSplit({
+      mode: singleMode,
+      accountId: params.bankAccountId,
+      accountName: params.bankAccountName,
+    });
 
     entries.push({
       accountId,
       accountName,
       debit: totalCashBank,
       credit: 0,
-      narration: `Payment received via ${singleMode}`,
+      narration: `Payment received via ${singleMode}${params.bankAccountName ? ` (${params.bankAccountName})` : ''}`,
     });
   }
 
@@ -516,6 +522,8 @@ export function createPaymentOutVoucher(params: {
   amount?: number;
   discount?: number;
   paymentMode?: string;
+  bankAccountId?: string;
+  bankAccountName?: string;
   mode?: string;
   referenceNo?: string;
   narration?: string;
@@ -548,14 +556,18 @@ export function createPaymentOutVoucher(params: {
   } else {
     const singleMode = params.paymentMode || params.mode || 'CASH';
     totalCashBank = Number(Number(params.amount || 0).toFixed(2));
-    const { accountId, accountName } = resolveAccountForSplit({ mode: singleMode });
+    const { accountId, accountName } = resolveAccountForSplit({
+      mode: singleMode,
+      accountId: params.bankAccountId,
+      accountName: params.bankAccountName,
+    });
 
     splitEntries.push({
       accountId,
       accountName,
       debit: 0,
       credit: totalCashBank,
-      narration: `Paid via ${singleMode}`,
+      narration: `Paid via ${singleMode}${params.bankAccountName ? ` (${params.bankAccountName})` : ''}`,
     });
   }
 
