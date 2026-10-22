@@ -266,16 +266,17 @@ class UpdateService {
       }).catch(() => {});
     }
 
+    let lastError: string | null = null;
+
+    // 1. Attempt GitHub Releases API with cache-busting.
+    // Do NOT send Cache-Control / Pragma here: those headers are not in GitHub's
+    // CORS Access-Control-Allow-Headers list, so a browser/WebView preflight fails.
+    // A failed API request must never prevent the raw fallbacks below from running.
     try {
-      // 1. Attempt GitHub Releases API with cache-busting
       const apiUrl = `https://api.github.com/repos/${repo}/releases/latest?_t=${Date.now()}`;
       const res = await fetch(apiUrl, {
         cache: 'no-store',
-        headers: {
-          Accept: 'application/vnd.github.v3+json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
+        headers: { Accept: 'application/vnd.github.v3+json' },
       });
 
       if (res.ok) {
@@ -290,45 +291,86 @@ class UpdateService {
             latestRelease: releaseInfo,
           };
         }
+      } else {
+        lastError = `GitHub Releases API returned HTTP ${res.status}`;
       }
+    } catch (err: any) {
+      lastError = err?.message || 'GitHub Releases API unavailable';
+      console.warn('[UpdateService] Releases API failed:', err);
+    }
 
-      // 1b. Check recent releases list if latest release wasn't newer (guards against GitHub latest tag designation delays)
-      try {
-        const listUrl = `https://api.github.com/repos/${repo}/releases?per_page=5&_t=${Date.now()}`;
-        const listRes = await fetch(listUrl, {
-          cache: 'no-store',
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        });
+    // 1b. Check recent releases list if latest release wasn't newer (guards against GitHub latest tag designation delays)
+    try {
+      const listUrl = `https://api.github.com/repos/${repo}/releases?per_page=5&_t=${Date.now()}`;
+      const listRes = await fetch(listUrl, {
+        cache: 'no-store',
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
 
-        if (listRes.ok) {
-          const releasesList = await listRes.json();
-          if (Array.isArray(releasesList)) {
-            for (const rel of releasesList) {
-              if (rel.draft) continue;
-              const relInfo = await this.formatReleaseData(rel, repo, isPwa);
-              if (this.isNewer(relInfo.version, CURRENT_APP_VERSION)) {
-                this.cachedRelease = relInfo;
-                return {
-                  hasUpdate: true,
-                  currentVersion: CURRENT_APP_VERSION,
-                  latestRelease: relInfo,
-                };
-              }
+      if (listRes.ok) {
+        const releasesList = await listRes.json();
+        if (Array.isArray(releasesList)) {
+          for (const rel of releasesList) {
+            if (rel.draft) continue;
+            const relInfo = await this.formatReleaseData(rel, repo, isPwa);
+            if (this.isNewer(relInfo.version, CURRENT_APP_VERSION)) {
+              this.cachedRelease = relInfo;
+              return {
+                hasUpdate: true,
+                currentVersion: CURRENT_APP_VERSION,
+                latestRelease: relInfo,
+              };
             }
           }
         }
-      } catch (_err) {
-        console.warn('[UpdateService] Failed to query releases list:', _err);
       }
+    } catch (_err) {
+      console.warn('[UpdateService] Failed to query releases list:', _err);
+    }
 
-      // 2. Fallback: Query raw package.json from GitHub master branch
-      console.log('[UpdateService] Releases API non-200. Querying raw GitHub master package.json...');
-      const rawPkgUrl = `https://raw.githubusercontent.com/${repo}/master/package.json`;
-      const rawRes = await fetch(rawPkgUrl);
+    // 2. Fallback: raw public/version.json on GitHub master. Cache-busting is
+    // essential because raw.githubusercontent.com caches files for several minutes.
+    try {
+      const rawVersionUrl = `https://raw.githubusercontent.com/${repo}/master/public/version.json?t=${Date.now()}`;
+      const rawVersionRes = await fetch(rawVersionUrl, { cache: 'no-store' });
+
+      if (rawVersionRes.ok) {
+        const vData = await rawVersionRes.json();
+        const rawVersion = String(vData?.version || '').replace(/^v/, '');
+
+        if (rawVersion) {
+          const notes = Array.isArray(vData.releaseNotes) && vData.releaseNotes.length > 0
+            ? vData.releaseNotes
+            : await this.fetchDynamicReleaseNotes(repo, rawVersion);
+          const releaseInfo: AppReleaseInfo = {
+            version: rawVersion,
+            versionCode: this.calculateVersionCode(rawVersion),
+            releaseDate: vData.buildTime ? vData.buildTime.split('T')[0] : new Date().toISOString().split('T')[0],
+            releaseTitle: `Vyapar PRO v${rawVersion}`,
+            releaseNotes: notes,
+            apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
+            apkSize: isPwa ? 'Web PWA' : '5.4 MB',
+            sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
+            htmlUrl: `https://github.com/${repo}`,
+            isPwa,
+          };
+
+          this.cachedRelease = releaseInfo;
+          return {
+            hasUpdate: this.isNewer(rawVersion, CURRENT_APP_VERSION),
+            currentVersion: CURRENT_APP_VERSION,
+            latestRelease: releaseInfo,
+          };
+        }
+      }
+    } catch (_err) {
+      console.warn('[UpdateService] Failed to query raw version.json:', _err);
+    }
+
+    // 3. Fallback: Query raw package.json from GitHub master branch.
+    try {
+      const rawPkgUrl = `https://raw.githubusercontent.com/${repo}/master/package.json?t=${Date.now()}`;
+      const rawRes = await fetch(rawPkgUrl, { cache: 'no-store' });
 
       if (rawRes.ok) {
         const rawPkg = await rawRes.json();
@@ -355,7 +397,7 @@ class UpdateService {
           releaseTitle: `Vyapar PRO v${githubVersion} (GitHub Master)`,
           releaseNotes: dynamicNotes,
           apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
-          apkSize: isPwa ? 'Web PWA' : '1.1 MB',
+          apkSize: isPwa ? 'Web PWA' : '5.4 MB',
           sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
           htmlUrl: `https://github.com/${repo}`,
           isPwa,
@@ -363,32 +405,38 @@ class UpdateService {
         };
 
         this.cachedRelease = releaseInfo;
-        const hasUpdate = this.isNewer(releaseInfo.version, CURRENT_APP_VERSION);
-
         return {
-          hasUpdate,
+          hasUpdate: this.isNewer(releaseInfo.version, CURRENT_APP_VERSION),
           currentVersion: CURRENT_APP_VERSION,
           latestRelease: releaseInfo,
         };
       }
+    } catch (_err) {
+      console.warn('[UpdateService] Failed to query raw package.json:', _err);
+    }
 
-      // 3. Fallback: Query local server /version.json
-      if (typeof window !== 'undefined') {
-        const localVersionRes = await fetch(`./version.json?t=${Date.now()}`);
+    // 4. Fallback: Query local server /version.json
+    if (typeof window !== 'undefined') {
+      try {
+        const localVersionRes = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
         if (localVersionRes.ok) {
           const vData = await localVersionRes.json();
-          if (vData.version && this.isNewer(vData.version, CURRENT_APP_VERSION)) {
+          const localVersion = String(vData?.version || '').replace(/^v/, '');
+
+          // Only surface the bundled manifest when it is actually newer. Returning
+          // the current version here would hide a total remote-check failure.
+          if (localVersion && this.isNewer(localVersion, CURRENT_APP_VERSION)) {
             const dynamicNotes = Array.isArray(vData.releaseNotes) && vData.releaseNotes.length > 0
               ? vData.releaseNotes
               : [
-                  `Vyapar Books update v${vData.version} deployed`,
+                  `Vyapar Books update v${localVersion} deployed`,
                   'Click Update to refresh application cache'
                 ];
             const releaseInfo: AppReleaseInfo = {
-              version: vData.version,
-              versionCode: this.calculateVersionCode(vData.version),
+              version: localVersion,
+              versionCode: this.calculateVersionCode(localVersion),
               releaseDate: vData.buildTime ? vData.buildTime.split('T')[0] : new Date().toISOString().split('T')[0],
-              releaseTitle: `Vyapar PRO v${vData.version}`,
+              releaseTitle: `Vyapar PRO v${localVersion}`,
               releaseNotes: dynamicNotes,
               apkUrl: '',
               apkSize: 'Web PWA',
@@ -401,23 +449,17 @@ class UpdateService {
             };
           }
         }
+      } catch (_err) {
+        console.warn('[UpdateService] Failed to query local version.json:', _err);
       }
-
-      return {
-        hasUpdate: false,
-        currentVersion: CURRENT_APP_VERSION,
-        latestRelease: this.cachedRelease || undefined,
-        error: `Could not fetch release information from GitHub (${repo})`,
-      };
-    } catch (err: any) {
-      console.warn('GitHub update check network error:', err);
-      return {
-        hasUpdate: false,
-        currentVersion: CURRENT_APP_VERSION,
-        latestRelease: this.cachedRelease || undefined,
-        error: err?.message || 'Network error checking for updates',
-      };
     }
+
+    return {
+      hasUpdate: false,
+      currentVersion: CURRENT_APP_VERSION,
+      latestRelease: this.cachedRelease || undefined,
+      error: lastError || `Could not fetch release information from GitHub (${repo})`,
+    };
   }
 
   public isNewer(latest: string, current: string): boolean {

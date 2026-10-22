@@ -159,6 +159,23 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const [activeSubModal, setActiveSubModal] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
+  const savedNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedNoticeTimeoutRef.current) {
+        clearTimeout(savedNoticeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showSavedNotice = (durationMs: number = 2000) => {
+    setSavedNotice(true);
+    if (savedNoticeTimeoutRef.current) {
+      clearTimeout(savedNoticeTimeoutRef.current);
+    }
+    savedNoticeTimeoutRef.current = setTimeout(() => setSavedNotice(false), durationMs);
+  };
 
   const [defaultPrintOption, setDefaultPrintOption] = useState<string>(() => {
     return localStorage.getItem('defaultPrintOption') || 'None';
@@ -167,8 +184,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleDefaultPrintOptionChange = (value: string) => {
     setDefaultPrintOption(value);
     localStorage.setItem('defaultPrintOption', value);
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2000);
+    showSavedNotice(2000);
   };
 
   // Multi-Device Profile Sync State
@@ -212,8 +228,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleToggleBuyPriceVisibility = (enabled: boolean) => {
     setShowBuyPricesGlobally(enabled);
     db.setBuyPriceVisibility(enabled);
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2000);
+    showSavedNotice(2000);
   };
 
   const [allowNegativeStock, setAllowNegativeStock] = useState<boolean>(() => {
@@ -241,8 +256,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleToggleNegativeStock = (enabled: boolean) => {
     setAllowNegativeStock(enabled);
     db.setAllowNegativeStock(enabled);
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 2000);
+    showSavedNotice(2000);
   };
 
   // Intercept switch_settings_tab window event (supports both legacy and new category keys)
@@ -362,6 +376,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         setUpdateRelease(res.latestRelease);
         setIsUpdateModalOpen(true);
         setUpdateStatusText(`New version v${res.latestRelease.version} is available!`);
+      } else if (res.error) {
+        // Never report "latest version" when every update source failed.
+        setUpdateStatusText(`Update check failed: ${res.error}. Please retry.`);
       } else {
         setUpdateStatusText(`You are on the latest version (v${CURRENT_APP_VERSION}).`);
       }
@@ -468,8 +485,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       isAppLockEnabled,
       allowNegativeStock,
     });
-    setSavedNotice(true);
-    setTimeout(() => setSavedNotice(false), 3000);
+    showSavedNotice(3000);
   };
 
   const handleSyncAllSettingsAcrossDevices = async () => {
@@ -575,9 +591,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       isAppLockEnabled,
       allowNegativeStock,
     });
-    setSavedNotice(true);
     setIsEditModalOpen(false);
-    setTimeout(() => setSavedNotice(false), 3000);
+    showSavedNotice(3000);
   };
 
   const stateName = getStateList().find((s) => s.code === profile.stateCode)?.name || 'Maharashtra';

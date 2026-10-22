@@ -1,14 +1,13 @@
 {
-  "version": "1.2.22",
+  "version": "1.2.23",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-22T06:32:41.544Z",
+  "buildTime": "2026-10-22T07:10:16.051Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Restored persistent tablet and desktop navigation sidebar (TabletSidebar) for seamless large-screen navigation",
-    "Sidebar provides direct 1-tap access to all business modules across Overview, Transactions, and Accounting",
-    "Sidebar omits duplicate POS and Create Sale Bill entries to keep billing creation anchored to Dashboard and Header quick actions",
-    "Mobile slide-out drawer remains removed; mobile workflows continue using touch bottom navigation and the More hub",
-    "Header More and Settings shortcuts remain available across all form factors"
+    "Fixed OTA update checks failing when the GitHub API request was blocked by a CORS preflight",
+    "Added cache-busted raw version.json and package.json fallbacks so new releases are still detected when the GitHub API is unavailable",
+    "Update-check failures now show a clear error message instead of falsely reporting the app is already on the latest version",
+    "No changes to billing, backup/restore, or the current navigation workflows"
   ]
 }
