@@ -7,7 +7,7 @@ export interface PurchaseActionDockProps {
   onClose: () => void;
   onSaveBill: () => void;
   onSaveDraft?: () => void;
-  purchaseType?: 'BILL' | 'PO' | 'RETURN';
+  purchaseType?: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN';
 }
 
 export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
@@ -20,26 +20,37 @@ export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
 }) => {
   const isPo = purchaseType === 'PO';
   const isReturn = purchaseType === 'RETURN';
+  const isChallan = purchaseType === 'CHALLAN';
 
-  const totalLabel = isPo
+  const totalLabel = isChallan
+    ? 'Total Challan Value'
+    : isPo
     ? 'Total Order Value'
     : isReturn
     ? 'Total Return Value'
     : 'Total Inward Payable';
 
-  const amountColor = isPo
+  const amountColor = isChallan
+    ? 'text-teal-600 dark:text-teal-400'
+    : isPo
     ? 'text-indigo-600 dark:text-indigo-400'
     : isReturn
     ? 'text-amber-700 dark:text-amber-400'
     : 'text-orange-600 dark:text-orange-400';
 
-  const saveBtnBg = isPo
+  const saveBtnBg = isChallan
+    ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/30'
+    : isPo
     ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30'
     : isReturn
     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/30'
     : 'bg-orange-600 hover:bg-orange-700 shadow-orange-600/30';
 
-  const saveBtnText = isPo
+  const saveBtnText = isChallan
+    ? isSubmitting
+      ? 'Saving Challan...'
+      : 'Save Purchase Challan'
+    : isPo
     ? isSubmitting
       ? 'Saving PO...'
       : 'Save Purchase Order'

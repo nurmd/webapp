@@ -564,6 +564,7 @@ export class RbacService {
         'sales_returns',
         'purchases',
         'purchase_orders',
+        'purchase_challans',
         'purchase_returns',
         'expenses',
         'parties',

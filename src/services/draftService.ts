@@ -47,13 +47,16 @@ export interface PurchaseDraft {
   originalBillDate?: string;
   returnReason?: string;
   orderStatus?: string;
-  challanStatus?: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
-  challanType?: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS';
+  challanStatus?: 'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED';
+  challanType?: string;
   consigneeName?: string;
   vehicleNumber?: string;
   transporterName?: string;
   transporterId?: string;
   ewayBillNumber?: string;
+  lrNumber?: string;
+  lrDate?: string;
+  receivedDate?: string;
 }
 
 export const getInvoiceDraftKey = (docType?: string | null): string => {
@@ -68,6 +71,7 @@ export const getInvoiceDraftKey = (docType?: string | null): string => {
 export const getPurchaseDraftKey = (docType?: string | null): string => {
   if (docType === 'PO') return 'gst_draft_purchase_order';
   if (docType === 'RETURN') return 'gst_draft_purchase_return';
+  if (docType === 'CHALLAN') return 'gst_draft_purchase_challan';
   return 'gst_draft_new_purchase';
 };
 

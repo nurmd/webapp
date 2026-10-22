@@ -97,6 +97,9 @@ const SalesReturnsView = React.lazy(() =>
 const PurchaseOrdersView = React.lazy(() =>
   import('./components/Orders/PurchaseOrdersView.tsx').then((m) => ({ default: m.PurchaseOrdersView }))
 );
+const PurchaseChallansView = React.lazy(() =>
+  import('./components/Purchases/PurchaseChallansView.tsx').then((m) => ({ default: m.PurchaseChallansView }))
+);
 const PurchaseReturnsView = React.lazy(() =>
   import('./components/Returns/PurchaseReturnsView.tsx').then((m) => ({ default: m.PurchaseReturnsView }))
 );
@@ -200,7 +203,7 @@ export const App: React.FC = () => {
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
   const [invoiceModalDefaultType, setInvoiceModalDefaultType] = useState<InvoiceType | undefined>(undefined);
-  const [purchaseModalDefaultType, setPurchaseModalDefaultType] = useState<'BILL' | 'PO' | 'RETURN' | undefined>(undefined);
+  const [purchaseModalDefaultType, setPurchaseModalDefaultType] = useState<'BILL' | 'PO' | 'RETURN' | 'CHALLAN' | undefined>(undefined);
 
   // Declarative Confirm Delete Modal State
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -568,11 +571,19 @@ export const App: React.FC = () => {
     setIsTableGridPurchaseOpen(true);
   }, []);
 
+  const handleOpenNewPurchaseChallan = useCallback(() => {
+    setEditingPurchase(null);
+    setSelectedSupplierForPurchase(null);
+    setPurchaseModalDefaultType('CHALLAN');
+    setIsTableGridPurchaseOpen(true);
+  }, []);
+
   const handleSavePurchase = useCallback((newBill: PurchaseBill) => {
     db.savePurchase(newBill);
 
-    // Auto-create Double-Entry Accounting Voucher for Purchase (only for inward bills, not purchase orders)
+    // Auto-create Double-Entry Accounting Voucher for Purchase (only for inward bills, not purchase orders or challans)
     const isPurchaseOrder = newBill.purchaseType === 'PO';
+    const isPurchaseChallan = newBill.purchaseType === 'CHALLAN';
     const existingVoucher = db.getVouchers().find(
       (v) =>
         !v.isReversed &&
@@ -583,7 +594,7 @@ export const App: React.FC = () => {
         (v.referenceNo === newBill.billNumber || v.voucherNumber === `VCH-PUR-${newBill.billNumber}`)
     );
 
-    if (!isPurchaseOrder && !newBill.isCancelled) {
+    if (!isPurchaseOrder && !isPurchaseChallan && !newBill.isCancelled) {
       const voucher = createPurchaseInvoiceVoucher({
         id: existingVoucher?.id,
         billNumber: newBill.billNumber,
@@ -1186,6 +1197,18 @@ export const App: React.FC = () => {
             company={company}
             purchases={purchases}
             onNewPurchaseOrder={handleOpenNewPurchaseOrder}
+            onViewPurchase={handleEditPurchase}
+            onEditPurchase={handleEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'purchase_challans' && (
+          <PurchaseChallansView
+            company={company}
+            purchases={purchases}
+            onNewPurchaseChallan={handleOpenNewPurchaseChallan}
             onViewPurchase={handleEditPurchase}
             onEditPurchase={handleEditPurchase}
             onDeletePurchase={handleDeletePurchase}

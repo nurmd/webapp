@@ -31,7 +31,7 @@ interface TableGridPurchaseModalProps {
   itemsCatalog: InventoryItem[];
   initialBill?: PurchaseBill | null;
   initialSupplier?: Party | null;
-  defaultPurchaseType?: 'BILL' | 'PO' | 'RETURN';
+  defaultPurchaseType?: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN';
   onClose: () => void;
   onSave: (bill: PurchaseBill) => void;
   onAddNewParty?: () => void;
@@ -66,7 +66,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     [initialBill, defaultPurchaseType]
   );
   const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(() => Boolean(initialDraft));
-  const effectivePurchaseType: 'BILL' | 'PO' | 'RETURN' = initialBill?.purchaseType || defaultPurchaseType || 'BILL';
+  const effectivePurchaseType: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN' = initialBill?.purchaseType || defaultPurchaseType || 'BILL';
 
   const [suppliers, setSuppliers] = useState<Party[]>(parties);
   useEffect(() => {
@@ -140,6 +140,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         ? 'PURCHASE_ORDER'
         : defaultPurchaseType === 'RETURN'
         ? 'DEBIT_NOTE'
+        : defaultPurchaseType === 'CHALLAN'
+        ? 'PURCHASE_CHALLAN'
         : 'PURCHASE_BILL';
     return generateNextDocumentNumber(docSeries, company, purchaseList);
   });
@@ -179,6 +181,35 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   );
   const [returnReason, setReturnReason] = useState<string>(
     () => initialBill?.returnReason || initialDraft?.returnReason || '01-Defective Goods'
+  );
+
+  // Challan & Transportation states
+  const [challanStatus, setChallanStatus] = useState<'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED'>(
+    () => initialBill?.challanStatus || (initialDraft as any)?.challanStatus || 'RECEIVED'
+  );
+  const [challanType, setChallanType] = useState<string>(
+    () => initialBill?.challanType || (initialDraft as any)?.challanType || 'Regular Inward'
+  );
+  const [challanNumber, setChallanNumber] = useState<string>(
+    () => initialBill?.challanNumber || (initialDraft as any)?.challanNumber || ''
+  );
+  const [vehicleNumber, setVehicleNumber] = useState<string>(
+    () => initialBill?.vehicleNumber || (initialDraft as any)?.vehicleNumber || ''
+  );
+  const [transporterName, setTransporterName] = useState<string>(
+    () => initialBill?.transporterName || (initialDraft as any)?.transporterName || ''
+  );
+  const [lrNumber, setLrNumber] = useState<string>(
+    () => initialBill?.lrNumber || (initialDraft as any)?.lrNumber || ''
+  );
+  const [lrDate, setLrDate] = useState<string>(
+    () => initialBill?.lrDate || (initialDraft as any)?.lrDate || ''
+  );
+  const [ewayBillNumber, setEwayBillNumber] = useState<string>(
+    () => initialBill?.ewayBillNumber || (initialDraft as any)?.ewayBillNumber || ''
+  );
+  const [receivedDate, setReceivedDate] = useState<string>(
+    () => initialBill?.receivedDate || (initialDraft as any)?.receivedDate || billDate
   );
 
   // Dedicated Add/Edit item modal
@@ -528,6 +559,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       referenceNo: s.referenceNo || s.reference,
     }));
 
+    const isSpecialDoc = effectivePurchaseType === 'PO' || effectivePurchaseType === 'CHALLAN';
+
     const newBill: PurchaseBill = {
       id: initialBill ? initialBill.id : `PUR-${Date.now()}`,
       billNumber: billNumber.trim() || `PB-${Date.now().toString().slice(-4)}`,
@@ -543,7 +576,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       dueDate: dueDate || undefined,
       items: purchaseItems,
       itcEligibility,
-      isRcm: isRcm,
+      isRcm: isSpecialDoc ? false : isRcm,
       totalGrossAmount: calcSummary.totalGrossAmount,
       totalDiscount: calcSummary.totalDiscount,
       totalTaxableAmount: calcSummary.totalTaxableAmount,
@@ -557,13 +590,22 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       roundOff: finalRoundOff,
       shippingAmount: Number(shippingAmount) || 0,
       grandTotal: finalGrandTotal,
-      paidAmount: totalPaid,
-      balanceAmount: balanceDue,
-      paymentMode: resolvedPaymentMode,
-      paymentStatus: autoPaymentStatus,
-      paymentSplits: savedSplits,
+      paidAmount: isSpecialDoc ? 0 : totalPaid,
+      balanceAmount: isSpecialDoc ? 0 : balanceDue,
+      paymentMode: isSpecialDoc ? 'CREDIT' : resolvedPaymentMode,
+      paymentStatus: isSpecialDoc ? 'UNPAID' : autoPaymentStatus,
+      paymentSplits: isSpecialDoc ? [] : savedSplits,
       notes: splitNote || initialBill?.notes,
       orderStatus: effectivePurchaseType === 'PO' ? (initialBill?.orderStatus || 'PENDING') : undefined,
+      challanStatus: effectivePurchaseType === 'CHALLAN' ? (initialBill?.challanStatus || challanStatus) : undefined,
+      challanType: effectivePurchaseType === 'CHALLAN' ? (challanType || undefined) : undefined,
+      challanNumber: effectivePurchaseType === 'CHALLAN' ? (challanNumber || undefined) : undefined,
+      lrNumber: effectivePurchaseType === 'CHALLAN' ? (lrNumber || undefined) : undefined,
+      lrDate: effectivePurchaseType === 'CHALLAN' ? (lrDate || undefined) : undefined,
+      vehicleNumber: effectivePurchaseType === 'CHALLAN' ? (vehicleNumber || undefined) : undefined,
+      transporterName: effectivePurchaseType === 'CHALLAN' ? (transporterName || undefined) : undefined,
+      ewayBillNumber: effectivePurchaseType === 'CHALLAN' ? (ewayBillNumber || undefined) : undefined,
+      receivedDate: effectivePurchaseType === 'CHALLAN' ? (receivedDate || billDate) : undefined,
       noteType: effectivePurchaseType === 'RETURN' ? 'D' : undefined,
       originalBillNumber: effectivePurchaseType === 'RETURN' ? (originalBillNumber.trim() || undefined) : undefined,
       originalBillDate: effectivePurchaseType === 'RETURN' ? (originalBillDate || undefined) : undefined,
@@ -598,6 +640,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       originalBillDate,
       returnReason,
       orderStatus: effectivePurchaseType === 'PO' ? 'PENDING' : undefined,
+      challanStatus: effectivePurchaseType === 'CHALLAN' ? challanStatus : undefined,
+      challanType: effectivePurchaseType === 'CHALLAN' ? challanType : undefined,
+      vehicleNumber: effectivePurchaseType === 'CHALLAN' ? vehicleNumber : undefined,
+      transporterName: effectivePurchaseType === 'CHALLAN' ? transporterName : undefined,
+      lrNumber: effectivePurchaseType === 'CHALLAN' ? lrNumber : undefined,
+      lrDate: effectivePurchaseType === 'CHALLAN' ? lrDate : undefined,
+      ewayBillNumber: effectivePurchaseType === 'CHALLAN' ? ewayBillNumber : undefined,
+      receivedDate: effectivePurchaseType === 'CHALLAN' ? receivedDate : undefined,
     }, effectivePurchaseType);
   }, [
     initialBill,
@@ -614,13 +664,21 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     originalBillNumber,
     originalBillDate,
     returnReason,
+    challanStatus,
+    challanType,
+    vehicleNumber,
+    transporterName,
+    lrNumber,
+    lrDate,
+    ewayBillNumber,
+    receivedDate,
     effectivePurchaseType,
   ]);
 
   // Safe close handler saving draft if unsaved progress exists
   const handleClose = useCallback(() => {
     if (!initialBill) {
-      const draftData = {
+      const draftData: any = {
         billNumber,
         billDate,
         dueDate,
@@ -635,6 +693,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         originalBillDate,
         returnReason,
         orderStatus: effectivePurchaseType === 'PO' ? 'PENDING' : undefined,
+        challanStatus: effectivePurchaseType === 'CHALLAN' ? challanStatus : undefined,
+        challanType: effectivePurchaseType === 'CHALLAN' ? challanType : undefined,
+        vehicleNumber: effectivePurchaseType === 'CHALLAN' ? vehicleNumber : undefined,
+        transporterName: effectivePurchaseType === 'CHALLAN' ? transporterName : undefined,
+        lrNumber: effectivePurchaseType === 'CHALLAN' ? lrNumber : undefined,
+        lrDate: effectivePurchaseType === 'CHALLAN' ? lrDate : undefined,
+        ewayBillNumber: effectivePurchaseType === 'CHALLAN' ? ewayBillNumber : undefined,
+        receivedDate: effectivePurchaseType === 'CHALLAN' ? receivedDate : undefined,
       };
       if (draftService.isPurchaseDraftNotEmpty(draftData)) {
         draftService.savePurchaseDraft(draftData, effectivePurchaseType);
@@ -657,13 +723,21 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     originalBillNumber,
     originalBillDate,
     returnReason,
+    challanStatus,
+    challanType,
+    vehicleNumber,
+    transporterName,
+    lrNumber,
+    lrDate,
+    ewayBillNumber,
+    receivedDate,
     effectivePurchaseType,
     onClose,
   ]);
 
   // Manual save draft handler
   const handleSaveDraft = useCallback(() => {
-    const draftData = {
+    const draftData: any = {
       billNumber,
       billDate,
       dueDate,
@@ -678,6 +752,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       originalBillDate,
       returnReason,
       orderStatus: effectivePurchaseType === 'PO' ? 'PENDING' : undefined,
+      challanStatus: effectivePurchaseType === 'CHALLAN' ? challanStatus : undefined,
+      challanType: effectivePurchaseType === 'CHALLAN' ? challanType : undefined,
+      vehicleNumber: effectivePurchaseType === 'CHALLAN' ? vehicleNumber : undefined,
+      transporterName: effectivePurchaseType === 'CHALLAN' ? transporterName : undefined,
+      lrNumber: effectivePurchaseType === 'CHALLAN' ? lrNumber : undefined,
+      lrDate: effectivePurchaseType === 'CHALLAN' ? lrDate : undefined,
+      ewayBillNumber: effectivePurchaseType === 'CHALLAN' ? ewayBillNumber : undefined,
+      receivedDate: effectivePurchaseType === 'CHALLAN' ? receivedDate : undefined,
     };
     draftService.savePurchaseDraft(draftData, effectivePurchaseType);
     showAppToast('Progress saved as draft');
@@ -695,6 +777,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     originalBillNumber,
     originalBillDate,
     returnReason,
+    challanStatus,
+    challanType,
+    vehicleNumber,
+    transporterName,
+    lrNumber,
+    lrDate,
+    ewayBillNumber,
+    receivedDate,
     effectivePurchaseType,
   ]);
 
@@ -728,6 +818,14 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     if (draft.originalBillNumber) setOriginalBillNumber(draft.originalBillNumber);
     if (draft.originalBillDate) setOriginalBillDate(draft.originalBillDate);
     if (draft.returnReason) setReturnReason(draft.returnReason);
+    if ((draft as any).challanStatus) setChallanStatus((draft as any).challanStatus);
+    if ((draft as any).challanType) setChallanType((draft as any).challanType);
+    if ((draft as any).vehicleNumber) setVehicleNumber((draft as any).vehicleNumber);
+    if ((draft as any).transporterName) setTransporterName((draft as any).transporterName);
+    if ((draft as any).lrNumber) setLrNumber((draft as any).lrNumber);
+    if ((draft as any).lrDate) setLrDate((draft as any).lrDate);
+    if ((draft as any).ewayBillNumber) setEwayBillNumber((draft as any).ewayBillNumber);
+    if ((draft as any).receivedDate) setReceivedDate((draft as any).receivedDate);
     if (draft.rows && draft.rows.length > 0) {
       setRows(draft.rows);
     }
@@ -838,6 +936,24 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             returnReason={returnReason}
             onReturnReasonChange={setReturnReason}
             orderStatus={initialBill?.orderStatus || 'PENDING'}
+            challanStatus={challanStatus}
+            onChallanStatusChange={setChallanStatus}
+            challanType={challanType}
+            onChallanTypeChange={setChallanType}
+            challanNumber={challanNumber}
+            onChallanNumberChange={setChallanNumber}
+            vehicleNumber={vehicleNumber}
+            onVehicleNumberChange={setVehicleNumber}
+            transporterName={transporterName}
+            onTransporterNameChange={setTransporterName}
+            lrNumber={lrNumber}
+            onLrNumberChange={setLrNumber}
+            lrDate={lrDate}
+            onLrDateChange={setLrDate}
+            ewayBillNumber={ewayBillNumber}
+            onEwayBillNumberChange={setEwayBillNumber}
+            receivedDate={receivedDate}
+            onReceivedDateChange={setReceivedDate}
             hasRestoredDraft={hasRestoredDraft}
             hasDraftInStorage={!initialBill && draftService.hasPurchaseDraft(effectivePurchaseType)}
             onSaveDraft={!initialBill ? handleSaveDraft : undefined}
@@ -899,17 +1015,19 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             accentColor="orange"
           />
 
-          <PaymentSettlementDock
-            paymentSplits={paymentSplits}
-            autoPaymentStatus={autoPaymentStatus}
-            balanceDue={balanceDue}
-            onUpdateSplitMode={handleUpdateSplitMode}
-            onUpdateSplitAmount={handleUpdateSplitAmount}
-            onUpdateSplitAccount={handleUpdateSplitAccount}
-            onAddSplitMode={handleAddSplitMode}
-            onRemoveSplit={handleRemoveSplit}
-            paymentModes={PURCHASE_PAYMENT_MODES}
-          />
+          {!['PO', 'CHALLAN'].includes(effectivePurchaseType) && (
+            <PaymentSettlementDock
+              paymentSplits={paymentSplits}
+              autoPaymentStatus={autoPaymentStatus}
+              balanceDue={balanceDue}
+              onUpdateSplitMode={handleUpdateSplitMode}
+              onUpdateSplitAmount={handleUpdateSplitAmount}
+              onUpdateSplitAccount={handleUpdateSplitAccount}
+              onAddSplitMode={handleAddSplitMode}
+              onRemoveSplit={handleRemoveSplit}
+              paymentModes={PURCHASE_PAYMENT_MODES}
+            />
+          )}
 
           <div className="h-8" aria-hidden="true" />
         </div>

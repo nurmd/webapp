@@ -133,6 +133,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     return purchases.filter((p) => p.purchaseType === 'PO' && p.orderStatus === 'PENDING').length;
   }, [purchases]);
 
+  const pendingPurchaseChallansCount = useMemo(() => {
+    return purchases.filter((p) => p.purchaseType === 'CHALLAN' && !p.isConverted && !p.isCancelled).length;
+  }, [purchases]);
+
   const purchaseReturnsCount = useMemo(() => {
     return purchases.filter((p) => p.purchaseType === 'RETURN').length;
   }, [purchases]);
@@ -251,6 +255,18 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         : undefined,
       action: () => onNavigate('purchase_orders'),
       keywords: ['po', 'purchase order', 'vendor order'],
+    },
+    {
+      id: 'purchase_challans',
+      title: 'Purchase Challans (GRN)',
+      subtitle: 'Goods receipt notes (GRN), inward physical stock & challan tracking',
+      icon: 'move_to_inbox',
+      category: 'purchases',
+      badge: pendingPurchaseChallansCount > 0
+        ? { text: `${pendingPurchaseChallansCount} Inward`, type: 'primary' }
+        : undefined,
+      action: () => onNavigate('purchase_challans'),
+      keywords: ['grn', 'goods receipt note', 'purchase challan', 'inward challan', 'stock inward'],
     },
     {
       id: 'purchase_return',

@@ -6,7 +6,7 @@ import { formatINR } from '../../../core/utils/formatters.ts';
 export interface PurchaseHeaderMetaProps {
   onClose: () => void;
   isEditing: boolean;
-  purchaseType?: 'BILL' | 'PO' | 'RETURN';
+  purchaseType?: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN';
   selectedSupplier: Party | null;
   billNumber: string;
   billDate: string;
@@ -32,6 +32,26 @@ export interface PurchaseHeaderMetaProps {
 
   // Order status
   orderStatus?: string;
+
+  // Challan & Transportation fields
+  challanStatus?: 'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED';
+  onChallanStatusChange?: (status: 'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED') => void;
+  challanType?: string;
+  onChallanTypeChange?: (val: string) => void;
+  challanNumber?: string;
+  onChallanNumberChange?: (val: string) => void;
+  vehicleNumber?: string;
+  onVehicleNumberChange?: (val: string) => void;
+  transporterName?: string;
+  onTransporterNameChange?: (val: string) => void;
+  lrNumber?: string;
+  onLrNumberChange?: (val: string) => void;
+  lrDate?: string;
+  onLrDateChange?: (val: string) => void;
+  ewayBillNumber?: string;
+  onEwayBillNumberChange?: (val: string) => void;
+  receivedDate?: string;
+  onReceivedDateChange?: (val: string) => void;
 
   // Draft props for top bar
   hasRestoredDraft?: boolean;
@@ -66,6 +86,24 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
   returnReason,
   onReturnReasonChange,
   orderStatus,
+  challanStatus = 'RECEIVED',
+  onChallanStatusChange,
+  challanType,
+  onChallanTypeChange,
+  challanNumber,
+  onChallanNumberChange,
+  vehicleNumber,
+  onVehicleNumberChange,
+  transporterName,
+  onTransporterNameChange,
+  lrNumber,
+  onLrNumberChange,
+  lrDate,
+  onLrDateChange,
+  ewayBillNumber,
+  onEwayBillNumberChange,
+  receivedDate,
+  onReceivedDateChange,
   hasRestoredDraft = false,
   hasDraftInStorage = false,
   onSaveDraft,
@@ -74,8 +112,13 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
 }) => {
   const isPo = purchaseType === 'PO';
   const isReturn = purchaseType === 'RETURN';
+  const isChallan = purchaseType === 'CHALLAN';
 
-  const titleText = isPo
+  const titleText = isChallan
+    ? isEditing
+      ? `Edit Purchase Challan #${billNumber}`
+      : 'New Purchase Challan (GRN)'
+    : isPo
     ? isEditing
       ? `Edit Purchase Order #${billNumber}`
       : 'New Purchase Order'
@@ -87,15 +130,35 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
     ? 'Edit Purchase Bill'
     : 'Record Purchase Bill';
 
-  const badgeText = isPo ? 'Purchase Order' : isReturn ? 'Debit Note (Return)' : 'Purchase (Inward)';
-  const badgeClass = isPo
+  const badgeText = isChallan
+    ? 'Purchase Challan (GRN)'
+    : isPo
+    ? 'Purchase Order'
+    : isReturn
+    ? 'Debit Note (Return)'
+    : 'Purchase (Inward)';
+  const badgeClass = isChallan
+    ? 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25'
+    : isPo
     ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25'
     : isReturn
     ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/30'
     : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20';
 
-  const iconName = isPo ? 'add_shopping_cart' : isReturn ? 'assignment_turned_in' : 'shopping_bag';
-  const iconBgClass = isPo ? 'bg-indigo-600' : isReturn ? 'bg-amber-600' : 'bg-orange-600';
+  const iconName = isChallan
+    ? 'move_to_inbox'
+    : isPo
+    ? 'add_shopping_cart'
+    : isReturn
+    ? 'assignment_turned_in'
+    : 'shopping_bag';
+  const iconBgClass = isChallan
+    ? 'bg-teal-600'
+    : isPo
+    ? 'bg-indigo-600'
+    : isReturn
+    ? 'bg-amber-600'
+    : 'bg-orange-600';
 
   return (
     <>
@@ -297,10 +360,10 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             type="button"
             onClick={onOpenBillNoModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title={isPo ? 'Change Purchase Order Number' : isReturn ? 'Change Debit Note Number' : 'Change Bill Number'}
+            title={isChallan ? 'Change Purchase Challan Number' : isPo ? 'Change Purchase Order Number' : isReturn ? 'Change Debit Note Number' : 'Change Bill Number'}
           >
             <span className="text-[9px] uppercase font-bold text-outline">
-              {isPo ? 'PO #:' : isReturn ? 'DN #:' : 'Bill #:'}
+              {isChallan ? 'Challan #:' : isPo ? 'PO #:' : isReturn ? 'DN #:' : 'Bill #:'}
             </span>
             <span className="font-bold text-on-surface truncate max-w-[120px]">{billNumber}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">edit</span>
@@ -311,25 +374,42 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             type="button"
             onClick={onOpenBillNoModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title={isPo ? 'Change PO Date' : isReturn ? 'Change Debit Note Date' : 'Change Bill Date'}
+            title={isChallan ? 'Change Challan Date' : isPo ? 'Change PO Date' : isReturn ? 'Change Debit Note Date' : 'Change Bill Date'}
           >
             <span className="material-symbols-outlined text-[13px] text-outline">calendar_today</span>
             <span>{billDate}</span>
           </button>
 
-          {/* Due / Expected Date */}
+          {/* Due / Expected / Received Date */}
           <button
             type="button"
             onClick={onOpenDueDateModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title={isPo ? 'Change Promised Delivery Date' : 'Change Payment Due Date'}
+            title={isChallan ? 'Change Goods Receipt Date' : isPo ? 'Change Promised Delivery Date' : 'Change Payment Due Date'}
           >
             <span className="text-[9px] uppercase font-bold text-outline">
-              {isPo ? 'Expected:' : 'Due:'}
+              {isChallan ? 'Received:' : isPo ? 'Expected:' : 'Due:'}
             </span>
             <span>{dueDate}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">event</span>
           </button>
+
+          {/* Challan Status Selector */}
+          {isChallan && onChallanStatusChange && (
+            <div className="h-7 px-2 rounded-lg bg-teal-500/10 text-teal-800 dark:text-teal-300 font-bold text-xs flex items-center gap-1 border border-teal-500/30">
+              <span className="text-[9px] uppercase font-bold text-teal-700 dark:text-teal-400">Status:</span>
+              <select
+                aria-label="Challan Status"
+                value={challanStatus || 'RECEIVED'}
+                onChange={(e) => onChallanStatusChange?.(e.target.value as any)}
+                className="bg-transparent font-bold text-xs text-teal-900 dark:text-teal-200 outline-none cursor-pointer"
+              >
+                <option value="RECEIVED" className="bg-surface text-on-surface">Received (In Stock)</option>
+                <option value="IN_TRANSIT" className="bg-surface text-on-surface">In Transit</option>
+                <option value="DRAFT" className="bg-surface text-on-surface">Draft</option>
+              </select>
+            </div>
+          )}
 
           {/* PO Status Badge */}
           {isPo && (
@@ -382,7 +462,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
           )}
 
           {/* ITC Eligibility Selector */}
-          {isGstActive && !isReturn && (
+          {isGstActive && !isReturn && !isChallan && (
             <div className="h-7 px-2 rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[11px] flex items-center gap-1 border border-orange-500/20">
               <span className="material-symbols-outlined text-[14px]">verified</span>
               <span>
@@ -398,7 +478,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
           )}
 
           {/* Reverse Charge Mechanism (RCM) Toggle */}
-          {isGstActive && onRcmChange && (
+          {isGstActive && !isChallan && onRcmChange && (
             <button
               type="button"
               role="switch"
@@ -416,6 +496,52 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
             </button>
           )}
         </div>
+
+        {/* Transportation & GRN Details for Purchase Challan */}
+        {isChallan && (
+          <div className="mt-2 pt-2 border-t border-outline-variant/20 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <label className="text-[9px] font-bold uppercase text-outline">Vehicle No</label>
+              <input
+                type="text"
+                value={vehicleNumber || ''}
+                onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
+                placeholder="e.g. MH12AB1234"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-md px-2 py-1 text-xs font-mono font-medium outline-none text-on-surface"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-bold uppercase text-outline">Transporter</label>
+              <input
+                type="text"
+                value={transporterName || ''}
+                onChange={(e) => onTransporterNameChange?.(e.target.value)}
+                placeholder="e.g. Transport Co"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-md px-2 py-1 text-xs font-medium outline-none text-on-surface"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-bold uppercase text-outline">LR / Consignment No</label>
+              <input
+                type="text"
+                value={lrNumber || ''}
+                onChange={(e) => onLrNumberChange?.(e.target.value)}
+                placeholder="e.g. LR-12345"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-md px-2 py-1 text-xs font-mono font-medium outline-none text-on-surface"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-bold uppercase text-outline">E-Way Bill No</label>
+              <input
+                type="text"
+                value={ewayBillNumber || ''}
+                onChange={(e) => onEwayBillNumberChange?.(e.target.value)}
+                placeholder="12-digit number"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-md px-2 py-1 text-xs font-mono font-medium outline-none text-on-surface"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

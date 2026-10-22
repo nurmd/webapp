@@ -1,15 +1,15 @@
 {
-  "version": "1.2.25",
+  "version": "1.2.26",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-22T11:52:47.596Z",
+  "buildTime": "2026-10-22T15:14:07.495Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Added Party Groups and Party Categories with create, rename, delete, color badges, assignment, filtering, and search",
-    "Party group/category assignments are preserved across partial saves, cross-tab updates, PouchDB sync, and backup/restore",
-    "Deleting a party group or category now safely unassigns affected parties without deleting any party records",
-    "Fixed item category quick-add from both new-item and edit-item flows by removing the nested form and hardening Enter/Save behavior",
-    "Added full backup/restore round-trip and legacy backup compatibility for party groups and categories",
-    "Hardened the release workflow with a concurrency guard to prevent overlapping PWA/APK asset uploads"
+    "Added Purchase Challan (Goods Receipt Note / GRN) workflow for inward physical stock tracking",
+    "Immediate physical inventory stock incrementation upon goods receipt",
+    "Isolated supplier payable liability and accounting vouchers until formal bill conversion",
+    "1-tap conversion from Purchase Challan to Purchase Bill without duplicate stock incrementation",
+    "Automatic physical stock reversion upon challan cancellation or deletion of unconverted challans",
+    "Added Purchase Challans view with KPI metrics, status filters, transport metadata tracking, and preview modal"
   ]
 }

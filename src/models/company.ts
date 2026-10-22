@@ -8,6 +8,7 @@ export type DocumentSeriesType =
   | 'DEBIT_NOTE'       // Debit Note (GST Table 9B)
   | 'PURCHASE_BILL'    // Purchase Invoices
   | 'PURCHASE_ORDER'   // Purchase Order
+  | 'PURCHASE_CHALLAN' // Inward Goods Receipt / Purchase Challan
   | 'PAYMENT_RECEIPT'; // Cash / Bank Receipt Voucher
 
 export type SeriesYearFormat = 'NONE' | 'YYYY' | 'YY_YY';

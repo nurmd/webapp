@@ -284,24 +284,48 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     // Adjust stock levels and update purchase prices via pure domain stockEngine
     const isPo = bill.purchaseType === 'PO';
     const isReturn = bill.purchaseType === 'RETURN';
+    const isChallan = bill.purchaseType === 'CHALLAN';
+    const isConvertedBill = bill.purchaseType === 'BILL' && Boolean(bill.convertedFromChallanId);
     if (!isPo) {
       const allowNegativeStock = this.getAllowNegativeStock();
       const currentItems = this.getItems();
-      let updatedItems: InventoryItem[];
+      let updatedItems: InventoryItem[] = currentItems;
       if (isReturn) {
         // Purchase Return / Debit Note: deducts returned items from inventory
         updatedItems = prevBill
           ? revertPurchaseStockAdjustment(currentItems, bill.items, prevBill.items, allowNegativeStock)
           : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+      } else if (isChallan) {
+        // Purchase Challan (GRN): increments physical inventory stock upon receipt!
+        const isCancelled = Boolean(bill.isCancelled || bill.challanStatus === 'CANCELLED');
+        const wasCancelled = Boolean(prevBill && (prevBill.isCancelled || prevBill.challanStatus === 'CANCELLED'));
+
+        if (isCancelled && !wasCancelled) {
+          // Newly cancelled: decrement the stock back out
+          updatedItems = applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+        } else if (!isCancelled && wasCancelled) {
+          // Uncancelled: re-increment the stock
+          updatedItems = applyPurchaseStockIncrement(currentItems, bill.items);
+        } else if (!isCancelled) {
+          // Active challan: normal creation or update
+          updatedItems = prevBill
+            ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
+            : applyPurchaseStockIncrement(currentItems, bill.items);
+        }
+      } else if (isConvertedBill && !prevBill) {
+        // Purchase Bill newly created from a Purchase Challan:
+        // Stock was ALREADY incremented by the source Challan upon receipt! Skip duplicate stock incrementation.
+        updatedItems = currentItems;
       } else {
+        // Standard Purchase Bill: increments inventory stock
         updatedItems = prevBill
           ? revertPurchaseStockAdjustment(currentItems, prevBill.items, bill.items, allowNegativeStock)
           : applyPurchaseStockIncrement(currentItems, bill.items);
       }
 
-      // Auto-register any brand new purchased items not yet in catalog (only for regular inward bills)
+      // Auto-register any brand new purchased items not yet in catalog (only for regular inward bills or active challans)
       const finalItems = [...updatedItems];
-      if (!isReturn) {
+      if (!isReturn && !(isChallan && (bill.isCancelled || bill.challanStatus === 'CANCELLED'))) {
         for (const line of bill.items) {
           const exists = findMatchingItem(finalItems, line);
           if (!exists && line.name && line.name.trim()) {
@@ -351,9 +375,9 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       this.recalculatePartyBalance(prevSupplierId);
     }
 
-    // Reverse Charge Mechanism (RCM): Paired Double-Entry Journal Voucher
+    // Reverse Charge Mechanism (RCM): Paired Double-Entry Journal Voucher (only for normal purchase bills)
     const rcmVoucherId = `VCH-RCM-${bill.id}`;
-    if (bill.isRcm && (bill.totalTax || 0) > 0) {
+    if (!isPo && !isChallan && !isReturn && bill.isRcm && (bill.totalTax || 0) > 0) {
       // Find any existing ACTIVE RCM voucher for this bill
       let existingActiveRcm = this.getVouchers().find(
         (v) =>
@@ -523,12 +547,22 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
     // Revert stock upon bill deletion via pure domain stockEngine
     if (bill && bill.purchaseType !== 'PO') {
-      const allowNegativeStock = this.getAllowNegativeStock();
-      const currentItems = this.getItems();
-      const updatedItems = bill.purchaseType === 'RETURN'
-        ? applyPurchaseStockIncrement(currentItems, bill.items)
-        : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
-      this.persistStockUpdates(currentItems, updatedItems);
+      const isBillFromChallan = bill.purchaseType === 'BILL' && Boolean(bill.convertedFromChallanId);
+      const isConvertedChallan = bill.purchaseType === 'CHALLAN' && Boolean(bill.isConverted);
+      const isCancelledChallan = bill.purchaseType === 'CHALLAN' && Boolean(bill.isCancelled || bill.challanStatus === 'CANCELLED');
+
+      // Only revert stock if the stock was actually held by this document:
+      // - Don't revert if this is a Bill whose stock came from a Challan (the Challan provided the stock).
+      // - Don't revert if this is a Challan that was already converted to a Bill (the Bill now owns the transaction).
+      // - Don't revert if this is a Challan that was already cancelled (its stock was already reverted on cancellation).
+      if (!isBillFromChallan && !isConvertedChallan && !isCancelledChallan) {
+        const allowNegativeStock = this.getAllowNegativeStock();
+        const currentItems = this.getItems();
+        const updatedItems = bill.purchaseType === 'RETURN'
+          ? applyPurchaseStockIncrement(currentItems, bill.items)
+          : applyPurchaseStockDecrement(currentItems, bill.items, allowNegativeStock);
+        this.persistStockUpdates(currentItems, updatedItems);
+      }
     }
 
     const supplierIdToRecalc =

@@ -298,8 +298,8 @@ export class PartyStorage extends SettingsStorage {
         (pur) => pur.supplierId === party.id || (pur.supplierName && pur.supplierName.trim().toLowerCase() === partyNameNorm)
       );
       partyPurchases.forEach((pur) => {
-        // Purchase Orders do not affect vendor payable balances
-        if (pur.purchaseType === 'PO') {
+        // Purchase Orders and Purchase Challans do not affect vendor payable balances
+        if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) {
           return;
         }
         const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
@@ -320,7 +320,9 @@ export class PartyStorage extends SettingsStorage {
           v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
       const totalPayments = partyPayments.reduce((sum, v) => sum + v.totalAmount, 0);
-      const totalPurchasePaid = partyPurchases.reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
+      const totalPurchasePaid = partyPurchases
+        .filter((pur) => pur.purchaseType !== 'PO' && pur.purchaseType !== 'CHALLAN' && !pur.isCancelled)
+        .reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
       if (totalPayments > totalPurchasePaid) {
         // We paid vendor more than total billed on purchases (advance to vendor)
         balance += (totalPayments - totalPurchasePaid);
@@ -416,9 +418,9 @@ export class PartyStorage extends SettingsStorage {
       const acc = accMap.get(supplier.id);
       if (!acc) continue;
 
-      acc.totalPurchasePaid += (pur.paidAmount || 0);
+      if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) continue;
 
-      if (pur.purchaseType === 'PO') continue;
+      acc.totalPurchasePaid += (pur.paidAmount || 0);
 
       const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
       if (pur.purchaseType === 'RETURN') {

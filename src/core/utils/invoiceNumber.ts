@@ -251,6 +251,12 @@ export const DOCUMENT_SERIES_LABELS: Record<DocumentSeriesType, { title: string;
     icon: 'add_shopping_cart',
     description: 'Procurement purchase order sent to authorized vendor',
   },
+  PURCHASE_CHALLAN: {
+    title: 'Purchase Challan (GRN)',
+    shortCode: 'PCH',
+    icon: 'move_to_inbox',
+    description: 'Inward goods receipt note (GRN) and physical stock entry',
+  },
   PAYMENT_RECEIPT: {
     title: 'Receipt / Payment Voucher',
     shortCode: 'REC',
@@ -318,6 +324,13 @@ export const DEFAULT_SERIES_CONFIGS: Record<DocumentSeriesType, DocumentSeriesCo
   },
   PURCHASE_ORDER: {
     prefix: 'PO',
+    separator: '-',
+    yearFormat: 'YYYY',
+    paddingDigits: 4,
+    startingNumber: 1,
+  },
+  PURCHASE_CHALLAN: {
+    prefix: 'PCH',
     separator: '-',
     yearFormat: 'YYYY',
     paddingDigits: 4,

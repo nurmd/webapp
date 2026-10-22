@@ -79,8 +79,18 @@ export interface PurchaseBill {
   updatedAt: string;
 
   // --- Extended GSTR Compliance & Filing Fields ---
-  purchaseType?: 'BILL' | 'PO' | 'RETURN';     // 'BILL' = Inward Bill, 'PO' = Purchase Order, 'RETURN' = Purchase Return / Debit Note
+  purchaseType?: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN'; // 'BILL' = Inward Bill, 'PO' = Purchase Order, 'RETURN' = Purchase Return / Debit Note, 'CHALLAN' = Inward Purchase Challan (GRN)
   orderStatus?: 'PENDING' | 'FULFILLED' | 'CANCELLED'; // For Purchase Orders
+  challanStatus?: 'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED'; // For Purchase Challans
+  challanType?: string;                        // Optional classification e.g. Regular Inward, Job Work Return, Branch Transfer, Sample
+  challanNumber?: string;                      // Optional supplier/delivery challan ref number
+  lrNumber?: string;                           // Lorry Receipt / Consignment Note No.
+  lrDate?: string;                             // Lorry Receipt Date
+  vehicleNumber?: string;                      // Delivery Vehicle Number
+  transporterName?: string;                    // Transporter / Courier Name
+  ewayBillNumber?: string;                     // E-Way Bill Number
+  receivedDate?: string;                       // Date goods received at warehouse/store
+  receivedBy?: string;                         // Person / staff receiving goods
   returnReason?: string;                       // Reason for Return / Debit Note (e.g. Defective Goods, Rate Difference)
   originalBillNumber?: string;                 // For Supplier Credit/Debit notes
   originalBillDate?: string;                   // For Supplier Credit/Debit notes
@@ -89,9 +99,11 @@ export interface PurchaseBill {
   importType?: 'GOODS' | 'SERVICES';           // Import classification
 
   // --- Document Conversion & Flow Tracking ---
-  isConverted?: boolean;                       // True if this PO has been converted into a Purchase Bill
+  isConverted?: boolean;                       // True if this PO or Challan has been converted into a Purchase Bill
   convertedToBillId?: string;                  // Resulting Purchase Bill ID
   convertedToBillNumber?: string;              // Resulting Purchase Bill Number (e.g. PUR-001)
   convertedFromPoId?: string;                  // Source PO ID
   convertedFromPoNumber?: string;              // Source PO Number
+  convertedFromChallanId?: string;             // Source Purchase Challan ID
+  convertedFromChallanNumber?: string;         // Source Purchase Challan Number
 }

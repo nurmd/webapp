@@ -189,3 +189,83 @@ export async function convertPurchaseOrderToBill(
 
   return newBill;
 }
+
+export interface ConvertPurchaseChallanOptions {
+  customBillNumber?: string;
+}
+
+/**
+ * Checks whether a Purchase Challan (GRN) can be converted into an inward Purchase Bill.
+ */
+export function canConvertPurchaseChallan(challan: PurchaseBill): boolean {
+  if (!challan) return false;
+  if (challan.isCancelled || challan.isConverted || challan.challanStatus === 'CANCELLED') return false;
+  return challan.purchaseType === 'CHALLAN';
+}
+
+/**
+ * Converts a Purchase Challan (GRN) into an official inward Purchase Bill.
+ * - Generates next sequential Purchase Bill number (e.g. PUR-001).
+ * - Changes purchaseType to 'BILL' (which posts accounts payable to vendor ledger and accounts).
+ * - Skips stock re-incrementation because the physical goods were already received on the Challan.
+ * - Marks source Challan as converted with bidirectional references.
+ */
+export async function convertPurchaseChallanToBill(
+  sourceChallan: PurchaseBill,
+  company: CompanyProfile,
+  options: ConvertPurchaseChallanOptions = {}
+): Promise<PurchaseBill> {
+  if (!canConvertPurchaseChallan(sourceChallan)) {
+    throw new Error(`Purchase Challan ${sourceChallan.billNumber} cannot be converted (already converted or cancelled).`);
+  }
+
+  const existingPurchases = db.getPurchases().map((p) => ({ id: p.id, invoiceNumber: p.billNumber }));
+  const nextNumber =
+    options.customBillNumber ||
+    generateNextDocumentNumber('PURCHASE_BILL', company, existingPurchases);
+
+  const now = new Date().toISOString();
+  const todayDateStr = now.split('T')[0];
+
+  const newBillId = `pur_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  // Clone items with fresh ids
+  const clonedItems = sourceChallan.items.map((item, idx) => ({
+    ...item,
+    id: `item_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 5)}`,
+  }));
+
+  const newBill: PurchaseBill = {
+    ...sourceChallan,
+    id: newBillId,
+    billNumber: nextNumber,
+    purchaseType: 'BILL',
+    date: todayDateStr,
+    dueDate: sourceChallan.dueDate || todayDateStr,
+    items: clonedItems,
+    notes: sourceChallan.notes
+      ? `${sourceChallan.notes}\n(Inwarded from Purchase Challan #${sourceChallan.billNumber})`
+      : `Inwarded from Purchase Challan #${sourceChallan.billNumber}`,
+    createdAt: now,
+    updatedAt: now,
+    isConverted: false,
+    convertedFromChallanId: sourceChallan.id,
+    convertedFromChallanNumber: sourceChallan.billNumber,
+  };
+
+  // 1. Save inward Purchase Bill (db.savePurchase skips stock increment because convertedFromChallanId is set, but updates vendor balance & posts accounting)
+  await db.savePurchase(newBill);
+
+  // 2. Mark source Challan as converted
+  const updatedSourceChallan: PurchaseBill = {
+    ...sourceChallan,
+    isConverted: true,
+    challanStatus: 'RECEIVED',
+    convertedToBillId: newBill.id,
+    convertedToBillNumber: newBill.billNumber,
+    updatedAt: now,
+  };
+  await db.savePurchase(updatedSourceChallan);
+
+  return newBill;
+}
