@@ -19,6 +19,7 @@ import {
 import { Header } from './components/Shell/Header.tsx';
 import { AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
+import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
 import {
   useCompany,
   useParties,
@@ -1023,6 +1024,18 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+      {/* Tablet / Desktop Persistent Sidebar Navigation */}
+      <TabletSidebar
+        activeTab={activeTab}
+        company={company}
+        activeUser={activeUser}
+        onSelectTab={handleSelectTab}
+        onOpenRoleSwitch={handleOpenRoleSwitch}
+        onCheckUpdate={handleCheckUpdateFromChrome}
+        hasUpdate={hasUpdate}
+        latestVersion={latestRelease?.version}
+      />
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top App Header - Detached & Pinned at Top */}

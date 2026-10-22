@@ -9,7 +9,6 @@ interface TabletSidebarProps {
   company: CompanyProfile;
   activeUser?: UserProfile;
   onSelectTab: (tab: AppTab) => void;
-  onNewInvoice: () => void;
   onOpenRoleSwitch?: () => void;
   onCheckUpdate?: () => void;
   hasUpdate?: boolean;
@@ -21,7 +20,6 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
   company,
   activeUser,
   onSelectTab,
-  onNewInvoice,
   onOpenRoleSwitch,
   onCheckUpdate,
   hasUpdate,
@@ -57,7 +55,6 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
       category: 'Overview',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-        { id: 'pos', label: 'Fast POS Counter', icon: 'storefront' },
       ],
     },
     {
@@ -90,6 +87,8 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
 
   return (
     <aside
+      data-testid="tablet-sidebar"
+      aria-label="Primary navigation"
       className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-black/[0.06] dark:border-white/[0.08] flex-shrink-0 select-none h-screen sticky top-0 z-30 shadow-[1px_0_6px_rgba(0,0,0,0.02)] overflow-x-hidden ${
         isMinimized ? 'w-[68px]' : 'w-56'
       }`}
@@ -133,27 +132,6 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           </button>
         )}
-      </div>
-
-      {/* Primary Action Button: + Create Sale Bill */}
-      <div className="p-2 flex-shrink-0">
-        <button
-          onClick={onNewInvoice}
-          type="button"
-          className={`group relative h-10 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-xs hover:shadow active:scale-95 transition-all flex items-center cursor-pointer ${
-            isMinimized ? 'w-11 mx-auto justify-center px-0' : 'w-full px-3 justify-start gap-2'
-          }`}
-          title={isMinimized ? 'Create Sale Bill (+)' : undefined}
-        >
-          <span className="material-symbols-outlined text-[19px] flex-shrink-0 group-hover:rotate-90 transition-transform duration-200">
-            add
-          </span>
-          {!isMinimized && (
-            <span className="whitespace-nowrap truncate animate-fade-in">
-              Create Sale Bill
-            </span>
-          )}
-        </button>
       </div>
 
       {/* Navigation Links */}

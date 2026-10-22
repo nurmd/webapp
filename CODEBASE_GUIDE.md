@@ -242,16 +242,17 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
   - Root container: `h-screen h-[100dvh] overflow-hidden flex flex-row`.
   - Global `<Header />`: Fixed outside the scroll hierarchy (`flex-shrink-0 z-30`).
   - Scroll container: `<main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">`.
-- **More-Driven Navigation Shell**:
-  - Navigation across all screen sizes (mobile, tablet, desktop) is unified through a streamlined, More-driven architecture.
-  - The legacy persistent `TabletSidebar` and mobile slide-out `Drawer` are **no longer mounted** in the production shell (`App.tsx`). Their components remain preserved in `src/components/Shell/` for legacy test compatibility (`AppTab` type exported from `Drawer.tsx`).
-  - `<Header />` provides always-visible `grid_view` (More hub) and `settings` (Settings gear) shortcuts, enabling instant 1-tap navigation on tablet and desktop where bottom-nav is hidden.
+- **Responsive Dual-Tier Navigation Shell**:
+  - Tablet & Desktop (`md:` and above) mount the persistent, collapsible `<TabletSidebar />` providing direct 1-tap access to all primary domain hubs (Dashboard, Sales, Purchases, Orders, Returns, Parties, Inventory, Finance, Reports, Print Settings, and Settings).
+  - Mobile viewports utilize `<BottomNav />` paired with the primary `<NavigationMenuHubView />` (More hub).
+  - The legacy mobile slide-out `<Drawer />` is **no longer mounted** in the application shell.
+  - **POS & Create Sale Bill Isolation**: To avoid duplication and preserve intentional workflow hierarchy, inline POS and Create Sale Bill shortcuts are omitted from both `TabletSidebar` and `NavigationMenuHubView`; creation flows remain anchored to Dashboard quick actions, Header controls, and mobile BottomNav.
+  - `<Header />` provides always-visible `grid_view` (More hub) and `settings` (Settings gear) shortcuts, enabling instant 1-tap navigation across all form factors.
   - Quick action controls (`+ New Bill`, `qr_code_scanner`, Search `⌘K`, User Profile) remain in `<Header />`.
   - **More Hub (`NavigationMenuHubView`) Redesign**:
     - Acts as the primary navigational directory for all core business hubs (Overview/Dashboard, Sales, Purchases, Parties, Inventory, Accounting, Reports, Settings, Print Settings).
     - Features a dedicated Overview category pill and direct Dashboard card.
     - Features a Settings gear shortcut on the merchant card and categorized Settings links.
-    - **POS & Create Invoice Isolation**: More intentionally omits inline `Create New Invoice` and `POS` counter CTA modules; billing and POS creation remain cleanly anchored to Dashboard quick actions, Header controls, and mobile BottomNav.
 - **Dynamic Code Splitting & Performance Architecture**:
   - **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
     ```typescript

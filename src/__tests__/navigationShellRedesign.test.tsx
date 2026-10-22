@@ -48,6 +48,7 @@ vi.mock('../services/auditTrail.ts', () => ({
 
 import { CompanyProfile } from '../models/company.ts';
 import { Header } from '../components/Shell/Header.tsx';
+import { TabletSidebar } from '../components/Shell/TabletSidebar.tsx';
 import { NavigationMenuHubView } from '../components/Navigation/NavigationMenuHubView.tsx';
 
 const sampleCompany: CompanyProfile = {
@@ -336,13 +337,57 @@ describe('Navigation Shell & More Menu Redesign Suite', () => {
     });
   });
 
-  describe('3. Shell Architecture Static Contract Check (App.tsx)', () => {
-    it('verifies App.tsx has no <TabletSidebar or <Drawer JSX mounts and no isDrawerOpen state', () => {
+  describe('3. TabletSidebar Navigation Contracts', () => {
+    it('renders with data-testid="tablet-sidebar", responsive hidden md:flex classes, and navigates', () => {
+      const onSelectTab = vi.fn();
+
+      act(() => {
+        root!.render(
+          <TabletSidebar
+            activeTab="dashboard"
+            company={sampleCompany}
+            onSelectTab={onSelectTab}
+          />
+        );
+      });
+
+      const sidebar = container?.querySelector('aside[data-testid="tablet-sidebar"]');
+      expect(sidebar).toBeDefined();
+      expect(sidebar?.getAttribute('aria-label')).toBe('Primary navigation');
+      expect(sidebar?.className).toContain('hidden');
+      expect(sidebar?.className).toContain('md:flex');
+
+      const text = sidebar?.textContent || '';
+      expect(text).toContain('Dashboard');
+      expect(text).toContain('Sales & Invoices');
+      expect(text).toContain('Navigation Hub');
+      expect(text).toContain('Company Settings');
+
+      // Must NOT contain removed POS or Create Sale Bill actions
+      expect(text).not.toContain('Fast POS Counter');
+      expect(text).not.toContain('Create Sale Bill');
+
+      // Click Sales & Invoices
+      const salesButton = Array.from(sidebar?.querySelectorAll('button') || []).find(
+        (b) => b.textContent?.includes('Sales & Invoices')
+      );
+      expect(salesButton).toBeDefined();
+      act(() => {
+        salesButton!.click();
+      });
+      expect(onSelectTab).toHaveBeenCalledWith('sales');
+    });
+  });
+
+  describe('4. Shell Architecture Static Contract Check (App.tsx)', () => {
+    it('verifies App.tsx mounts <TabletSidebar, has no <Drawer JSX mounts and no isDrawerOpen state', () => {
       const appFilePath = path.resolve(__dirname, '../App.tsx');
       const source = fs.readFileSync(appFilePath, 'utf-8');
 
-      // Must not render TabletSidebar or Drawer
-      expect(source).not.toMatch(/<TabletSidebar/);
+      // Must render TabletSidebar
+      expect(source).toMatch(/<TabletSidebar/);
+
+      // Must not render Drawer
       expect(source).not.toMatch(/<Drawer[\s\n>]/);
 
       // Must not have isDrawerOpen state variable

@@ -576,7 +576,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
               activeTab={activeTab}
               company={company}
               onSelectTab={handleSelectTab}
-              onNewInvoice={handleNewInvoice}
             />
           </div>
         );

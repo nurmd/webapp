@@ -1,15 +1,14 @@
 {
-  "version": "1.2.21",
+  "version": "1.2.22",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-22T06:07:56.308Z",
+  "buildTime": "2026-10-22T06:32:41.544Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "More-driven navigation architecture: removed side drawers and sidebar mounts for a clean, unified mobile and tablet experience",
-    "Header More (grid_view) and Settings gear shortcuts for instant 1-tap navigation on tablet and desktop",
-    "Redesigned More hub: added Dashboard/Overview, Print Settings, and Business Profile & Settings; removed duplicate Create Invoice and POS entries",
-    "Permissionless Android backup/restore: direct export to Downloads on Android 10+ with SAF file-picker fallback",
-    "Restore safety engine: durable PouchDB restore via system file picker with atomic rollback safety snapshots",
-    "Phase 4 split-payment ledger hardening: tender account metadata preservation, strict payment status derivation, and automated audit trails"
+    "Restored persistent tablet and desktop navigation sidebar (TabletSidebar) for seamless large-screen navigation",
+    "Sidebar provides direct 1-tap access to all business modules across Overview, Transactions, and Accounting",
+    "Sidebar omits duplicate POS and Create Sale Bill entries to keep billing creation anchored to Dashboard and Header quick actions",
+    "Mobile slide-out drawer remains removed; mobile workflows continue using touch bottom navigation and the More hub",
+    "Header More and Settings shortcuts remain available across all form factors"
   ]
 }
