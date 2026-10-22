@@ -17,7 +17,7 @@
 import { useSyncExternalStore, useMemo } from 'react';
 import { db, SyncedSettings } from '../../services/db.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { Party } from '../../models/party.ts';
+import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -44,6 +44,8 @@ export const subscribeToDataStore = (listener: () => void): (() => void) => {
 
 export const getCompanySnapshot = (): CompanyProfile => db.getCompany();
 export const getPartiesSnapshot = (): Party[] => db.getParties();
+export const getPartyGroupsSnapshot = (): PartyGroup[] => db.getPartyGroups();
+export const getPartyCategoriesSnapshot = (): PartyCategory[] => db.getPartyCategories();
 export const getItemsSnapshot = (): InventoryItem[] => db.getItems();
 export const getInvoicesSnapshot = (): Invoice[] => db.getInvoices();
 export const getPurchasesSnapshot = (): PurchaseBill[] => db.getPurchases();
@@ -72,6 +74,22 @@ export function useCompany(): CompanyProfile {
  */
 export function useParties(): Party[] {
   return useSyncExternalStore(subscribeToDataStore, getPartiesSnapshot, getPartiesSnapshot);
+}
+
+/**
+ * Subscribes to Party Groups.
+ * Re-renders ONLY when party groups change.
+ */
+export function usePartyGroups(): PartyGroup[] {
+  return useSyncExternalStore(subscribeToDataStore, getPartyGroupsSnapshot, getPartyGroupsSnapshot);
+}
+
+/**
+ * Subscribes to Party Categories.
+ * Re-renders ONLY when party categories change.
+ */
+export function usePartyCategories(): PartyCategory[] {
+  return useSyncExternalStore(subscribeToDataStore, getPartyCategoriesSnapshot, getPartyCategoriesSnapshot);
 }
 
 /**

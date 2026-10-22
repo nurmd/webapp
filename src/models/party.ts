@@ -2,6 +2,24 @@ export type PartyType = 'CUSTOMER' | 'SUPPLIER';
 
 export type BalanceType = 'TO_RECEIVE' | 'TO_PAY'; // TO_RECEIVE = Receivable (Dr), TO_PAY = Payable (Cr)
 
+export interface PartyGroup {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PartyCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Party {
   id: string;
   name: string;
@@ -21,6 +39,8 @@ export interface Party {
   openingBalanceType?: BalanceType; // 'TO_RECEIVE' | 'TO_PAY'
   openingBalanceDate?: string; // YYYY-MM-DD
   currentBalance: number; // Signed: Positive: Receivable (Dr), Negative: Payable (Cr)
+  groupId?: string;
+  categoryId?: string;
   createdAt: string;
   updatedAt: string;
 }

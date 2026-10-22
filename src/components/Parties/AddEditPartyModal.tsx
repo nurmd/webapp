@@ -4,6 +4,7 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface AddEditPartyModalProps {
@@ -47,6 +48,11 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const [openingBalanceDate, setOpeningBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isComposition, setIsComposition] = useState(false);
   const [gstinError, setGstinError] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+
+  const partyGroups = usePartyGroups();
+  const partyCategories = usePartyCategories();
 
   useEffect(() => {
     if (editingParty) {
@@ -62,6 +68,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setHasSeparateShipping(!!editingParty.shippingAddress && editingParty.shippingAddress !== editingParty.billingAddress);
       setCreditLimit(editingParty.creditLimit ? editingParty.creditLimit.toString() : '');
       setIsComposition(Boolean(editingParty.isComposition));
+      setGroupId(editingParty.groupId || '');
+      setCategoryId(editingParty.categoryId || '');
       setGstinError(null);
 
       const hasExplicit = typeof editingParty.openingBalance === 'number';
@@ -91,6 +99,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       setOpeningBalanceType(initialType === 'CUSTOMER' ? 'TO_RECEIVE' : 'TO_PAY');
       setOpeningBalanceDate(new Date().toISOString().split('T')[0]);
       setIsComposition(false);
+      setGroupId('');
+      setCategoryId('');
       setGstinError(null);
     }
   }, [editingParty, initialType, isOpen]);
@@ -187,6 +197,8 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
       openingBalanceType: numOpening > 0 ? openingBalanceType : undefined,
       openingBalanceDate: numOpening > 0 ? openingBalanceDate : undefined,
       currentBalance: finalCurrentBalance,
+      groupId: groupId.trim() ? groupId.trim() : undefined,
+      categoryId: categoryId.trim() ? categoryId.trim() : undefined,
       createdAt: editingParty ? editingParty.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -235,7 +247,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
         <form onSubmit={handleSavePartyForm} className="flex flex-col gap-3 text-xs">
           {/* Type Switcher */}
           <div>
-            <label className="block font-bold text-on-surface-variant mb-1">Party Category</label>
+            <label className="block font-bold text-on-surface-variant mb-1">Party Type</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -261,6 +273,46 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
                 <span className="material-symbols-outlined text-[16px]">local_shipping</span>
                 <span>Supplier (Vendor)</span>
               </button>
+            </div>
+          </div>
+
+          {/* Group and Category Selectors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label htmlFor="party-form-group-select" className="block font-bold text-on-surface-variant mb-1">
+                Party Group
+              </label>
+              <select
+                id="party-form-group-select"
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                className="w-full h-9 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-secondary"
+              >
+                <option value="">Unassigned</option>
+                {partyGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="party-form-category-select" className="block font-bold text-on-surface-variant mb-1">
+                Party Category
+              </label>
+              <select
+                id="party-form-category-select"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full h-9 px-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-secondary"
+              >
+                <option value="">Unassigned</option>
+                {partyCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -346,8 +398,9 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
             )}
 
             <div>
-              <label className="block font-bold text-on-surface-variant mb-1">State / POS</label>
+              <label htmlFor="party-form-state-select" className="block font-bold text-on-surface-variant mb-1">State / POS</label>
               <select
+                id="party-form-state-select"
                 value={stateCode}
                 onChange={(e) => setStateCode(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-xs focus:outline-none focus:ring-2 focus:ring-secondary/40"

@@ -1,5 +1,5 @@
 import { CompanyProfile } from '../../models/company.ts';
-import { Party } from '../../models/party.ts';
+import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment, ItemCategory, DEFAULT_ITEM_CATEGORIES } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -24,6 +24,8 @@ export const STORAGE_KEYS = {
   CASH_BANK_TXNS: 'gst_cash_bank_transactions',
   LOANS: 'gst_loans',
   LOAN_TXNS: 'gst_loan_transactions',
+  PARTY_GROUPS: 'gst_party_groups',
+  PARTY_CATEGORIES: 'gst_party_categories',
   LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
   TOMBSTONES: 'gst_sync_tombstones',
   CONFLICTS: 'gst_sync_conflicts',
@@ -306,6 +308,16 @@ export class StorageEngine {
 
   getParties(): Party[] {
     return this.get<Party[]>(STORAGE_KEYS.PARTIES, DEFAULT_PARTIES);
+  }
+
+  // Base accessors for party groups and categories; mirrors getParties()/getItems() in StorageEngine
+  // while PartyStorage provides domain-specific mutations, validations, and sync hooks.
+  getPartyGroups(): PartyGroup[] {
+    return this.get<PartyGroup[]>(STORAGE_KEYS.PARTY_GROUPS, []);
+  }
+
+  getPartyCategories(): PartyCategory[] {
+    return this.get<PartyCategory[]>(STORAGE_KEYS.PARTY_CATEGORIES, []);
   }
 
   getStockAdjustments(): StockAdjustment[] {

@@ -1,4 +1,4 @@
-import { Party } from '../../models/party.ts';
+import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { pouch } from '../pouchdb.ts';
 import { STORAGE_KEYS } from './storageEngine.ts';
 import { SettingsStorage } from './settingsStorage.ts';
@@ -18,6 +18,8 @@ export class PartyStorage extends SettingsStorage {
       const isExplicitZero = party.openingBalance !== undefined && party.openingBalance === 0;
       partyToSave = {
         ...party,
+        groupId: 'groupId' in party ? (party.groupId || undefined) : existing.groupId,
+        categoryId: 'categoryId' in party ? (party.categoryId || undefined) : existing.categoryId,
         openingBalance: isExplicitZero
           ? undefined
           : party.openingBalance !== undefined
@@ -51,6 +53,148 @@ export class PartyStorage extends SettingsStorage {
     pouch.putDoc('party', partyToSave);
     this.broadcastChange('party', 'save', partyToSave.id, partyToSave);
     this.recalculatePartyBalance(partyToSave.id);
+    this.notifyListeners();
+  }
+
+  // Party Groups Management
+  getPartyGroups(): PartyGroup[] {
+    return this.get<PartyGroup[]>(STORAGE_KEYS.PARTY_GROUPS, []);
+  }
+
+  savePartyGroup(group: PartyGroup): PartyGroup {
+    const trimmedName = (group.name || '').trim();
+    if (!trimmedName) {
+      throw new Error('Party group name cannot be empty');
+    }
+
+    const list = [...this.getPartyGroups()];
+    const idx = list.findIndex((g) => g.id === group.id);
+    const duplicate = list.find(
+      (g) => g.id !== group.id && g.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (duplicate) {
+      throw new Error(`A party group named "${trimmedName}" already exists`);
+    }
+
+    const savedGroup: PartyGroup = {
+      ...group,
+      name: trimmedName,
+      description: group.description?.trim() || undefined,
+      color: group.color?.trim() || undefined,
+      createdAt: (idx >= 0 && list[idx].createdAt) || group.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (idx >= 0) {
+      list[idx] = savedGroup;
+    } else {
+      list.push(savedGroup);
+    }
+
+    this.removeTombstone('party_group', savedGroup.id);
+    this.set(STORAGE_KEYS.PARTY_GROUPS, list);
+    pouch.putDoc('party_group', savedGroup);
+    this.broadcastChange('party_group', 'save', savedGroup.id, savedGroup);
+    this.notifyListeners();
+    return savedGroup;
+  }
+
+  deletePartyGroup(id: string): void {
+    const list = this.getPartyGroups().filter((g) => g.id !== id);
+    this.recordTombstone('party_group', id);
+    this.set(STORAGE_KEYS.PARTY_GROUPS, list);
+    pouch.deleteDoc('party_group', id);
+
+    // Unassign this group from all parties referencing it; never delete parties
+    const parties = this.getParties();
+    let partiesChanged = false;
+    const updatedParties = parties.map((p) => {
+      if (p.groupId === id) {
+        partiesChanged = true;
+        const updated: Party = { ...p, groupId: undefined, updatedAt: new Date().toISOString() };
+        pouch.putDoc('party', updated);
+        this.broadcastChange('party', 'save', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    if (partiesChanged) {
+      this.set(STORAGE_KEYS.PARTIES, updatedParties);
+    }
+
+    this.broadcastChange('party_group', 'delete', id);
+    this.notifyListeners();
+  }
+
+  // Party Categories Management
+  getPartyCategories(): PartyCategory[] {
+    return this.get<PartyCategory[]>(STORAGE_KEYS.PARTY_CATEGORIES, []);
+  }
+
+  savePartyCategory(category: PartyCategory): PartyCategory {
+    const trimmedName = (category.name || '').trim();
+    if (!trimmedName) {
+      throw new Error('Party category name cannot be empty');
+    }
+
+    const list = [...this.getPartyCategories()];
+    const idx = list.findIndex((c) => c.id === category.id);
+    const duplicate = list.find(
+      (c) => c.id !== category.id && c.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (duplicate) {
+      throw new Error(`A party category named "${trimmedName}" already exists`);
+    }
+
+    const savedCat: PartyCategory = {
+      ...category,
+      name: trimmedName,
+      description: category.description?.trim() || undefined,
+      color: category.color?.trim() || undefined,
+      createdAt: (idx >= 0 && list[idx].createdAt) || category.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (idx >= 0) {
+      list[idx] = savedCat;
+    } else {
+      list.push(savedCat);
+    }
+
+    this.removeTombstone('party_category', savedCat.id);
+    this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
+    pouch.putDoc('party_category', savedCat);
+    this.broadcastChange('party_category', 'save', savedCat.id, savedCat);
+    this.notifyListeners();
+    return savedCat;
+  }
+
+  deletePartyCategory(id: string): void {
+    const list = this.getPartyCategories().filter((c) => c.id !== id);
+    this.recordTombstone('party_category', id);
+    this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
+    pouch.deleteDoc('party_category', id);
+
+    // Unassign this category from all parties referencing it; never delete parties
+    const parties = this.getParties();
+    let partiesChanged = false;
+    const updatedParties = parties.map((p) => {
+      if (p.categoryId === id) {
+        partiesChanged = true;
+        const updated: Party = { ...p, categoryId: undefined, updatedAt: new Date().toISOString() };
+        pouch.putDoc('party', updated);
+        this.broadcastChange('party', 'save', updated.id, updated);
+        return updated;
+      }
+      return p;
+    });
+
+    if (partiesChanged) {
+      this.set(STORAGE_KEYS.PARTIES, updatedParties);
+    }
+
+    this.broadcastChange('party_category', 'delete', id);
     this.notifyListeners();
   }
 

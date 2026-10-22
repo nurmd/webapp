@@ -1,15 +1,15 @@
 {
-  "version": "1.2.24",
+  "version": "1.2.25",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-22T10:26:18.088Z",
+  "buildTime": "2026-10-22T11:52:47.596Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Added a complete Delivery Challan workflow: create, edit, view, cancel, delete, search, date filters, and draft/dispatched/delivered/cancelled statuses",
-    "Capture Rule 55 purpose, consignee/ship-to address, vehicle, transporter, and 12-digit e-way bill details",
-    "Print/PDF and thermal receipts now use proper Delivery Challan labels and suppress payment, balance-due, and UPI blocks",
-    "One-tap conversion to a Tax Invoice with sequential numbering, stock decrement, and customer ledger posting only at conversion",
-    "Delivery Challans are available from the mobile drawer, tablet sidebar, and More menu with cashier/accountant access",
-    "Includes the v1.2.23 OTA update-check fix"
+    "Added Party Groups and Party Categories with create, rename, delete, color badges, assignment, filtering, and search",
+    "Party group/category assignments are preserved across partial saves, cross-tab updates, PouchDB sync, and backup/restore",
+    "Deleting a party group or category now safely unassigns affected parties without deleting any party records",
+    "Fixed item category quick-add from both new-item and edit-item flows by removing the nested form and hardening Enter/Save behavior",
+    "Added full backup/restore round-trip and legacy backup compatibility for party groups and categories",
+    "Hardened the release workflow with a concurrency guard to prevent overlapping PWA/APK asset uploads"
   ]
 }

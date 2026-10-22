@@ -2,6 +2,7 @@ import React from 'react';
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { db } from '../../services/db.ts';
 
 export interface PartyInfoCardProps {
   party: Party;
@@ -28,6 +29,9 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
   setShowPartyDetails,
   onEditParty,
 }) => {
+  const group = party.groupId ? db.getPartyGroups().find((g) => g.id === party.groupId) : undefined;
+  const category = party.categoryId ? db.getPartyCategories().find((c) => c.id === party.categoryId) : undefined;
+
   return (
     <section className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 border border-outline-variant/20 shadow-xs flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
@@ -138,6 +142,40 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 {party.billingAddress || 'Local Counter'}
               </span>
             </div>
+            {(group || category) && (
+              <div className="col-span-2 pt-1 border-t border-outline-variant/15 flex items-center gap-2 flex-wrap">
+                {group && (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1"
+                    style={{
+                      backgroundColor: `${group.color || '#2563eb'}18`,
+                      color: group.color || '#2563eb',
+                    }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: group.color || '#2563eb' }}
+                    />
+                    <span>Group: {group.name}</span>
+                  </span>
+                )}
+                {category && (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1"
+                    style={{
+                      backgroundColor: `${category.color || '#0d9488'}18`,
+                      color: category.color || '#0d9488',
+                    }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: category.color || '#0d9488' }}
+                    />
+                    <span>Category: {category.name}</span>
+                  </span>
+                )}
+              </div>
+            )}
             <div className="col-span-2 pt-1 border-t border-outline-variant/15 flex items-center justify-between">
               <span className="text-outline">Opening Balance</span>
               <div className="flex items-center gap-1.5">

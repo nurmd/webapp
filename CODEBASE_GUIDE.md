@@ -50,7 +50,7 @@ gst-billing-app/
     │   └── utils/             # Formatters (INR ₹, dates), number-to-words (Lakhs/Crores)
     ├── models/                # TypeScript data schemas & entity contracts
     │   ├── invoice.ts         # Invoice, InvoiceItemEntry, PaymentMode, PaymentStatus
-    │   ├── party.ts           # Party (Customer/Supplier), balances, contact details
+    │   ├── party.ts           # Party (Customer/Supplier), balances, contact details, PartyGroup, PartyCategory
     │   ├── item.ts            # InventoryItem, StockAdjustment, units, pricing
     │   ├── purchase.ts        # PurchaseBill, PurchaseItemEntry, ITC eligibility
     │   ├── voucher.ts         # Voucher (Receipt, Payment, Journal, Contra), entries
@@ -194,6 +194,25 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Immutable audit trail is preserved on device: restore appends an audit event recording the restore mode, timestamp, and entity counts without clobbering existing local audit history.
 - **Dynamic App Versioning**:
   - Backups dynamically resolve `appVersion` from `package.json` rather than hardcoding version strings.
+
+### H. Party Groups & Categories Domain Architecture
+- **Data Models (`src/models/party.ts`)**:
+  - `PartyGroup` & `PartyCategory`: User-defined classification entities (`id`, `name`, `color`, `description`, `createdAt`, `updatedAt`).
+  - `Party`: Includes optional `groupId?: string` and `categoryId?: string` references.
+- **Persistence & Storage Keys (`src/services/db/storageEngine.ts`, `src/services/db/partyStorage.ts`)**:
+  - Stored under `gst_party_groups` (`STORAGE_KEYS.PARTY_GROUPS`) and `gst_party_categories` (`STORAGE_KEYS.PARTY_CATEGORIES`).
+  - `PartyStorage` provides validated CRUD (`savePartyGroup`, `deletePartyGroup`, `savePartyCategory`, `deletePartyCategory`) enforcing trimmed non-empty names and case-insensitive uniqueness.
+  - Partial updates via `db.saveParty` merge and strictly preserve existing `groupId` and `categoryId` unless explicitly passed.
+  - Deleting a group or category unassigns references from affected parties (`groupId: undefined` / `categoryId: undefined`) with updated timestamp; parties are never deleted.
+- **Sync & Backup Resilience (`src/services/db/syncStorage.ts`, `src/services/db/backupRestoreStorage.ts`)**:
+  - Included in PouchDB sync reconciliation, real-time incoming changes (`applyIncomingChange`), and cross-tab BroadcastChannel mutations (`applyLocalEntityMutation`).
+  - Centralized dangling reference pruning (`pruneDanglingPartyReferences`) cleans unassigned references during local deletion, incoming changes, and full sync reconciliation.
+  - Full round-trip backup/restore with backward compatibility for legacy backups omitting group/category collections.
+- **Reactive State & UI Integration (`src/core/store/useDataStore.ts`, `src/components/Parties/`)**:
+  - `usePartyGroups()` and `usePartyCategories()` hooks provide selective reactive updates via `useSyncExternalStore`.
+  - `PartiesView`: Includes "Groups & Categories" management launcher, Group and Category filter dropdowns with auto-reset for stale IDs, and search token matching on group/category names.
+  - `PartyGroupsCategoriesModal`: Tabbed palette editor for groups and categories with duplicate name validation and RBAC deletion protection (`rbac.canDeleteParty()`).
+  - `AddEditPartyModal`: Live group and category assignment dropdowns with "Unassigned" default and "Party Type" classification.
 
 ---
 

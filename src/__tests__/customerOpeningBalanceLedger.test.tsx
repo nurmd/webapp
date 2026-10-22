@@ -1661,7 +1661,7 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       });
 
       // Verify state dropdown begins empty (not Maharashtra / '27')
-      const stateSelect = container.querySelector('select') as HTMLSelectElement;
+      const stateSelect = container.querySelector('#party-form-state-select') as HTMLSelectElement;
       expect(stateSelect).not.toBeNull();
       expect(stateSelect.value).toBe('');
 

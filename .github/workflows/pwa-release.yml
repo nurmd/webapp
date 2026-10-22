@@ -1,5 +1,9 @@
 name: Build & Release PWA for Debian Server
 
+concurrency:
+  group: pwa-release-workflow
+  cancel-in-progress: false
+
 on:
   push:
     branches: [ master, main ]

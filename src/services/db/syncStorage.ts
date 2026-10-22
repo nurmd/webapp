@@ -1,5 +1,5 @@
 import { CompanyProfile } from '../../models/company.ts';
-import { Party } from '../../models/party.ts';
+import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -136,6 +136,16 @@ export class SyncStorage extends BackupRestoreStorage {
         case 'adjustment': this.set(STORAGE_KEYS.ADJUSTMENTS, this.getStockAdjustments().filter((a) => a.id !== id)); break;
         case 'bank_account': this.set(STORAGE_KEYS.BANK_ACCOUNTS, this.getBankAccounts().filter((b) => b.id !== id)); break;
         case 'cash_bank_txn': this.set(STORAGE_KEYS.CASH_BANK_TXNS, this.getCashBankTransactions().filter((t) => t.id !== id)); break;
+        case 'party_group': {
+          this.set(STORAGE_KEYS.PARTY_GROUPS, this.getPartyGroups().filter((g) => g.id !== id));
+          this.pruneDanglingPartyReferences(false);
+          break;
+        }
+        case 'party_category': {
+          this.set(STORAGE_KEYS.PARTY_CATEGORIES, this.getPartyCategories().filter((c) => c.id !== id));
+          this.pruneDanglingPartyReferences(false);
+          break;
+        }
       }
       this.syncAllPartyBalances();
     } else if (data) {
@@ -175,6 +185,8 @@ export class SyncStorage extends BackupRestoreStorage {
             const isExplicitZero = data.openingBalance !== undefined && data.openingBalance === 0;
             list[idx] = {
               ...data,
+              groupId: 'groupId' in data ? (data.groupId || undefined) : existing.groupId,
+              categoryId: 'categoryId' in data ? (data.categoryId || undefined) : existing.categoryId,
               openingBalance: isExplicitZero
                 ? undefined
                 : data.openingBalance !== undefined
@@ -253,10 +265,64 @@ export class SyncStorage extends BackupRestoreStorage {
           this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
           break;
         }
+        case 'party_group': {
+          const list = [...this.getPartyGroups()];
+          const idx = list.findIndex((g) => g.id === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.set(STORAGE_KEYS.PARTY_GROUPS, list);
+          break;
+        }
+        case 'party_category': {
+          const list = [...this.getPartyCategories()];
+          const idx = list.findIndex((c) => c.id === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
+          break;
+        }
       }
       this.syncAllPartyBalances();
     }
     this.notifyListeners();
+  }
+
+  private pruneDanglingPartyReferences(persistToPouch: boolean = false): void {
+    const existingGroupIds = new Set(this.getPartyGroups().map((g) => g.id));
+    const existingCategoryIds = new Set(this.getPartyCategories().map((c) => c.id));
+    let hasChanges = false;
+
+    const parties = this.getParties().map((p) => {
+      let changed = false;
+      let newGroupId = p.groupId;
+      let newCategoryId = p.categoryId;
+
+      if (p.groupId && !existingGroupIds.has(p.groupId)) {
+        newGroupId = undefined;
+        changed = true;
+      }
+      if (p.categoryId && !existingCategoryIds.has(p.categoryId)) {
+        newCategoryId = undefined;
+        changed = true;
+      }
+
+      if (changed) {
+        hasChanges = true;
+        const updated: Party = {
+          ...p,
+          groupId: newGroupId,
+          categoryId: newCategoryId,
+          updatedAt: new Date().toISOString(),
+        };
+        if (persistToPouch && typeof (pouch as any)?.putDoc === 'function') {
+          pouch.putDoc('party', updated);
+        }
+        return updated;
+      }
+      return p;
+    });
+
+    if (hasChanges) {
+      this.set(STORAGE_KEYS.PARTIES, parties);
+    }
   }
 
   public applyIncomingChange(change?: PouchDocChange): void {
@@ -335,6 +401,18 @@ export class SyncStorage extends BackupRestoreStorage {
           this.set(STORAGE_KEYS.LOAN_TXNS, list);
           break;
         }
+        case 'party_group': {
+          const list = this.getPartyGroups().filter((g) => g.id !== docId);
+          this.set(STORAGE_KEYS.PARTY_GROUPS, list);
+          this.pruneDanglingPartyReferences(true);
+          break;
+        }
+        case 'party_category': {
+          const list = this.getPartyCategories().filter((c) => c.id !== docId);
+          this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
+          this.pruneDanglingPartyReferences(true);
+          break;
+        }
       }
       this.notifyListeners();
       return;
@@ -403,6 +481,8 @@ export class SyncStorage extends BackupRestoreStorage {
           const isExplicitZero = incoming.openingBalance !== undefined && incoming.openingBalance === 0;
           list[idx] = {
             ...incoming,
+            groupId: 'groupId' in incoming ? (incoming.groupId || undefined) : existing.groupId,
+            categoryId: 'categoryId' in incoming ? (incoming.categoryId || undefined) : existing.categoryId,
             openingBalance: isExplicitZero
               ? undefined
               : incoming.openingBalance !== undefined
@@ -485,6 +565,20 @@ export class SyncStorage extends BackupRestoreStorage {
         const idx = list.findIndex((t) => t.id === docId);
         if (idx >= 0) list[idx] = data as any; else list.unshift(data as any);
         this.set(STORAGE_KEYS.LOAN_TXNS, list);
+        break;
+      }
+      case 'party_group': {
+        const list = [...this.getPartyGroups()];
+        const idx = list.findIndex((g) => g.id === docId);
+        if (idx >= 0) list[idx] = data as PartyGroup; else list.push(data as PartyGroup);
+        this.set(STORAGE_KEYS.PARTY_GROUPS, list);
+        break;
+      }
+      case 'party_category': {
+        const list = [...this.getPartyCategories()];
+        const idx = list.findIndex((c) => c.id === docId);
+        if (idx >= 0) list[idx] = data as PartyCategory; else list.push(data as PartyCategory);
+        this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
         break;
       }
     }
@@ -621,7 +715,7 @@ export class SyncStorage extends BackupRestoreStorage {
           this.removeTombstone(entityType, id);
           mergedMap.set(id, remoteItem);
         } else {
-          pouch.deleteDoc(entityType, id).catch(() => {});
+          pouch.deleteDoc(entityType, id)?.catch?.(() => {});
         }
       } else {
         const remoteItem = (remoteItems || []).find((r) => r && r.id === id);
@@ -687,7 +781,7 @@ export class SyncStorage extends BackupRestoreStorage {
           this.removeTombstone(entityType, id);
           mergedMap.set(id, remoteItem);
         } else {
-          pouch.deleteDoc(entityType, id).catch(() => {});
+          pouch.deleteDoc(entityType, id)?.catch?.(() => {});
         }
       } else {
         mergedMap.set(id, remoteItem);
@@ -722,6 +816,8 @@ export class SyncStorage extends BackupRestoreStorage {
         remoteCashBankTxns,
         remoteLoans,
         remoteLoanTxns,
+        remotePartyGroups,
+        remotePartyCategories,
         remoteTombstones,
       ] = await Promise.all([
         pouch.getAllDocs<SyncedSettings>('settings'),
@@ -737,6 +833,8 @@ export class SyncStorage extends BackupRestoreStorage {
         pouch.getAllDocs<CashBankTransaction>('cash_bank_txn'),
         pouch.getAllDocs<LoanAccount>('loan'),
         pouch.getAllDocs<LoanTransaction>('loan_txn'),
+        pouch.getAllDocs<PartyGroup>('party_group'),
+        pouch.getAllDocs<PartyCategory>('party_category'),
         typeof (pouch as any)?.getAllTombstones === 'function'
           ? (pouch as any).getAllTombstones()
           : Promise.resolve([]),
@@ -851,6 +949,20 @@ export class SyncStorage extends BackupRestoreStorage {
         this.getLoanTransactions(),
         remoteLoanTxns
       );
+      this.reconcileCollection(
+        'party_group',
+        STORAGE_KEYS.PARTY_GROUPS,
+        this.getPartyGroups(),
+        remotePartyGroups
+      );
+      this.reconcileCollection(
+        'party_category',
+        STORAGE_KEYS.PARTY_CATEGORIES,
+        this.getPartyCategories(),
+        remotePartyCategories
+      );
+
+      this.pruneDanglingPartyReferences(true);
 
       if (typeof (pouch as any)?.refreshConflicts === 'function') {
         await (pouch as any).refreshConflicts();

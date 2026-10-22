@@ -7,8 +7,10 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
+import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
 import { PartyDetailPage } from './PartyDetailPage.tsx';
 import { AddEditPartyModal } from './AddEditPartyModal.tsx';
+import { PartyGroupsCategoriesModal } from './modals/PartyGroupsCategoriesModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
@@ -75,6 +77,32 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   const [editingParty, setEditingParty] = useState<Party | null>(null);
   const [selectedPartyForLedger, setSelectedPartyForLedger] = useState<Party | null>(null);
   const [whatsappParty, setWhatsappParty] = useState<Party | null>(null);
+
+  const partyGroups = usePartyGroups();
+  const partyCategories = usePartyCategories();
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('ALL');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('ALL');
+  const [isGroupsModalOpen, setIsGroupsModalOpen] = useState(false);
+
+  // Auto-reset stale filter if the selected group or category is deleted/synced away
+  useEffect(() => {
+    if (selectedGroupId !== 'ALL' && selectedGroupId !== 'UNASSIGNED') {
+      if (!partyGroups.some((g) => g.id === selectedGroupId)) {
+        setSelectedGroupId('ALL');
+      }
+    }
+  }, [partyGroups, selectedGroupId]);
+
+  useEffect(() => {
+    if (selectedCategoryId !== 'ALL' && selectedCategoryId !== 'UNASSIGNED') {
+      if (!partyCategories.some((c) => c.id === selectedCategoryId)) {
+        setSelectedCategoryId('ALL');
+      }
+    }
+  }, [partyCategories, selectedCategoryId]);
+
+  const groupMap = useMemo(() => new Map(partyGroups.map((g) => [g.id, g])), [partyGroups]);
+  const categoryMap = useMemo(() => new Map(partyCategories.map((c) => [c.id, c])), [partyCategories]);
 
   // Precomputed lookup map of latest transaction timestamp against each party
   const partyLatestTxMap = useMemo(() => {
@@ -217,15 +245,36 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
   const filtered = activePartiesList.filter((p) => {
     const q = search.toLowerCase();
+    const group = p.groupId ? groupMap.get(p.groupId) : undefined;
+    const category = p.categoryId ? categoryMap.get(p.categoryId) : undefined;
+
     const matchesSearch =
       p.name.toLowerCase().includes(q) ||
       (p.phone && p.phone.includes(q)) ||
       (p.gstin && p.gstin.toLowerCase().includes(q)) ||
       (p.pan && p.pan.toLowerCase().includes(q)) ||
       (p.email && p.email.toLowerCase().includes(q)) ||
-      p.billingAddress.toLowerCase().includes(q);
+      p.billingAddress.toLowerCase().includes(q) ||
+      (group && group.name.toLowerCase().includes(q)) ||
+      (category && category.name.toLowerCase().includes(q));
 
     if (!matchesSearch) return false;
+
+    if (selectedGroupId !== 'ALL') {
+      if (selectedGroupId === 'UNASSIGNED') {
+        if (p.groupId) return false;
+      } else if (p.groupId !== selectedGroupId) {
+        return false;
+      }
+    }
+
+    if (selectedCategoryId !== 'ALL') {
+      if (selectedCategoryId === 'UNASSIGNED') {
+        if (p.categoryId) return false;
+      } else if (p.categoryId !== selectedCategoryId) {
+        return false;
+      }
+    }
 
     if (statusFilter === 'OVERDUE') {
       return activeSegment === 'CUSTOMERS' ? p.currentBalance > 0 : p.currentBalance < 0;
@@ -463,36 +512,49 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
       {/* 3. Search & Quick Filter Pills */}
       <section className="flex flex-col gap-1.5">
-        <div className="relative flex items-center">
-          <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">
-            search
-          </span>
-          <input
-            type="text"
-            placeholder={
-              isGstActive
-                ? (activeSegment === 'CUSTOMERS'
-                    ? 'Search customer by name, phone, GSTIN...'
-                    : 'Search supplier by name, phone, GSTIN...')
-                : (activeSegment === 'CUSTOMERS'
-                    ? 'Search customer by name, phone...'
-                    : 'Search supplier by name, phone...')
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-container-lowest pl-9 pr-8 py-2 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-xs border border-outline-variant/20 transition-all"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
-              title="Clear search"
-              aria-label="Clear search"
-            >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          )}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 flex items-center">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder={
+                isGstActive
+                  ? (activeSegment === 'CUSTOMERS'
+                      ? 'Search customer by name, phone, GSTIN...'
+                      : 'Search supplier by name, phone, GSTIN...')
+                  : (activeSegment === 'CUSTOMERS'
+                      ? 'Search customer by name, phone...'
+                      : 'Search supplier by name, phone...')
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-surface-container-lowest pl-9 pr-8 py-2 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none shadow-xs border border-outline-variant/20 transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsGroupsModalOpen(true)}
+            className="h-[34px] sm:h-[36px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-2xs transition-colors cursor-pointer active:scale-95"
+            title="Manage Party Groups & Categories"
+            aria-label="Manage Party Groups & Categories"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">folder_special</span>
+            <span className="hidden sm:inline">Groups &amp; Categories</span>
+          </button>
         </div>
 
         {/* Filter Pills */}
@@ -532,6 +594,69 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
+
+          {/* Group Filter Select */}
+          {partyGroups.length > 0 && (
+            <select
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+              className={`min-h-[36px] sm:min-h-[38px] px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 ${
+                selectedGroupId !== 'ALL'
+                  ? 'bg-secondary text-on-secondary'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+              }`}
+              title="Filter by Group"
+              aria-label="Filter by Party Group"
+            >
+              <option value="ALL">All Groups</option>
+              <option value="UNASSIGNED">Unassigned Group</option>
+              {partyGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Category Filter Select */}
+          {partyCategories.length > 0 && (
+            <select
+              value={selectedCategoryId}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              className={`min-h-[36px] sm:min-h-[38px] px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 ${
+                selectedCategoryId !== 'ALL'
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+              }`}
+              title="Filter by Category"
+              aria-label="Filter by Party Category"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="UNASSIGNED">Unassigned Category</option>
+              {partyCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(search || statusFilter !== 'ALL' || selectedGroupId !== 'ALL' || selectedCategoryId !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('ALL');
+                setSelectedGroupId('ALL');
+                setSelectedCategoryId('ALL');
+              }}
+              className="min-h-[36px] sm:min-h-[38px] px-3 py-1.5 rounded-full text-xs font-semibold text-error hover:bg-error-container/20 border border-error/30 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+              title="Clear all active filters"
+            >
+              <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
+              <span>Clear Filters</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -544,7 +669,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             </span>
             <p className="font-semibold text-xs text-on-surface">No {activeSegment.toLowerCase()} found</p>
             <p className="text-[11px] text-outline mt-0.5">
-              {search ? 'Try clearing your search query' : 'Tap the button below to add your first party'}
+              {search || statusFilter !== 'ALL' || selectedGroupId !== 'ALL' || selectedCategoryId !== 'ALL'
+                ? 'Try clearing your search or active filters'
+                : 'Tap the button below to add your first party'}
             </p>
           </div>
         ) : (
@@ -596,6 +723,40 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                         </>
                       )}
                     </div>
+                    {(party.groupId || party.categoryId) && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {party.groupId && groupMap.get(party.groupId) && (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1"
+                            style={{
+                              backgroundColor: `${groupMap.get(party.groupId)!.color || '#2563eb'}18`,
+                              color: groupMap.get(party.groupId)!.color || '#2563eb',
+                            }}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: groupMap.get(party.groupId)!.color || '#2563eb' }}
+                            />
+                            <span>{groupMap.get(party.groupId)!.name}</span>
+                          </span>
+                        )}
+                        {party.categoryId && categoryMap.get(party.categoryId) && (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1"
+                            style={{
+                              backgroundColor: `${categoryMap.get(party.categoryId)!.color || '#0d9488'}18`,
+                              color: categoryMap.get(party.categoryId)!.color || '#0d9488',
+                            }}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: categoryMap.get(party.categoryId)!.color || '#0d9488' }}
+                            />
+                            <span>{categoryMap.get(party.categoryId)!.name}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -695,6 +856,12 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           initialTemplate={whatsappParty.currentBalance > 0 ? 'GENTLE_REMINDER' : 'PARTY_STATEMENT'}
         />
       )}
+
+      {/* Party Groups & Categories Management Modal */}
+      <PartyGroupsCategoriesModal
+        isOpen={isGroupsModalOpen}
+        onClose={() => setIsGroupsModalOpen(false)}
+      />
     </div>
   );
 };

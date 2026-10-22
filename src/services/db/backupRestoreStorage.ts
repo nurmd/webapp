@@ -38,6 +38,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
           ? JSON.parse(localStorage.getItem('gst_audit_logs') || '[]')
           : []);
     const categories = this.getCategories();
+    const partyGroups = this.getPartyGroups();
+    const partyCategories = this.getPartyCategories();
     const allowNegativeStock = this.getAllowNegativeStock();
     const hideBuyPrices = !this.getBuyPriceVisibility();
 
@@ -53,6 +55,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       cashBankTransactions: cashBankTransactions.length,
       auditLogs: auditLogs.length,
       categories: categories.length,
+      partyGroups: partyGroups.length,
+      partyCategories: partyCategories.length,
     };
 
     const data: DatabaseBackupData = {
@@ -68,6 +72,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       bankAccounts,
       cashBankTransactions,
       categories,
+      partyGroups,
+      partyCategories,
       auditLogs,
       allowNegativeStock,
       hideBuyPrices,
@@ -170,6 +176,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       bankAccounts: this.getBankAccounts(),
       cashBankTxns: this.getCashBankTransactions(),
       categories: this.getCategories(),
+      partyGroups: this.getPartyGroups(),
+      partyCategories: this.getPartyCategories(),
     };
 
     // Helper for merging or replacing arrays by ID.
@@ -232,6 +240,12 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
     const finalCategories = Array.isArray(data.categories)
       ? mergeCollection(snapshot.categories, data.categories)
       : snapshot.categories;
+    const finalPartyGroups = Array.isArray(data.partyGroups)
+      ? (mode === 'REPLACE' ? data.partyGroups : mergeCollection(snapshot.partyGroups, data.partyGroups))
+      : snapshot.partyGroups;
+    const finalPartyCategories = Array.isArray(data.partyCategories)
+      ? (mode === 'REPLACE' ? data.partyCategories : mergeCollection(snapshot.partyCategories, data.partyCategories))
+      : snapshot.partyCategories;
 
     const collections: { type: string; items: any[]; storageKey: string }[] = [
       { type: 'invoice', items: finalInvoices, storageKey: STORAGE_KEYS.INVOICES },
@@ -243,6 +257,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       { type: 'adjustment', items: finalAdjustments, storageKey: STORAGE_KEYS.ADJUSTMENTS },
       { type: 'bank_account', items: finalBankAccounts, storageKey: STORAGE_KEYS.BANK_ACCOUNTS },
       { type: 'cash_bank_txn', items: finalCashBankTxns, storageKey: STORAGE_KEYS.CASH_BANK_TXNS },
+      { type: 'party_group', items: finalPartyGroups, storageKey: STORAGE_KEYS.PARTY_GROUPS },
+      { type: 'party_category', items: finalPartyCategories, storageKey: STORAGE_KEYS.PARTY_CATEGORIES },
     ];
 
     try {
@@ -283,6 +299,12 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       if (Array.isArray(finalCategories)) {
         this.set(STORAGE_KEYS.CATEGORIES, finalCategories);
       }
+      if (Array.isArray(finalPartyGroups)) {
+        this.set(STORAGE_KEYS.PARTY_GROUPS, finalPartyGroups);
+      }
+      if (Array.isArray(finalPartyCategories)) {
+        this.set(STORAGE_KEYS.PARTY_CATEGORIES, finalPartyCategories);
+      }
       if (data.allowNegativeStock !== undefined) {
         try {
           localStorage.setItem('gst_allow_negative_stock', data.allowNegativeStock.toString());
@@ -311,6 +333,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       this.set(STORAGE_KEYS.BANK_ACCOUNTS, snapshot.bankAccounts);
       this.set(STORAGE_KEYS.CASH_BANK_TXNS, snapshot.cashBankTxns);
       this.set(STORAGE_KEYS.CATEGORIES, snapshot.categories);
+      this.set(STORAGE_KEYS.PARTY_GROUPS, snapshot.partyGroups);
+      this.set(STORAGE_KEYS.PARTY_CATEGORIES, snapshot.partyCategories);
       if (snapshot.allowNegativeStock !== undefined) {
         try {
           localStorage.setItem('gst_allow_negative_stock', snapshot.allowNegativeStock.toString());
@@ -333,6 +357,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
         { type: 'adjustment', items: snapshot.adjustments },
         { type: 'bank_account', items: snapshot.bankAccounts },
         { type: 'cash_bank_txn', items: snapshot.cashBankTxns },
+        { type: 'party_group', items: snapshot.partyGroups },
+        { type: 'party_category', items: snapshot.partyCategories },
       ];
 
       try {
@@ -408,6 +434,8 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
         adjustments: finalAdjustments.length,
         bankAccounts: finalBankAccounts.length,
         cashBankTransactions: finalCashBankTxns.length,
+        partyGroups: finalPartyGroups.length,
+        partyCategories: finalPartyCategories.length,
       },
     };
   }

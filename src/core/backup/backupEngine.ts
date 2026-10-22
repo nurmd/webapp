@@ -1,5 +1,5 @@
 import { CompanyProfile } from '../../models/company.ts';
-import { Party } from '../../models/party.ts';
+import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
@@ -20,6 +20,8 @@ export interface DatabaseBackupCounts {
   cashBankTransactions: number;
   auditLogs: number;
   categories?: number;
+  partyGroups?: number;
+  partyCategories?: number;
 }
 
 export interface DatabaseBackupData {
@@ -35,6 +37,8 @@ export interface DatabaseBackupData {
   bankAccounts: BankAccount[];
   cashBankTransactions: CashBankTransaction[];
   categories?: any[];
+  partyGroups?: PartyGroup[];
+  partyCategories?: PartyCategory[];
   auditLogs?: any[];
   allowNegativeStock?: boolean;
   hideBuyPrices?: boolean;

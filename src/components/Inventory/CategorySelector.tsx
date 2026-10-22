@@ -105,8 +105,11 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     setShowQuickAdd(false);
   };
 
-  const handleCreateDetailed = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateDetailed = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const trimmed = quickName.trim();
     if (!trimmed) return;
 
@@ -178,6 +181,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchQuery.trim() && !exactMatchExists) {
                   e.preventDefault();
+                  e.stopPropagation();
                   handleCreateFast(searchQuery);
                 }
               }}
@@ -213,7 +217,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 
           {/* Quick Add Form Expanded */}
           {showQuickAdd ? (
-            <form onSubmit={handleCreateDetailed} className="p-3 bg-surface-container-low/60 flex flex-col gap-2.5 border-b border-outline-variant/20">
+            <div className="p-3 bg-surface-container-low/60 flex flex-col gap-2.5 border-b border-outline-variant/20">
               <div className="text-[11px] font-bold text-on-surface flex items-center justify-between">
                 <span>New Category</span>
                 <button
@@ -230,6 +234,17 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                 placeholder="Category Name"
                 value={quickName}
                 onChange={(e) => setQuickName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCreateDetailed(e);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowQuickAdd(false);
+                  }
+                }}
                 autoFocus
                 className="w-full h-8 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs text-on-surface focus:outline-none focus:border-secondary"
               />
@@ -256,14 +271,15 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleCreateDetailed}
                   disabled={!quickName.trim()}
                   className="px-3 py-1 text-xs bg-secondary text-on-secondary font-semibold rounded-md shadow-xs disabled:opacity-50"
                 >
                   Save &amp; Select
                 </button>
               </div>
-            </form>
+            </div>
           ) : (
             /* Category items list */
             <div className="overflow-y-auto flex-1 p-1 divide-y divide-outline-variant/10">
