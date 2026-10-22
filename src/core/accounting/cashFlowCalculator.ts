@@ -89,6 +89,7 @@ export function computeCashFlowStatement(params: {
 
   // A. Operating Activities - Vouchers (Customer Receipts & Supplier Payments)
   for (const v of vouchers) {
+    if (v.isReversed || v.isCancelled) continue;
     if (v.voucherType === 'RECEIPT') {
       const partyEntry = v.entries.find((e) => e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK');
       operatingItems.push({

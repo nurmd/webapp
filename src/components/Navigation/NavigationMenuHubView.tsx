@@ -20,7 +20,6 @@ interface NavigationMenuHubViewProps {
   vouchers: Voucher[];
   onNavigate: (tab: AppTab) => void;
   onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
-  onNewInvoice: () => void;
   onOpenRoleSwitch?: () => void;
   onCheckUpdate?: () => void;
   hasUpdate?: boolean;
@@ -30,6 +29,7 @@ interface NavigationMenuHubViewProps {
 
 type HubCategory =
   | 'all'
+  | 'overview'
   | 'sales'
   | 'purchases'
   | 'parties'
@@ -63,7 +63,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   vouchers,
   onNavigate,
   onNavigateToParties,
-  onNewInvoice,
   onOpenRoleSwitch,
   onCheckUpdate,
   hasUpdate,
@@ -147,6 +146,17 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
 
   // Menu items master catalog
   const menuItems: MenuItem[] = useMemo(() => [
+    // Overview & Home
+    {
+      id: 'nav_dashboard',
+      title: 'Dashboard',
+      subtitle: 'Business summary, live KPIs & quick actions',
+      icon: 'dashboard',
+      category: 'overview',
+      action: () => onNavigate('dashboard'),
+      keywords: ['dashboard', 'home', 'summary', 'kpi', 'overview'],
+    },
+
     // Sales & Billing
     {
       id: 'sale_invoices',
@@ -161,16 +171,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       keywords: isGstActive
         ? ['sales', 'bill', 'invoice', 'gst', 'tax', 'cash', 'credit', 'sales ledger', 'ledger']
         : ['sales', 'bill', 'invoice', 'cash', 'credit', 'sales ledger', 'ledger'],
-    },
-    {
-      id: 'quick_pos',
-      title: 'Fast Retail POS Counter',
-      subtitle: 'Rapid barcode punch, speed shelf & 1-tap checkout',
-      icon: 'point_of_sale',
-      category: 'sales',
-      badge: { text: '1-Tap Rapid', type: 'success' },
-      action: () => onNavigate('pos'),
-      keywords: ['pos', 'counter', 'barcode', 'punch', 'retail', 'speed'],
     },
     {
       id: 'sale_quotation',
@@ -326,15 +326,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       keywords: ['unit', 'pricing', 'tier', 'wholesale', 'mrp', 'rate'],
     },
     {
-      id: 'barcode_catalog',
-      title: 'Barcode Catalog & Labels',
-      subtitle: 'Generate and scan thermal barcode labels & EAN codes',
-      icon: 'barcode_scanner',
-      category: 'inventory',
-      action: () => onNavigate('pos'),
-      keywords: ['barcode', 'scanner', 'label', 'ean', 'print code'],
-    },
-    {
       id: 'low_stock_alerts',
       title: 'Low Stock Alerts',
       subtitle: `${lowStockItems.length} items below minimum reorder threshold`,
@@ -451,6 +442,24 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     },
 
     // Settings & Configuration
+    {
+      id: 'business_profile_settings',
+      title: 'Business Profile & Settings',
+      subtitle: 'Company details, GST tax options, app lock & preferences',
+      icon: 'settings',
+      category: 'settings',
+      action: () => onNavigate('settings'),
+      keywords: ['settings', 'profile', 'company', 'preferences', 'config', 'business'],
+    },
+    {
+      id: 'print_settings_hub',
+      title: 'Print Settings',
+      subtitle: 'Thermal printer roll width, Bluetooth pairing & invoice formats',
+      icon: 'print',
+      category: 'settings',
+      action: () => onNavigate('print_settings'),
+      keywords: ['print', 'printer', 'thermal', 'bluetooth', 'receipt', 'format', 'a4', 'a5'],
+    },
     {
       id: 'gst_settings',
       title: 'GST & Legal Tax Configuration',
@@ -570,6 +579,12 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   // Group filtered items by category for structured layout
   const sections = useMemo(() => [
     {
+      key: 'overview',
+      title: 'Overview & Home',
+      dotColor: 'bg-primary',
+      items: filteredItems.filter((i) => i.category === 'overview'),
+    },
+    {
       key: 'sales',
       title: 'Sales & Billing',
       dotColor: 'bg-secondary',
@@ -671,11 +686,12 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
 
             <button
               onClick={() => onNavigate('settings')}
+              aria-label="Open Settings"
+              title="Settings"
               className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant flex-shrink-0 active:scale-95 transition-transform cursor-pointer hover:bg-surface-container-high"
-              title="Edit Business Profile"
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
+              <span className="material-symbols-outlined text-[18px]">settings</span>
             </button>
           </div>
 
@@ -765,6 +781,19 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
 
           <button
             type="button"
+            onClick={() => setSelectedCategory('overview')}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-xs font-semibold shadow-sm transition-all cursor-pointer ${
+              selectedCategory === 'overview'
+                ? 'bg-secondary text-on-secondary'
+                : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">dashboard</span>
+            Overview
+          </button>
+
+          <button
+            type="button"
             onClick={() => setSelectedCategory('sales')}
             className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-label-md text-xs font-semibold shadow-sm transition-all cursor-pointer ${
               selectedCategory === 'sales'
@@ -772,7 +801,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
                 : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px] text-secondary">point_of_sale</span>
+            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
             Sales
           </button>
 
@@ -852,29 +881,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
           >
             <span className="material-symbols-outlined text-[16px]">settings</span>
             Settings
-          </button>
-        </div>
-
-        {/* Action Button: Quick Add Bill CTA */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onNewInvoice}
-            aria-label={company.isGstEnabled !== false ? 'Create New GST Invoice' : 'Create New Invoice'}
-            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-secondary text-on-secondary font-label-md text-sm font-bold shadow-[0_4px_16px_rgba(0,108,73,0.25)] active:scale-98 transition-transform cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[20px]">add_circle</span>
-            {company.isGstEnabled !== false ? 'Create New GST Invoice' : 'Create New Invoice'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate('pos')}
-            className="px-4 py-3 rounded-2xl bg-surface-container-lowest text-secondary font-label-md text-sm font-bold border border-outline-variant/40 flex items-center gap-1.5 shadow-sm active:scale-98 transition-transform cursor-pointer hover:bg-surface-container-low"
-            title="Fast POS Counter"
-          >
-            <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
-            POS
           </button>
         </div>
 

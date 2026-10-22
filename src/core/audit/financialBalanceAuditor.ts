@@ -146,11 +146,11 @@ export function auditAllPartyBalances(options?: {
     const totalPurchaseUnpaid = partyPurchases.reduce((sum, p) => sum + (p.balanceAmount || 0), 0);
 
     const totalReceipts = partyVouchers
-      .filter((v) => v.voucherType === 'RECEIPT')
+      .filter((v) => !v.isCancelled && !v.isReversed && v.voucherType === 'RECEIPT')
       .reduce((sum, v) => sum + (v.totalAmount || 0), 0);
 
     const totalPaymentsOut = partyVouchers
-      .filter((v) => v.voucherType === 'PAYMENT')
+      .filter((v) => !v.isCancelled && !v.isReversed && v.voucherType === 'PAYMENT')
       .reduce((sum, v) => sum + (v.totalAmount || 0), 0);
 
     if (isCustomer) {

@@ -4,7 +4,8 @@ import { StockAdjustment, InventoryItem, UnitOfMeasurement } from '../../models/
 import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
 import { getFinancialYear } from '../../core/utils/dateFilters.ts';
-import { createRcmJournalVoucher } from '../../core/accounting/ledger.ts';
+import { createRcmJournalVoucher, createReversalVoucher } from '../../core/accounting/ledger.ts';
+import { derivePaymentSettlement } from '../../core/accounting/paymentSplitUtils.ts';
 import {
   applyInvoiceStockDecrement,
   revertInvoiceStockAdjustment,
@@ -46,6 +47,28 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       invoice.financialYear = getFinancialYear(invoice.date);
     }
 
+    // Centralize payment status & tender breakdown derivation (invariant enforcement)
+    const settlement = derivePaymentSettlement({
+      grandTotal: invoice.grandTotal,
+      paymentMode: invoice.paymentMode,
+      paymentStatus: invoice.paymentStatus,
+      paidAmount: invoice.paidAmount,
+      balanceAmount: invoice.balanceAmount,
+      paymentSplits: invoice.paymentSplits,
+      notes: invoice.notes,
+      bankAccountId: (invoice as any).bankAccountId,
+      bankAccountName: (invoice as any).bankAccountName,
+    });
+    invoice = {
+      ...invoice,
+      paidAmount: settlement.paidAmount,
+      balanceAmount: settlement.balanceAmount,
+      paymentStatus: settlement.paymentStatus,
+      paymentMode: settlement.paymentMode,
+      paymentSplits: settlement.paymentSplits,
+      notes: settlement.notes,
+    };
+
     const idx = list.findIndex((inv) => inv.id === invoice.id);
     const prevInvoice = idx >= 0 ? list[idx] : null;
 
@@ -54,6 +77,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     } else {
       list.unshift(invoice);
     }
+    this.removeTombstone('invoice', invoice.id);
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.putDoc('invoice', invoice);
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
@@ -135,9 +159,37 @@ export class InvoicePurchaseStorage extends FinancialStorage {
   deleteInvoice(id: string): void {
     const inv = this.getInvoices().find((i) => i.id === id);
     const list = this.getInvoices().filter((i) => i.id !== id);
+    this.recordTombstone('invoice', id);
     this.set(STORAGE_KEYS.INVOICES, list);
     pouch.deleteDoc('invoice', id);
     this.broadcastChange('invoice', 'delete', id);
+
+    // Statutory Audit Trail: Reverse linked posted vouchers instead of hard-deleting
+    if (inv) {
+      const allVouchers = this.getVouchers();
+      const linkedVouchers = allVouchers.filter(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          v.voucherType === 'SALES' &&
+          !v.voucherNumber.startsWith('VCH-REV-') &&
+          (v.referenceNo === inv.invoiceNumber ||
+            v.voucherNumber === `VCH-SAL-${inv.invoiceNumber}` ||
+            v.voucherNumber === `VCH-SALES-${inv.invoiceNumber}`)
+      );
+      for (const origVoucher of linkedVouchers) {
+        const revVoucher = createReversalVoucher({
+          originalVoucher: origVoucher,
+          reason: `Reversal of Sales Voucher #${origVoucher.voucherNumber} upon deletion of invoice #${inv.invoiceNumber}`,
+        });
+        this.saveVoucher(revVoucher);
+        this.saveVoucher({
+          ...origVoucher,
+          isReversed: true,
+          reversalVoucherId: revVoucher.id,
+        });
+      }
+    }
 
     // Restore stock upon invoice deletion via pure domain stockEngine
     if (inv && inv.invoiceType !== 'ESTIMATE' && inv.invoiceType !== 'SALES_ORDER') {
@@ -185,6 +237,28 @@ export class InvoicePurchaseStorage extends FinancialStorage {
   }
 
   savePurchase(bill: PurchaseBill): void {
+    // Centralize payment status & tender breakdown derivation (invariant enforcement)
+    const settlement = derivePaymentSettlement({
+      grandTotal: bill.grandTotal,
+      paymentMode: bill.paymentMode,
+      paymentStatus: bill.paymentStatus,
+      paidAmount: bill.paidAmount,
+      balanceAmount: bill.balanceAmount,
+      paymentSplits: bill.paymentSplits,
+      notes: bill.notes,
+      bankAccountId: (bill as any).bankAccountId,
+      bankAccountName: (bill as any).bankAccountName,
+    });
+    bill = {
+      ...bill,
+      paidAmount: settlement.paidAmount,
+      balanceAmount: settlement.balanceAmount,
+      paymentStatus: settlement.paymentStatus,
+      paymentMode: settlement.paymentMode,
+      paymentSplits: settlement.paymentSplits,
+      notes: settlement.notes,
+    };
+
     const list = [...this.getPurchases()];
     const idx = list.findIndex((b) => b.id === bill.id);
     const prevBill = idx >= 0 ? list[idx] : null;
@@ -194,6 +268,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     } else {
       list.unshift(bill);
     }
+    this.removeTombstone('purchase', bill.id);
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.putDoc('purchase', bill);
     this.broadcastChange('purchase', 'save', bill.id, bill);
@@ -271,7 +346,55 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     // Reverse Charge Mechanism (RCM): Paired Double-Entry Journal Voucher
     const rcmVoucherId = `VCH-RCM-${bill.id}`;
     if (bill.isRcm && (bill.totalTax || 0) > 0) {
+      // Find any existing ACTIVE RCM voucher for this bill
+      let existingActiveRcm = this.getVouchers().find(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          !v.voucherNumber.startsWith('VCH-REV-') &&
+          (v.id === rcmVoucherId ||
+            v.id.startsWith(`${rcmVoucherId}-`) ||
+            (v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-')))
+      );
+
+      // When RCM tax or key details change on an existing active voucher, reverse it first
+      if (
+        existingActiveRcm &&
+        (Number((existingActiveRcm.totalAmount || 0).toFixed(2)) !== Number((bill.totalTax || 0).toFixed(2)) ||
+          existingActiveRcm.date !== bill.date)
+      ) {
+        const rev = createReversalVoucher({
+          originalVoucher: existingActiveRcm,
+          reason: `Reversal of RCM voucher #${existingActiveRcm.voucherNumber} due to tax adjustment on bill #${bill.billNumber}`,
+        });
+        this.saveVoucher(rev);
+        this.saveVoucher({
+          ...existingActiveRcm,
+          isReversed: true,
+          reversalVoucherId: rev.id,
+        });
+        existingActiveRcm = undefined;
+      }
+
+      let targetRcmId: string;
+      if (existingActiveRcm) {
+        targetRcmId = existingActiveRcm.id;
+      } else {
+        // Ensure we never collide with or overwrite an existing (or reversed/cancelled) voucher
+        const baseId = rcmVoucherId;
+        const isBaseTaken = this.getVouchers().some((v) => v.id === baseId);
+        targetRcmId = isBaseTaken
+          ? `${baseId}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`
+          : baseId;
+      }
+
+      // Final safety guard: targetRcmId must never match a reversed or cancelled voucher
+      if (this.getVouchers().some((v) => v.id === targetRcmId && (v.isReversed || v.isCancelled))) {
+        targetRcmId = `${rcmVoucherId}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+      }
+
       const rcmVoucher = createRcmJournalVoucher({
+        id: targetRcmId,
         billId: bill.id,
         billNumber: bill.billNumber,
         date: bill.date,
@@ -285,12 +408,27 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       });
       this.saveVoucher(rcmVoucher);
     } else {
-      // If purchase is not RCM or has 0 tax, clean up any existing RCM voucher
-      const existingRcm = this.getVouchers().find(
-        (v) => v.id === rcmVoucherId || (v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+      // If purchase is not RCM or has 0 tax, reverse any existing active RCM voucher (no hard-deletes)
+      const existingRcmList = this.getVouchers().filter(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          !v.voucherNumber.startsWith('VCH-REV-') &&
+          (v.id === rcmVoucherId ||
+            v.id.startsWith(`${rcmVoucherId}-`) ||
+            (v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-')))
       );
-      if (existingRcm) {
-        this.deleteVoucher(existingRcm.id);
+      for (const existingRcm of existingRcmList) {
+        const rev = createReversalVoucher({
+          originalVoucher: existingRcm,
+          reason: `Reversal of RCM liability & ITC journal entry for bill #${bill.billNumber} (RCM disabled)`,
+        });
+        this.saveVoucher(rev);
+        this.saveVoucher({
+          ...existingRcm,
+          isReversed: true,
+          reversalVoucherId: rev.id,
+        });
       }
     }
 
@@ -318,17 +456,61 @@ export class InvoicePurchaseStorage extends FinancialStorage {
   deletePurchase(id: string): void {
     const bill = this.getPurchases().find((b) => b.id === id);
     const list = this.getPurchases().filter((b) => b.id !== id);
+    this.recordTombstone('purchase', id);
     this.set(STORAGE_KEYS.PURCHASES, list);
     pouch.deleteDoc('purchase', id);
     this.broadcastChange('purchase', 'delete', id);
 
-    // Clean up paired RCM journal voucher upon bill deletion
+    // Statutory Audit Trail: Reverse paired RCM journal voucher upon bill deletion (no hard-deletes)
     const rcmVoucherId = `VCH-RCM-${id}`;
-    const pairedRcmVoucher = this.getVouchers().find(
-      (v) => v.id === rcmVoucherId || (bill && v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-'))
+    const pairedRcmVouchers = this.getVouchers().filter(
+      (v) =>
+        !v.isReversed &&
+        !v.isCancelled &&
+        !v.voucherNumber.startsWith('VCH-REV-') &&
+        (v.id === rcmVoucherId ||
+          v.id.startsWith(`${rcmVoucherId}-`) ||
+          (bill && v.referenceNo === bill.billNumber && v.voucherNumber.startsWith('VCH-RCM-')))
     );
-    if (pairedRcmVoucher) {
-      this.deleteVoucher(pairedRcmVoucher.id);
+    for (const pairedRcm of pairedRcmVouchers) {
+      const revRcm = createReversalVoucher({
+        originalVoucher: pairedRcm,
+        reason: `Reversal of RCM liability & ITC journal entry for deleted bill #${bill?.billNumber || id}`,
+      });
+      this.saveVoucher(revRcm);
+      this.saveVoucher({
+        ...pairedRcm,
+        isReversed: true,
+        reversalVoucherId: revRcm.id,
+      });
+    }
+
+    // Statutory Audit Trail: Reverse linked posted purchase vouchers instead of hard-deleting
+    if (bill) {
+      const allVouchers = this.getVouchers();
+      const linkedVouchers = allVouchers.filter(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          v.voucherType === 'PURCHASE' &&
+          !v.voucherNumber.startsWith('VCH-REV-') &&
+          !v.voucherNumber.startsWith('VCH-RCM-') &&
+          (v.referenceNo === bill.billNumber ||
+            v.voucherNumber === `VCH-PUR-${bill.billNumber}` ||
+            v.voucherNumber === `VCH-PURCHASE-${bill.billNumber}`)
+      );
+      for (const origVoucher of linkedVouchers) {
+        const revVoucher = createReversalVoucher({
+          originalVoucher: origVoucher,
+          reason: `Reversal of Purchase Voucher #${origVoucher.voucherNumber} upon deletion of bill #${bill.billNumber}`,
+        });
+        this.saveVoucher(revVoucher);
+        this.saveVoucher({
+          ...origVoucher,
+          isReversed: true,
+          reversalVoucherId: revVoucher.id,
+        });
+      }
     }
 
     // Revert stock upon bill deletion via pure domain stockEngine

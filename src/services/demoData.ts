@@ -8,8 +8,6 @@ import type { BankAccount, CashBankTransaction } from '../models/bankAccount.ts'
 import type { LoanAccount, LoanTransaction } from '../models/loan.ts';
 import type { Voucher } from '../core/accounting/voucherTypes.ts';
 
-export const DEMO_COUCHDB_REMOTE_URL = 'https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo';
-
 export const DEMO_COMPANY: CompanyProfile = {
   id: 'COMP-001',
   businessName: 'Brahmaputra Hardware & Electricals',
@@ -20,13 +18,13 @@ export const DEMO_COMPANY: CompanyProfile = {
   address: 'Shop No. 12-14, Commercial Plaza, G.S. Road, Guwahati',
   pincode: '781005',
   phone: '+91 98765 43210',
-  email: 'demo@brahmaputrahw.store',
-  website: 'https://sync.brahmaputrahw.store',
+  email: 'contact@demo-hardware.in',
+  website: 'https://demo-hardware.in',
   bankName: 'State Bank of India',
   accountNumber: '38291048291',
   ifscCode: 'SBIN0001234',
   branchName: 'Guwahati Main Branch',
-  upiId: 'brahmaputrahw@sbi',
+  upiId: 'demohardware@sbi',
   termsAndConditions: '1. Goods once sold will not be taken back without original bill.\n2. Interest @ 18% p.a. charged on overdue bills.\n3. Subject to Guwahati jurisdiction.',
   invoicePrefix: 'BHW-',
   isGstEnabled: true,

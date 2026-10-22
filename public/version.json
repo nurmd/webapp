@@ -1,15 +1,15 @@
 {
-  "version": "1.2.20",
+  "version": "1.2.21",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-21T13:14:51.805Z",
+  "buildTime": "2026-10-22T06:10:06.985Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Bank account selection dropdown in Payment In / Payment Out when Bank mode is selected (v1.2.20)",
-    "Payment Mode converted to space-saving dropdown sitting side-by-side with Bank Account",
-    "Removed Full Due and 50% quick chips to streamline modal space on mobile screens",
-    "dedicated visual and functional workflows for Sales Order, Purchase Order, Sales Return, and Purchase Return (v1.2.19)",
-    "add clear From ➔ To visual route cues and badges for Contra transactions",
-    "resolve inaccurate bank statement running balance and table rendering"
+    "More-driven navigation architecture: removed side drawers and sidebar mounts for a clean, unified mobile and tablet experience",
+    "Header More (grid_view) and Settings gear shortcuts for instant 1-tap navigation on tablet and desktop",
+    "Redesigned More hub: added Dashboard/Overview, Print Settings, and Business Profile & Settings; removed duplicate Create Invoice and POS entries",
+    "Permissionless Android backup/restore: direct export to Downloads on Android 10+ with SAF file-picker fallback",
+    "Restore safety engine: durable PouchDB restore via system file picker with atomic rollback safety snapshots",
+    "Phase 4 split-payment ledger hardening: tender account metadata preservation, strict payment status derivation, and automated audit trails"
   ]
 }

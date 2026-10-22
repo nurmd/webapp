@@ -210,7 +210,7 @@ This script:
 ---
 
 ### Method 2: In-App PWA Update (For Users & Cashiers)
-Inside the PWA running at `https://billing.brahmaputrahw.store`:
+Inside the deployed PWA (e.g. `https://billing.example.com`):
 1. The app automatically checks GitHub and the Service Worker in the background.
 2. When a newer version is deployed, a notification prompt appears: **"PWA Update Available from GitHub (vX.X.X)"**.
 3. Tap **"Update & Reload Now"** — the Service Worker activates immediately, purges obsolete caches, and reloads with the fresh code. All local offline billing data remains intact.

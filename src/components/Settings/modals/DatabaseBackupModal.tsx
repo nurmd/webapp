@@ -1,10 +1,14 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { db } from '../../../services/db.ts';
 import {
   DatabaseBackupBundle,
   validateBackupBundle,
   generateBackupFilename,
 } from '../../../core/backup/backupEngine.ts';
+import {
+  createAndVerifyPreMigrationBackup,
+  restorePreMigrationBackup,
+} from '../../../services/db/preMigrationBackup.ts';
 import { formatINR, formatDate } from '../../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../../services/toast.ts';
@@ -42,45 +46,11 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
   const [restoreProgress, setRestoreProgress] = useState(0);
   const [restoreStepText, setRestoreStepText] = useState('');
   const [restoreSuccessNotice, setRestoreSuccessNotice] = useState<string | null>(null);
+  const [lastSafetySnapshotId, setLastSafetySnapshotId] = useState<string | null>(null);
+  const [canRollback, setCanRollback] = useState(false);
+  const [isRollingBack, setIsRollingBack] = useState(false);
 
-  // Android Storage Permission Management
   const isAndroidBridge = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
-  const [hasStoragePerm, setHasStoragePerm] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.hasStoragePermission) {
-      try {
-        return (window as any).AndroidBridge.hasStoragePermission();
-      } catch {
-        return true;
-      }
-    }
-    return true;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    (window as any).onStoragePermissionResult = (status: string) => {
-      if (status === 'GRANTED') {
-        setHasStoragePerm(true);
-        showAppToast('Storage permission granted!');
-      } else {
-        setHasStoragePerm(false);
-        showAppToast('Storage permission denied');
-      }
-    };
-    return () => {
-      delete (window as any).onStoragePermissionResult;
-    };
-  }, []);
-
-  const handleRequestStoragePermission = () => {
-    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.requestStoragePermission) {
-      try {
-        (window as any).AndroidBridge.requestStoragePermission();
-      } catch {
-        showAppToast('Failed to open storage settings');
-      }
-    }
-  };
 
   // Live database snapshot for Backup view
   const liveBackup = useMemo(() => {
@@ -97,6 +67,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     setParsedBundle(null);
     setSelectedFile(file);
     setIsArmedConfirm(false);
+    setCanRollback(false);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -124,10 +95,11 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     reader.readAsText(file);
   };
 
-  // Explicit Browse File Handler supporting Modern Web File System Access API + Fallback
+  // Explicit Browse File Handler supporting system file picker without storage permissions
   const handleBrowseFiles = async () => {
-    if (isAndroidBridge && !hasStoragePerm) {
-      handleRequestStoragePermission();
+    if (isAndroidBridge) {
+      fileInputRef.current?.click();
+      return;
     }
     if (typeof window !== 'undefined' && 'showOpenFilePicker' in window) {
       try {
@@ -151,7 +123,6 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
         }
       } catch (err: any) {
         if (err.name === 'AbortError') return; // User cancelled file picker
-        // Fall back to input click if showOpenFilePicker failed
       }
     }
     fileInputRef.current?.click();
@@ -162,7 +133,6 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     if (file) {
       processSelectedFile(file);
     }
-    // Clear input value so selecting the same file again triggers onChange
     if (e.target) {
       e.target.value = '';
     }
@@ -191,37 +161,71 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     }
   };
 
-  // "Save To..." Handler (AndroidBridge Storage or File System Access API Save Dialog)
-  const handleSaveToLocation = async () => {
+  // Consolidated Export Handler (Android MediaStore / SAF picker or Web showSaveFilePicker / Blob)
+  const executeExport = async (usePicker: boolean = false) => {
     setIsExporting(true);
-    setExportProgress(15);
-    setExportStepText('Compiling database records & vouchers...');
+    setExportProgress(20);
+    setExportStepText('Gathering financial records & vouchers...');
+
+    let timeoutId: any = null;
 
     try {
-      const bundle = liveBackup || db.createDatabaseBackup();
-      const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
-      const jsonStr = JSON.stringify(bundle, null, 2);
+      setExportProgress(50);
+      setExportStepText('Building & verifying backup bundle...');
 
-      setExportProgress(45);
-      setExportStepText('Verifying data integrity & FNV-1a checksum...');
-      await new Promise((r) => setTimeout(r, 200));
+      const bundle = await (db as any).createDatabaseBackupAsync();
+      const { filename, jsonStr } = (db as any).serializeDatabaseBackup(bundle);
 
-      if (isAndroidBridge && (window as any).AndroidBridge?.saveBackupToStorage) {
-        if (!hasStoragePerm) {
-          handleRequestStoragePermission();
-        }
-        setExportProgress(75);
-        setExportStepText('Saving backup to device storage (Downloads/GSTBilling)...');
-        const res = (window as any).AndroidBridge.saveBackupToStorage(filename, jsonStr);
-        if (res && res.startsWith('SUCCESS')) {
-          setExportProgress(100);
-          setExportStepText('Backup saved to device storage!');
-          setLastExportedFilename(filename);
-          showAppToast(`Backup saved: ${filename}`);
+      if (isAndroidBridge) {
+        setExportProgress(80);
+        setExportStepText(usePicker ? 'Opening save dialog...' : 'Saving backup...');
+
+        // Clear any stale callback before installing new one
+        try {
+          delete (window as any).onBackupSaveResult;
+        } catch {}
+
+        const savePromise = new Promise<{ status: string; displayName: string; message: string }>((resolve, reject) => {
+          timeoutId = setTimeout(() => {
+            try {
+              delete (window as any).onBackupSaveResult;
+            } catch {}
+            reject(new Error('Backup save timed out. Please try again.'));
+          }, 120000);
+
+          (window as any).onBackupSaveResult = (status: string, displayName: string, message: string) => {
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            try {
+              delete (window as any).onBackupSaveResult;
+            } catch {}
+            resolve({ status, displayName, message });
+          };
+        });
+
+        if (usePicker && typeof (window as any).AndroidBridge?.saveBackupWithPicker === 'function') {
+          (window as any).AndroidBridge.saveBackupWithPicker(filename, jsonStr);
+        } else if (typeof (window as any).AndroidBridge?.downloadBackup === 'function') {
+          (window as any).AndroidBridge.downloadBackup(filename, jsonStr);
         } else {
-          throw new Error(res || 'Failed to save to device storage');
+          throw new Error('Android backup export bridge not available');
         }
-      } else if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+
+        const res = await savePromise;
+        if (res.status === 'SUCCESS') {
+          setExportProgress(100);
+          setExportStepText('Backup saved successfully!');
+          setLastExportedFilename(res.displayName || filename);
+          showAppToast(`Backup saved: ${res.displayName || filename}`);
+        } else if (res.status === 'CANCELLED') {
+          setExportStepText('');
+          showAppToast(res.message || 'Backup cancelled');
+        } else {
+          throw new Error(res.message || 'Failed to save backup');
+        }
+      } else if (usePicker && typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
         setExportProgress(75);
         setExportStepText('Choose folder to save backup file...');
 
@@ -236,7 +240,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
         });
 
         setExportProgress(90);
-        setExportStepText('Writing backup to selected location...');
+        setExportStepText('Writing backup to selected file...');
         const writable = await handle.createWritable();
         await writable.write(jsonStr);
         await writable.close();
@@ -246,77 +250,38 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
         setLastExportedFilename(filename);
         showAppToast(`Backup saved to chosen folder: ${filename}`);
       } else {
-        // Fallback for browsers / webviews without showSaveFilePicker
         setExportProgress(85);
-        setExportStepText('Saving backup to device Downloads...');
+        setExportStepText('Initiating download...');
         const res = db.downloadDatabaseBackup(bundle);
-        setExportProgress(100);
-        setExportStepText('Backup downloaded!');
-        setLastExportedFilename(res.filename);
-        showAppToast(`Backup saved: ${res.filename}`);
-      }
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        // User cancelled the save file picker dialog
-        return;
-      }
-      showAppToast(`Save failed: ${err?.message || 'Unknown error'}`);
-    } finally {
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-        setExportStepText('');
-      }, 1200);
-    }
-  };
-
-  // Quick Direct Download Handler
-  const handleDownloadBackup = async () => {
-    setIsExporting(true);
-    setExportProgress(20);
-    setExportStepText('Gathering financial records & bills...');
-
-    try {
-      await new Promise((r) => setTimeout(r, 150));
-      setExportProgress(60);
-      setExportStepText('Generating JSON backup bundle...');
-
-      const bundle = liveBackup || db.createDatabaseBackup();
-      const filename = generateBackupFilename(bundle.metadata?.businessName || bundle.data.company.businessName);
-      const jsonStr = JSON.stringify(bundle, null, 2);
-
-      if (isAndroidBridge && (window as any).AndroidBridge?.saveBackupToStorage) {
-        if (!hasStoragePerm) {
-          handleRequestStoragePermission();
+        if (!res.success && res.reason === 'ANDROID_FILE_PICKER_REQUIRED') {
+          throw new Error('Android file picker required');
         }
-        setExportProgress(85);
-        setExportStepText('Saving backup to Downloads...');
-        const res = (window as any).AndroidBridge.saveBackupToStorage(filename, jsonStr);
-        if (res && res.startsWith('SUCCESS')) {
-          setExportProgress(100);
-          setExportStepText('Backup saved to Downloads!');
-          setLastExportedFilename(filename);
-          showAppToast(`Backup saved: ${filename}`);
-        } else {
-          throw new Error(res || 'Failed to save to Downloads');
-        }
-      } else {
-        const res = db.downloadDatabaseBackup(bundle);
         setExportProgress(100);
         setExportStepText('Download initiated!');
         setLastExportedFilename(res.filename);
         showAppToast(`Backup downloaded: ${res.filename}`);
       }
     } catch (err: any) {
-      showAppToast(`Backup download failed: ${err?.message || 'Unknown error'}`);
+      if (err.name === 'AbortError') {
+        return;
+      }
+      showAppToast(`Save failed: ${err?.message || 'Unknown error'}`);
     } finally {
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-        setExportStepText('');
-      }, 1000);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      try {
+        delete (window as any).onBackupSaveResult;
+      } catch {}
+      setIsExporting(false);
+      setExportProgress(0);
+      setExportStepText('');
     }
   };
+
+  const handleDownloadBackup = () => executeExport(false);
+  const handleSaveToLocation = () => executeExport(true);
 
   const handleShareBackup = async () => {
     if (!liveBackup) return;
@@ -337,7 +302,6 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
         }
       }
 
-      // Fallback: Copy to clipboard
       await navigator.clipboard.writeText(jsonStr);
       showAppToast('Backup JSON copied to clipboard');
     } catch (err: any) {
@@ -355,25 +319,26 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
     setRestoreStepText('Validating backup bundle & checksum...');
     setValidationError(null);
     setRestoreSuccessNotice(null);
+    setCanRollback(false);
+
+    const snapshotId = `restore_${Date.now()}`;
+    let snapshotCreated = false;
 
     try {
-      await new Promise((r) => setTimeout(r, 200));
-
-      // 1. Download safety backup of current data first
-      setRestoreProgress(35);
-      setRestoreStepText('Creating safety snapshot of current database...');
-      db.downloadDatabaseBackup();
-      await new Promise((r) => setTimeout(r, 200));
+      // 1. Create and verify pre-restore safety snapshot before touching any data
+      setRestoreProgress(30);
+      setRestoreStepText('Creating verified safety snapshot...');
+      createAndVerifyPreMigrationBackup(snapshotId);
+      snapshotCreated = true;
+      setLastSafetySnapshotId(snapshotId);
 
       // 2. Execute restore
       setRestoreProgress(65);
       setRestoreStepText('Restoring invoices, items, parties & vouchers...');
       const result = await db.restoreDatabaseBackup(parsedBundle, restoreMode);
-      await new Promise((r) => setTimeout(r, 200));
 
       setRestoreProgress(90);
       setRestoreStepText('Syncing local offline database & audit trail...');
-      await new Promise((r) => setTimeout(r, 200));
 
       setRestoreProgress(100);
       setRestoreStepText('Database restored successfully!');
@@ -385,10 +350,32 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
       onRestored?.();
     } catch (err: any) {
       setValidationError(err?.message || 'Database restore failed.');
+      if (snapshotCreated) {
+        setCanRollback(true);
+      }
     } finally {
-      setTimeout(() => {
-        setIsRestoring(false);
-      }, 1000);
+      setIsRestoring(false);
+    }
+  };
+
+  const handleRollback = async () => {
+    if (!lastSafetySnapshotId) return;
+    setIsRollingBack(true);
+    try {
+      const ok = await restorePreMigrationBackup(lastSafetySnapshotId);
+      if (ok) {
+        setValidationError(null);
+        setRestoreSuccessNotice('Database safely rolled back to pre-restore snapshot.');
+        setCanRollback(false);
+        showAppToast('Database restored to safety snapshot');
+        onRestored?.();
+      } else {
+        showAppToast('Failed to rollback to safety snapshot');
+      }
+    } catch (err: any) {
+      showAppToast(`Rollback failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setIsRollingBack(false);
     }
   };
 
@@ -455,46 +442,6 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-5 overflow-y-auto flex flex-col gap-4">
-          {/* Android Storage Permission Banner */}
-          {isAndroidBridge && !hasStoragePerm && (
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
-              <div className="flex items-center gap-2.5 text-amber-700 dark:text-amber-300 font-medium">
-                <span className="material-symbols-outlined text-[22px] text-amber-600 dark:text-amber-400">folder_special</span>
-                <div>
-                  <div className="font-bold">Storage Permission Required</div>
-                  <div className="text-[11px] text-on-surface-variant">
-                    Allow storage access to directly save and restore database backups from device storage.
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleRequestStoragePermission}
-                className="self-end sm:self-center py-2 px-3.5 rounded-xl bg-amber-600 text-white font-bold text-xs shadow-sm hover:brightness-110 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">security</span>
-                <span>Grant Permission</span>
-              </button>
-            </div>
-          )}
-
-          {isAndroidBridge && hasStoragePerm && (
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">check_circle</span>
-                <span>Device Storage Access Active (Downloads/GSTBilling)</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleRequestStoragePermission}
-                className="text-[11px] text-emerald-600 dark:text-emerald-400 underline hover:no-underline cursor-pointer"
-                title="Manage storage permission in device settings"
-              >
-                Manage
-              </button>
-            </div>
-          )}
-
           {activeTab === 'BACKUP' ? (
             /* --- CREATE BACKUP TAB --- */
             <div className="flex flex-col gap-4">
@@ -600,24 +547,24 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
               <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={handleSaveToLocation}
+                  onClick={handleDownloadBackup}
                   disabled={isExporting}
                   className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-secondary text-on-secondary font-bold text-sm shadow-md active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  title="Choose folder or location on device to save backup"
+                  title="Download database backup file"
                 >
-                  <span className="material-symbols-outlined text-[20px]">save_as</span>
-                  <span>{isExporting ? 'Saving...' : 'Save To...'}</span>
+                  <span className="material-symbols-outlined text-[20px]">download</span>
+                  <span>{isExporting ? 'Saving...' : 'Download Backup'}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleDownloadBackup}
+                  onClick={handleSaveToLocation}
                   disabled={isExporting}
                   className="w-full sm:w-auto py-3 px-4 rounded-xl border border-secondary/40 bg-secondary/10 text-secondary hover:bg-secondary/20 font-bold text-sm active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  title="Direct download to browser default Downloads folder"
+                  title="Choose destination file or folder"
                 >
-                  <span className="material-symbols-outlined text-[20px]">download</span>
-                  <span>Quick Download</span>
+                  <span className="material-symbols-outlined text-[20px]">save_as</span>
+                  <span>Save As...</span>
                 </button>
 
                 <button
@@ -705,6 +652,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
                         setSelectedFile(null);
                         setParsedBundle(null);
                         setValidationError(null);
+                        setCanRollback(false);
                       }}
                       className="py-2 px-3 rounded-xl border border-outline-variant/40 text-on-surface-variant hover:text-error hover:border-error/40 text-xs font-semibold transition-colors cursor-pointer"
                       title="Remove selected file"
@@ -747,11 +695,29 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
                 </div>
               )}
 
-              {/* Validation Error Banner */}
+              {/* Validation Error Banner with Rollback Option */}
               {validationError && (
-                <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold flex items-center gap-2 animate-fade-in">
-                  <span className="material-symbols-outlined text-[20px] flex-shrink-0">error</span>
-                  <span>{validationError}</span>
+                <div className="p-3.5 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-semibold flex flex-col gap-2.5 animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px] flex-shrink-0">error</span>
+                    <span>{validationError}</span>
+                  </div>
+                  {canRollback && lastSafetySnapshotId && (
+                    <div className="flex items-center justify-between pt-2 border-t border-error/20">
+                      <span className="text-[11px] text-on-surface-variant">
+                        A verified safety snapshot was saved before restore failed.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRollback}
+                        disabled={isRollingBack}
+                        className="py-1.5 px-3 rounded-lg bg-error text-on-error font-bold text-xs hover:brightness-110 active:scale-95 transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">undo</span>
+                        <span>{isRollingBack ? 'Rolling back...' : 'Rollback to Snapshot'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -865,8 +831,8 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
                           </p>
                           <p className="text-[11px] text-on-surface-variant mt-0.5 leading-relaxed">
                             {restoreMode === 'REPLACE'
-                              ? 'This will overwrite your existing sales, purchases, items, parties and vouchers with the backup bundle. A safety backup copy of your current database will be auto-downloaded first.'
-                              : 'This will merge records from the backup bundle into your database. A safety backup copy of your current database will be auto-downloaded first.'}
+                              ? 'This will overwrite your existing sales, purchases, items, parties and vouchers with the backup bundle. A verified safety snapshot of your current database will be saved before restore.'
+                              : 'This will merge records from the backup bundle into your database. A verified safety snapshot of your current database will be saved before restore.'}
                           </p>
                         </div>
                       </div>
@@ -903,7 +869,7 @@ export const DatabaseBackupModal: React.FC<DatabaseBackupModalProps> = ({
         <div className="p-3.5 sm:p-4 border-t border-outline-variant/20 bg-surface-container-low/50 flex items-center justify-between text-xs text-on-surface-variant">
           <div className="flex items-center gap-1.5 text-[11px]">
             <span className="material-symbols-outlined text-[16px] text-secondary">security</span>
-            <span>Safety copy automatically downloaded before any restore</span>
+            <span>Verified safety snapshot saved before restore</span>
           </div>
           <button
             type="button"

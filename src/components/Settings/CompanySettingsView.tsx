@@ -405,23 +405,21 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     setSyncUrlInput('');
   };
 
-  const handleLoadDemoCouchDb = () => {
-    setSyncUrlInput(DEFAULT_COUCHDB_REMOTE_URL);
-    setIsSyncStarting(true);
-    pouch.startSync(DEFAULT_COUCHDB_REMOTE_URL);
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
-      setIsSyncStarting(false);
-      setIsSyncConfigOpen(false);
-    }, 800);
+  const handleResolveConflict = async (conflictId: string, choice: 'keep_winning' | 'keep_conflicting') => {
+    try {
+      if (typeof (db as any).resolveConflict === 'function') {
+        await (db as any).resolveConflict(conflictId, choice);
+      }
+    } catch (e) {
+      console.error('Failed to resolve sync conflict:', e);
+    }
   };
 
   const handlePopulateDemoData = async () => {
     setIsPopulatingDemo(true);
     try {
       await db.loadDemoData();
-      await pouch.syncNow();
-      setDemoNotice('Demo data populated and synced successfully!');
+      setDemoNotice('Demo data populated locally successfully!');
       setTimeout(() => setDemoNotice(null), 3500);
     } catch (e: any) {
       setDemoNotice('Error populating demo data: ' + (e?.message || String(e)));
@@ -830,13 +828,13 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 setSyncUrlInput={setSyncUrlInput}
                 handleConnectSync={handleConnectSync}
                 handleStopSync={handleStopSync}
-                handleLoadDemoCouchDb={handleLoadDemoCouchDb}
                 handlePopulateDemoData={handlePopulateDemoData}
                 isPopulatingDemo={isPopulatingDemo}
                 demoNotice={demoNotice}
                 copiedSyncCode={copiedSyncCode}
                 handleCopySyncCode={handleCopySyncCode}
                 onOpenDatabaseBackup={() => setIsDatabaseBackupModalOpen(true)}
+                handleResolveConflict={handleResolveConflict}
               />
             )}
 

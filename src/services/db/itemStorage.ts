@@ -22,6 +22,7 @@ export class ItemStorage extends PartyStorage {
     } else {
       list.push(item);
     }
+    this.removeTombstone('item', item.id);
     this.set(STORAGE_KEYS.ITEMS, list);
     pouch.putDoc('item', item);
     this.broadcastChange('item', 'save', item.id, item);
@@ -30,6 +31,7 @@ export class ItemStorage extends PartyStorage {
 
   deleteItem(id: string): void {
     const list = this.getItems().filter((i) => i.id !== id);
+    this.recordTombstone('item', id);
     this.set(STORAGE_KEYS.ITEMS, list);
     pouch.deleteDoc('item', id);
     this.broadcastChange('item', 'delete', id);

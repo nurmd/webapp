@@ -1,5 +1,5 @@
 import React from 'react';
-import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL } from '../../../services/pouchdb.ts';
+import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict } from '../../../services/pouchdb.ts';
 
 export interface DataSyncTabProps {
   isSyncingProfile: boolean;
@@ -20,10 +20,11 @@ export interface DataSyncTabProps {
   copiedSyncCode?: boolean;
   handleCopySyncCode?: () => void;
   onOpenDatabaseBackup?: () => void;
-  handleLoadDemoCouchDb?: () => void;
   handlePopulateDemoData?: () => void;
   isPopulatingDemo?: boolean;
   demoNotice?: string | null;
+  conflicts?: SyncConflict[];
+  handleResolveConflict?: (conflictId: string, choice: 'keep_winning' | 'keep_conflicting') => void;
 }
 
 export const DataSyncTab: React.FC<DataSyncTabProps> = ({
@@ -45,11 +46,13 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   copiedSyncCode,
   handleCopySyncCode,
   onOpenDatabaseBackup,
-  handleLoadDemoCouchDb,
   handlePopulateDemoData,
   isPopulatingDemo = false,
   demoNotice = null,
+  conflicts: propConflicts,
+  handleResolveConflict,
 }) => {
+  const activeConflicts = propConflicts ?? syncState?.conflicts ?? [];
   return (
     <div className="flex flex-col gap-4">
       {/* 1. Full Database Backup & Restore Card */}
@@ -196,17 +199,15 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
                   Store Data Protected
                 </span>
-                {syncState.remoteUrl?.includes('gst_demo') && (
+                {syncState.remoteUrl && (
                   <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
-                    Demo Cloud
+                    Cloud Synced
                   </span>
                 )}
               </div>
               <span className="text-[11px] text-on-secondary-container/80 truncate">
                 {(syncState.status === 'synced' || syncState.status === 'syncing')
-                  ? (syncState.remoteUrl?.includes('gst_demo')
-                      ? 'Live 2-Way Sync Active with Demo CouchDB Server'
-                      : 'Continuous 2-Way CouchDB Multi-Device Sync Active')
+                  ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
                   : '100% Offline-First IndexedDB Storage Ready'}
               </span>
             </div>
@@ -242,51 +243,29 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
         {/* Collapsible Sync Settings */}
         {isSyncConfigOpen && (
           <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2.5 animate-fade-in">
-            {/* Demo CouchDB Server Quick Selector */}
-            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="material-symbols-outlined text-[18px] text-secondary">cloud_sync</span>
+            {handlePopulateDemoData && (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-on-surface">Demo CouchDB Server</span>
-                  <span className="text-[10px] text-on-surface-variant font-mono truncate">
-                    sync.brahmaputrahw.store/gst_demo
+                  <span className="text-xs font-bold text-on-surface">Local Demo Dataset</span>
+                  <span className="text-[10px] text-on-surface-variant">
+                    Populate sample items, parties, invoices, and vouchers locally
                   </span>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
-                  data-testid="use-demo-couchdb-btn"
-                  onClick={() => {
-                    if (handleLoadDemoCouchDb) {
-                      handleLoadDemoCouchDb();
-                    } else {
-                      setSyncUrlInput(DEFAULT_COUCHDB_REMOTE_URL);
-                    }
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-secondary/15 hover:bg-secondary/25 text-secondary text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                  title="Connect directly to Brahmaputra demo CouchDB"
+                  data-testid="populate-demo-data-btn"
+                  disabled={isPopulatingDemo}
+                  onClick={handlePopulateDemoData}
+                  className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50 transition-colors shrink-0"
+                  title="Populate demo invoices, purchases, items, parties and accounting records locally"
                 >
-                  <span className="material-symbols-outlined text-[14px]">bolt</span>
-                  <span>Use Demo CouchDB</span>
+                  <span className={`material-symbols-outlined text-[14px] ${isPopulatingDemo ? 'animate-spin' : ''}`}>
+                    {isPopulatingDemo ? 'progress_activity' : 'dataset'}
+                  </span>
+                  <span>{isPopulatingDemo ? 'Populating...' : 'Populate Demo Data'}</span>
                 </button>
-                {handlePopulateDemoData && (
-                  <button
-                    type="button"
-                    data-testid="populate-demo-data-btn"
-                    disabled={isPopulatingDemo}
-                    onClick={handlePopulateDemoData}
-                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50 transition-colors"
-                    title="Populate demo invoices, purchases, items, parties and accounting records"
-                  >
-                    <span className={`material-symbols-outlined text-[14px] ${isPopulatingDemo ? 'animate-spin' : ''}`}>
-                      {isPopulatingDemo ? 'progress_activity' : 'dataset'}
-                    </span>
-                    <span>{isPopulatingDemo ? 'Populating...' : 'Populate Demo Data'}</span>
-                  </button>
-                )}
               </div>
-            </div>
+            )}
 
             <label className="text-[11px] font-bold text-on-secondary-container">
               Remote CouchDB / Cloudflare Tunnel URL:
@@ -295,7 +274,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
               <input
                 type="text"
                 data-testid="sync-url-input"
-                placeholder={DEFAULT_COUCHDB_REMOTE_URL}
+                placeholder={DEFAULT_COUCHDB_REMOTE_URL || 'https://user:pass@couchdb.yourdomain.com/database'}
                 value={syncUrlInput}
                 onChange={(e) => setSyncUrlInput(e.target.value)}
                 className="flex-1 bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"
@@ -317,6 +296,129 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 </button>
               )}
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* 3. Sync Conflict Queue Card */}
+      <section
+        data-testid="sync-conflict-queue-section"
+        className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col gap-3"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                activeConflicts.length > 0
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[24px]">
+                {activeConflicts.length > 0 ? 'warning' : 'rule'}
+              </span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-headline-sm text-sm font-bold text-on-surface truncate">
+                  Revision Conflict Queue
+                </span>
+                <span
+                  data-testid="conflict-queue-badge"
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    activeConflicts.length > 0
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                  }`}
+                >
+                  {activeConflicts.length > 0
+                    ? `${activeConflicts.length} Unresolved Conflict${activeConflicts.length > 1 ? 's' : ''}`
+                    : '0 Conflicts • Verified Clean'}
+                </span>
+              </div>
+              <span className="text-[11px] text-on-surface-variant truncate">
+                PouchDB _rev branch resolution &amp; multi-terminal concurrent mutation safety
+              </span>
+            </div>
+          </div>
+
+          {activeConflicts.length > 0 && (
+            <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
+              Action required
+            </span>
+          )}
+        </div>
+
+        {activeConflicts.length > 0 ? (
+          <div className="flex flex-col gap-3 pt-2 border-t border-outline-variant/15">
+            {activeConflicts.map((conflict) => (
+              <div
+                key={conflict.id}
+                data-testid={`conflict-item-${conflict.docId}`}
+                className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[10px] font-mono font-bold uppercase">
+                      {conflict.docType}
+                    </span>
+                    <span className="text-xs font-bold text-on-surface truncate">
+                      {conflict.entityId}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-on-surface-variant font-mono">
+                    {conflict.detectedAt ? new Date(conflict.detectedAt).toLocaleTimeString() : ''}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-on-surface">Version A (Winning / Local)</span>
+                      <span className="text-[10px] text-on-surface-variant font-mono">
+                        {conflict.winningRev ? conflict.winningRev.slice(0, 8) + '...' : 'rev-1'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant font-mono truncate">
+                      Updated: {conflict.winningDoc?.updatedAt || 'N/A'}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid={`resolve-winning-${conflict.docId}`}
+                      onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_winning')}
+                      className="mt-1 px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold cursor-pointer hover:opacity-90 transition-opacity"
+                    >
+                      Keep Version A
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-on-surface">Version B (Conflicting / Remote)</span>
+                      <span className="text-[10px] text-on-surface-variant font-mono">
+                        {conflict.conflictingRev ? conflict.conflictingRev.slice(0, 8) + '...' : 'rev-2'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant font-mono truncate">
+                      Updated: {conflict.conflictingDoc?.updatedAt || 'N/A'}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid={`resolve-conflicting-${conflict.docId}`}
+                      onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_conflicting')}
+                      className="mt-1 px-2.5 py-1.5 rounded-lg bg-outline-variant/50 text-on-surface text-xs font-bold cursor-pointer hover:bg-outline-variant transition-colors"
+                    >
+                      Keep Version B
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2 text-xs text-on-surface-variant">
+            <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+            <span>No revision conflicts detected across devices. Multi-terminal sync state is clean.</span>
           </div>
         )}
       </section>

@@ -7,7 +7,7 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { Expense } from '../../models/expense.ts';
 import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
-import { pouch, type PouchDocChange } from '../pouchdb.ts';
+import { pouch, type PouchDocChange, type SyncConflict } from '../pouchdb.ts';
 import {
   STORAGE_KEYS,
   SyncedSettings,
@@ -125,6 +125,7 @@ export class SyncStorage extends BackupRestoreStorage {
 
   public applyLocalEntityMutation(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
     if (action === 'delete') {
+      this.recordTombstone(entity, id);
       switch (entity) {
         case 'invoice': this.set(STORAGE_KEYS.INVOICES, this.getInvoices().filter((i) => i.id !== id)); break;
         case 'purchase': this.set(STORAGE_KEYS.PURCHASES, this.getPurchases().filter((p) => p.id !== id)); break;
@@ -138,6 +139,7 @@ export class SyncStorage extends BackupRestoreStorage {
       }
       this.syncAllPartyBalances();
     } else if (data) {
+      this.removeTombstone(entity, id);
       switch (entity) {
         case 'invoice': {
           const list = [...this.getInvoices()];
@@ -273,6 +275,7 @@ export class SyncStorage extends BackupRestoreStorage {
     const docId = change.id.substring(colonIdx + 1);
 
     if (change.deleted) {
+      this.recordTombstone(docType, docId);
       switch (docType) {
         case 'invoice': {
           const list = this.getInvoices().filter((i) => i.id !== docId);
@@ -345,6 +348,7 @@ export class SyncStorage extends BackupRestoreStorage {
 
     const { _id, _rev, docType: _dt, syncedAt: _sa, ...cleanEntity } = doc;
     const data = (doc as any).data || cleanEntity;
+    this.removeTombstone(docType, docId);
 
     switch (docType) {
       case 'settings': {
@@ -490,7 +494,7 @@ export class SyncStorage extends BackupRestoreStorage {
   private purgeDemoData(): void {
     try {
       if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-      const PURGE_KEY = 'gst_demo_purged_v1017';
+      const PURGE_KEY = 'gst_legacy_sample_purged_v1017';
       if (localStorage.getItem(PURGE_KEY)) return;
 
       // 1. Company
@@ -558,6 +562,150 @@ export class SyncStorage extends BackupRestoreStorage {
     }
   }
 
+  private areEntitiesDivergent(a: any, b: any): boolean {
+    if (!a || !b) return true;
+    const cleanA = { ...a };
+    const cleanB = { ...b };
+    delete cleanA._id;
+    delete cleanA._rev;
+    delete cleanA._conflicts;
+    delete cleanA.syncedAt;
+    delete cleanA.docType;
+    delete cleanB._id;
+    delete cleanB._rev;
+    delete cleanB._conflicts;
+    delete cleanB.syncedAt;
+    delete cleanB.docType;
+
+    return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
+  }
+
+  private reconcileCollection<T extends { id: string; updatedAt?: string; createdAt?: string }>(
+    entityType: string,
+    storageKey: string,
+    localItems: T[],
+    remoteItems: any[],
+    demoFilter?: (item: T) => boolean
+  ): T[] {
+    const tombstones = this.getTombstones();
+    const localMap = new Map<string, T>();
+    (localItems || []).forEach((item) => {
+      if (item && item.id) localMap.set(item.id, item);
+    });
+
+    const isFinancial = [
+      'invoice',
+      'purchase',
+      'voucher',
+      'expense',
+      'bank_account',
+      'cash_bank_txn',
+      'loan',
+      'loan_txn',
+    ].includes(entityType);
+
+    const unsyncedToPush: T[] = [];
+    const mergedMap = new Map<string, T>();
+
+    // 1. Process local items
+    for (const [id, localItem] of localMap.entries()) {
+      if (demoFilter && !demoFilter(localItem)) continue;
+
+      const tombstoneKey = `${entityType}:${id}`;
+      const tombstone = tombstones[tombstoneKey];
+
+      if (tombstone) {
+        const remoteItem = (remoteItems || []).find((r) => r && r.id === id);
+        const remoteTime = remoteItem?.updatedAt || remoteItem?.createdAt || '';
+        if (remoteItem && remoteTime && remoteTime > tombstone.deletedAt) {
+          this.removeTombstone(entityType, id);
+          mergedMap.set(id, remoteItem);
+        } else {
+          pouch.deleteDoc(entityType, id).catch(() => {});
+        }
+      } else {
+        const remoteItem = (remoteItems || []).find((r) => r && r.id === id);
+        if (!remoteItem) {
+          // Local unsynced record: remote does not have it yet!
+          // NEVER DELETE LOCAL UNSYNCED RECORDS
+          mergedMap.set(id, localItem);
+          unsyncedToPush.push(localItem);
+        } else {
+          const isDivergent = this.areEntitiesDivergent(localItem, remoteItem);
+
+          if (isFinancial && isDivergent) {
+            // For financial documents, if both sides changed, enqueue a visible conflict!
+            // Never silently merge or replace the local dirty record!
+            const conflictId = `${entityType}:${id}#financial-divergence`;
+            const conflict: SyncConflict = {
+              id: conflictId,
+              docId: `${entityType}:${id}`,
+              docType: entityType,
+              entityId: id,
+              winningRev: remoteItem._rev || 'remote-branch',
+              conflictingRev: 'local-dirty',
+              winningDoc: remoteItem,
+              conflictingDoc: localItem,
+              detectedAt: new Date().toISOString(),
+            };
+            if (typeof (pouch as any)?.addExplicitConflict === 'function') {
+              (pouch as any).addExplicitConflict(conflict);
+            }
+            // Preserve the local record in place until operator resolves
+            mergedMap.set(id, localItem);
+          } else if (isDivergent) {
+            const localTime = localItem.updatedAt || localItem.createdAt || '';
+            const remoteTime = remoteItem.updatedAt || remoteItem.createdAt || '';
+
+            if (localTime && remoteTime && localTime > remoteTime) {
+              mergedMap.set(id, localItem);
+              unsyncedToPush.push(localItem);
+            } else {
+              mergedMap.set(id, remoteItem);
+            }
+          } else {
+            mergedMap.set(id, remoteItem);
+          }
+        }
+      }
+    }
+
+    // 2. Process remote items not yet in mergedMap
+    for (const remoteItem of remoteItems || []) {
+      if (!remoteItem || !remoteItem.id) continue;
+      if (demoFilter && !demoFilter(remoteItem)) continue;
+
+      const id = remoteItem.id;
+      if (mergedMap.has(id)) continue;
+
+      const tombstoneKey = `${entityType}:${id}`;
+      const tombstone = tombstones[tombstoneKey];
+
+      if (tombstone) {
+        const remoteTime = remoteItem.updatedAt || remoteItem.createdAt || '';
+        if (remoteTime && remoteTime > tombstone.deletedAt) {
+          this.removeTombstone(entityType, id);
+          mergedMap.set(id, remoteItem);
+        } else {
+          pouch.deleteDoc(entityType, id).catch(() => {});
+        }
+      } else {
+        mergedMap.set(id, remoteItem);
+      }
+    }
+
+    const mergedList = Array.from(mergedMap.values());
+    this.set(storageKey, mergedList);
+
+    if (unsyncedToPush.length > 0 && typeof (pouch as any)?.putDoc === 'function') {
+      Promise.all(unsyncedToPush.map((item) => pouch.putDoc(entityType, item))).catch((err) => {
+        console.warn(`Error pushing unsynced ${entityType} records to PouchDB:`, err);
+      });
+    }
+
+    return mergedList;
+  }
+
   public async syncAllFromPouch(): Promise<void> {
     try {
       const [
@@ -574,6 +722,7 @@ export class SyncStorage extends BackupRestoreStorage {
         remoteCashBankTxns,
         remoteLoans,
         remoteLoanTxns,
+        remoteTombstones,
       ] = await Promise.all([
         pouch.getAllDocs<SyncedSettings>('settings'),
         pouch.getAllDocs<CompanyProfile>('company'),
@@ -588,7 +737,19 @@ export class SyncStorage extends BackupRestoreStorage {
         pouch.getAllDocs<CashBankTransaction>('cash_bank_txn'),
         pouch.getAllDocs<LoanAccount>('loan'),
         pouch.getAllDocs<LoanTransaction>('loan_txn'),
+        typeof (pouch as any)?.getAllTombstones === 'function'
+          ? (pouch as any).getAllTombstones()
+          : Promise.resolve([]),
       ]);
+
+      // Replicate remote tombstones into local storage so remote deletions are respected
+      if (Array.isArray(remoteTombstones)) {
+        for (const t of remoteTombstones) {
+          if (t && t.targetType && t.targetId && t.deletedAt) {
+            this.recordTombstone(t.targetType, t.targetId, t.deletedAt);
+          }
+        }
+      }
 
       if (remoteSettings.length > 0) {
         const { printingSettings, printerWidth, printerType, bluetoothPrinterAddress, ...syncable } = remoteSettings[0] as any;
@@ -611,52 +772,134 @@ export class SyncStorage extends BackupRestoreStorage {
           this.set(STORAGE_KEYS.COMPANY, comp);
         }
       }
-      if (remoteInvoices.length > 0) {
-        const filtered = remoteInvoices.filter((i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-'));
-        this.set(STORAGE_KEYS.INVOICES, filtered);
-      }
-      if (remotePurchases.length > 0) {
-        const filtered = remotePurchases.filter((p) => !DEMO_PURCHASE_IDS.has(p.id));
-        this.set(STORAGE_KEYS.PURCHASES, filtered);
-      }
-      if (remoteParties.length > 0) {
-        const filtered = remoteParties.filter((p) => !DEMO_PARTY_IDS.has(p.id));
-        this.set(STORAGE_KEYS.PARTIES, filtered);
-      }
-      if (remoteItems.length > 0) {
-        const filtered = remoteItems.filter((i) => !DEMO_ITEM_IDS.has(i.id));
-        this.set(STORAGE_KEYS.ITEMS, filtered);
-      }
-      if (remoteExpenses.length > 0) {
-        const filtered = remoteExpenses.filter((e) => !DEMO_EXPENSE_IDS.has(e.id));
-        this.set(STORAGE_KEYS.EXPENSES, filtered);
-      }
-      if (remoteAdjustments.length > 0) this.set(STORAGE_KEYS.ADJUSTMENTS, remoteAdjustments);
-      if (remoteVouchers.length > 0) this.set(STORAGE_KEYS.VOUCHERS, remoteVouchers);
-      if (remoteBankAccounts.length > 0) {
-        const filtered = remoteBankAccounts.filter((b) => !DEMO_BANK_IDS.has(b.id)).map((b) => {
+
+      // Reconcile collections without wholesale overwriting local unsynced records
+      this.reconcileCollection(
+        'invoice',
+        STORAGE_KEYS.INVOICES,
+        this.getInvoices(),
+        remoteInvoices,
+        (i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-')
+      );
+      this.reconcileCollection(
+        'purchase',
+        STORAGE_KEYS.PURCHASES,
+        this.getPurchases(),
+        remotePurchases,
+        (p) => !DEMO_PURCHASE_IDS.has(p.id)
+      );
+      this.reconcileCollection(
+        'party',
+        STORAGE_KEYS.PARTIES,
+        this.getParties(),
+        remoteParties,
+        (p) => !DEMO_PARTY_IDS.has(p.id)
+      );
+      this.reconcileCollection(
+        'item',
+        STORAGE_KEYS.ITEMS,
+        this.getItems(),
+        remoteItems,
+        (i) => !DEMO_ITEM_IDS.has(i.id)
+      );
+      this.reconcileCollection(
+        'expense',
+        STORAGE_KEYS.EXPENSES,
+        this.getExpenses(),
+        remoteExpenses,
+        (e) => !DEMO_EXPENSE_IDS.has(e.id)
+      );
+      this.reconcileCollection(
+        'adjustment',
+        STORAGE_KEYS.ADJUSTMENTS,
+        this.getStockAdjustments(),
+        remoteAdjustments
+      );
+      this.reconcileCollection(
+        'voucher',
+        STORAGE_KEYS.VOUCHERS,
+        this.getVouchers(),
+        remoteVouchers
+      );
+      this.reconcileCollection(
+        'bank_account',
+        STORAGE_KEYS.BANK_ACCOUNTS,
+        this.getBankAccounts(),
+        remoteBankAccounts.filter((b) => !DEMO_BANK_IDS.has(b.id)).map((b) => {
           if (b.id === 'ACC_CASH' && b.openingBalance === 15000) {
             return { ...b, openingBalance: 0 };
           }
           return b;
-        });
-        this.set(STORAGE_KEYS.BANK_ACCOUNTS, filtered.length > 0 ? filtered : DEFAULT_BANK_ACCOUNTS);
-      }
-      if (remoteCashBankTxns.length > 0) {
-        const filtered = remoteCashBankTxns.filter((t) => !DEMO_TXN_IDS.has(t.id));
-        this.set(STORAGE_KEYS.CASH_BANK_TXNS, filtered);
-      }
-      if (remoteLoans.length > 0) {
-        this.set(STORAGE_KEYS.LOANS, remoteLoans);
-      }
-      if (remoteLoanTxns.length > 0) {
-        this.set(STORAGE_KEYS.LOAN_TXNS, remoteLoanTxns);
+        })
+      );
+      this.reconcileCollection(
+        'cash_bank_txn',
+        STORAGE_KEYS.CASH_BANK_TXNS,
+        this.getCashBankTransactions(),
+        remoteCashBankTxns,
+        (t) => !DEMO_TXN_IDS.has(t.id)
+      );
+      this.reconcileCollection(
+        'loan',
+        STORAGE_KEYS.LOANS,
+        this.getLoans(),
+        remoteLoans
+      );
+      this.reconcileCollection(
+        'loan_txn',
+        STORAGE_KEYS.LOAN_TXNS,
+        this.getLoanTransactions(),
+        remoteLoanTxns
+      );
+
+      if (typeof (pouch as any)?.refreshConflicts === 'function') {
+        await (pouch as any).refreshConflicts();
       }
 
       this.syncAllPartyBalances();
       this.notifyListeners();
     } catch (e) {
       console.warn('Error applying full PouchDB sync:', e);
+    }
+  }
+
+  public async getConflicts(): Promise<SyncConflict[]> {
+    if (typeof (pouch as any)?.getConflicts === 'function') {
+      return (pouch as any).getConflicts();
+    }
+    return [];
+  }
+
+  public async resolveConflict(
+    conflictId: string,
+    choice: 'keep_winning' | 'keep_conflicting' | 'merge',
+    options?: { docId?: string; winningRev?: string; conflictingRev?: string; mergedDoc?: any }
+  ): Promise<void> {
+    if (typeof (pouch as any)?.resolveConflict === 'function') {
+      const docId = options?.docId || conflictId.split('#')[0];
+      const conflictingRev = options?.conflictingRev || conflictId.split('#')[1];
+
+      const conflicts = await this.getConflicts();
+      const targetConflict = conflicts.find((c) => c.id === conflictId || c.docId === docId);
+
+      await (pouch as any).resolveConflict(docId, choice, {
+        ...options,
+        conflictingRev,
+      });
+
+      if (targetConflict) {
+        const colonIdx = docId.indexOf(':');
+        const entityType = colonIdx !== -1 ? docId.substring(0, colonIdx) : targetConflict.docType;
+        const entityId = targetConflict.entityId;
+
+        if (choice === 'keep_winning') {
+          this.applyLocalEntityMutation(entityType, 'save', entityId, targetConflict.winningDoc);
+        } else if (choice === 'keep_conflicting') {
+          this.applyLocalEntityMutation(entityType, 'save', entityId, targetConflict.conflictingDoc);
+        }
+      }
+
+      await this.syncAllFromPouch();
     }
   }
 

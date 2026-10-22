@@ -6,3 +6,6 @@ export * from './financialStorage.ts';
 export * from './invoicePurchaseStorage.ts';
 export * from './backupRestoreStorage.ts';
 export * from './syncStorage.ts';
+export * from './preMigrationBackup.ts';
+export * from './reconcileAndRepair.ts';
+export * from './migrateLegacySplits.ts';

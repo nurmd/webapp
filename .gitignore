@@ -29,3 +29,16 @@ dist-pwa/*
 !.agents/skills/
 dist-test/
 
+# Keystores, signing certificates, and secrets (Repository Policy)
+android-native/keystore/
+*.keystore
+*.jks
+*.p12
+signing.properties
+lineage.proof
+*.key
+.env
+.env.*
+!.env.example
+
+

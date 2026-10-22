@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoice.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
+import { db } from '../../../services/db.ts';
 
 export interface PaymentSettlementDockProps {
   paymentSplits: PaymentSplit[];
@@ -8,9 +9,11 @@ export interface PaymentSettlementDockProps {
   balanceDue: number;
   onUpdateSplitMode: (id: string, mode: PaymentMode) => void;
   onUpdateSplitAmount: (id: string, amount: number) => void;
+  onUpdateSplitAccount?: (id: string, accountId: string, accountName: string) => void;
   onAddSplitMode: () => void;
   onRemoveSplit: (id: string) => void;
   paymentModes?: { value: PaymentMode; label: string }[];
+  bankAccounts?: { id: string; accountName: string; bankName?: string; accountType?: string }[];
 }
 
 const DEFAULT_PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
@@ -28,10 +31,21 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
   balanceDue,
   onUpdateSplitMode,
   onUpdateSplitAmount,
+  onUpdateSplitAccount,
   onAddSplitMode,
   onRemoveSplit,
   paymentModes = DEFAULT_PAYMENT_MODES,
+  bankAccounts: passedBankAccounts,
 }) => {
+  const activeBankAccounts = useMemo(() => {
+    if (passedBankAccounts && passedBankAccounts.length > 0) {
+      return passedBankAccounts.filter((b) => (b.accountType || 'BANK') === 'BANK');
+    }
+    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
+  }, [passedBankAccounts]);
+
+  const defaultBank = activeBankAccounts.find((b) => (b as any).isDefault) || activeBankAccounts[0];
+  const defaultBankId = defaultBank?.id || 'ACC_BANK';
   return (
     <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
       {/* Header with Title and Auto-Identified Status */}
@@ -85,6 +99,32 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
                 arrow_drop_down
               </span>
             </div>
+
+            {/* Bank Account Selector for non-cash tenders */}
+            {split.mode !== 'CASH' && split.mode !== 'CREDIT' && activeBankAccounts.length > 0 && (
+              <div className="relative flex-1 sm:max-w-[150px]">
+                <select
+                  value={split.accountId || defaultBankId}
+                  onChange={(e) => {
+                    const acc = activeBankAccounts.find((b) => b.id === e.target.value);
+                    if (acc && onUpdateSplitAccount) {
+                      onUpdateSplitAccount(split.id, acc.id, acc.accountName);
+                    }
+                  }}
+                  className="w-full h-8 pl-2 pr-6 rounded-lg bg-surface-container-low text-[11px] font-semibold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-colors cursor-pointer appearance-none truncate"
+                  title="Select bank account for this split"
+                >
+                  {activeBankAccounts.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.accountName}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined text-[14px] text-outline absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                  account_balance
+                </span>
+              </div>
+            )}
 
             {/* Amount Input (or ledger banner if Credit) */}
             {split.mode !== 'CREDIT' ? (

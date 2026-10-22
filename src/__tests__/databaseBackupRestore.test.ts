@@ -43,7 +43,13 @@ vi.mock('../services/pouchdb.ts', () => {
       putDoc: vi.fn(async (type: string, doc: any) => {
         inMemoryDocs.set(`${type}:${doc.id}`, { ...doc, docType: type });
       }),
+      putDocStrict: vi.fn(async (type: string, doc: any) => {
+        inMemoryDocs.set(`${type}:${doc.id}`, { ...doc, docType: type });
+      }),
       deleteDoc: vi.fn(async (type: string, id: string) => {
+        inMemoryDocs.delete(`${type}:${id}`);
+      }),
+      deleteDocStrict: vi.fn(async (type: string, id: string) => {
         inMemoryDocs.delete(`${type}:${id}`);
       }),
       getAllDocs: vi.fn(async (type: string) => {
@@ -55,8 +61,10 @@ vi.mock('../services/pouchdb.ts', () => {
       getDoc: vi.fn(async (type: string, id: string) => {
         return inMemoryDocs.get(`${type}:${id}`) || null;
       }),
+      getAllTombstones: vi.fn(async () => []),
       migrateFromLocalStorage: vi.fn(async () => {}),
       sync: vi.fn(),
+      syncNow: vi.fn(async () => {}),
       getSyncState: vi.fn(() => ({ status: 'idle', message: 'Offline' })),
       subscribeSync: vi.fn(() => () => {}),
     },
@@ -64,7 +72,14 @@ vi.mock('../services/pouchdb.ts', () => {
   };
 });
 
+import { pouch } from '../services/pouchdb.ts';
 import { db } from '../services/db.ts';
+import {
+  createAndVerifyPreMigrationBackup,
+  hasVerifiedPreMigrationBackup,
+  restorePreMigrationBackup,
+} from '../services/db/preMigrationBackup.ts';
+import packageJson from '../../package.json';
 import {
   computeBackupChecksum,
   generateBackupFilename,
@@ -358,6 +373,101 @@ describe('Database Backup & Restore Engine', () => {
       corrupted.checksum = '0000000000000000000000000000000000000000000000000000000000000000';
 
       await expect(db.restoreDatabaseBackup(corrupted)).rejects.toThrow('Checksum does not match');
+    });
+
+    it('uses dynamic appVersion matching package.json', () => {
+      const bundle = db.createDatabaseBackup();
+      expect(bundle.appVersion).toBe(packageJson.version);
+    });
+
+    it('deletes stale PouchDB docs in REPLACE mode preventing syncAllFromPouch resurrection', async () => {
+      // 1. Seed old invoice in localStorage and PouchDB
+      const oldInvoice = {
+        id: 'INV-OLD-999',
+        invoiceNumber: 'INV-OLD-999',
+        date: '2026-01-01',
+        customerName: 'Old Customer',
+        items: [],
+        grandTotal: 500,
+        status: 'PAID',
+      } as any;
+      db.saveInvoice(oldInvoice);
+      await pouch.putDoc('invoice', oldInvoice);
+
+      const beforeDocs = await pouch.getAllDocs('invoice');
+      expect(beforeDocs.some((i: any) => i.id === 'INV-OLD-999')).toBe(true);
+
+      // 2. Prepare bundle without the old invoice
+      const bundle = db.createDatabaseBackup();
+      bundle.data.invoices = [
+        {
+          id: 'INV-NEW-001',
+          invoiceNumber: 'INV-NEW-001',
+          date: '2026-04-10',
+          customerName: 'New Customer',
+          items: [],
+          grandTotal: 1000,
+          status: 'PAID',
+        } as any,
+      ];
+      bundle.checksum = computeBackupChecksum(bundle.data);
+
+      // 3. Restore in REPLACE mode
+      await db.restoreDatabaseBackup(bundle, 'REPLACE');
+
+      // 4. Assert old invoice was deleted from PouchDB
+      const pouchInvoices = await pouch.getAllDocs('invoice');
+      expect(pouchInvoices.some((i: any) => i.id === 'INV-OLD-999')).toBe(false);
+      expect(pouchInvoices.some((i: any) => i.id === 'INV-NEW-001')).toBe(true);
+
+      // 5. Call syncAllFromPouch and verify old invoice does not resurrect
+      await db.syncAllFromPouch();
+      const storedInvoices = db.getInvoices();
+      expect(storedInvoices.some((i) => i.id === 'INV-OLD-999')).toBe(false);
+      expect(storedInvoices.some((i) => i.id === 'INV-NEW-001')).toBe(true);
+    });
+
+    it('rolls back local storage and rejects when a PouchDB write fails', async () => {
+      const initialParty = createSampleParty('PARTY-SAFE-01', 'Safe Customer');
+      db.saveParty(initialParty);
+
+      const bundle = db.createDatabaseBackup();
+      bundle.data.parties = [createSampleParty('PARTY-INCOMING-FAIL', 'Incoming Fail Customer')];
+      bundle.checksum = computeBackupChecksum(bundle.data);
+
+      const putStrictSpy = vi.spyOn(pouch, 'putDocStrict').mockRejectedValueOnce(new Error('PouchDB disk write error'));
+
+      await expect(db.restoreDatabaseBackup(bundle, 'REPLACE')).rejects.toThrow('PouchDB disk write error');
+
+      const currentParties = db.getParties();
+      expect(currentParties.some((p) => p.id === 'PARTY-SAFE-01')).toBe(true);
+      expect(currentParties.some((p) => p.id === 'PARTY-INCOMING-FAIL')).toBe(false);
+
+      putStrictSpy.mockRestore();
+    });
+
+    it('creates and verifies a restorable pre-migration safety snapshot prior to restore', async () => {
+      const party = createSampleParty('PARTY-SNAPSHOT-01', 'Snapshot Customer');
+      db.saveParty(party);
+
+      const snapshotId = `restore_test_${Date.now()}`;
+      const snapshotResult = createAndVerifyPreMigrationBackup(snapshotId);
+
+      expect(snapshotResult.success).toBe(true);
+      expect(snapshotResult.migrationId).toBe(snapshotId);
+      expect(hasVerifiedPreMigrationBackup(snapshotId)).toBe(true);
+
+      // Mutate data
+      db.saveParty(createSampleParty('PARTY-MUTATED-01', 'Mutated Customer'));
+      expect(db.getParties().some((p) => p.id === 'PARTY-MUTATED-01')).toBe(true);
+
+      // Restore from snapshot
+      const restored = await restorePreMigrationBackup(snapshotId);
+      expect(restored).toBe(true);
+
+      const partiesAfterRollback = db.getParties();
+      expect(partiesAfterRollback.some((p) => p.id === 'PARTY-SNAPSHOT-01')).toBe(true);
+      expect(partiesAfterRollback.some((p) => p.id === 'PARTY-MUTATED-01')).toBe(false);
     });
   });
 });

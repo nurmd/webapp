@@ -47,6 +47,7 @@ vi.mock('../services/pouchdb.ts', () => ({
 }));
 
 import { db } from '../services/db.ts';
+import { STORAGE_KEYS } from '../services/db/storageEngine.ts';
 import { Party } from '../models/party.ts';
 import { InventoryItem } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
@@ -305,6 +306,11 @@ describe('Financial Balance and Inventory Stock Auditors', () => {
         updatedAt: '2026-01-16T10:00:00.000Z',
       };
       db.saveInvoice(corruptedInvoice);
+      // Simulate historical corruption in storage after save
+      const corruptedList = db.getInvoices().map((inv) =>
+        inv.id === corruptedInvoice.id ? { ...inv, balanceAmount: 500 } : inv
+      );
+      (db as any).set(STORAGE_KEYS.INVOICES, corruptedList);
 
       const reportBefore = auditAllPartyBalances();
       expect(reportBefore.inconsistentDocuments.length).toBe(1);
@@ -719,18 +725,30 @@ describe('Financial Balance and Inventory Stock Auditors', () => {
       expect(drCgst?.debit).toBe(1250);
       expect(crCgst?.credit).toBe(1250);
 
-      // 2. Updating bill to non-RCM removes the paired RCM voucher
+      // 2. Updating bill to non-RCM reverses the paired RCM voucher (no hard-deletes)
       db.savePurchase({ ...rcmBill, isRcm: false });
       const vouchersAfterNonRcm = db.getVouchers();
-      expect(vouchersAfterNonRcm.find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeUndefined();
+      const rcmV = vouchersAfterNonRcm.find((v) => v.id === `VCH-RCM-${rcmBill.id}`);
+      expect(rcmV).toBeDefined();
+      expect(rcmV?.isReversed).toBe(true);
+      expect(vouchersAfterNonRcm.find((v) => v.reversalOfVoucherId === `VCH-RCM-${rcmBill.id}`)).toBeDefined();
 
-      // 3. Re-saving as RCM regenerates it
+      // 3. Re-saving as RCM regenerates active RCM voucher without overwriting reversed predecessor
       db.savePurchase(rcmBill);
-      expect(db.getVouchers().find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeDefined();
+      const activeRcm = db.getVouchers().find(
+        (v) => (v.id === `VCH-RCM-${rcmBill.id}` || v.id.startsWith(`VCH-RCM-${rcmBill.id}-`)) && !v.isReversed
+      );
+      expect(activeRcm).toBeDefined();
 
-      // 4. Deleting the purchase bill cleans up the paired RCM voucher
+      // Original reversed voucher is preserved intact
+      const origReversed = db.getVouchers().find((v) => v.id === `VCH-RCM-${rcmBill.id}`);
+      expect(origReversed?.isReversed).toBe(true);
+
+      // 4. Deleting the purchase bill reverses the new active RCM voucher
       db.deletePurchase(rcmBill.id);
-      expect(db.getVouchers().find((v) => v.id === `VCH-RCM-${rcmBill.id}`)).toBeUndefined();
+      const deletedRcm = db.getVouchers().find((v) => v.id === activeRcm?.id);
+      expect(deletedRcm?.isReversed).toBe(true);
+      expect(db.getVouchers().find((v) => v.reversalOfVoucherId === activeRcm?.id)).toBeDefined();
     });
   });
 });

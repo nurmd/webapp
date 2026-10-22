@@ -103,10 +103,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         return;
       }
       amt = totalSplit;
+      const selectedBank = availableBankAccounts.find((a) => a.id === selectedBankAccountId) || availableBankAccounts[0];
       splits = [
-        ...(c > 0 ? [{ id: 's-cash', mode: 'CASH' as const, amount: c }] : []),
-        ...(u > 0 ? [{ id: 's-upi', mode: 'UPI' as const, amount: u }] : []),
-        ...(b > 0 ? [{ id: 's-bank', mode: 'BANK' as const, amount: b }] : []),
+        ...(c > 0 ? [{ id: 's-cash', mode: 'CASH' as const, amount: c, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' }] : []),
+        ...(u > 0 ? [{ id: 's-upi', mode: 'UPI' as const, amount: u, accountId: selectedBank?.id, accountName: selectedBank?.accountName }] : []),
+        ...(b > 0 ? [{ id: 's-bank', mode: 'BANK' as const, amount: b, accountId: selectedBank?.id, accountName: selectedBank?.accountName }] : []),
       ];
     }
 

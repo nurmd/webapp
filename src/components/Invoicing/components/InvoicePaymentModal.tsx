@@ -3,6 +3,7 @@ import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoic
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { formatSplitNotes } from '../../../core/accounting/paymentSplitUtils.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
+import { db } from '../../../services/db.ts';
 
 export interface InvoicePaymentModalProps {
   isOpen: boolean;
@@ -53,10 +54,21 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
         id: s.id || `split-${idx}-${Date.now()}`,
         mode: s.mode,
         amount: Number(s.amount) || 0,
+        accountId: s.accountId,
+        accountName: s.accountName,
+        reference: s.reference || s.referenceNo,
+        referenceNo: s.referenceNo || s.reference,
       }));
     }
-    return [{ id: '1', mode: 'CASH', amount: finalGrandTotal }];
+    return [{ id: '1', mode: 'CASH', amount: finalGrandTotal, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' }];
   });
+
+  const bankAccounts = useMemo(() => {
+    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
+  }, []);
+
+  const defaultBank = bankAccounts.find((b) => (b as any).isDefault) || bankAccounts[0];
+  const defaultBankId = defaultBank?.id || 'ACC_BANK';
 
   const [paymentRefNotes, setPaymentRefNotes] = useState('');
 
@@ -191,7 +203,15 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     let excessToDeduct = changeToReturn;
     const savedSplits: PaymentSplit[] = splits.map((s) => {
       if (s.mode === 'CREDIT') {
-        return { id: s.id, mode: s.mode, amount: balanceDue };
+        return {
+          id: s.id,
+          mode: s.mode,
+          amount: balanceDue,
+          accountId: s.accountId,
+          accountName: s.accountName,
+          reference: s.reference || s.referenceNo,
+          referenceNo: s.referenceNo || s.reference,
+        };
       }
       const rawAmount = Number(s.amount) || 0;
       if (s.mode === 'CASH' && excessToDeduct > 0) {
@@ -201,12 +221,20 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
           id: s.id,
           mode: s.mode,
           amount: Number(Math.max(0, rawAmount - deduction).toFixed(2)),
+          accountId: s.accountId || 'ACC_CASH',
+          accountName: s.accountName || 'Cash in Hand',
+          reference: s.reference || s.referenceNo,
+          referenceNo: s.referenceNo || s.reference,
         };
       }
       return {
         id: s.id,
         mode: s.mode,
         amount: rawAmount,
+        accountId: s.accountId || (s.mode === 'CASH' ? 'ACC_CASH' : defaultBankId),
+        accountName: s.accountName || (s.mode === 'CASH' ? 'Cash in Hand' : defaultBank?.accountName),
+        reference: s.reference || s.referenceNo,
+        referenceNo: s.referenceNo || s.reference,
       };
     });
 
@@ -358,6 +386,32 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       className="w-full h-8 pl-6 pr-2.5 rounded-lg bg-surface-container-lowest text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
                     />
                   </div>
+                  {splits[0].mode !== 'CASH' && bankAccounts.length > 0 && (
+                    <div className="relative mt-1.5">
+                      <select
+                        value={splits[0].accountId || defaultBankId}
+                        onChange={(e) => {
+                          const acc = bankAccounts.find((b) => b.id === e.target.value);
+                          if (acc) {
+                            setSplits((prev) =>
+                              prev.map((s, idx) => (idx === 0 ? { ...s, accountId: acc.id, accountName: acc.accountName } : s))
+                            );
+                          }
+                        }}
+                        className="w-full h-7 pl-2 pr-6 rounded-lg bg-surface-container-lowest text-[11px] font-semibold text-on-surface border border-outline-variant/30 outline-none cursor-pointer appearance-none truncate"
+                        title="Select bank account for this payment"
+                      >
+                        {bankAccounts.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.accountName}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined text-[13px] text-outline absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                        account_balance
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-between text-xs py-1">
@@ -418,6 +472,33 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                         arrow_drop_down
                       </span>
                     </div>
+
+                    {split.mode !== 'CASH' && split.mode !== 'CREDIT' && bankAccounts.length > 0 && (
+                      <div className="relative flex-1 sm:max-w-[130px]">
+                        <select
+                          value={split.accountId || defaultBankId}
+                          onChange={(e) => {
+                            const acc = bankAccounts.find((b) => b.id === e.target.value);
+                            if (acc) {
+                              setSplits((prev) =>
+                                prev.map((s) => (s.id === split.id ? { ...s, accountId: acc.id, accountName: acc.accountName } : s))
+                              );
+                            }
+                          }}
+                          className="w-full h-8 pl-2 pr-5 rounded-lg bg-surface-container-lowest text-[11px] font-semibold text-on-surface border border-outline-variant/30 outline-none cursor-pointer appearance-none truncate"
+                          title="Select bank account for this split"
+                        >
+                          {bankAccounts.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.accountName}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="material-symbols-outlined text-[13px] text-outline absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none">
+                          account_balance
+                        </span>
+                      </div>
+                    )}
 
                     <div className="relative flex-1 flex items-center">
                       <span className="absolute left-2 text-[11px] font-semibold text-outline pointer-events-none">₹</span>

@@ -283,12 +283,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // C. Accounting Vouchers (Receipts = Money In, Payments = Money Out)
     activeVouchers.forEach((v, vIdx) => {
       if (!v) return;
+      if (v.isReversed || v.isCancelled) return;
       // Exclude auto-generated SALES and PURCHASE vouchers that mirror primary invoices/purchases
       if (v.voucherType === 'SALES' || v.voucherType === 'PURCHASE') {
         return;
       }
       const vNum = v.voucherNumber || '';
-      if (vNum.startsWith('VCH-SAL-') || vNum.startsWith('VCH-PUR-')) {
+      if (vNum.startsWith('VCH-SAL-') || vNum.startsWith('VCH-PUR-') || vNum.startsWith('VCH-REV-') || vNum.startsWith('VCH-RCM-')) {
         return;
       }
 

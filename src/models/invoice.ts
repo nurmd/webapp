@@ -19,6 +19,10 @@ export interface PaymentSplit {
   id: string;
   mode: PaymentMode;
   amount: number;
+  accountId?: string;
+  accountName?: string;
+  reference?: string;
+  referenceNo?: string;
 }
 
 export interface InvoiceItemEntry {

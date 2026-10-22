@@ -21,7 +21,7 @@ if (typeof window !== 'undefined') {
 
 // Mock pouchdb
 vi.mock('../services/pouchdb.ts', () => ({
-  DEFAULT_COUCHDB_REMOTE_URL: 'https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo',
+  DEFAULT_COUCHDB_REMOTE_URL: '',
   pouch: {
     putDoc: vi.fn(async () => ({ ok: true })),
     deleteDoc: vi.fn(async () => ({ ok: true })),
@@ -75,11 +75,11 @@ describe('Demo CouchDB Sync & Data Population Test Suite', () => {
     root = createRoot(container);
   });
 
-  it('verifies DEFAULT_COUCHDB_REMOTE_URL configuration', () => {
-    expect(DEFAULT_COUCHDB_REMOTE_URL).toBe('https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo');
+  it('verifies DEFAULT_COUCHDB_REMOTE_URL is empty', () => {
+    expect(DEFAULT_COUCHDB_REMOTE_URL).toBe('');
   });
 
-  it('renders "Use Demo CouchDB" button and initiates sync on click', async () => {
+  it('verifies that the insecure "Use Demo CouchDB" button no longer exists in UI', async () => {
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
     });
@@ -100,58 +100,53 @@ describe('Demo CouchDB Sync & Data Population Test Suite', () => {
       tuneBtn.click();
     });
 
-    // Find and click "Use Demo CouchDB" button
-    const useDemoBtn = container.querySelector('[data-testid="use-demo-couchdb-btn"]') as HTMLButtonElement;
-    expect(useDemoBtn).not.toBeNull();
-    expect(useDemoBtn.textContent).toContain('Use Demo CouchDB');
-
-    act(() => {
-      useDemoBtn.click();
-    });
-
-    expect(pouch.startSync).toHaveBeenCalledWith('https://demo:passwordisdemo@sync.brahmaputrahw.store/gst_demo');
+    // Verify "Use Demo CouchDB" button does NOT exist
+    const useDemoBtn = container.querySelector('[data-testid="use-demo-couchdb-btn"]');
+    expect(useDemoBtn).toBeNull();
+    expect(pouch.startSync).not.toHaveBeenCalled();
   });
 
-  it('loads rich demo dataset via db.loadDemoData() and syncs to pouch', async () => {
+  it('loads rich demo dataset locally via db.loadDemoData() without remote sync', async () => {
     await db.loadDemoData();
 
-    // Verify Company was updated
+    // Verify Company was updated locally
     const currentCompany = db.getCompany();
     expect(currentCompany.businessName).toBe(DEMO_COMPANY.businessName);
     expect(currentCompany.gstin).toBe(DEMO_COMPANY.gstin);
 
-    // Verify Items loaded
+    // Verify Items loaded locally
     const items = db.getItems();
     expect(items.length).toBe(DEMO_ITEMS.length);
     expect(items[0].name).toBe(DEMO_ITEMS[0].name);
 
-    // Verify Parties loaded
+    // Verify Parties loaded locally
     const parties = db.getParties();
     expect(parties.length).toBe(DEMO_PARTIES.length);
 
-    // Verify Invoices loaded
+    // Verify Invoices loaded locally
     const invoices = db.getInvoices();
     expect(invoices.length).toBe(DEMO_INVOICES.length);
 
-    // Verify Purchases loaded
+    // Verify Purchases loaded locally
     const purchases = db.getPurchases();
     expect(purchases.length).toBe(DEMO_PURCHASES.length);
 
-    // Verify Expenses loaded
+    // Verify Expenses loaded locally
     const expenses = db.getExpenses();
     expect(expenses.length).toBe(DEMO_EXPENSES.length);
 
-    // Verify Loans loaded
+    // Verify Loans loaded locally
     const loans = db.getLoans();
     expect(loans.length).toBe(DEMO_LOANS.length);
     expect(loans[0].accountNumber).toBe('39820019284');
     expect(loans[0].lenderName).toBe('State Bank of India MSME Loan');
 
-    // Verify Loan Transactions loaded
+    // Verify Loan Transactions loaded locally
     const loanTxns = db.getLoanTransactions();
     expect(loanTxns.length).toBe(DEMO_LOAN_TXNS.length);
 
-    // Verify Pouch putDoc was invoked for demo records
-    expect(pouch.putDoc).toHaveBeenCalled();
+    // Verify remote sync was NOT triggered
+    expect(pouch.startSync).not.toHaveBeenCalled();
+    expect(pouch.syncNow).not.toHaveBeenCalled();
   });
 });

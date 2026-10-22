@@ -294,6 +294,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
     let payAmt = paymentAmount;
     let splitsToAdd: PaymentSplit[] = [];
+    const defaultBank = db.getBankAccounts().find((b) => b.isDefault && b.accountType === 'BANK') || db.getBankAccounts().find((b) => b.accountType === 'BANK');
 
     if (paymentMode === 'SPLIT') {
       const c = parseFloat(splitCash) || 0;
@@ -305,12 +306,19 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         return;
       }
       payAmt = totalSplit;
-      if (c > 0) splitsToAdd.push({ id: `rcpt-c-${Date.now()}`, mode: 'CASH', amount: c });
-      if (u > 0) splitsToAdd.push({ id: `rcpt-u-${Date.now()}`, mode: 'UPI', amount: u });
-      if (b > 0) splitsToAdd.push({ id: `rcpt-b-${Date.now()}`, mode: 'BANK', amount: b });
+      if (c > 0) splitsToAdd.push({ id: `rcpt-c-${Date.now()}`, mode: 'CASH', amount: c, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' });
+      if (u > 0) splitsToAdd.push({ id: `rcpt-u-${Date.now()}`, mode: 'UPI', amount: u, accountId: defaultBank?.id, accountName: defaultBank?.accountName });
+      if (b > 0) splitsToAdd.push({ id: `rcpt-b-${Date.now()}`, mode: 'BANK', amount: b, accountId: defaultBank?.id, accountName: defaultBank?.accountName });
     } else {
       if (payAmt <= 0) return;
-      splitsToAdd.push({ id: `rcpt-${Date.now()}`, mode: paymentMode, amount: payAmt });
+      const isCash = paymentMode === 'CASH';
+      splitsToAdd.push({
+        id: `rcpt-${Date.now()}`,
+        mode: paymentMode,
+        amount: payAmt,
+        accountId: isCash ? 'ACC_CASH' : defaultBank?.id,
+        accountName: isCash ? 'Cash-in-hand' : defaultBank?.accountName,
+      });
     }
 
     if (payAmt <= 0) return;
@@ -352,6 +360,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       amount: payAmt,
       discount: discAmt,
       paymentMode: paymentMode,
+      bankAccountId: defaultBank?.id,
+      bankAccountName: defaultBank?.accountName,
       paymentSplits: splitsToAdd,
       referenceNo: paymentModalInvoice.invoiceNumber,
       narration: `Payment received against invoice #${paymentModalInvoice.invoiceNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,

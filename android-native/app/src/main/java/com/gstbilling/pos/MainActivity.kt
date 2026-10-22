@@ -1,13 +1,12 @@
 package com.gstbilling.pos
 
 import android.app.Activity
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
@@ -21,6 +20,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -34,17 +34,23 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var vibrator: Vibrator? = null
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    var pendingBackupDisplayName: String? = null
 
     companion object {
         const val FILE_CHOOSER_REQUEST_CODE = 2001
-        const val STORAGE_PERMISSION_REQUEST_CODE = 102
+        const val CREATE_BACKUP_DOCUMENT_REQUEST_CODE = 2002
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Clean up temporary update APK from previous session if install was completed
-        cleanTempApk()
+        // Only clean stale pending backup files on fresh startup; preserve state across Activity recreations
+        if (savedInstanceState == null) {
+            cleanTempFiles()
+        } else {
+            pendingBackupDisplayName = savedInstanceState.getString("pendingBackupDisplayName")
+            cleanTempApk()
+        }
 
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
@@ -80,17 +86,6 @@ class MainActivity : Activity() {
 
         setupWebView()
         webView.loadUrl("https://appassets.androidplatform.net/index.html")
-        
-        // Request Storage permissions for Android 6.0+ (API 23+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val storagePermissions = arrayOf(
-                android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ).filter { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
-            if (storagePermissions.isNotEmpty()) {
-                requestPermissions(storagePermissions.toTypedArray(), STORAGE_PERMISSION_REQUEST_CODE)
-            }
-        }
 
         // Request Bluetooth permissions for Android 12+
         if (Build.VERSION.SDK_INT >= 31) {
@@ -111,6 +106,21 @@ class MainActivity : Activity() {
         cleanTempApk()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("pendingBackupDisplayName", pendingBackupDisplayName)
+    }
+
+    fun cleanPendingBackup() {
+        try {
+            val tempBackup = File(cacheDir, "pending_backup.json")
+            if (tempBackup.exists()) {
+                tempBackup.delete()
+            }
+        } catch (_: Exception) {}
+        pendingBackupDisplayName = null
+    }
+
     private fun cleanTempApk() {
         try {
             val tempApk = File(cacheDir, "temp_update.apk")
@@ -118,6 +128,23 @@ class MainActivity : Activity() {
                 tempApk.delete()
             }
         } catch (_: Exception) {}
+    }
+
+    private fun cleanTempFiles() {
+        cleanTempApk()
+        cleanPendingBackup()
+    }
+
+    fun dispatchBackupResult(status: String, displayName: String, message: String) {
+        val qStatus = JSONObject.quote(status)
+        val qDisplayName = JSONObject.quote(displayName)
+        val qMessage = JSONObject.quote(message)
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.onBackupSaveResult && window.onBackupSaveResult($qStatus, $qDisplayName, $qMessage);",
+                null
+            )
+        }
     }
 
     private fun setupWebView() {
@@ -262,16 +289,49 @@ class MainActivity : Activity() {
                 fileUploadCallback?.onReceiveValue(results)
                 fileUploadCallback = null
             }
+        } else if (requestCode == CREATE_BACKUP_DOCUMENT_REQUEST_CODE) {
+            val displayName = pendingBackupDisplayName ?: "backup.json"
+            if (resultCode == Activity.RESULT_OK) {
+                val uri = data?.data
+                val tempFile = File(cacheDir, "pending_backup.json")
+                if (uri == null || !tempFile.exists()) {
+                    cleanPendingBackup()
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "Failed to save backup: Backup payload missing", Toast.LENGTH_LONG).show()
+                    }
+                    dispatchBackupResult("ERROR", displayName, "Backup payload missing")
+                } else {
+                    Thread {
+                        try {
+                            contentResolver.openOutputStream(uri)?.use { os ->
+                                tempFile.inputStream().use { input ->
+                                    input.copyTo(os)
+                                }
+                                os.flush()
+                            } ?: throw IOException("Failed to open destination stream")
+                            cleanPendingBackup()
+                            runOnUiThread {
+                                Toast.makeText(this@MainActivity, "Backup saved: $displayName", Toast.LENGTH_LONG).show()
+                            }
+                            dispatchBackupResult("SUCCESS", displayName, "")
+                        } catch (e: Exception) {
+                            cleanPendingBackup()
+                            runOnUiThread {
+                                Toast.makeText(this@MainActivity, "Failed to save backup: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                            dispatchBackupResult("ERROR", displayName, e.message ?: "Failed to save backup")
+                        }
+                    }.start()
+                }
+            } else {
+                cleanPendingBackup()
+                dispatchBackupResult("CANCELLED", displayName, "Backup cancelled")
+            }
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == STORAGE_PERMISSION_REQUEST_CODE) {
-            val allGranted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
-            val status = if (allGranted) "GRANTED" else "DENIED"
-            webView.evaluateJavascript("window.onStoragePermissionResult && window.onStoragePermissionResult('$status');", null)
-        }
     }
 
     private var lastBackPressTime: Long = 0
@@ -341,93 +401,76 @@ class AndroidBridge(
     }
 
     @JavascriptInterface
-    fun hasStoragePermission(): Boolean {
-        return try {
-            if (Build.VERSION.SDK_INT >= 30) {
-                var isManager = false
-                try {
-                    val method = Environment::class.java.getMethod("isExternalStorageManager")
-                    isManager = method.invoke(null) as? Boolean ?: false
-                } catch (_: Exception) {}
-                isManager || context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val read = context.checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                val write = context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                read && write
-            } else {
-                true
-            }
-        } catch (_: Exception) {
-            true
+    fun downloadBackup(filename: String, jsonContent: String) {
+        val safeName = if (filename.endsWith(".json")) filename else "$filename.json"
+        if (Build.VERSION.SDK_INT < 29) {
+            saveBackupWithPicker(safeName, jsonContent)
+            return
         }
+
+        Thread {
+            var pendingUri: Uri? = null
+            try {
+                val values = ContentValues().apply {
+                    put("_display_name", safeName)
+                    put("mime_type", "application/json")
+                    put("relative_path", "Download/GSTBilling")
+                    put("is_pending", 1)
+                }
+                val downloadsUri = Class.forName("android.provider.MediaStore\$Downloads")
+                    .getField("EXTERNAL_CONTENT_URI")
+                    .get(null) as Uri
+                val resolver = context.contentResolver
+                val uri = resolver.insert(downloadsUri, values)
+                    ?: throw IOException("Failed to create Downloads entry")
+                pendingUri = uri
+
+                resolver.openOutputStream(uri)?.use { os ->
+                    os.write(jsonContent.toByteArray(Charsets.UTF_8))
+                    os.flush()
+                } ?: throw IOException("Failed to open Downloads output stream")
+
+                values.clear()
+                values.put("is_pending", 0)
+                resolver.update(uri, values, null, null)
+
+                dispatchBackupResult("SUCCESS", safeName, "")
+            } catch (e: Exception) {
+                if (pendingUri != null) {
+                    try { context.contentResolver.delete(pendingUri, null, null) } catch (_: Exception) {}
+                }
+                // Never fail the user action: fall back to the permissionless SAF picker.
+                saveBackupWithPicker(safeName, jsonContent)
+            }
+        }.start()
     }
 
     @JavascriptInterface
-    fun requestStoragePermission() {
-        (context as? Activity)?.let { act ->
+    fun saveBackupWithPicker(filename: String, jsonContent: String) {
+        val safeName = if (filename.endsWith(".json")) filename else "$filename.json"
+        (context as? MainActivity)?.let { act ->
             act.runOnUiThread {
                 try {
-                    if (Build.VERSION.SDK_INT >= 30) {
-                        try {
-                            val intent = Intent("android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION").apply {
-                                data = Uri.parse("package:${context.packageName}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            val intent = Intent("android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION").apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        }
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        act.requestPermissions(
-                            arrayOf(
-                                android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                                android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                            ),
-                            MainActivity.STORAGE_PERMISSION_REQUEST_CODE
-                        )
+                    val tempFile = File(act.cacheDir, "pending_backup.json")
+                    tempFile.writeText(jsonContent, Charsets.UTF_8)
+                    act.pendingBackupDisplayName = safeName
+
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/json"
+                        putExtra(Intent.EXTRA_TITLE, safeName)
                     }
+                    act.startActivityForResult(intent, MainActivity.CREATE_BACKUP_DOCUMENT_REQUEST_CODE)
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Could not open storage permission settings", Toast.LENGTH_SHORT).show()
+                    act.cleanPendingBackup()
+                    act.dispatchBackupResult("ERROR", safeName, e.message ?: "Failed to open save file picker")
                 }
             }
         }
     }
 
-    @JavascriptInterface
-    fun saveBackupToStorage(filename: String, jsonContent: String): String {
-        return try {
-            val safeName = if (filename.endsWith(".json")) filename else "$filename.json"
-            val targetFile = try {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                val vyaparDir = File(downloadsDir, "GSTBilling")
-                if (!vyaparDir.exists()) vyaparDir.mkdirs()
-                val f = File(vyaparDir, safeName)
-                f.writeText(jsonContent, Charsets.UTF_8)
-                f
-            } catch (_: Exception) {
-                val appDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-                val f = File(appDir, safeName)
-                f.writeText(jsonContent, Charsets.UTF_8)
-                f
-            }
-
-            try {
-                MediaScannerConnection.scanFile(context, arrayOf(targetFile.absolutePath), arrayOf("application/json"), null)
-            } catch (_: Exception) {}
-
-            (context as? Activity)?.runOnUiThread {
-                Toast.makeText(context, "Database backup saved: ${targetFile.name}", Toast.LENGTH_LONG).show()
-            }
-            "SUCCESS:${targetFile.absolutePath}"
-        } catch (e: Exception) {
-            (context as? Activity)?.runOnUiThread {
-                Toast.makeText(context, "Failed to save backup: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-            "ERROR:${e.message}"
-        }
+    private fun dispatchBackupResult(status: String, displayName: String, message: String) {
+        (context as? MainActivity)?.dispatchBackupResult(status, displayName, message)
     }
 
     @JavascriptInterface

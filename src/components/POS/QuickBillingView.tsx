@@ -71,6 +71,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     upi: number;
     card: number;
     credit: number;
+    upiAccountId?: string;
+    upiAccountName?: string;
+    cardAccountId?: string;
+    cardAccountName?: string;
   } | null>(null);
 
   // Modals
@@ -482,7 +486,19 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
   // Checkout Execution
   // Accepts an optional pre-resolved split breakdown to avoid React async state race.
-  const handleCheckout = (modeOverride?: PaymentMode, resolvedSplit?: { cash: number; upi: number; card: number; credit: number } | null) => {
+  const handleCheckout = (
+    modeOverride?: PaymentMode,
+    resolvedSplit?: {
+      cash: number;
+      upi: number;
+      card: number;
+      credit: number;
+      upiAccountId?: string;
+      upiAccountName?: string;
+      cardAccountId?: string;
+      cardAccountName?: string;
+    } | null
+  ) => {
     if (cart.length === 0) return;
 
     // Use the directly-passed split (avoids async setSplitBreakdown race condition).
@@ -568,12 +584,50 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const splitsList: PaymentSplit[] = activeSplit
       ? ([
-          activeSplit.cash > 0 ? { id: `split-cash-${Date.now()}`, mode: 'CASH' as PaymentMode, amount: activeSplit.cash } : null,
-          activeSplit.upi > 0 ? { id: `split-upi-${Date.now()}`, mode: 'UPI' as PaymentMode, amount: activeSplit.upi } : null,
-          activeSplit.card > 0 ? { id: `split-card-${Date.now()}`, mode: 'CARD' as PaymentMode, amount: activeSplit.card } : null,
-          activeSplit.credit > 0 ? { id: `split-credit-${Date.now()}`, mode: 'CREDIT' as PaymentMode, amount: activeSplit.credit } : null,
+          activeSplit.cash > 0
+            ? {
+                id: `split-cash-${Date.now()}`,
+                mode: 'CASH' as PaymentMode,
+                amount: activeSplit.cash,
+                accountId: 'ACC_CASH',
+                accountName: 'Cash-in-hand',
+              }
+            : null,
+          activeSplit.upi > 0
+            ? {
+                id: `split-upi-${Date.now()}`,
+                mode: 'UPI' as PaymentMode,
+                amount: activeSplit.upi,
+                accountId: activeSplit.upiAccountId,
+                accountName: activeSplit.upiAccountName,
+              }
+            : null,
+          activeSplit.card > 0
+            ? {
+                id: `split-card-${Date.now()}`,
+                mode: 'CARD' as PaymentMode,
+                amount: activeSplit.card,
+                accountId: activeSplit.cardAccountId,
+                accountName: activeSplit.cardAccountName,
+              }
+            : null,
+          activeSplit.credit > 0
+            ? {
+                id: `split-credit-${Date.now()}`,
+                mode: 'CREDIT' as PaymentMode,
+                amount: activeSplit.credit,
+              }
+            : null,
         ].filter(Boolean) as PaymentSplit[])
-      : [{ id: '1', mode: chosenMode, amount: paidAmount }];
+      : [
+          {
+            id: '1',
+            mode: chosenMode,
+            amount: paidAmount,
+            accountId: chosenMode === 'CASH' ? 'ACC_CASH' : undefined,
+            accountName: chosenMode === 'CASH' ? 'Cash-in-hand' : undefined,
+          },
+        ];
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,

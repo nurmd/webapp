@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { db } from '../../services/db.ts';
 
-interface SplitPaymentBreakdown {
+export interface SplitPaymentBreakdown {
   cash: number;
   upi: number;
   card: number;
   credit: number;
+  upiAccountId?: string;
+  upiAccountName?: string;
+  cardAccountId?: string;
+  cardAccountName?: string;
 }
 
-interface SplitPaymentModalProps {
+export interface SplitPaymentModalProps {
   isOpen: boolean;
   grandTotal: number;
   hasCustomerSelected: boolean;
@@ -29,10 +34,17 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     return true;
   }, isOpen, 20);
 
+  const bankAccounts = useMemo(() => {
+    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
+  }, []);
+  const defaultBank = bankAccounts.find((b) => (b as any).isDefault) || bankAccounts[0];
+
   const [cash, setCash] = useState<string>('');
   const [upi, setUpi] = useState<string>('');
   const [card, setCard] = useState<string>('');
   const [credit, setCredit] = useState<string>('');
+  const [upiAccountId, setUpiAccountId] = useState<string>(defaultBank?.id || '');
+  const [cardAccountId, setCardAccountId] = useState<string>(defaultBank?.id || '');
 
   if (!isOpen) return null;
 
@@ -59,11 +71,17 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
+    const selUpiAcc = bankAccounts.find((b) => b.id === (upiAccountId || defaultBank?.id)) || defaultBank;
+    const selCardAcc = bankAccounts.find((b) => b.id === (cardAccountId || defaultBank?.id)) || defaultBank;
     onConfirmSplit({
       cash: numCash,
       upi: numUpi,
       card: numCard,
       credit: numCredit,
+      upiAccountId: selUpiAcc?.id,
+      upiAccountName: selUpiAcc?.accountName,
+      cardAccountId: selCardAcc?.id,
+      cardAccountName: selCardAcc?.accountName,
     });
     onClose();
   };
@@ -161,11 +179,23 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
               onChange={(e) => setUpi(e.target.value)}
               className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary"
             />
+            {bankAccounts.length > 1 && numUpi > 0 && (
+              <select
+                value={upiAccountId}
+                onChange={(e) => setUpiAccountId(e.target.value)}
+                className="w-28 text-[11px] font-semibold bg-surface-container-low border border-outline-variant/30 rounded-lg px-1.5 py-1 text-on-surface outline-none focus:border-secondary truncate cursor-pointer"
+                title="Select bank for UPI receipt"
+              >
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>{b.accountName}</option>
+                ))}
+              </select>
+            )}
             {remaining > 0 && (
               <button
                 type="button"
                 onClick={() => handleFillRemaining('upi')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer"
+                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer shrink-0"
               >
                 + Fill
               </button>
@@ -187,11 +217,23 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
               onChange={(e) => setCard(e.target.value)}
               className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary"
             />
+            {bankAccounts.length > 1 && numCard > 0 && (
+              <select
+                value={cardAccountId}
+                onChange={(e) => setCardAccountId(e.target.value)}
+                className="w-28 text-[11px] font-semibold bg-surface-container-low border border-outline-variant/30 rounded-lg px-1.5 py-1 text-on-surface outline-none focus:border-secondary truncate cursor-pointer"
+                title="Select bank for Card settlement"
+              >
+                {bankAccounts.map((b) => (
+                  <option key={b.id} value={b.id}>{b.accountName}</option>
+                ))}
+              </select>
+            )}
             {remaining > 0 && (
               <button
                 type="button"
                 onClick={() => handleFillRemaining('card')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer"
+                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer shrink-0"
               >
                 + Fill
               </button>

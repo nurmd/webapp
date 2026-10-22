@@ -55,6 +55,7 @@ export function computeCashBankSummary(params: {
   // Calculate total voucher receipts per party so we only count unvouchered upfront invoice payments
   const partyVoucherReceipts: Record<string, number> = {};
   vouchers.forEach((v) => {
+    if (v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'RECEIPT') {
       v.entries.forEach((e) => {
         if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
@@ -99,8 +100,10 @@ export function computeCashBankSummary(params: {
             const splitAmt = Number((s.amount * ratio).toFixed(2));
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
-            const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-            const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (inv as any).bankAccountId || defaultBank.id);
+            const targetAccName = isCash
+              ? 'Cash in Hand'
+              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || (inv as any).bankAccountName || defaultBank.accountName);
 
             balances[targetAccId] = (balances[targetAccId] || 0) + splitAmt;
 
@@ -127,8 +130,10 @@ export function computeCashBankSummary(params: {
           });
         } else {
           const isCash = inv.paymentMode === 'CASH';
-          const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-          const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+          const targetAccId = isCash ? 'ACC_CASH' : ((inv as any).bankAccountId || defaultBank.id);
+          const targetAccName = isCash
+            ? 'Cash in Hand'
+            : (accounts.find((a) => a.id === targetAccId)?.accountName || (inv as any).bankAccountName || defaultBank.accountName);
 
           balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
 
@@ -160,6 +165,7 @@ export function computeCashBankSummary(params: {
   // 3. Process Purchases (Outflow from upfront payments without vouchers)
   const supplierVoucherPayments: Record<string, number> = {};
   vouchers.forEach((v) => {
+    if (v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'PAYMENT') {
       v.entries.forEach((e) => {
         if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
@@ -202,8 +208,10 @@ export function computeCashBankSummary(params: {
             const splitAmt = Number((s.amount * ratio).toFixed(2));
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
-            const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-            const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (pur as any).bankAccountId || defaultBank.id);
+            const targetAccName = isCash
+              ? 'Cash in Hand'
+              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || (pur as any).bankAccountName || defaultBank.accountName);
 
             balances[targetAccId] = (balances[targetAccId] || 0) - splitAmt;
 
@@ -230,8 +238,10 @@ export function computeCashBankSummary(params: {
           });
         } else {
           const isCash = pur.paymentMode === 'CASH';
-          const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-          const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+          const targetAccId = isCash ? 'ACC_CASH' : ((pur as any).bankAccountId || defaultBank.id);
+          const targetAccName = isCash
+            ? 'Cash in Hand'
+            : (accounts.find((a) => a.id === targetAccId)?.accountName || (pur as any).bankAccountName || defaultBank.accountName);
 
           balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
 
@@ -264,8 +274,10 @@ export function computeCashBankSummary(params: {
   expenses.forEach((exp) => {
     if (exp.amount > 0) {
       const isCash = exp.paymentMode === 'CASH';
-      const targetAccId = isCash ? 'ACC_CASH' : defaultBank.id;
-      const targetAccName = isCash ? 'Cash in Hand' : defaultBank.accountName;
+      const targetAccId = isCash ? 'ACC_CASH' : ((exp as any).bankAccountId || defaultBank.id);
+      const targetAccName = isCash
+        ? 'Cash in Hand'
+        : (accounts.find((a) => a.id === targetAccId)?.accountName || (exp as any).bankAccountName || defaultBank.accountName);
 
       balances[targetAccId] = (balances[targetAccId] || 0) - exp.amount;
 
@@ -294,6 +306,7 @@ export function computeCashBankSummary(params: {
 
   // 5. Process Payment Vouchers (Receipts / Payments with specific accounts)
   vouchers.forEach((v) => {
+    if (v.isReversed || v.isCancelled) return;
     // Process explicit receipt / payment vouchers that affect cash or bank
     if (v.voucherType === 'RECEIPT') {
       const bankIds = new Set(accounts.map((a) => a.id));

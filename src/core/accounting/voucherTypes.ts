@@ -46,4 +46,8 @@ export interface Voucher {
   narration: string;
   totalAmount: number;
   createdAt: string;
+  isCancelled?: boolean;
+  isReversed?: boolean;
+  reversalVoucherId?: string;
+  reversalOfVoucherId?: string;
 }

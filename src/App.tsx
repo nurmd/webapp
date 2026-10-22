@@ -13,12 +13,12 @@ import {
   createPurchaseInvoiceVoucher,
   createPaymentReceiptVoucher,
   createPaymentOutVoucher,
+  createReversalVoucher,
 } from './core/accounting/ledger.ts';
 
 import { Header } from './components/Shell/Header.tsx';
-import { Drawer, AppTab } from './components/Shell/Drawer.tsx';
+import { AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
-import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
 import {
   useCompany,
   useParties,
@@ -164,7 +164,6 @@ const ModalLoadingFallback: React.FC<{ title?: string }> = ({ title = 'Loading..
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeUser, setActiveUser] = useState<UserProfile>(rbac.getActiveUser());
   const [isRoleSwitchOpen, setIsRoleSwitchOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -255,11 +254,6 @@ export const App: React.FC = () => {
   }, []);
 
   // System Back Navigation for Modals and Tabs with explicit priorities
-  useBackNavigation(() => {
-    setIsDrawerOpen(false);
-    return true;
-  }, isDrawerOpen, 30);
-
   useBackNavigation(() => {
     setIsStandardInvoiceOpen(false);
     return true;
@@ -436,23 +430,52 @@ export const App: React.FC = () => {
       return;
     }
 
-    // Auto-create Double-Entry Accounting Voucher for Sales
-    const voucher = createSalesInvoiceVoucher({
-      invoiceNumber: newInvoice.invoiceNumber,
-      date: newInvoice.date,
-      customerName: newInvoice.partyName,
-      customerId: newInvoice.partyId || 'ACC_CASH',
-      taxableAmount: newInvoice.totalTaxableAmount,
-      cgstAmount: newInvoice.totalCgst,
-      sgstAmount: newInvoice.totalSgst,
-      igstAmount: newInvoice.totalIgst,
-      cessAmount: newInvoice.totalCess,
-      grandTotal: newInvoice.grandTotal,
-      isCashSale: newInvoice.paymentMode === 'CASH',
-      roundOff: newInvoice.roundOff,
-      paymentSplits: newInvoice.paymentSplits,
-    });
-    db.saveVoucher(voucher);
+    // Auto-create Double-Entry Accounting Voucher for Sales (only for taxable sales, not quotes or orders)
+    const isOrderOrEstimate =
+      newInvoice.invoiceType === 'ESTIMATE' ||
+      newInvoice.invoiceType === 'SALES_ORDER' ||
+      newInvoice.invoiceType === 'DELIVERY_CHALLAN';
+
+    const existingVoucher = db.getVouchers().find(
+      (v) =>
+        !v.isReversed &&
+        !v.isCancelled &&
+        v.voucherType === 'SALES' &&
+        !v.voucherNumber.startsWith('VCH-REV-') &&
+        (v.referenceNo === newInvoice.invoiceNumber || v.voucherNumber === `VCH-SAL-${newInvoice.invoiceNumber}`)
+    );
+
+    if (!isOrderOrEstimate && !newInvoice.isCancelled) {
+      const voucher = createSalesInvoiceVoucher({
+        id: existingVoucher?.id,
+        invoiceNumber: newInvoice.invoiceNumber,
+        date: newInvoice.date,
+        customerName: newInvoice.partyName,
+        customerId: newInvoice.partyId || 'ACC_CASH',
+        taxableAmount: newInvoice.totalTaxableAmount,
+        cgstAmount: newInvoice.totalCgst,
+        sgstAmount: newInvoice.totalSgst,
+        igstAmount: newInvoice.totalIgst,
+        cessAmount: newInvoice.totalCess,
+        grandTotal: newInvoice.grandTotal,
+        isCashSale: newInvoice.paymentMode === 'CASH',
+        roundOff: newInvoice.roundOff,
+        paymentSplits: newInvoice.paymentSplits,
+      });
+      db.saveVoucher(voucher);
+    } else if (existingVoucher) {
+      // Document was converted/edited to an estimate/order or cancelled: reverse any existing active voucher
+      const rev = createReversalVoucher({
+        originalVoucher: existingVoucher,
+        reason: `Reversal of Sales Voucher #${existingVoucher.voucherNumber} for non-taxable/cancelled document`,
+      });
+      db.saveVoucher(rev);
+      db.saveVoucher({
+        ...existingVoucher,
+        isReversed: true,
+        reversalVoucherId: rev.id,
+      });
+    }
 
     if (newInvoice.partyId) {
       db.recalculatePartyBalance(newInvoice.partyId);
@@ -537,23 +560,49 @@ export const App: React.FC = () => {
   const handleSavePurchase = useCallback((newBill: PurchaseBill) => {
     db.savePurchase(newBill);
 
-    // Auto-create Double-Entry Accounting Voucher for Purchase (Input Tax Credit)
-    const voucher = createPurchaseInvoiceVoucher({
-      billNumber: newBill.billNumber,
-      date: newBill.date,
-      supplierName: newBill.supplierName,
-      supplierId: newBill.supplierId,
-      taxableAmount: newBill.totalTaxableAmount,
-      cgstAmount: newBill.totalCgst,
-      sgstAmount: newBill.totalSgst,
-      igstAmount: newBill.totalIgst,
-      cessAmount: newBill.totalCess,
-      grandTotal: newBill.grandTotal,
-      isCashPurchase: newBill.paymentMode === 'CASH',
-      roundOff: newBill.roundOff,
-      paymentSplits: newBill.paymentSplits,
-    });
-    db.saveVoucher(voucher);
+    // Auto-create Double-Entry Accounting Voucher for Purchase (only for inward bills, not purchase orders)
+    const isPurchaseOrder = newBill.purchaseType === 'PO';
+    const existingVoucher = db.getVouchers().find(
+      (v) =>
+        !v.isReversed &&
+        !v.isCancelled &&
+        v.voucherType === 'PURCHASE' &&
+        !v.voucherNumber.startsWith('VCH-REV-') &&
+        !v.voucherNumber.startsWith('VCH-RCM-') &&
+        (v.referenceNo === newBill.billNumber || v.voucherNumber === `VCH-PUR-${newBill.billNumber}`)
+    );
+
+    if (!isPurchaseOrder && !newBill.isCancelled) {
+      const voucher = createPurchaseInvoiceVoucher({
+        id: existingVoucher?.id,
+        billNumber: newBill.billNumber,
+        date: newBill.date,
+        supplierName: newBill.supplierName,
+        supplierId: newBill.supplierId,
+        taxableAmount: newBill.totalTaxableAmount,
+        cgstAmount: newBill.totalCgst,
+        sgstAmount: newBill.totalSgst,
+        igstAmount: newBill.totalIgst,
+        cessAmount: newBill.totalCess,
+        grandTotal: newBill.grandTotal,
+        isCashPurchase: newBill.paymentMode === 'CASH',
+        roundOff: newBill.roundOff,
+        paymentSplits: newBill.paymentSplits,
+      });
+      db.saveVoucher(voucher);
+    } else if (existingVoucher) {
+      // Document was converted/edited to a PO or cancelled: reverse any existing active voucher
+      const rev = createReversalVoucher({
+        originalVoucher: existingVoucher,
+        reason: `Reversal of Purchase Voucher #${existingVoucher.voucherNumber} for non-inward/cancelled bill`,
+      });
+      db.saveVoucher(rev);
+      db.saveVoucher({
+        ...existingVoucher,
+        isReversed: true,
+        reversalVoucherId: rev.id,
+      });
+    }
 
     if (newBill.supplierId) {
       db.recalculatePartyBalance(newBill.supplierId);
@@ -701,6 +750,10 @@ export const App: React.FC = () => {
                 id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 mode: s.mode,
                 amount: Number((s.amount * ratio).toFixed(2)),
+                accountId: s.accountId,
+                accountName: s.accountName,
+                reference: s.reference,
+                referenceNo: s.referenceNo,
               });
             }
           });
@@ -709,6 +762,8 @@ export const App: React.FC = () => {
             id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             mode: (paymentMode as PaymentMode) || 'CASH',
             amount: settleAmt,
+            accountId: paymentMode === 'CASH' ? 'ACC_CASH' : bankAccountId,
+            accountName: paymentMode === 'CASH' ? 'Cash-in-hand' : bankAcc?.accountName,
           });
         }
         if (newBalInv > 0) {
@@ -777,6 +832,10 @@ export const App: React.FC = () => {
                 id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 mode: s.mode,
                 amount: Number((s.amount * ratio).toFixed(2)),
+                accountId: s.accountId,
+                accountName: s.accountName,
+                reference: s.reference,
+                referenceNo: s.referenceNo,
               });
             }
           });
@@ -785,6 +844,8 @@ export const App: React.FC = () => {
             id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             mode: (paymentMode as PaymentMode) || 'CASH',
             amount: settleAmt,
+            accountId: paymentMode === 'CASH' ? 'ACC_CASH' : bankAccountId,
+            accountName: paymentMode === 'CASH' ? 'Cash-in-hand' : bankAcc?.accountName,
           });
         }
         if (newBalPur > 0) {
@@ -953,8 +1014,8 @@ export const App: React.FC = () => {
   }, [activeUser.role]);
 
   // Navigation Chrome Callbacks
-  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), []);
-  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const handleOpenMore = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
+  const handleOpenSettings = useCallback(() => handleSelectTab('settings'), [handleSelectTab]);
   const handleOpenRoleSwitch = useCallback(() => setIsRoleSwitchOpen(true), []);
   const handleCloseRoleSwitch = useCallback(() => setIsRoleSwitchOpen(false), []);
   const handleSearchClick = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
@@ -962,19 +1023,6 @@ export const App: React.FC = () => {
 
   return (
     <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
-      {/* Tablet / Desktop Persistent Sidebar Navigation */}
-      <TabletSidebar
-        activeTab={activeTab}
-        company={company}
-        activeUser={activeUser}
-        onSelectTab={handleSelectTab}
-        onNewInvoice={handleOpenNewInvoice}
-        onOpenRoleSwitch={handleOpenRoleSwitch}
-        onCheckUpdate={handleCheckUpdateFromChrome}
-        hasUpdate={hasUpdate}
-        latestVersion={latestRelease?.version}
-      />
-
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top App Header - Detached & Pinned at Top */}
@@ -982,7 +1030,8 @@ export const App: React.FC = () => {
           <Header
             company={company}
             activeUser={activeUser}
-            onOpenDrawer={handleOpenDrawer}
+            onOpenMore={handleOpenMore}
+            onOpenSettings={handleOpenSettings}
             onNewInvoice={handleOpenNewInvoice}
             onSearchClick={handleSearchClick}
             onBarcodeClick={handleBarcodeClick}
@@ -990,21 +1039,6 @@ export const App: React.FC = () => {
             hasUpdate={hasUpdate}
           />
         </div>
-
-        {/* Slide-out Navigation Drawer (Mobile) */}
-        <Drawer
-          isOpen={isDrawerOpen}
-          activeTab={activeTab}
-          company={company}
-          activeUser={activeUser}
-          onClose={handleCloseDrawer}
-          onSelectTab={handleSelectTab}
-          onOpenRoleSwitch={handleOpenRoleSwitch}
-          onCheckUpdate={handleCheckUpdateFromChrome}
-          hasUpdate={hasUpdate}
-          latestVersion={latestRelease?.version}
-          isCheckingUpdate={isCheckingUpdate}
-        />
 
         {/* Main Working Screen Area - Rendered strictly below topbar with independent scroll containment */}
         <main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">
@@ -1248,7 +1282,6 @@ export const App: React.FC = () => {
             vouchers={vouchers}
             onNavigate={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
-            onNewInvoice={handleOpenNewInvoice}
             onOpenRoleSwitch={handleOpenRoleSwitch}
             onCheckUpdate={handleCheckUpdateFromChrome}
             hasUpdate={hasUpdate}

@@ -33,42 +33,59 @@ export type VoucherPaymentSplit = PaymentSplitTender;
  * - BANK / NET_BANKING -> ACC_BANK, 'Bank Account'
  * Respects split.accountId and split.accountName if custom accounts are provided.
  */
-export function resolveAccountForSplit(split: {
-  mode: string;
-  accountId?: string;
-  accountName?: string;
-}): { accountId: string; accountName: string } {
-  if (split.accountId && split.accountName) {
-    return { accountId: split.accountId, accountName: split.accountName };
+export function resolveAccountForSplit(
+  split: {
+    mode: string;
+    accountId?: string;
+    accountName?: string;
+  },
+  defaultBankAccountId?: string,
+  defaultBankAccountName?: string
+): { accountId: string; accountName: string } {
+  // 1. If split.accountId is provided, resolve it immediately even if split.accountName is absent
+  if (split.accountId) {
+    let resolvedName = split.accountName;
+    if (!resolvedName) {
+      if (split.accountId === 'ACC_CASH') {
+        resolvedName = 'Cash-in-hand';
+      } else if (defaultBankAccountId && split.accountId === defaultBankAccountId && defaultBankAccountName) {
+        resolvedName = defaultBankAccountName;
+      } else {
+        const modeUpper = (split.mode || '').toUpperCase().trim();
+        if (modeUpper === 'UPI') resolvedName = 'Bank Account (UPI)';
+        else if (modeUpper === 'CARD') resolvedName = 'Bank Account (Card)';
+        else if (modeUpper === 'CHEQUE') resolvedName = 'Bank Account (Cheque)';
+        else resolvedName = 'Bank Account';
+      }
+    }
+    return { accountId: split.accountId, accountName: resolvedName };
   }
+
   const modeUpper = (split.mode || '').toUpperCase().trim();
   if (modeUpper === 'CASH') {
     return {
-      accountId: split.accountId || 'ACC_CASH',
+      accountId: 'ACC_CASH',
       accountName: split.accountName || 'Cash-in-hand',
     };
   }
-  if (modeUpper === 'UPI') {
-    return {
-      accountId: split.accountId || 'ACC_BANK',
-      accountName: split.accountName || 'Bank Account (UPI)',
-    };
+
+  const fallbackId = defaultBankAccountId || 'ACC_BANK';
+  let defaultName: string;
+  if (defaultBankAccountName) {
+    defaultName = defaultBankAccountName;
+  } else if (modeUpper === 'UPI') {
+    defaultName = 'Bank Account (UPI)';
+  } else if (modeUpper === 'CARD') {
+    defaultName = 'Bank Account (Card)';
+  } else if (modeUpper === 'CHEQUE') {
+    defaultName = 'Bank Account (Cheque)';
+  } else {
+    defaultName = 'Bank Account';
   }
-  if (modeUpper === 'CARD') {
-    return {
-      accountId: split.accountId || 'ACC_BANK',
-      accountName: split.accountName || 'Bank Account (Card)',
-    };
-  }
-  if (modeUpper === 'CHEQUE') {
-    return {
-      accountId: split.accountId || 'ACC_BANK',
-      accountName: split.accountName || 'Bank Account (Cheque)',
-    };
-  }
+
   return {
-    accountId: split.accountId || 'ACC_BANK',
-    accountName: split.accountName || 'Bank Account',
+    accountId: fallbackId,
+    accountName: split.accountName || defaultName,
   };
 }
 
@@ -79,6 +96,7 @@ export function resolveAccountForSplit(split: {
  * - Multi-tender split payment debits (Cash, Bank/UPI, Customer Credit)
  */
 export function createSalesInvoiceVoucher(params: {
+  id?: string;
   invoiceId?: string;
   invoiceNumber: string;
   date: string;
@@ -91,6 +109,8 @@ export function createSalesInvoiceVoucher(params: {
   cessAmount?: number;
   grandTotal: number;
   isCashSale?: boolean;
+  bankAccountId?: string;
+  bankAccountName?: string;
   roundOff?: number;
   paymentSplits?: VoucherPaymentSplit[];
 }): Voucher {
@@ -127,7 +147,7 @@ export function createSalesInvoiceVoucher(params: {
           narration: `Sales Bill #${params.invoiceNumber} (On Credit)`,
         });
       } else {
-        const { accountId, accountName } = resolveAccountForSplit(split);
+        const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
         entries.push({
           accountId,
           accountName,
@@ -230,7 +250,7 @@ export function createSalesInvoiceVoucher(params: {
   }
 
   return {
-    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: params.id || `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     voucherNumber: `VCH-SAL-${params.invoiceNumber}`,
     voucherType: 'SALES',
     date: params.date,
@@ -249,6 +269,7 @@ export function createSalesInvoiceVoucher(params: {
  * - Multi-tender split payment credits (Cash, Bank/UPI, Supplier Credit)
  */
 export function createPurchaseInvoiceVoucher(params: {
+  id?: string;
   billId?: string;
   billNumber: string;
   date: string;
@@ -261,6 +282,8 @@ export function createPurchaseInvoiceVoucher(params: {
   cessAmount?: number;
   grandTotal: number;
   isCashPurchase?: boolean;
+  bankAccountId?: string;
+  bankAccountName?: string;
   roundOff?: number;
   paymentSplits?: VoucherPaymentSplit[];
 }): Voucher {
@@ -354,7 +377,7 @@ export function createPurchaseInvoiceVoucher(params: {
           narration: `Payable for bill #${params.billNumber} (On Credit)`,
         });
       } else {
-        const { accountId, accountName } = resolveAccountForSplit(split);
+        const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
         entries.push({
           accountId,
           accountName,
@@ -400,7 +423,7 @@ export function createPurchaseInvoiceVoucher(params: {
   }
 
   return {
-    id: `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: params.id || `VCH-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     voucherNumber: `VCH-PUR-${params.billNumber}`,
     voucherType: 'PURCHASE',
     date: params.date,
@@ -445,7 +468,7 @@ export function createPaymentReceiptVoucher(params: {
     activeSplits.forEach((split) => {
       const splitAmt = Number(Number(split.amount).toFixed(2));
       totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
-      const { accountId, accountName } = resolveAccountForSplit(split);
+      const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
       const splitRef = split.reference || split.referenceNo;
       const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
 
@@ -541,7 +564,7 @@ export function createPaymentOutVoucher(params: {
     activeSplits.forEach((split) => {
       const splitAmt = Number(Number(split.amount).toFixed(2));
       totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
-      const { accountId, accountName } = resolveAccountForSplit(split);
+      const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
       const splitRef = split.reference || split.referenceNo;
       const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
 
@@ -611,6 +634,7 @@ export function createPaymentOutVoucher(params: {
  * Credit: Output GST Payable under Reverse Charge Accounts (CGST/SGST/IGST/Cess)
  */
 export function createRcmJournalVoucher(params: {
+  id?: string;
   billId?: string;
   billNumber: string;
   date: string;
@@ -705,7 +729,7 @@ export function createRcmJournalVoucher(params: {
   }
 
   return {
-    id: `VCH-RCM-${params.billId || Date.now()}`,
+    id: params.id || (params.billId ? `VCH-RCM-${params.billId}` : `VCH-RCM-${Date.now()}`),
     voucherNumber: `VCH-RCM-${params.billNumber}`,
     voucherType: 'JOURNAL',
     date: params.date,
@@ -714,6 +738,46 @@ export function createRcmJournalVoucher(params: {
     narration: `Automated RCM liability & ITC journal entry for Purchase Bill #${params.billNumber} from ${params.supplierName}`,
     totalAmount: params.totalTax,
     createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Generates an automated Contra/Reversal Journal Voucher that swaps all debits and credits of a voucher,
+ * maintaining statutory audit trail integrity without hard-deleting posted vouchers.
+ */
+export function createReversalVoucher(params: {
+  originalVoucher: Voucher;
+  reason?: string;
+  date?: string;
+  id?: string;
+}): Voucher {
+  const orig = params.originalVoucher;
+  const date = params.date || new Date().toISOString().split('T')[0];
+
+  const reversedEntries: JournalEntryLine[] = orig.entries.map((entry) => ({
+    accountId: entry.accountId,
+    accountName: entry.accountName,
+    debit: entry.credit,
+    credit: entry.debit,
+    narration: `Reversal: ${entry.narration || ''}`.trim(),
+  }));
+
+  const prefix = orig.voucherNumber.startsWith('VCH-')
+    ? orig.voucherNumber.replace(/^VCH-/, 'VCH-REV-')
+    : `VCH-REV-${orig.voucherNumber}`;
+
+  return {
+    id: params.id || `VCH-REV-${orig.id}-${Date.now().toString(36)}`,
+    voucherNumber: prefix,
+    voucherType: 'JOURNAL',
+    date,
+    referenceNo: orig.referenceNo || orig.voucherNumber,
+    entries: reversedEntries,
+    narration: params.reason || `Reversal of voucher #${orig.voucherNumber}`,
+    totalAmount: orig.totalAmount,
+    createdAt: new Date().toISOString(),
+    isReversed: false,
+    reversalOfVoucherId: orig.id,
   };
 }
 

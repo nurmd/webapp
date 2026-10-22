@@ -37,10 +37,27 @@ rm -f "$NATIVE_DIR/app/src/main/assets/"*.map
 echo "[3/6] Compiling Android resources with aapt2..."
 cd "$NATIVE_DIR"
 
-KEYSTORE_FILE="$NATIVE_DIR/keystore/app-key.keystore"
+KEYSTORE_FILE="${ANDROID_KEYSTORE_PATH:-$NATIVE_DIR/keystore/app-key.keystore}"
 if [ ! -f "$KEYSTORE_FILE" ]; then
-  echo "FATAL ERROR: Static release keystore not found at $KEYSTORE_FILE!"
-  echo "A static keystore is strictly required to ensure OTA updates can be installed without signature mismatches."
+  echo "FATAL ERROR: Release signing keystore not found at $KEYSTORE_FILE!"
+  echo "Please provide a valid keystore path via ANDROID_KEYSTORE_PATH."
+  exit 1
+fi
+
+# Load signing credentials from environment variables or gitignored signing.properties
+KS_PASS="${ANDROID_KS_PASS}"
+KEY_PASS="${ANDROID_KEY_PASS:-$ANDROID_KS_PASS}"
+
+if [ -z "$KS_PASS" ] && [ -f "$NATIVE_DIR/signing.properties" ]; then
+  # Optional local dev fallback from gitignored file
+  KS_PASS=$(grep -E "^storePassword=" "$NATIVE_DIR/signing.properties" | cut -d'=' -f2-)
+  KEY_PASS=$(grep -E "^keyPassword=" "$NATIVE_DIR/signing.properties" | cut -d'=' -f2-)
+fi
+
+if [ -z "$KS_PASS" ]; then
+  echo "FATAL ERROR: Keystore password not provided!"
+  echo "Please export ANDROID_KS_PASS (and optionally ANDROID_KEY_PASS / ANDROID_KEY_ALIAS) in your environment."
+  echo "Never commit or hardcode keystore passwords."
   exit 1
 fi
 
@@ -92,12 +109,23 @@ cp build/base.apk build/app-unaligned.apk
 mkdir -p "$APP_DIR/dist-android"
 FINAL_APK="$APP_DIR/dist-android/GSTBilling-Vyapar.apk"
 
-apksigner sign \
-  --ks "$KEYSTORE_FILE" \
-  --ks-pass pass:android \
-  --key-pass pass:android \
-  --out "$FINAL_APK" \
-  build/app-unaligned.apk
+SIGN_OPTS=(
+  --ks "$KEYSTORE_FILE"
+  --ks-pass "pass:$KS_PASS"
+  --key-pass "pass:$KEY_PASS"
+)
+
+if [ -n "$ANDROID_KEY_ALIAS" ]; then
+  SIGN_OPTS+=(--ks-key-alias "$ANDROID_KEY_ALIAS")
+fi
+
+LINEAGE_FILE="${ANDROID_LINEAGE_PATH:-$NATIVE_DIR/keystore/lineage.proof}"
+if [ -f "$LINEAGE_FILE" ]; then
+  echo "Applying APK Signature Scheme v3 rotation lineage proof ($LINEAGE_FILE)..."
+  SIGN_OPTS+=(--lineage "$LINEAGE_FILE")
+fi
+
+apksigner sign "${SIGN_OPTS[@]}" --out "$FINAL_APK" build/app-unaligned.apk
 
 # Verify signature
 echo "Verifying static keystore signature on output APK..."

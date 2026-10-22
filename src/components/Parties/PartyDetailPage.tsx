@@ -8,7 +8,6 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
-import { calculateStockDecrement } from '../../core/inventory/stockEngine.ts';
 import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { usePartyPassbook, PassbookEntry } from './usePartyPassbook.ts';
@@ -169,26 +168,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   };
 
   const executeDeleteInvoiceBill = (inv: Invoice) => {
-    // Restore stock
-    const allItems = db.getItems();
-    for (const line of inv.items) {
-      if (line.itemId) {
-        const itm = allItems.find((i) => i.id === line.itemId);
-        if (itm) {
-          itm.currentStock += line.quantity;
-          db.saveItem(itm);
-        }
-      }
-    }
-
-    // Rollback party balance: when deleted, receivable is reduced by unpaid balance
-    const unpaidBal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : (inv.grandTotal - (inv.paidAmount || 0));
-    db.saveParty({
-      ...party,
-      currentBalance: party.currentBalance - unpaidBal,
-      updatedAt: new Date().toISOString(),
-    });
-
     db.deleteInvoice(inv.id);
     setSelectedInvoiceForView(null);
     onRefresh?.();
@@ -203,27 +182,6 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   };
 
   const executeDeletePurchaseBill = (bill: PurchaseBill) => {
-    // Rollback stock
-    const allowNegativeStock = db.getAllowNegativeStock();
-    const allItems = db.getItems();
-    for (const line of bill.items) {
-      if (line.itemId) {
-        const itm = allItems.find((i) => i.id === line.itemId);
-        if (itm) {
-          itm.currentStock = calculateStockDecrement(itm.currentStock, line.quantity, allowNegativeStock);
-          db.saveItem(itm);
-        }
-      }
-    }
-
-    // Rollback party balance: when deleted, liability is reduced by the unpaid balance
-    const unpaidBal = typeof bill.balanceAmount === 'number' ? bill.balanceAmount : (bill.grandTotal - (bill.paidAmount || 0));
-    db.saveParty({
-      ...party,
-      currentBalance: party.currentBalance + unpaidBal,
-      updatedAt: new Date().toISOString(),
-    });
-
     db.deletePurchase(bill.id);
     setSelectedPurchaseBill(null);
     onRefresh?.();

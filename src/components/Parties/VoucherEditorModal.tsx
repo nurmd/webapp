@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { Voucher, JournalEntryLine } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { createReversalVoucher } from '../../core/accounting/ledger.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -242,10 +243,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         const c = parseFloat(editSplitCash) || 0;
         const u = parseFloat(editSplitUPI) || 0;
         const b = parseFloat(editSplitBank) || 0;
+        const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId) || availableBankAccounts[0];
+        const existingUpi = inv.paymentSplits?.find((s) => s.mode === 'UPI');
+        const existingBank = inv.paymentSplits?.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING');
         const splits: PaymentSplit[] = [];
-        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c });
-        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u });
-        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b });
+        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' });
+        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u, accountId: existingUpi?.accountId || selectedBank?.id, accountName: existingUpi?.accountName || selectedBank?.accountName });
+        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b, accountId: existingBank?.accountId || selectedBank?.id, accountName: existingBank?.accountName || selectedBank?.accountName });
         if (newBalInv > 0) splits.push({ id: `s-bal-${Date.now()}`, mode: 'CREDIT', amount: newBalInv });
         if (splits.length > 0) updatedSplits = splits;
       }
@@ -279,10 +283,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         const c = parseFloat(editSplitCash) || 0;
         const u = parseFloat(editSplitUPI) || 0;
         const b = parseFloat(editSplitBank) || 0;
+        const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId) || availableBankAccounts[0];
+        const existingUpi = pur.paymentSplits?.find((s) => s.mode === 'UPI');
+        const existingBank = pur.paymentSplits?.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING');
         const splits: PaymentSplit[] = [];
-        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c });
-        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u });
-        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b });
+        if (c > 0) splits.push({ id: `s-c-${Date.now()}`, mode: 'CASH', amount: c, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' });
+        if (u > 0) splits.push({ id: `s-u-${Date.now()}`, mode: 'UPI', amount: u, accountId: existingUpi?.accountId || selectedBank?.id, accountName: existingUpi?.accountName || selectedBank?.accountName });
+        if (b > 0) splits.push({ id: `s-b-${Date.now()}`, mode: 'BANK', amount: b, accountId: existingBank?.accountId || selectedBank?.id, accountName: existingBank?.accountName || selectedBank?.accountName });
         if (newBalPur > 0) splits.push({ id: `s-bal-${Date.now()}`, mode: 'CREDIT', amount: newBalPur });
         if (splits.length > 0) updatedSplits = splits;
       }
@@ -381,40 +388,40 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const executeDeleteLedgerItem = (entry: PassbookEntry) => {
     if (entry.rawVoucher) {
       const v = entry.rawVoucher;
-      let adjustedBal = party.currentBalance;
-      if (v.voucherType === 'RECEIPT') {
-        adjustedBal += v.totalAmount;
-      } else {
-        adjustedBal -= v.totalAmount;
-      }
-      db.deleteVoucher(v.id);
-      db.saveParty({ ...party, currentBalance: adjustedBal, updatedAt: new Date().toISOString() });
+      const revVoucher = createReversalVoucher({
+        originalVoucher: v,
+        reason: `Reversal of ${v.voucherType} #${v.voucherNumber} from Party Passbook`,
+      });
+      db.saveVoucher(revVoucher);
+      db.saveVoucher({ ...v, isReversed: true, reversalVoucherId: revVoucher.id });
       db.recalculatePartyBalance(party.id);
     } else if (entry.id.startsWith('pay-inv-') && entry.rawInvoice) {
       const inv = entry.rawInvoice;
       const amt = entry.credit;
+      const newPaid = Math.max(0, (inv.paidAmount || 0) - amt);
+      const newBalance = Number((inv.grandTotal - newPaid).toFixed(2));
       const updatedInv: Invoice = {
         ...inv,
-        paidAmount: Math.max(0, inv.paidAmount - amt),
-        balanceAmount: inv.grandTotal,
-        paymentStatus: 'UNPAID',
+        paidAmount: newPaid,
+        balanceAmount: newBalance,
+        paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= inv.grandTotal ? 'PAID' : 'PARTIAL'),
         updatedAt: new Date().toISOString(),
       };
       db.saveInvoice(updatedInv);
-      db.saveParty({ ...party, currentBalance: party.currentBalance + amt, updatedAt: new Date().toISOString() });
       db.recalculatePartyBalance(party.id);
     } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
       const pur = entry.rawPurchase;
       const amt = entry.debit;
+      const newPaid = Math.max(0, (pur.paidAmount || 0) - amt);
+      const newBalance = Number((pur.grandTotal - newPaid).toFixed(2));
       const updatedPur: PurchaseBill = {
         ...pur,
-        paidAmount: Math.max(0, pur.paidAmount - amt),
-        balanceAmount: pur.grandTotal,
-        paymentStatus: 'UNPAID',
+        paidAmount: newPaid,
+        balanceAmount: newBalance,
+        paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= pur.grandTotal ? 'PAID' : 'PARTIAL'),
         updatedAt: new Date().toISOString(),
       };
       db.savePurchase(updatedPur);
-      db.saveParty({ ...party, currentBalance: party.currentBalance - amt, updatedAt: new Date().toISOString() });
       db.recalculatePartyBalance(party.id);
     } else if (entry.isOpening) {
       db.clearPartyOpeningBalance(party.id);

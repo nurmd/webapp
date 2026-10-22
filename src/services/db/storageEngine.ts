@@ -25,7 +25,15 @@ export const STORAGE_KEYS = {
   LOANS: 'gst_loans',
   LOAN_TXNS: 'gst_loan_transactions',
   LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
+  TOMBSTONES: 'gst_sync_tombstones',
+  CONFLICTS: 'gst_sync_conflicts',
 };
+
+export interface Tombstone {
+  type: string;
+  id: string;
+  deletedAt: string;
+}
 
 export interface SyncedSettings {
   id: string; // 'app_settings'
@@ -327,5 +335,37 @@ export class StorageEngine {
 
   getCategories(): ItemCategory[] {
     return this.get<ItemCategory[]>(STORAGE_KEYS.CATEGORIES, DEFAULT_ITEM_CATEGORIES);
+  }
+
+  public getTombstones(): Record<string, Tombstone> {
+    return this.get<Record<string, Tombstone>>(STORAGE_KEYS.TOMBSTONES, {});
+  }
+
+  public recordTombstone(type: string, id: string, deletedAt?: string): void {
+    const tombstones = { ...this.getTombstones() };
+    const key = `${type}:${id}`;
+    const timestamp = deletedAt || new Date().toISOString();
+    if (!tombstones[key] || timestamp > tombstones[key].deletedAt) {
+      tombstones[key] = {
+        type,
+        id,
+        deletedAt: timestamp,
+      };
+      this.set(STORAGE_KEYS.TOMBSTONES, tombstones);
+    }
+  }
+
+  public removeTombstone(type: string, id: string): void {
+    const tombstones = { ...this.getTombstones() };
+    const key = `${type}:${id}`;
+    if (tombstones[key]) {
+      delete tombstones[key];
+      this.set(STORAGE_KEYS.TOMBSTONES, tombstones);
+    }
+  }
+
+  public isTombstoned(type: string, id: string): boolean {
+    const tombstones = this.getTombstones();
+    return Boolean(tombstones[`${type}:${id}`]);
   }
 }

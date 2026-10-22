@@ -127,6 +127,7 @@ export function usePartyPassbook({
     let totalVoucherPayments = 0;
 
     vouchers.forEach((v) => {
+      if (v.isCancelled || v.isReversed) return;
       const isPartyVoucher = v.entries.some(
         (e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === party.name.toLowerCase())
       );

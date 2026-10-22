@@ -23,11 +23,19 @@ export class FinancialStorage extends ItemStorage {
     const idx = list.findIndex((v) => v.id === voucher.id);
     const prevVoucher = idx >= 0 ? list[idx] : null;
 
-    if (idx >= 0) {
+    if (idx >= 0 && prevVoucher) {
+      // Guard: Never allow an existing reversed or cancelled voucher to be overwritten with an active state
+      if ((prevVoucher.isReversed || prevVoucher.isCancelled) && !voucher.isReversed && !voucher.isCancelled) {
+        console.warn(
+          `[saveVoucher] Blocked attempt to overwrite reversed/cancelled voucher #${prevVoucher.voucherNumber} (${prevVoucher.id}) with active voucher.`
+        );
+        return;
+      }
       list[idx] = voucher;
     } else {
       list.unshift(voucher);
     }
+    this.removeTombstone('voucher', voucher.id);
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.putDoc('voucher', voucher);
     this.broadcastChange('voucher', 'save', voucher.id, voucher);
@@ -80,6 +88,7 @@ export class FinancialStorage extends ItemStorage {
   deleteVoucher(id: string): void {
     const prevVoucher = this.getVouchers().find((v) => v.id === id);
     const list = this.getVouchers().filter((v) => v.id !== id);
+    this.recordTombstone('voucher', id);
     this.set(STORAGE_KEYS.VOUCHERS, list);
     pouch.deleteDoc('voucher', id);
     this.broadcastChange('voucher', 'delete', id);
@@ -133,6 +142,7 @@ export class FinancialStorage extends ItemStorage {
     } else {
       list.unshift(expense);
     }
+    this.removeTombstone('expense', expense.id);
     this.set(STORAGE_KEYS.EXPENSES, list);
     pouch.putDoc('expense', expense);
     this.broadcastChange('expense', 'save', expense.id, expense);
@@ -141,6 +151,7 @@ export class FinancialStorage extends ItemStorage {
 
   deleteExpense(id: string): void {
     const list = this.getExpenses().filter((e) => e.id !== id);
+    this.recordTombstone('expense', id);
     this.set(STORAGE_KEYS.EXPENSES, list);
     pouch.deleteDoc('expense', id);
     this.broadcastChange('expense', 'delete', id);
@@ -161,6 +172,7 @@ export class FinancialStorage extends ItemStorage {
     } else {
       list.push(account);
     }
+    this.removeTombstone('bank_account', account.id);
     this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
     pouch.putDoc('bank_account', account);
     this.broadcastChange('bank_account', 'save', account.id, account);
@@ -170,6 +182,7 @@ export class FinancialStorage extends ItemStorage {
   deleteBankAccount(id: string): void {
     if (id === 'ACC_CASH') return; // Cannot delete cash register
     const list = this.getBankAccounts().filter((b) => b.id !== id);
+    this.recordTombstone('bank_account', id);
     this.set(STORAGE_KEYS.BANK_ACCOUNTS, list);
     pouch.deleteDoc('bank_account', id);
     this.broadcastChange('bank_account', 'delete', id);
@@ -189,6 +202,7 @@ export class FinancialStorage extends ItemStorage {
     } else {
       list.unshift(txn);
     }
+    this.removeTombstone('cash_bank_txn', txn.id);
     this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
     pouch.putDoc('cash_bank_txn', txn);
     this.broadcastChange('cash_bank_txn', 'save', txn.id, txn);
@@ -197,6 +211,7 @@ export class FinancialStorage extends ItemStorage {
 
   deleteCashBankTransaction(id: string): void {
     const list = this.getCashBankTransactions().filter((t) => t.id !== id);
+    this.recordTombstone('cash_bank_txn', id);
     this.set(STORAGE_KEYS.CASH_BANK_TXNS, list);
     pouch.deleteDoc('cash_bank_txn', id);
     this.broadcastChange('cash_bank_txn', 'delete', id);
@@ -216,6 +231,7 @@ export class FinancialStorage extends ItemStorage {
     } else {
       list.push(loan);
     }
+    this.removeTombstone('loan', loan.id);
     this.set(STORAGE_KEYS.LOANS, list);
     pouch.putDoc('loan', loan);
     this.broadcastChange('loan', 'save', loan.id, loan);
@@ -224,6 +240,7 @@ export class FinancialStorage extends ItemStorage {
 
   deleteLoan(id: string): void {
     const list = this.getLoans().filter((l) => l.id !== id);
+    this.recordTombstone('loan', id);
     this.set(STORAGE_KEYS.LOANS, list);
     pouch.deleteDoc('loan', id);
     this.broadcastChange('loan', 'delete', id);

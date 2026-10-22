@@ -115,17 +115,83 @@ gst-billing-app/
 ## 4. Data Persistence & Synchronization (`src/services/`)
 
 ### A. The Storage Service (`src/services/db.ts`)
-The `StorageService` class (`db`) is the unified database facade:
+The `StorageService` class (`db`) is the unified database facade composing focused domain storages:
 - **Keys**: `invoices`, `parties`, `items`, `purchases`, `vouchers`, `expenses`, `bank_accounts`, `cash_bank_transactions`, `company_profile`, `synced_settings`.
 - **Reactive Subscriptions**:
   - Components subscribe to changes via `db.subscribe(callback)`.
   - DB mutations broadcast changes across browser tabs via `BroadcastChannel('gst_billing_sync')`.
   - PouchDB changes from remote CouchDB instances trigger `db.applyRemoteDoc()`.
 
-### B. Non-Destructive Entity Persistence Rule
+### B. Distributed Sync & Revision Handling (`src/services/pouchdb.ts`, `src/services/db/syncStorage.ts`)
+- **PouchDB `_rev` Conflict Detection**:
+  - Abolished clock-skewed last-write-wins (`updatedAt` comparison) for financial documents.
+  - Financial records (`invoice`, `purchase`, `voucher`, `expense`, `bank_account`, `cash_bank_txn`, `loan`, `loan_txn`) that undergo concurrent mutations on multiple devices are preserved and enqueued in an operator-visible **Revision Conflict Queue** instead of silently overwriting local unsynced edits.
+  - HTTP 409 Put Conflicts: `putDoc()` compares content divergence (`isDocDivergent`); if divergent, it captures both revisions into explicit conflict state rather than performing blind overwrites.
+- **Replicated Tombstones**:
+  - Deletions are persisted across devices using replicated tombstone documents (`_id: 'tombstone:${type}:${id}'`, `docType: 'tombstone'`, `deletedAt: ISOString`).
+  - `syncAllFromPouch()` consumes remote tombstones via `getAllTombstones()`, ensuring remote deletions are respected locally and never resurrected during sync handshakes.
+  - Local domain stores (`invoicePurchaseStorage`, `partyStorage`, `itemStorage`, `financialStorage`) clear tombstones on save and record tombstones on delete.
+
+### C. Ledger Reversals & Double-Entry Integrity (`src/core/accounting/`, `src/services/db/reconcileAndRepair.ts`)
+- **No Hard-Deletes of Posted Vouchers**:
+  - Deleting an invoice or purchase bill NEVER purges historical accounting vouchers.
+  - Instead, the system posts an automated Contra/Reversal Journal Voucher (`VCH-REV-SAL-*` / `VCH-REV-PUR-*`) with debits and credits exactly swapped, referencing the original voucher ID, and marks the original voucher `isReversed: true`.
+  - The books net out to exactly zero while preserving an unbroken statutory CARO 2020 / MCA audit trail.
+- **Quote & Order Accounting Isolation**:
+  - Documents of type `ESTIMATE`, `SALES_ORDER`, `DELIVERY_CHALLAN`, and purchase orders (`PO`) are purely commercial/operational records and are strictly isolated from accounting voucher generation.
+- **Passbook Single-Engine Stock Routing**:
+  - Passbook and ledger deletion flows delegate exclusively to `db.deleteInvoice()` and `db.deletePurchase()`, preventing double-decrement/increment bugs.
+- **Idempotent Reconciliation & Repair Tool (`reconcileAndRepair.ts`)**:
+  - Gated by mandatory restorable pre-migration backup snapshot (`preMigrationBackup.ts`). Aborts immediately if the backup cannot be cryptographically verified.
+  - Scans and consolidates duplicate vouchers from repeat edits, reverses orphan vouchers referencing deleted documents, prunes invalid estimate vouchers, realigns stock discrepancies, and resynchronizes party balances.
+  - Strictly idempotent across repeated executions.
+
+### D. Split-Bank Architecture & Tender Routing (`paymentSplitUtils.ts`, `ledger.ts`, `cashBankCalculator.ts`)
+- **Multi-Bank Account Allocation**:
+  - `PaymentSplit` supports optional `accountId`, `accountName`, `reference`, and `referenceNo` metadata.
+  - Multi-tender splits (UPI, CARD, BANK, CHEQUE, NET_BANKING) route directly to the designated bank account selected by the user, rather than defaulting globally to `ACC_BANK`.
+  - Cash portions route to `ACC_CASH` (`Cash-in-hand`).
+  - `resolveAccountForSplit()` provides pure domain account resolution with default bank fallback.
+- **Centralized Payment Status & Settlement Invariant (`derivePaymentSettlement`)**:
+  - Derives payment status and amounts synchronously in `saveInvoice()` and `savePurchase()`:
+    - `PAID`: `totalPaid >= grandTotal`
+    - `PARTIAL`: `0 < totalPaid < grandTotal`
+    - `UNPAID`: `totalPaid <= 0` or single `CREDIT` tender.
+  - Never trusts caller-supplied `CASH` mode if payment is unpaid.
+  - Clamps overpayment so `paidAmount <= grandTotal` and deducts excess from cash splits to prevent business cash inflation by returned customer change.
+  - Preserves tender breakdown in `paymentSplits` and audit notes.
+
+### E. Idempotent Legacy Payment Split Migration (`migrateLegacySplits.ts`)
+- **Safe & Gated Migration**:
+  - Gated by mandatory pre-migration backup snapshot (`preMigrationBackup.ts`).
+  - Scans legacy invoices and purchase bills containing old notes-based splits or single-tender records.
+  - Fills missing `accountId` and `accountName` using the active primary bank account for bank tenders and `ACC_CASH` for cash.
+  - Strictly idempotent: does not rewrite or duplicate splits that already have `accountId`.
+  - Integrated into `reconcileAndRepairLedgerAndInventory()`.
+
+### F. Non-Destructive Entity Persistence Rule
 > **CRITICAL INVARIANT:** Calling `db.saveParty(party)` or `db.saveItem(item)` with a partial record must **NEVER** strip existing baseline metadata.
 - If incoming party omits `openingBalance`, `openingBalanceType`, or `openingBalanceDate`, existing values are strictly preserved.
 - To intentionally remove an opening balance, call `db.clearPartyOpeningBalance(partyId)` or pass explicit `0`.
+
+### G. Permissionless Backup & Disaster Recovery Architecture (`backupRestoreStorage.ts`, `preMigrationBackup.ts`, `DatabaseBackupModal.tsx`)
+- **Android Permissionless Storage Operations**:
+  - Zero storage permissions declared or requested: no `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `MANAGE_EXTERNAL_STORAGE`, or legacy storage flags.
+  - Export on Android 10+ (API 29+) writes directly to `Download/GSTBilling` via compile-safe reflection on `MediaStore.Downloads` without storage permissions; falls back to SAF `ACTION_CREATE_DOCUMENT` on earlier versions or upon error. Completely permissionless.
+  - Import / restore uses native WebView `<input type="file">` triggering `WebChromeClient.onShowFileChooser` (SAF), requiring zero permissions.
+  - Web & PWA environments leverage `showSaveFilePicker` / `showOpenFilePicker` with standard blob download fallbacks.
+- **PouchDB Durability & Strict Write Invariant**:
+  - `restoreDatabaseBackup()` guarantees durability against offline PouchDB sync resurrection:
+    - In `REPLACE` mode, reads all existing docs in PouchDB per entity type and executes `deleteDocStrict()` with tombstone generation for every stale ID not present in the incoming bundle.
+    - All final documents, company profile, and settings are written with strict awaited PouchDB operations (`putDocStrict()`).
+    - 409 conflict resolution: explicitly re-reads latest `_rev` and overwrites it so restore state always wins.
+    - If any PouchDB write rejects, the operation rolls back local storage and PouchDB to the pre-restore snapshot and rethrows. Never reports false success.
+- **Pre-Restore Safety Snapshot & Rollback**:
+  - Before mutating any data during restore, `DatabaseBackupModal` executes `createAndVerifyPreMigrationBackup(snapshotId)`.
+  - If restore encounters an error, the UI displays an actionable Rollback button to instantly revert via `restorePreMigrationBackup(snapshotId)`.
+  - Immutable audit trail is preserved on device: restore appends an audit event recording the restore mode, timestamp, and entity counts without clobbering existing local audit history.
+- **Dynamic App Versioning**:
+  - Backups dynamically resolve `appVersion` from `package.json` rather than hardcoding version strings.
 
 ---
 
@@ -176,6 +242,16 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
   - Root container: `h-screen h-[100dvh] overflow-hidden flex flex-row`.
   - Global `<Header />`: Fixed outside the scroll hierarchy (`flex-shrink-0 z-30`).
   - Scroll container: `<main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">`.
+- **More-Driven Navigation Shell**:
+  - Navigation across all screen sizes (mobile, tablet, desktop) is unified through a streamlined, More-driven architecture.
+  - The legacy persistent `TabletSidebar` and mobile slide-out `Drawer` are **no longer mounted** in the production shell (`App.tsx`). Their components remain preserved in `src/components/Shell/` for legacy test compatibility (`AppTab` type exported from `Drawer.tsx`).
+  - `<Header />` provides always-visible `grid_view` (More hub) and `settings` (Settings gear) shortcuts, enabling instant 1-tap navigation on tablet and desktop where bottom-nav is hidden.
+  - Quick action controls (`+ New Bill`, `qr_code_scanner`, Search `⌘K`, User Profile) remain in `<Header />`.
+  - **More Hub (`NavigationMenuHubView`) Redesign**:
+    - Acts as the primary navigational directory for all core business hubs (Overview/Dashboard, Sales, Purchases, Parties, Inventory, Accounting, Reports, Settings, Print Settings).
+    - Features a dedicated Overview category pill and direct Dashboard card.
+    - Features a Settings gear shortcut on the merchant card and categorized Settings links.
+    - **POS & Create Invoice Isolation**: More intentionally omits inline `Create New Invoice` and `POS` counter CTA modules; billing and POS creation remain cleanly anchored to Dashboard quick actions, Header controls, and mobile BottomNav.
 - **Dynamic Code Splitting & Performance Architecture**:
   - **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
     ```typescript
@@ -202,6 +278,8 @@ npm run build
 ```
 
 ### Key Test Suites (`src/__tests__/`)
+- `splitBankArchitectureAndMigration.test.ts`: Split-bank tender routing, metadata persistence, overpayment clamping, legacy migration idempotency.
+- `ledgerReversalsAndRepair.test.ts`: Double-entry reversals, repair engine, non-hard-delete RCM vouchers, pre-migration backup verification.
 - `gstCalculator.test.ts`: Tax calculation, interstate vs intrastate, round-off.
 - `inventoryConstraints.test.ts`: Stock decrement, overselling clamping, `allowNegativeStock`.
 - `customerOpeningBalanceLedger.test.tsx`: Opening balance preservation across invoice lifecycles.

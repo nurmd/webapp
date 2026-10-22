@@ -93,6 +93,7 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
     let payAmt = parseFloat(amount);
     const discAmt = parseFloat(discount) || 0;
     let splits: PaymentSplit[] | undefined = undefined;
+    const defaultBank = db.getBankAccounts().find((b) => b.isDefault && b.accountType === 'BANK') || db.getBankAccounts().find((b) => b.accountType === 'BANK');
 
     if (paymentMode === 'SPLIT') {
       const c = parseFloat(splitCash) || 0;
@@ -105,9 +106,9 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
       }
       payAmt = totalSplit;
       splits = [
-        ...(c > 0 ? [{ id: `s-cash-${Date.now()}`, mode: 'CASH' as const, amount: c }] : []),
-        ...(u > 0 ? [{ id: `s-upi-${Date.now()}`, mode: 'UPI' as const, amount: u }] : []),
-        ...(b > 0 ? [{ id: `s-bank-${Date.now()}`, mode: 'BANK' as const, amount: b }] : []),
+        ...(c > 0 ? [{ id: `s-cash-${Date.now()}`, mode: 'CASH' as const, amount: c, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' }] : []),
+        ...(u > 0 ? [{ id: `s-upi-${Date.now()}`, mode: 'UPI' as const, amount: u, accountId: defaultBank?.id, accountName: defaultBank?.accountName }] : []),
+        ...(b > 0 ? [{ id: `s-bank-${Date.now()}`, mode: 'BANK' as const, amount: b, accountId: defaultBank?.id, accountName: defaultBank?.accountName }] : []),
       ];
     } else {
       if (isNaN(payAmt) || payAmt <= 0) {
@@ -162,10 +163,13 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
             if (splits && splits.length > 0) {
               splits.forEach((s) => updatedSplits.push({ ...s }));
             } else {
+              const isCash = paymentMode === 'CASH';
               updatedSplits.push({
                 id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 mode: (paymentMode as any) || 'CASH',
                 amount: payAmt,
+                accountId: isCash ? 'ACC_CASH' : defaultBank?.id,
+                accountName: isCash ? 'Cash-in-hand' : defaultBank?.accountName,
               });
             }
             if (newBal > 0) {
@@ -197,6 +201,8 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
               amount: payAmt,
               discount: discAmt,
               paymentMode,
+              bankAccountId: defaultBank?.id,
+              bankAccountName: defaultBank?.accountName,
               paymentSplits: splits && splits.length > 0 ? splits : undefined,
               narration: notes || `Payment received for Bill #${inv.invoiceNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
             });
@@ -225,10 +231,13 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
             if (splits && splits.length > 0) {
               splits.forEach((s) => updatedSplits.push({ ...s }));
             } else {
+              const isCash = paymentMode === 'CASH';
               updatedSplits.push({
                 id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 mode: (paymentMode as any) || 'CASH',
                 amount: payAmt,
+                accountId: isCash ? 'ACC_CASH' : defaultBank?.id,
+                accountName: isCash ? 'Cash-in-hand' : defaultBank?.accountName,
               });
             }
             if (newBal > 0) {
@@ -260,6 +269,8 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
               amount: payAmt,
               discount: discAmt,
               paymentMode,
+              bankAccountId: defaultBank?.id,
+              bankAccountName: defaultBank?.accountName,
               paymentSplits: splits && splits.length > 0 ? splits : undefined,
               narration: notes || `Payment made for Bill #${pur.billNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
             });

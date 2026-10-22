@@ -216,7 +216,7 @@ export class AuditTrailService {
   /**
    * Ensures storage is loaded and hydrated from memory or PouchDB IndexedDB.
    */
-  private async ensureLoaded(): Promise<void> {
+  public async ensureLoaded(): Promise<void> {
     this.reclaimLegacyLocalStorage();
 
     if (this.loaded && this.records.length > 0) return;

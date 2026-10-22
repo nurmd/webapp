@@ -46,6 +46,7 @@ export class PartyStorage extends SettingsStorage {
       }
       list.push(partyToSave);
     }
+    this.removeTombstone('party', partyToSave.id);
     this.set(STORAGE_KEYS.PARTIES, list);
     pouch.putDoc('party', partyToSave);
     this.broadcastChange('party', 'save', partyToSave.id, partyToSave);
@@ -75,6 +76,7 @@ export class PartyStorage extends SettingsStorage {
 
   deleteParty(id: string): void {
     const list = this.getParties().filter((p) => p.id !== id);
+    this.recordTombstone('party', id);
     this.set(STORAGE_KEYS.PARTIES, list);
     pouch.deleteDoc('party', id);
     this.broadcastChange('party', 'delete', id);
@@ -133,6 +135,8 @@ export class PartyStorage extends SettingsStorage {
       const vouchers = this.getVouchers();
       const partyReceipts = vouchers.filter(
         (v) =>
+          !v.isCancelled &&
+          !v.isReversed &&
           v.voucherType === 'RECEIPT' &&
           v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
@@ -166,6 +170,8 @@ export class PartyStorage extends SettingsStorage {
       const vouchers = this.getVouchers();
       const partyPayments = vouchers.filter(
         (v) =>
+          !v.isCancelled &&
+          !v.isReversed &&
           v.voucherType === 'PAYMENT' &&
           v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
@@ -280,6 +286,7 @@ export class PartyStorage extends SettingsStorage {
 
     // 4. Single pass over vouchers: O(V * E)
     for (const v of vouchers) {
+      if (v.isCancelled || v.isReversed) continue;
       const isReceipt = v.voucherType === 'RECEIPT';
       const isPayment = v.voucherType === 'PAYMENT';
       if (!isReceipt && !isPayment) continue;

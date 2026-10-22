@@ -5,7 +5,9 @@ import { UserProfile } from '../../services/rbac.ts';
 interface HeaderProps {
   company: CompanyProfile;
   activeUser?: UserProfile;
-  onOpenDrawer: () => void;
+  onOpenDrawer?: () => void;
+  onOpenMore?: () => void;
+  onOpenSettings?: () => void;
   onNewInvoice: () => void;
   onSearchClick?: () => void;
   onBarcodeClick?: () => void;
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   company,
   activeUser,
   onOpenDrawer,
+  onOpenMore,
+  onOpenSettings,
   onNewInvoice,
   onSearchClick,
   onBarcodeClick,
@@ -25,6 +29,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 }) => {
   const isGst = company.isGstEnabled !== false;
   const brandInitial = (company.tradeName || company.businessName || 'V')[0].toUpperCase();
+  const handleMoreClick = onOpenMore ?? onOpenDrawer;
 
   return (
     <header className="w-full relative z-30 bg-white dark:bg-slate-900 border-b border-black/[0.06] dark:border-white/[0.08] shadow-[0_1px_4px_rgba(0,0,0,0.03)] pt-safe transition-colors flex-shrink-0">
@@ -32,12 +37,13 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         {/* Left: Navigation Menu Toggle & Brand Identity */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <button
-            onClick={onOpenDrawer}
-            aria-label="Open Navigation Drawer"
-            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-200 bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:hover:bg-slate-700/60 active:scale-90 transition-all flex-shrink-0 cursor-pointer relative border border-black/[0.04] dark:border-white/[0.06]"
+            onClick={handleMoreClick}
+            aria-label="Open More menu"
+            title="More"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-200 bg-slate-100/70 hover:bg-slate-200/70 dark:bg-slate-800/60 dark:hover:bg-slate-700/60 active:scale-90 transition-all flex-shrink-0 cursor-pointer relative border border-black/[0.04] dark:border-white/[0.06]"
             type="button"
           >
-            <span className="material-symbols-outlined text-[20px]">menu</span>
+            <span className="material-symbols-outlined text-[20px]">grid_view</span>
             {hasUpdate && (
               <span
                 className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse"
@@ -112,6 +118,19 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               title="Quick POS Counter"
             >
               <span className="material-symbols-outlined text-[19px]">qr_code_scanner</span>
+            </button>
+          )}
+
+          {/* Settings Shortcut */}
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              aria-label="Open Settings"
+              title="Settings"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-90 transition-all cursor-pointer border border-black/[0.03] dark:border-white/[0.05]"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[19px]">settings</span>
             </button>
           )}
 

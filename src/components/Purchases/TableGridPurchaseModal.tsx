@@ -363,6 +363,12 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     );
   };
 
+  const handleUpdateSplitAccount = (id: string, accountId: string, accountName: string) => {
+    setPaymentSplits((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, accountId, accountName } : s))
+    );
+  };
+
   const handleAddSplitMode = () => {
     setIsManualAmount(true);
     const existingModes = new Set(paymentSplits.map((s) => s.mode));
@@ -516,6 +522,10 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       id: s.id,
       mode: s.mode,
       amount: s.mode === 'CREDIT' ? balanceDue : Number(s.amount) || 0,
+      accountId: s.accountId,
+      accountName: s.accountName,
+      reference: s.reference || s.referenceNo,
+      referenceNo: s.referenceNo || s.reference,
     }));
 
     const newBill: PurchaseBill = {
@@ -895,6 +905,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             balanceDue={balanceDue}
             onUpdateSplitMode={handleUpdateSplitMode}
             onUpdateSplitAmount={handleUpdateSplitAmount}
+            onUpdateSplitAccount={handleUpdateSplitAccount}
             onAddSplitMode={handleAddSplitMode}
             onRemoveSplit={handleRemoveSplit}
             paymentModes={PURCHASE_PAYMENT_MODES}
