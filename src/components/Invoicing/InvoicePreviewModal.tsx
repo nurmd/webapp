@@ -347,6 +347,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const wordsTotal = invoice.amountInWords || amountInWords(resolvedGrandTotal);
   const wordsTax = amountInWords(resolvedTotalTax);
 
+  const isDeliveryChallan = invoice.invoiceType === 'DELIVERY_CHALLAN';
+  const challanPurpose = invoice.challanType === 'SUPPLY_ON_APPROVAL'
+    ? 'Supply on approval'
+    : invoice.challanType === 'JOB_WORK'
+    ? 'Job work'
+    : invoice.challanType === 'OTHERS'
+    ? 'Others'
+    : invoice.challanType === 'FOR_REMOVAL'
+    ? 'For removal'
+    : undefined;
+
   const thermalSettings = printSettingsService.getSettings().thermal;
 
   const thermalText = formatThermalReceiptText(
@@ -355,7 +366,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       companyAddress: thermalSettings.showAddress ? company.address : '',
       gstin: (thermalSettings.showGstin && isGst) ? company.gstin : '',
       phone: thermalSettings.showPhone ? company.phone : '',
-      receiptTitle: resolveReceiptTitle(thermalSettings.receiptTitle, company.isCompositionScheme, Boolean(company.gstin)),
+      receiptTitle: isDeliveryChallan
+        ? 'DELIVERY CHALLAN'
+        : resolveReceiptTitle(thermalSettings.receiptTitle, company.isCompositionScheme, Boolean(company.gstin)),
       invoiceNo: invoice.invoiceNumber,
       date: formatDate(invoice.date),
       customerName: invoice.partyName,
@@ -374,20 +387,23 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       shippingAmount: invoice.shippingAmount,
       roundOff: invoice.roundOff,
       grandTotal: resolvedGrandTotal,
-      paidAmount: invoice.paidAmount,
-      balanceAmount: invoice.balanceAmount,
-      partyBalance: party ? party.currentBalance : undefined,
-      paymentSplits: invoice.paymentSplits,
-      upiId: company.upiId,
+      paidAmount: isDeliveryChallan ? undefined : invoice.paidAmount,
+      balanceAmount: isDeliveryChallan ? undefined : invoice.balanceAmount,
+      partyBalance: isDeliveryChallan ? undefined : (party ? party.currentBalance : undefined),
+      paymentSplits: isDeliveryChallan ? undefined : invoice.paymentSplits,
+      upiId: isDeliveryChallan ? undefined : company.upiId,
       terms: company.termsAndConditions,
       stateName: sellerStateObj?.name,
       isCompositionScheme: company.isCompositionScheme,
+      isDeliveryChallan,
+      challanPurpose,
+      vehicleNumber: invoice.vehicleNumber,
     },
     thermalWidth
   );
 
   const upiQrUrl = useMemo(() => {
-    if (!company.upiId) return null;
+    if (isDeliveryChallan || !company.upiId) return null;
     try {
       const upiPayload = `upi://pay?pa=${company.upiId}&pn=${encodeURIComponent(
         company.tradeName || company.businessName
@@ -397,7 +413,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     } catch {
       return null;
     }
-  }, [company.upiId, company.tradeName, company.businessName, invoice.balanceAmount, resolvedGrandTotal]);
+  }, [isDeliveryChallan, company.upiId, company.tradeName, company.businessName, invoice.balanceAmount, resolvedGrandTotal]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-2 print-modal-overlay animate-fade-in">
@@ -572,7 +588,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   )}
                   <div className="pt-0.5">
                     <span className="inline-block px-1.5 py-0.2 text-[8px] font-black uppercase tracking-widest bg-slate-100 text-slate-900 border border-slate-300 rounded">
-                      {company.isCompositionScheme ? 'BILL OF SUPPLY' : isGst ? 'TAX INVOICE' : 'RETAIL INVOICE'}
+                      {invoice.invoiceType === 'DELIVERY_CHALLAN'
+                        ? 'DELIVERY CHALLAN'
+                        : company.isCompositionScheme
+                        ? 'BILL OF SUPPLY'
+                        : isGst
+                        ? 'TAX INVOICE'
+                        : 'RETAIL INVOICE'}
                     </span>
                   </div>
                 </div>
@@ -583,12 +605,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 {/* Metadata Row */}
                 <div className="text-[10px] space-y-0.5 leading-tight">
                   <div className="flex justify-between items-center">
-                    <span><strong className="text-slate-800">Bill:</strong> {invoice.invoiceNumber}</span>
+                    <span><strong className="text-slate-800">{isDeliveryChallan ? 'Challan:' : 'Bill:'}</strong> {invoice.invoiceNumber}</span>
                     <span className="text-slate-700">{formatDate(invoice.date)}</span>
                   </div>
                   {invoice.partyName && (
                     <div className="truncate">
                       <strong className="text-slate-800">Party:</strong> {invoice.partyName}
+                    </div>
+                  )}
+                  {isDeliveryChallan && challanPurpose && (
+                    <div>
+                      <strong className="text-slate-800">Purpose:</strong> {challanPurpose}
+                    </div>
+                  )}
+                  {isDeliveryChallan && invoice.vehicleNumber && (
+                    <div>
+                      <strong className="text-slate-800">Vehicle:</strong> {invoice.vehicleNumber}
                     </div>
                   )}
                 </div>
@@ -701,16 +733,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   </div>
                 </div>
 
-                {/* Payment Status / Balance Due */}
-                {invoice.balanceAmount > 0 && (
+                {/* Payment Status / Balance Due - Suppressed for Delivery Challans */}
+                {!isDeliveryChallan && invoice.balanceAmount > 0 && (
                   <div className="flex justify-between items-center text-[10px] text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded">
                     <span>Balance Due:</span>
                     <span>₹{invoice.balanceAmount.toFixed(2)}</span>
                   </div>
                 )}
 
-                {/* Dynamic UPI QR Code */}
-                {upiQrUrl && (
+                {/* Dynamic UPI QR Code - Suppressed for Delivery Challans */}
+                {!isDeliveryChallan && upiQrUrl && (
                   <div className="pt-0.5 text-center flex flex-col items-center">
                     <div className="p-1 bg-white border border-slate-300 rounded inline-block shadow-2xs">
                       <img src={upiQrUrl} alt="UPI QR" className="w-16 h-16 sm:w-20 sm:h-20 block" />
@@ -743,7 +775,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <div className="bg-surface-container-lowest p-3.5 rounded-xl border border-outline-variant/30 shadow-xs space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
-                    {company.isCompositionScheme ? 'BILL OF SUPPLY' : isGst ? 'TAX INVOICE' : 'RETAIL INVOICE'}
+                    {invoice.invoiceType === 'DELIVERY_CHALLAN'
+                      ? 'DELIVERY CHALLAN'
+                      : company.isCompositionScheme
+                      ? 'BILL OF SUPPLY'
+                      : isGst
+                      ? 'TAX INVOICE'
+                      : 'RETAIL INVOICE'}
                   </span>
                   <span className="text-[10px] font-bold text-on-surface-variant uppercase bg-surface-container px-2 py-0.5 rounded border border-outline-variant/30">
                     {copyType}
@@ -752,23 +790,30 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                 <div className="flex items-center justify-between gap-2 border-b border-outline-variant/20 pb-2">
                   <div>
-                    <span className="text-[10px] text-on-surface-variant font-bold uppercase block">Invoice Number</span>
+                    <span className="text-[10px] text-on-surface-variant font-bold uppercase block">
+                      {isDeliveryChallan ? 'Challan Number' : 'Invoice Number'}
+                    </span>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-base font-black text-on-surface font-mono">{invoice.invoiceNumber}</span>
                       <button
                         type="button"
                         onClick={handleCopyInvoiceNo}
                         className="p-1 rounded hover:bg-surface-container text-on-surface-variant cursor-pointer transition-colors"
-                        title="Copy invoice number"
+                        title={isDeliveryChallan ? 'Copy challan number' : 'Copy invoice number'}
                       >
                         {copiedInvoiceNo ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Payment Status Pill */}
+                  {/* Status Pill */}
                   <div className="text-right">
-                    {invoice.balanceAmount <= 0 ? (
+                    {isDeliveryChallan ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border border-indigo-500/30 uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        {invoice.challanStatus || 'DELIVERED'}
+                      </span>
+                    ) : invoice.balanceAmount <= 0 ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         PAID
@@ -789,13 +834,21 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] pt-0.5">
                   <div>
-                    <span className="text-on-surface-variant block font-medium">Invoice Date:</span>
+                    <span className="text-on-surface-variant block font-medium">
+                      {isDeliveryChallan ? 'Challan Date:' : 'Invoice Date:'}
+                    </span>
                     <span className="font-bold text-on-surface">{formatDate(invoice.date)}</span>
                   </div>
-                  {invoice.dueDate && (
+                  {!isDeliveryChallan && invoice.dueDate && (
                     <div className="text-right">
                       <span className="text-on-surface-variant block font-medium">Due Date:</span>
                       <span className="font-bold text-rose-600 dark:text-rose-400">{formatDate(invoice.dueDate)}</span>
+                    </div>
+                  )}
+                  {isDeliveryChallan && challanPurpose && (
+                    <div className="text-right">
+                      <span className="text-on-surface-variant block font-medium">Purpose (Rule 55):</span>
+                      <span className="font-bold text-teal-700 dark:text-teal-400">{challanPurpose}</span>
                     </div>
                   )}
                 </div>
@@ -983,7 +1036,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                   {/* Grand Total */}
                   <div className="pt-2 border-t border-outline-variant/30 flex justify-between items-center text-sm">
-                    <span className="font-black uppercase tracking-tight text-on-surface">Net Amount Payable</span>
+                    <span className="font-black uppercase tracking-tight text-on-surface">
+                      {isDeliveryChallan ? 'Total Goods Value' : 'Net Amount Payable'}
+                    </span>
                     <span className="text-base font-black text-primary font-tabular-data">
                       ₹{resolvedGrandTotal.toFixed(2)}
                     </span>
@@ -994,8 +1049,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     Amount in words: <strong className="text-on-surface not-italic">{wordsTotal}</strong>
                   </p>
 
-                  {/* Balance status */}
-                  {invoice.balanceAmount > 0 && (
+                  {/* Balance status - suppressed for Delivery Challans */}
+                  {!isDeliveryChallan && invoice.balanceAmount > 0 && (
                     <div className="flex justify-between items-center bg-rose-500/10 text-rose-700 dark:text-rose-400 p-2 rounded-lg font-bold text-xs mt-2 border border-rose-500/20">
                       <span>Balance Due</span>
                       <span className="font-tabular-data">₹{invoice.balanceAmount.toFixed(2)}</span>
@@ -1004,8 +1059,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 </div>
               </div>
 
-              {/* 5. UPI QR & Banking Card */}
-              {(upiQrUrl || company.accountNumber) && (
+              {/* 5. UPI QR & Banking Card - suppressed for Delivery Challans */}
+              {!isDeliveryChallan && (upiQrUrl || company.accountNumber) && (
                 <div className="bg-surface-container-lowest p-3.5 rounded-xl border border-outline-variant/30 shadow-xs space-y-3">
                   <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant block">
                     Payment Information
@@ -1130,9 +1185,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
                 <div className="text-center flex-1 mx-2">
                   <h1 className="text-lg sm:text-xl font-black tracking-wider uppercase text-slate-950">
-                    {company.isCompositionScheme ? 'BILL OF SUPPLY' : (isGst ? 'TAX INVOICE' : 'RETAIL INVOICE')}
+                    {invoice.invoiceType === 'DELIVERY_CHALLAN'
+                      ? 'DELIVERY CHALLAN'
+                      : company.isCompositionScheme
+                      ? 'BILL OF SUPPLY'
+                      : (isGst ? 'TAX INVOICE' : 'RETAIL INVOICE')}
                   </h1>
-                  {company.isCompositionScheme ? (
+                  {invoice.invoiceType === 'DELIVERY_CHALLAN' ? (
+                    <p className="text-[10px] text-slate-600 font-semibold italic">
+                      (Issued under Rule 55 of CGST Rules, 2017 &mdash; Not a Tax Invoice)
+                    </p>
+                  ) : company.isCompositionScheme ? (
                     <p className="text-[10px] text-slate-600 font-semibold italic">
                       Composition taxable person, not eligible to collect tax on supplies
                     </p>
@@ -1202,7 +1265,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   <div className="grid grid-cols-2 divide-x divide-slate-800 p-2 bg-slate-100/60">
                     <div>
                       <span className="text-[9px] text-slate-600 uppercase font-black block tracking-wider">
-                        Invoice Number
+                        {isDeliveryChallan ? 'Challan Number' : 'Invoice Number'}
                       </span>
                       <span className="font-mono font-black text-sm text-slate-950">
                         {invoice.invoiceNumber}
@@ -1210,7 +1273,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                     <div className="pl-2">
                       <span className="text-[9px] text-slate-600 uppercase font-black block tracking-wider">
-                        Invoice Date
+                        {isDeliveryChallan ? 'Challan Date' : 'Invoice Date'}
                       </span>
                       <span className="font-bold text-xs text-slate-950">
                         {formatDate(invoice.date)}
@@ -1218,34 +1281,55 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 divide-x divide-slate-800 p-2">
-                    <div>
-                      <span className="text-[9px] text-slate-500 uppercase font-bold block">
-                        Payment Mode / Terms
-                      </span>
-                      <span className="font-semibold text-slate-900 uppercase">
-                        {invoice.paymentMode === 'SPLIT' ? 'Split Payment' : invoice.paymentMode} ({invoice.paymentStatus})
-                      </span>
-                      {((invoice.paymentSplits && invoice.paymentSplits.length > 1) || (invoice.notes && invoice.notes.includes('Split'))) && (
-                        <span className="text-[10px] text-slate-600 block mt-0.5 normal-case font-medium">
-                          {invoice.paymentSplits && invoice.paymentSplits.length > 0
-                            ? invoice.paymentSplits
-                                .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
-                                .map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`)
-                                .join(' • ')
-                            : invoice.notes?.replace('Split Payment — ', '')}
+                  {isDeliveryChallan ? (
+                    <div className="grid grid-cols-2 divide-x divide-slate-800 p-2">
+                      <div>
+                        <span className="text-[9px] text-slate-500 uppercase font-bold block">
+                          Purpose of Supply (Rule 55)
                         </span>
-                      )}
+                        <span className="font-bold text-slate-950 text-[11px]">
+                          {challanPurpose || 'For removal'}
+                        </span>
+                      </div>
+                      <div className="pl-2">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold block">
+                          Challan Status
+                        </span>
+                        <span className="font-bold text-indigo-700 text-[11px] uppercase">
+                          {invoice.challanStatus || 'DELIVERED'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="pl-2">
-                      <span className="text-[9px] text-slate-500 uppercase font-bold block">
-                        Due Date
-                      </span>
-                      <span className="text-slate-900 font-medium">
-                        {invoice.dueDate ? formatDate(invoice.dueDate) : '-'}
-                      </span>
+                  ) : (
+                    <div className="grid grid-cols-2 divide-x divide-slate-800 p-2">
+                      <div>
+                        <span className="text-[9px] text-slate-500 uppercase font-bold block">
+                          Payment Mode / Terms
+                        </span>
+                        <span className="font-semibold text-slate-900 uppercase">
+                          {invoice.paymentMode === 'SPLIT' ? 'Split Payment' : invoice.paymentMode} ({invoice.paymentStatus})
+                        </span>
+                        {((invoice.paymentSplits && invoice.paymentSplits.length > 1) || (invoice.notes && invoice.notes.includes('Split'))) && (
+                          <span className="text-[10px] text-slate-600 block mt-0.5 normal-case font-medium">
+                            {invoice.paymentSplits && invoice.paymentSplits.length > 0
+                              ? invoice.paymentSplits
+                                  .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+                                  .map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`)
+                                  .join(' • ')
+                              : invoice.notes?.replace('Split Payment — ', '')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="pl-2">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold block">
+                          Due Date
+                        </span>
+                        <span className="text-slate-900 font-medium">
+                          {invoice.dueDate ? formatDate(invoice.dueDate) : '-'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {isGst && (
                     <div className="grid grid-cols-2 divide-x divide-slate-800 p-2">
@@ -1273,7 +1357,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       <span className="text-[9px] text-slate-500 uppercase font-bold block">
                         Delivery Note / Despatch Doc
                       </span>
-                      <span className="text-slate-700 italic">As per order</span>
+                      <span className="text-slate-700 font-medium">
+                        {invoice.vehicleNumber
+                          ? `Vehicle: ${invoice.vehicleNumber}`
+                          : invoice.ewayBillNumber
+                          ? `E-Way: ${invoice.ewayBillNumber}`
+                          : 'As per order'}
+                      </span>
                     </div>
                     <div className="pl-2">
                       <span className="text-[9px] text-slate-500 uppercase font-bold block">
@@ -1292,11 +1382,30 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   <div className="text-[9px] font-black uppercase tracking-wider text-slate-600 pb-0.5 border-b border-slate-200">
                     Details of Consignee (Shipped To)
                   </div>
-                  <div className="font-black text-slate-950 text-sm mt-1">{invoice.partyName}</div>
+                  <div className="font-black text-slate-950 text-sm mt-1">{invoice.consigneeName || invoice.partyName}</div>
+                  {invoice.consigneeName && invoice.partyName && invoice.consigneeName !== invoice.partyName && (
+                    <div className="text-[10px] text-slate-500 font-medium">(Party: {invoice.partyName})</div>
+                  )}
                   <div className="text-slate-700 text-xs mt-0.5 leading-snug">
                     {invoice.shippingAddress || invoice.partyAddress || 'Same as Billed Address / Local Counter'}
                     {invoice.shippingPincode ? ` - ${invoice.shippingPincode}` : ''}
                   </div>
+                  {(invoice.transporterName || invoice.ewayBillNumber) && (
+                    <div className="mt-1 pt-1 border-t border-dashed border-slate-300 text-[10px] text-slate-700">
+                      {invoice.transporterName && (
+                        <div>
+                          <strong className="text-slate-900">Transporter:</strong> {invoice.transporterName}
+                          {invoice.transporterId ? ` (${invoice.transporterId})` : ''}
+                        </div>
+                      )}
+                      {invoice.ewayBillNumber && (
+                        <div>
+                          <strong className="text-slate-900">E-Way Bill:</strong>{' '}
+                          <span className="font-mono font-bold text-slate-900">{invoice.ewayBillNumber}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {isGst && (
                     <div className="mt-1.5 space-y-0.5 text-xs">
                       <div>
@@ -1740,9 +1849,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <div className="p-3 flex flex-col justify-between gap-3 bg-slate-50/10">
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-wider text-slate-700 mb-1 border-b border-slate-200 pb-0.5">
-                      Company's Bank Details
+                      {isDeliveryChallan ? 'Statutory Transport Notice' : "Company's Bank Details"}
                     </div>
-                    {company.bankName ? (
+                    {isDeliveryChallan ? (
+                      <div className="text-xs space-y-0.5 text-slate-800">
+                        <p className="font-medium">
+                          Goods are transported under <strong>Rule 55 of CGST Rules, 2017</strong> for the purpose of <strong>{challanPurpose || 'removal'}</strong>. This document is a delivery challan and does not constitute a demand for payment.
+                        </p>
+                      </div>
+                    ) : company.bankName ? (
                       <div className="text-xs space-y-0.5 text-slate-800">
                         <div>
                           <span className="text-slate-500 font-semibold">Bank Name: </span>
@@ -1765,7 +1880,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     ) : (
                       <div className="text-xs text-slate-500 italic">No bank account specified</div>
                     )}
-                    {company.upiId && (
+                    {!isDeliveryChallan && company.upiId && (
                       <div className="text-xs text-emerald-800 font-bold mt-1.5 flex items-center gap-1">
                         <span className="text-slate-500 font-semibold">UPI ID:</span> {company.upiId}
                       </div>
@@ -1792,7 +1907,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 {/* Right Side: UPI QR Code & Authorised Signatory */}
                 <div className="p-3 flex flex-col justify-between items-end text-right bg-slate-50/10">
                   <div className="flex items-center gap-3 w-full justify-end">
-                    {upiQrUrl && (
+                    {!isDeliveryChallan && upiQrUrl && (
                       <div className="p-1 bg-white border border-slate-300 rounded text-center shadow-xs">
                         <img src={upiQrUrl} alt="UPI QR" className="w-20 h-20 block" />
                         <span className="text-[9px] font-black text-emerald-700 block mt-0.5 tracking-tight uppercase">
@@ -1802,7 +1917,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                     )}
 
                     <div className="text-right">
-                      {invoice.balanceAmount > 0 && (
+                      {!isDeliveryChallan && invoice.balanceAmount > 0 && (
                         <div className="mb-2">
                           <span className="text-[10px] uppercase font-bold text-rose-600 block">
                             Balance Due
@@ -1812,21 +1927,30 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           </span>
                         </div>
                       )}
-                      <div className="text-[11px] text-slate-600 font-medium">
-                        Payment Status:{' '}
-                        <span
-                          className={`font-bold ${
-                            invoice.paymentStatus === 'PAID'
-                              ? 'text-emerald-700'
-                              : invoice.paymentStatus === 'PARTIAL'
-                              ? 'text-amber-700'
-                              : 'text-rose-700'
-                          }`}
-                        >
-                          {invoice.paymentStatus}
-                        </span>
-                      </div>
-                      {a4Settings.showPartyBalance && party && (
+                      {!isDeliveryChallan ? (
+                        <div className="text-[11px] text-slate-600 font-medium">
+                          Payment Status:{' '}
+                          <span
+                            className={`font-bold ${
+                              invoice.paymentStatus === 'PAID'
+                                ? 'text-emerald-700'
+                                : invoice.paymentStatus === 'PARTIAL'
+                                ? 'text-amber-700'
+                                : 'text-rose-700'
+                            }`}
+                          >
+                            {invoice.paymentStatus}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-600 font-medium">
+                          Challan Status:{' '}
+                          <span className="font-bold text-indigo-700 uppercase">
+                            {invoice.challanStatus || 'DELIVERED'}
+                          </span>
+                        </div>
+                      )}
+                      {!isDeliveryChallan && a4Settings.showPartyBalance && party && (
                         <div className="mt-2 pt-1 border-t border-slate-300">
                           <span className="text-[10px] uppercase font-bold text-slate-600 block">
                             Total Party Balance

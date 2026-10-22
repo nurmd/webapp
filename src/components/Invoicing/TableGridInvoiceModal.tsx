@@ -183,11 +183,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [invoiceDate, setInvoiceDate] = useState<string>(
     initialInvoice ? initialInvoice.date : (initialDraft?.invoiceDate || new Date().toISOString().split('T')[0])
   );
+  const isDefaultDC = (initialInvoice?.invoiceType || initialDraft?.manualInvoiceType || defaultInvoiceType) === 'DELIVERY_CHALLAN';
   const [dueDate, setDueDate] = useState<string>(
     initialInvoice?.dueDate ||
       initialDraft?.dueDate ||
       (() => {
         const d = new Date();
+        if (isDefaultDC) {
+          return d.toISOString().split('T')[0];
+        }
         const offset = typeof db.getDefaultDueDays === 'function' ? db.getDefaultDueDays() : 15;
         d.setDate(d.getDate() + offset);
         return d.toISOString().split('T')[0];
@@ -227,6 +231,29 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   );
   const [returnReason, setReturnReason] = useState<string>(
     () => initialInvoice?.returnReason || initialDraft?.returnReason || '01-Sales Return'
+  );
+
+  // Delivery Challan & Transportation fields
+  const [consigneeName, setConsigneeName] = useState<string>(
+    () => initialInvoice?.consigneeName || (initialDraft as any)?.consigneeName || ''
+  );
+  const [vehicleNumber, setVehicleNumber] = useState<string>(
+    () => initialInvoice?.vehicleNumber || (initialDraft as any)?.vehicleNumber || ''
+  );
+  const [transporterName, setTransporterName] = useState<string>(
+    () => initialInvoice?.transporterName || (initialDraft as any)?.transporterName || ''
+  );
+  const [transporterId, setTransporterId] = useState<string>(
+    () => initialInvoice?.transporterId || (initialDraft as any)?.transporterId || ''
+  );
+  const [ewayBillNumber, setEwayBillNumber] = useState<string>(
+    () => initialInvoice?.ewayBillNumber || (initialDraft as any)?.ewayBillNumber || ''
+  );
+  const [challanStatus, setChallanStatus] = useState<'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'>(
+    () => initialInvoice?.challanStatus || (initialDraft as any)?.challanStatus || 'DISPATCHED'
+  );
+  const [challanType, setChallanType] = useState<'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS'>(
+    () => initialInvoice?.challanType || (initialDraft as any)?.challanType || 'FOR_REMOVAL'
   );
 
   // Scanner modal
@@ -585,6 +612,17 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       orderStatus: effectiveInvoiceType === 'SALES_ORDER'
         ? (initialInvoice?.orderStatus || 'PENDING')
         : undefined,
+      challanStatus: effectiveInvoiceType === 'DELIVERY_CHALLAN'
+        ? (challanStatus || initialInvoice?.challanStatus || 'DISPATCHED')
+        : undefined,
+      challanType: effectiveInvoiceType === 'DELIVERY_CHALLAN'
+        ? (challanType || initialInvoice?.challanType || 'FOR_REMOVAL')
+        : undefined,
+      consigneeName: consigneeName.trim() || undefined,
+      vehicleNumber: vehicleNumber.trim() || undefined,
+      transporterName: transporterName.trim() || undefined,
+      transporterId: transporterId.trim() || undefined,
+      ewayBillNumber: ewayBillNumber.trim() || undefined,
       createdAt: initialInvoice ? initialInvoice.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -647,6 +685,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       originalInvoiceDate,
       returnReason,
       orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
+      challanStatus: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanStatus : undefined,
+      challanType: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanType : undefined,
+      consigneeName,
+      vehicleNumber,
+      transporterName,
+      transporterId,
+      ewayBillNumber,
     }, effectiveInvoiceType);
   }, [
     initialInvoice,
@@ -666,6 +711,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     originalInvoiceDate,
     returnReason,
     effectiveInvoiceType,
+    challanStatus,
+    challanType,
+    consigneeName,
+    vehicleNumber,
+    transporterName,
+    transporterId,
+    ewayBillNumber,
   ]);
 
   // Safe close handler saving draft if unsaved progress exists
@@ -688,6 +740,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         originalInvoiceDate,
         returnReason,
         orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
+        challanStatus: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanStatus : undefined,
+        challanType: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanType : undefined,
+        consigneeName,
+        vehicleNumber,
+        transporterName,
+        transporterId,
+        ewayBillNumber,
       };
       if (draftService.isInvoiceDraftNotEmpty(draftData)) {
         draftService.saveInvoiceDraft(draftData, effectiveInvoiceType);
@@ -735,6 +794,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       originalInvoiceDate,
       returnReason,
       orderStatus: effectiveInvoiceType === 'SALES_ORDER' ? 'PENDING' : undefined,
+      challanStatus: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanStatus : undefined,
+      challanType: effectiveInvoiceType === 'DELIVERY_CHALLAN' ? challanType : undefined,
+      consigneeName,
+      vehicleNumber,
+      transporterName,
+      transporterId,
+      ewayBillNumber,
     };
     draftService.saveInvoiceDraft(draftData, effectiveInvoiceType);
     showAppToast('Progress saved as draft');
@@ -755,6 +821,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     originalInvoiceDate,
     returnReason,
     effectiveInvoiceType,
+    challanStatus,
+    challanType,
+    consigneeName,
+    vehicleNumber,
+    transporterName,
+    transporterId,
+    ewayBillNumber,
   ]);
 
   // Discard draft and reset form
@@ -767,6 +840,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     setShippingAmount(0);
     setShippingAddress('');
     setShippingPincode('');
+    setConsigneeName('');
+    setVehicleNumber('');
+    setTransporterName('');
+    setTransporterId('');
+    setEwayBillNumber('');
+    setChallanStatus('DISPATCHED');
+    setChallanType('FOR_REMOVAL');
     setOverallDiscountPercent(0);
     setOriginalInvoiceNumber('');
     setOriginalInvoiceDate('');
@@ -777,7 +857,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   // Restore draft from storage
   const handleRestoreDraft = useCallback(() => {
-    const draft = draftService.getInvoiceDraft(effectiveInvoiceType);
+    const draft = draftService.getInvoiceDraft(effectiveInvoiceType) as any;
     if (!draft) {
       showAppToast('No saved draft found');
       return;
@@ -790,6 +870,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     if (typeof draft.shippingAmount === 'number') setShippingAmount(draft.shippingAmount);
     if (draft.shippingAddress) setShippingAddress(draft.shippingAddress);
     if (draft.shippingPincode) setShippingPincode(draft.shippingPincode);
+    if (draft.consigneeName) setConsigneeName(draft.consigneeName);
+    if (draft.vehicleNumber) setVehicleNumber(draft.vehicleNumber);
+    if (draft.transporterName) setTransporterName(draft.transporterName);
+    if (draft.transporterId) setTransporterId(draft.transporterId);
+    if (draft.ewayBillNumber) setEwayBillNumber(draft.ewayBillNumber);
+    if (draft.challanStatus) setChallanStatus(draft.challanStatus);
+    if (draft.challanType) setChallanType(draft.challanType);
     if (draft.originalInvoiceNumber) setOriginalInvoiceNumber(draft.originalInvoiceNumber);
     if (draft.originalInvoiceDate) setOriginalInvoiceDate(draft.originalInvoiceDate);
     if (draft.returnReason) setReturnReason(draft.returnReason);
@@ -899,7 +986,12 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             invoiceType={effectiveInvoiceType}
             autoDetectedInvoiceType={autoDetectedInvoiceType}
             isManualTypeOverride={Boolean(manualInvoiceType)}
-            onInvoiceTypeChange={(val) => setManualInvoiceType(val)}
+            onInvoiceTypeChange={(val) => {
+              setManualInvoiceType(val);
+              if (val === 'DELIVERY_CHALLAN') {
+                setDueDate(new Date().toISOString().split('T')[0]);
+              }
+            }}
             isRcm={isRcm}
             onRcmChange={setIsRcm}
             isCompositionScheme={company.isCompositionScheme}
@@ -927,6 +1019,20 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             returnReason={returnReason}
             onReturnReasonChange={setReturnReason}
             orderStatus={initialInvoice?.orderStatus || 'PENDING'}
+            challanStatus={challanStatus}
+            onChallanStatusChange={setChallanStatus}
+            challanType={challanType}
+            onChallanTypeChange={setChallanType}
+            consigneeName={consigneeName}
+            onConsigneeNameChange={setConsigneeName}
+            vehicleNumber={vehicleNumber}
+            onVehicleNumberChange={setVehicleNumber}
+            transporterName={transporterName}
+            onTransporterNameChange={setTransporterName}
+            transporterId={transporterId}
+            onTransporterIdChange={setTransporterId}
+            ewayBillNumber={ewayBillNumber}
+            onEwayBillNumberChange={setEwayBillNumber}
             hasRestoredDraft={hasRestoredDraft}
             hasDraftInStorage={!initialInvoice && draftService.hasInvoiceDraft(effectiveInvoiceType)}
             onSaveDraft={!initialInvoice ? handleSaveDraft : undefined}

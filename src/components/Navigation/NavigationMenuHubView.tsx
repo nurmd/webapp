@@ -121,6 +121,10 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     return invoices.filter((i) => (i.invoiceType as string) === 'SALES_ORDER' && i.orderStatus === 'PENDING').length;
   }, [invoices]);
 
+  const deliveryChallansCount = useMemo(() => {
+    return invoices.filter((i) => (i.invoiceType as string) === 'DELIVERY_CHALLAN').length;
+  }, [invoices]);
+
   const salesReturnsCount = useMemo(() => {
     return invoices.filter((i) => (i.invoiceType as string) === 'CREDIT_NOTE').length;
   }, [invoices]);
@@ -202,8 +206,11 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Goods dispatch documentation without immediate billing',
       icon: 'local_shipping',
       category: 'sales',
-      action: () => onNavigate('sales'),
-      keywords: ['challan', 'dispatch', 'transport', 'delivery'],
+      badge: deliveryChallansCount > 0
+        ? { text: `${deliveryChallansCount} Challans`, type: 'primary' }
+        : undefined,
+      action: () => onNavigate('delivery_challans'),
+      keywords: ['challan', 'dispatch', 'transport', 'delivery', 'delivery challan', 'rule 55'],
     },
     {
       id: 'sale_return',

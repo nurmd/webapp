@@ -20,6 +20,7 @@ export type AppTab =
   | 'quotations'
   | 'sales_orders'
   | 'sales_returns'
+  | 'delivery_challans'
   | 'purchase_orders'
   | 'purchase_returns';
 
@@ -65,6 +66,7 @@ export const Drawer: React.FC<DrawerProps> = React.memo(({
       category: 'Transactions',
       items: [
         { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
+        { id: 'delivery_challans', label: 'Delivery Challans', icon: 'local_shipping' },
         { id: 'quotations', label: 'Quotations / Estimates', icon: 'request_quote' },
         { id: 'sales_orders', label: 'Sale Orders', icon: 'assignment' },
         { id: 'sales_returns', label: 'Sale Returns (Credit Note)', icon: 'assignment_return' },

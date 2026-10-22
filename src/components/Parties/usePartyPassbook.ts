@@ -52,10 +52,15 @@ export function usePartyPassbook({
 
   const isCustomer = party.type === 'CUSTOMER';
 
-  // Filter party's sales and purchases
+  // Filter party's sales and purchases (exclude non-sale quotations, delivery challans, sales orders, and cancelled docs)
   const partyInvoices = useMemo(() => {
     return invoices.filter(
-      (inv) => inv.partyId === party.id || inv.partyName.toLowerCase() === party.name.toLowerCase()
+      (inv) =>
+        !inv.isCancelled &&
+        inv.invoiceType !== 'ESTIMATE' &&
+        inv.invoiceType !== 'SALES_ORDER' &&
+        inv.invoiceType !== 'DELIVERY_CHALLAN' &&
+        (inv.partyId === party.id || inv.partyName.toLowerCase() === party.name.toLowerCase())
     );
   }, [invoices, party]);
 

@@ -19,7 +19,15 @@ export interface ConvertPurchaseOrderOptions {
  */
 export function canConvertToInvoice(doc: Invoice): boolean {
   if (!doc) return false;
-  if (doc.isCancelled || doc.isConverted || doc.orderStatus === 'CANCELLED' || doc.orderStatus === 'FULFILLED') return false;
+  if (
+    doc.isCancelled ||
+    doc.isConverted ||
+    doc.orderStatus === 'CANCELLED' ||
+    doc.orderStatus === 'FULFILLED' ||
+    doc.challanStatus === 'CANCELLED'
+  ) {
+    return false;
+  }
   return (
     doc.invoiceType === 'ESTIMATE' ||
     doc.invoiceType === 'DELIVERY_CHALLAN' ||
@@ -97,6 +105,7 @@ export async function convertDocumentToTaxInvoice(
     ...sourceDoc,
     isConverted: true,
     orderStatus: sourceDoc.invoiceType === 'SALES_ORDER' ? 'FULFILLED' : sourceDoc.orderStatus,
+    challanStatus: sourceDoc.invoiceType === 'DELIVERY_CHALLAN' ? 'DELIVERED' : sourceDoc.challanStatus,
     convertedToInvoiceId: newInvoice.id,
     convertedToInvoiceNumber: newInvoice.invoiceNumber,
     updatedAt: now,

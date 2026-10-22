@@ -65,6 +65,7 @@ gst-billing-app/
     │   ├── Dashboard/         # Executive metrics & quick-action cards
     │   ├── POS/               # QuickBillingView (1-tap POS counter & split payments)
     │   ├── Invoicing/         # TableGridInvoiceModal, CreateInvoiceModal, InvoicePrintModal
+    │   ├── Challans/          # DeliveryChallansView (Rule 55 goods transport & 1-tap conversion)
     │   ├── Inventory/         # InventoryView, ItemDetailSheet, ItemFormModal, adjustments
     │   ├── Parties/           # PartiesView, AddEditPartyModal, usePartyPassbook, VoucherEditorModal
     │   ├── Purchases/         # PurchasesHubView, TableGridPurchaseModal, SimplifiedPurchaseModal
@@ -89,6 +90,7 @@ gst-billing-app/
 
 ### B. Inventory & Stock Engine (`src/core/inventory/stockEngine.ts`)
 - **Centralized Stock Routing**: All stock changes (sales invoices, invoice edits, deletions, purchase bills, stock adjustments) MUST pass through `stockEngine.ts`.
+- **Delivery Challan & Non-Sale Documents**: Delivery Challans (Rule 55), Quotations/Estimates, and Sales Orders are strictly non-sale documents. Saving or deleting them bypasses inventory stock adjustments and party ledger postings. Stock decrements and receivable balances are only posted when the document is converted into a Tax Invoice.
 - **Negative Stock Configuration**:
   - Controlled by `db.getAllowNegativeStock()` and `allowNegativeStock` parameter.
   - **When disabled (`false`)**: Decrement operations clamp available stock at `0` to prevent negative quantities.

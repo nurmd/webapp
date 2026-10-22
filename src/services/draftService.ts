@@ -22,6 +22,13 @@ export interface InvoiceDraft {
   originalInvoiceDate?: string;
   returnReason?: string;
   orderStatus?: string;
+  challanStatus?: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
+  challanType?: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS';
+  consigneeName?: string;
+  vehicleNumber?: string;
+  transporterName?: string;
+  transporterId?: string;
+  ewayBillNumber?: string;
 }
 
 export interface PurchaseDraft {
@@ -40,6 +47,13 @@ export interface PurchaseDraft {
   originalBillDate?: string;
   returnReason?: string;
   orderStatus?: string;
+  challanStatus?: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
+  challanType?: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS';
+  consigneeName?: string;
+  vehicleNumber?: string;
+  transporterName?: string;
+  transporterId?: string;
+  ewayBillNumber?: string;
 }
 
 export const getInvoiceDraftKey = (docType?: string | null): string => {

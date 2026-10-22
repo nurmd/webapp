@@ -30,6 +30,9 @@ export interface ThermalReceiptData {
   terms?: string;
   stateName?: string;
   isCompositionScheme?: boolean;
+  isDeliveryChallan?: boolean;
+  challanPurpose?: string;
+  vehicleNumber?: string;
 }
 
 /**
@@ -64,8 +67,14 @@ export function formatThermalReceiptText(
   if (data.gstin) lines.push(padCenter(`GSTIN: ${data.gstin}`, width));
   if (data.phone) lines.push(padCenter(`Ph: ${data.phone}`, width));
 
-  // Dynamic receipt title honoring custom configuration and composition scheme
-  const title = (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
+  // Dynamic receipt title honoring custom configuration, composition scheme, and delivery challans
+  const isChallan = Boolean(
+    data.isDeliveryChallan ||
+    (data.receiptTitle && data.receiptTitle.trim().toUpperCase() === 'DELIVERY CHALLAN')
+  );
+  const title = isChallan
+    ? 'DELIVERY CHALLAN'
+    : (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
     ? data.receiptTitle.trim().toUpperCase()
     : data.isCompositionScheme
     ? 'BILL OF SUPPLY'
@@ -76,12 +85,25 @@ export function formatThermalReceiptText(
   lines.push(doubleLine);
 
   // Invoice & Customer Meta
-  lines.push(padRow(`Bill No: ${data.invoiceNo}`, `Date: ${data.date}`, width));
+  const docLabel = isChallan ? 'Challan No' : 'Bill No';
+  const dateLabel = isChallan ? 'Challan Date' : 'Date';
+  if (width === 32 && isChallan) {
+    lines.push(`Challan No: ${data.invoiceNo}`);
+    lines.push(`Date      : ${data.date}`);
+  } else {
+    lines.push(padRow(`${docLabel}: ${data.invoiceNo}`, `${dateLabel}: ${data.date}`, width));
+  }
   if (data.customerName) {
     lines.push(`Customer: ${data.customerName}`);
   }
   if (data.customerPhone) {
     lines.push(`Mobile  : ${data.customerPhone}`);
+  }
+  if (isChallan && data.challanPurpose) {
+    lines.push(`Purpose : ${data.challanPurpose}`);
+  }
+  if (isChallan && data.vehicleNumber) {
+    lines.push(`Vehicle : ${data.vehicleNumber}`);
   }
   lines.push(line);
 
@@ -137,30 +159,32 @@ export function formatThermalReceiptText(
   lines.push(padRow('GRAND TOTAL:', `Rs. ${data.grandTotal.toFixed(2)}`, width));
   lines.push(doubleLine);
 
-  if (data.paymentSplits && data.paymentSplits.length > 1) {
-    data.paymentSplits.forEach((s) => {
-      if (s.mode !== 'CREDIT' && s.amount > 0) {
-        lines.push(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
-      }
-    });
-  } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
-    lines.push(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
-  }
-  if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
-    lines.push(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
-  }
-  if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
-    const balText = data.partyBalance > 0
-      ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
-      : data.partyBalance < 0
-      ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
-      : 'Rs. 0.00';
-    lines.push(padRow('Total Party Bal:', balText, width));
-    lines.push(line);
-  }
+  if (!isChallan) {
+    if (data.paymentSplits && data.paymentSplits.length > 1) {
+      data.paymentSplits.forEach((s) => {
+        if (s.mode !== 'CREDIT' && s.amount > 0) {
+          lines.push(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+        }
+      });
+    } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+      lines.push(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+    }
+    if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
+      lines.push(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+    }
+    if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
+      const balText = data.partyBalance > 0
+        ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
+        : data.partyBalance < 0
+        ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+        : 'Rs. 0.00';
+      lines.push(padRow('Total Party Bal:', balText, width));
+      lines.push(line);
+    }
 
-  if (data.upiId) {
-    lines.push(padCenter(`Pay via UPI: ${data.upiId}`, width));
+    if (data.upiId) {
+      lines.push(padCenter(`Pay via UPI: ${data.upiId}`, width));
+    }
   }
   lines.push(padCenter(data.terms || 'Thank you! Visit again.', width));
   if (data.stateName) {

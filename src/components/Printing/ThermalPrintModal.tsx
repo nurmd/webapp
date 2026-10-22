@@ -54,12 +54,25 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     );
   }, [invoice.partyId, invoice.partyName]);
 
+  const isDeliveryChallan = invoice.invoiceType === 'DELIVERY_CHALLAN';
+  const challanPurpose = invoice.challanType === 'SUPPLY_ON_APPROVAL'
+    ? 'Supply on approval'
+    : invoice.challanType === 'JOB_WORK'
+    ? 'Job work'
+    : invoice.challanType === 'OTHERS'
+    ? 'Others'
+    : invoice.challanType === 'FOR_REMOVAL'
+    ? 'For removal'
+    : undefined;
+
   const receiptData: ThermalReceiptData = {
     companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
     companyAddress: thermalSettings.showAddress ? company.address : '',
     gstin: thermalSettings.showGstin ? company.gstin : '',
     phone: thermalSettings.showPhone ? company.phone : '',
-    receiptTitle: company.isCompositionScheme
+    receiptTitle: isDeliveryChallan
+      ? 'DELIVERY CHALLAN'
+      : company.isCompositionScheme
       ? (!thermalSettings.receiptTitle || thermalSettings.receiptTitle === 'TAX INVOICE' || thermalSettings.receiptTitle === 'RETAIL INVOICE' ? 'Bill of Supply' : thermalSettings.receiptTitle)
       : thermalSettings.receiptTitle,
     invoiceNo: invoice.invoiceNumber,
@@ -80,13 +93,16 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     shippingAmount: invoice.shippingAmount,
     roundOff: invoice.roundOff,
     grandTotal: invoice.grandTotal,
-    paidAmount: invoice.paidAmount,
-    balanceAmount: thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined,
-    partyBalance: thermalSettings.showPartyBalance && party ? party.currentBalance : undefined,
-    paymentSplits: invoice.paymentSplits,
-    upiId: thermalSettings.showUpiQr ? company.upiId : undefined,
+    paidAmount: isDeliveryChallan ? undefined : invoice.paidAmount,
+    balanceAmount: isDeliveryChallan ? undefined : (thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined),
+    partyBalance: isDeliveryChallan ? undefined : (thermalSettings.showPartyBalance && party ? party.currentBalance : undefined),
+    paymentSplits: isDeliveryChallan ? undefined : invoice.paymentSplits,
+    upiId: isDeliveryChallan ? undefined : (thermalSettings.showUpiQr ? company.upiId : undefined),
     terms: thermalSettings.greetingText || company.termsAndConditions,
     isCompositionScheme: Boolean(company.isCompositionScheme),
+    isDeliveryChallan,
+    challanPurpose,
+    vehicleNumber: invoice.vehicleNumber,
   };
 
   const previewText = formatThermalReceiptText(receiptData, width, {

@@ -88,6 +88,9 @@ const QuotationsEstimatesView = React.lazy(() =>
 const SalesOrdersView = React.lazy(() =>
   import('./components/Orders/SalesOrdersView.tsx').then((m) => ({ default: m.SalesOrdersView }))
 );
+const DeliveryChallansView = React.lazy(() =>
+  import('./components/Challans/DeliveryChallansView.tsx').then((m) => ({ default: m.DeliveryChallansView }))
+);
 const SalesReturnsView = React.lazy(() =>
   import('./components/Returns/SalesReturnsView.tsx').then((m) => ({ default: m.SalesReturnsView }))
 );
@@ -534,6 +537,13 @@ export const App: React.FC = () => {
     setEditingInvoice(null);
     setSelectedPartyForInvoice(null);
     setInvoiceModalDefaultType('SALES_ORDER');
+    setIsTableGridInvoiceOpen(true);
+  }, []);
+
+  const handleOpenNewDeliveryChallan = useCallback(() => {
+    setEditingInvoice(null);
+    setSelectedPartyForInvoice(null);
+    setInvoiceModalDefaultType('DELIVERY_CHALLAN');
     setIsTableGridInvoiceOpen(true);
   }, []);
 
@@ -1129,6 +1139,18 @@ export const App: React.FC = () => {
             company={company}
             invoices={invoices}
             onNewSalesOrder={handleOpenNewSalesOrder}
+            onViewInvoice={setPreviewInvoice}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'delivery_challans' && (
+          <DeliveryChallansView
+            company={company}
+            invoices={invoices}
+            onNewDeliveryChallan={handleOpenNewDeliveryChallan}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onDeleteInvoice={handleDeleteInvoice}

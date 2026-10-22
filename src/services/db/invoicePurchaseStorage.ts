@@ -82,10 +82,13 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     pouch.putDoc('invoice', invoice);
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
-    // Update stock levels via pure domain stockEngine
-    const isQuoteOrOrder = invoice.invoiceType === 'ESTIMATE' || invoice.invoiceType === 'SALES_ORDER';
+    // Update stock levels via pure domain stockEngine (Estimates, Orders, and Delivery Challans are non-sale docs)
+    const isNonSaleDoc =
+      invoice.invoiceType === 'ESTIMATE' ||
+      invoice.invoiceType === 'SALES_ORDER' ||
+      invoice.invoiceType === 'DELIVERY_CHALLAN';
     const isCreditNote = invoice.invoiceType === 'CREDIT_NOTE';
-    if (!isQuoteOrOrder) {
+    if (!isNonSaleDoc) {
       const allowNegativeStock = this.getAllowNegativeStock();
       const currentItems = this.getItems();
       let updatedItems: InventoryItem[];
@@ -192,7 +195,12 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
 
     // Restore stock upon invoice deletion via pure domain stockEngine
-    if (inv && inv.invoiceType !== 'ESTIMATE' && inv.invoiceType !== 'SALES_ORDER') {
+    if (
+      inv &&
+      inv.invoiceType !== 'ESTIMATE' &&
+      inv.invoiceType !== 'SALES_ORDER' &&
+      inv.invoiceType !== 'DELIVERY_CHALLAN'
+    ) {
       const currentItems = this.getItems();
       const allowNegativeStock = this.getAllowNegativeStock();
       const updatedItems = inv.invoiceType === 'CREDIT_NOTE'

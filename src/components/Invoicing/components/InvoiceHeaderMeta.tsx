@@ -50,6 +50,22 @@ export interface InvoiceHeaderMetaProps {
   // Order status
   orderStatus?: string;
 
+  // Delivery Challan & Transportation fields
+  challanStatus?: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
+  onChallanStatusChange?: (status: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED') => void;
+  challanType?: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS';
+  onChallanTypeChange?: (type: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS') => void;
+  consigneeName?: string;
+  onConsigneeNameChange?: (name: string) => void;
+  vehicleNumber?: string;
+  onVehicleNumberChange?: (val: string) => void;
+  transporterName?: string;
+  onTransporterNameChange?: (val: string) => void;
+  transporterId?: string;
+  onTransporterIdChange?: (val: string) => void;
+  ewayBillNumber?: string;
+  onEwayBillNumberChange?: (val: string) => void;
+
   // Draft props for top bar
   hasRestoredDraft?: boolean;
   hasDraftInStorage?: boolean;
@@ -105,21 +121,49 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   returnReason,
   onReturnReasonChange,
   orderStatus,
+  challanStatus,
+  onChallanStatusChange,
+  challanType,
+  onChallanTypeChange,
+  consigneeName,
+  onConsigneeNameChange,
+  vehicleNumber,
+  onVehicleNumberChange,
+  transporterName,
+  onTransporterNameChange,
+  transporterId,
+  onTransporterIdChange,
+  ewayBillNumber,
+  onEwayBillNumberChange,
   hasRestoredDraft = false,
   hasDraftInStorage = false,
   onSaveDraft,
   onRestoreDraft,
   onDiscardDraft,
 }) => {
-  const [isShippingExpanded, setIsShippingExpanded] = React.useState<boolean>(() => {
-    return Boolean(shippingAddress || shippingPincode || initialInvoice?.shippingAddress || initialInvoice?.shippingPincode);
-  });
-
   const isSalesOrder = invoiceType === 'SALES_ORDER';
   const isCreditNote = invoiceType === 'CREDIT_NOTE';
   const isDebitNote = invoiceType === 'DEBIT_NOTE';
   const isQuotation = invoiceType === 'ESTIMATE';
   const isDeliveryChallan = invoiceType === 'DELIVERY_CHALLAN';
+
+  const [isShippingExpanded, setIsShippingExpanded] = React.useState<boolean>(() => {
+    return Boolean(
+      isDeliveryChallan ||
+      shippingAddress ||
+      shippingPincode ||
+      consigneeName ||
+      vehicleNumber ||
+      transporterName ||
+      ewayBillNumber ||
+      initialInvoice?.shippingAddress ||
+      initialInvoice?.shippingPincode ||
+      initialInvoice?.consigneeName ||
+      initialInvoice?.vehicleNumber ||
+      initialInvoice?.transporterName ||
+      initialInvoice?.ewayBillNumber
+    );
+  });
 
   let titleText = 'New Invoice';
   let badgeText = '';
@@ -386,19 +430,71 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
             <span>{formatDateDisplay(invoiceDate)}</span>
           </button>
 
-          {/* Due / Delivery Date */}
+          {/* Due / Delivery / Dispatch Date */}
           <button
             type="button"
             onClick={onOpenDueDateModal}
             className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
-            title={isSalesOrder ? 'Change Expected Delivery Date' : isQuotation ? 'Change Validity Date' : 'Change Due Date'}
+            title={
+              isDeliveryChallan
+                ? 'Change Dispatch / Transit Date'
+                : isSalesOrder
+                ? 'Change Expected Delivery Date'
+                : isQuotation
+                ? 'Change Validity Date'
+                : 'Change Due Date'
+            }
           >
             <span className="text-[9px] uppercase font-bold text-outline">
-              {isSalesOrder ? 'Delivery:' : isQuotation ? 'Valid:' : 'Due:'}
+              {isDeliveryChallan ? 'Dispatch:' : isSalesOrder ? 'Delivery:' : isQuotation ? 'Valid:' : 'Due:'}
             </span>
             <span>{formatDateDisplay(dueDate)}</span>
             <span className="material-symbols-outlined text-[12px] text-outline">event</span>
           </button>
+
+          {/* Delivery Challan Status Selector */}
+          {isDeliveryChallan && (
+            <div
+              data-testid="challan-status-selector"
+              className="h-7 px-2 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] flex items-center gap-1 border border-indigo-500/25"
+            >
+              <span className="material-symbols-outlined text-[13px]">local_shipping</span>
+              <span className="text-[9px] uppercase font-bold text-indigo-600 dark:text-indigo-400">Status:</span>
+              <select
+                aria-label="Challan Status"
+                value={challanStatus || 'DISPATCHED'}
+                onChange={(e) => onChallanStatusChange?.(e.target.value as any)}
+                className="bg-transparent font-bold text-xs text-indigo-800 dark:text-indigo-200 outline-none cursor-pointer"
+              >
+                <option value="DRAFT" className="bg-surface text-on-surface">Draft</option>
+                <option value="DISPATCHED" className="bg-surface text-on-surface">Dispatched</option>
+                <option value="DELIVERED" className="bg-surface text-on-surface">Delivered</option>
+                <option value="CANCELLED" className="bg-surface text-on-surface">Cancelled</option>
+              </select>
+            </div>
+          )}
+
+          {/* Delivery Challan Purpose (Rule 55) Selector */}
+          {isDeliveryChallan && (
+            <div
+              data-testid="challan-type-selector"
+              className="h-7 px-2 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold text-[11px] flex items-center gap-1 border border-teal-500/25"
+            >
+              <span className="material-symbols-outlined text-[13px]">assignment_turned_in</span>
+              <span className="text-[9px] uppercase font-bold text-teal-600 dark:text-teal-400">Purpose:</span>
+              <select
+                aria-label="Challan Purpose (Rule 55)"
+                value={challanType || 'FOR_REMOVAL'}
+                onChange={(e) => onChallanTypeChange?.(e.target.value as any)}
+                className="bg-transparent font-bold text-xs text-teal-800 dark:text-teal-200 outline-none cursor-pointer"
+              >
+                <option value="FOR_REMOVAL" className="bg-surface text-on-surface">For removal</option>
+                <option value="SUPPLY_ON_APPROVAL" className="bg-surface text-on-surface">Supply on approval</option>
+                <option value="JOB_WORK" className="bg-surface text-on-surface">Job work</option>
+                <option value="OTHERS" className="bg-surface text-on-surface">Others</option>
+              </select>
+            </div>
+          )}
 
           {/* Sales Order Status Badge */}
           {isSalesOrder && (
@@ -548,52 +644,132 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
         </div>
       </div>
 
-      {/* Expandable Bill-to Ship-to Panel */}
-      {isShippingExpanded && (onShippingAddressChange || onShippingPincodeChange) && (
-        <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col md:flex-row gap-3 text-xs animate-fade-in">
-          <div className="flex-1 flex flex-col gap-1">
-            <div className="flex items-center justify-between">
+      {/* Expandable Bill-to Ship-to & Transport Panel */}
+      {isShippingExpanded && (
+        <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-3 text-xs animate-fade-in">
+          <div className="flex flex-col md:flex-row gap-3">
+            {/* Consignee Name (Bill-to Ship-to Recipient) */}
+            <div className="w-full md:w-1/3 flex flex-col gap-1">
               <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
-                <span className="material-symbols-outlined text-[13px] text-secondary">local_shipping</span>
-                Shipping Address (Consignee / Ship-to)
+                <span className="material-symbols-outlined text-[13px] text-secondary">person_pin</span>
+                Consignee / Recipient Name
               </label>
-              {selectedParty?.billingAddress && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onShippingAddressChange?.(selectedParty.billingAddress);
-                    if (selectedParty.pincode) {
-                      onShippingPincodeChange?.(selectedParty.pincode);
-                    }
-                  }}
-                  className="text-[10px] font-semibold text-secondary hover:underline cursor-pointer"
-                >
-                  Copy from Billing Address
-                </button>
-              )}
+              <input
+                type="text"
+                value={consigneeName || ''}
+                onChange={(e) => onConsigneeNameChange?.(e.target.value)}
+                placeholder={selectedParty?.name || 'Consignee / Receiving party'}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
             </div>
-            <input
-              type="text"
-              value={shippingAddress || ''}
-              onChange={(e) => onShippingAddressChange?.(e.target.value)}
-              placeholder={selectedParty?.billingAddress || 'Enter destination delivery address (leave blank if same as billing)'}
-              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-medium outline-none focus:ring-1 focus:ring-secondary/40"
-            />
+
+            {/* Shipping Address */}
+            <div className="flex-1 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[13px] text-secondary">local_shipping</span>
+                  Shipping Address (Consignee / Ship-to)
+                </label>
+                {selectedParty?.billingAddress && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onShippingAddressChange?.(selectedParty.billingAddress);
+                      if (selectedParty.pincode) {
+                        onShippingPincodeChange?.(selectedParty.pincode);
+                      }
+                    }}
+                    className="text-[10px] font-semibold text-secondary hover:underline cursor-pointer"
+                  >
+                    Copy from Billing
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={shippingAddress || ''}
+                onChange={(e) => onShippingAddressChange?.(e.target.value)}
+                placeholder={selectedParty?.billingAddress || 'Enter destination delivery address (leave blank if same as billing)'}
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
+
+            {/* Shipping Pincode */}
+            <div className="w-full md:w-36 flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">pin_drop</span>
+                Ship Pincode
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={shippingPincode || ''}
+                onChange={(e) => onShippingPincodeChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-digit PIN"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
           </div>
 
-          <div className="w-full md:w-44 flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px] text-secondary">pin_drop</span>
-              Shipping Pincode
-            </label>
-            <input
-              type="text"
-              maxLength={6}
-              value={shippingPincode || ''}
-              onChange={(e) => onShippingPincodeChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="6-digit PIN"
-              className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono font-medium outline-none focus:ring-1 focus:ring-secondary/40"
-            />
+          {/* Transportation / Logistics Details (Rule 55 / Rule 138) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-2 border-t border-outline-variant/20">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">directions_car</span>
+                Vehicle Number
+              </label>
+              <input
+                type="text"
+                value={vehicleNumber || ''}
+                onChange={(e) => onVehicleNumberChange?.(e.target.value.toUpperCase())}
+                placeholder="e.g. MH12AB1234"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono uppercase font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">forklift</span>
+                Transporter Name
+              </label>
+              <input
+                type="text"
+                value={transporterName || ''}
+                onChange={(e) => onTransporterNameChange?.(e.target.value)}
+                placeholder="e.g. VRL Logistics"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">badge</span>
+                Transporter ID / GSTIN
+              </label>
+              <input
+                type="text"
+                maxLength={15}
+                value={transporterId || ''}
+                onChange={(e) => onTransporterIdChange?.(e.target.value.toUpperCase())}
+                placeholder="15-digit TRANSIN"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono uppercase font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-outline flex items-center gap-1">
+                <span className="material-symbols-outlined text-[13px] text-secondary">receipt</span>
+                E-Way Bill Number
+              </label>
+              <input
+                type="text"
+                maxLength={12}
+                value={ewayBillNumber || ''}
+                onChange={(e) => onEwayBillNumberChange?.(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                placeholder="12-digit E-Way Bill"
+                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-lg px-2.5 py-1.5 text-xs text-on-surface font-mono font-medium outline-none focus:ring-1 focus:ring-secondary/40"
+              />
+            </div>
           </div>
         </div>
       )}

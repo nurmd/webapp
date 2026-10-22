@@ -1,13 +1,15 @@
 {
-  "version": "1.2.23",
+  "version": "1.2.24",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-22T07:14:18.210Z",
+  "buildTime": "2026-10-22T10:26:18.088Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Fixed OTA update checks failing when the GitHub API request was blocked by a CORS preflight",
-    "Added cache-busted raw version.json and package.json fallbacks so new releases are still detected when the GitHub API is unavailable",
-    "Update-check failures now show a clear error message instead of falsely reporting the app is already on the latest version",
-    "No changes to billing, backup/restore, or the current navigation workflows"
+    "Added a complete Delivery Challan workflow: create, edit, view, cancel, delete, search, date filters, and draft/dispatched/delivered/cancelled statuses",
+    "Capture Rule 55 purpose, consignee/ship-to address, vehicle, transporter, and 12-digit e-way bill details",
+    "Print/PDF and thermal receipts now use proper Delivery Challan labels and suppress payment, balance-due, and UPI blocks",
+    "One-tap conversion to a Tax Invoice with sequential numbering, stock decrement, and customer ledger posting only at conversion",
+    "Delivery Challans are available from the mobile drawer, tablet sidebar, and More menu with cashier/accountant access",
+    "Includes the v1.2.23 OTA update-check fix"
   ]
 }

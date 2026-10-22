@@ -110,6 +110,9 @@ export interface Invoice {
   noteType?: 'C' | 'D';                        // 'C' = Credit Note, 'D' = Debit Note (Table 9B)
   returnReason?: string;                       // Reason for Credit/Debit Note (e.g. Goods Damaged, Billing Error)
   orderStatus?: 'PENDING' | 'FULFILLED' | 'CANCELLED'; // Status for Sales Orders
+  challanStatus?: 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'; // Status for Delivery Challans
+  challanType?: 'SUPPLY_ON_APPROVAL' | 'JOB_WORK' | 'FOR_REMOVAL' | 'OTHERS'; // Reason for transport per Rule 55
+  consigneeName?: string;                      // Consignee name for Bill-to Ship-to / Delivery Challan
   isRcm?: boolean;                             // Reverse Charge Mechanism flag (Table 4 / Table 3.1(d))
   isCancelled?: boolean;                       // Document cancelled status flag (Table 13 doc_issue)
 

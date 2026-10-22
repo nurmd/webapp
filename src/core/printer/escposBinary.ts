@@ -155,7 +155,13 @@ export function buildThermalReceiptBinary(
     builder.line(`Ph: ${data.phone}`);
   }
 
-  const title = (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
+  const isChallan = Boolean(
+    data.isDeliveryChallan ||
+    (data.receiptTitle && data.receiptTitle.trim().toUpperCase() === 'DELIVERY CHALLAN')
+  );
+  const title = isChallan
+    ? 'DELIVERY CHALLAN'
+    : (data.receiptTitle && data.receiptTitle.trim() && data.receiptTitle.trim().toUpperCase() !== 'TAX INVOICE' && data.receiptTitle.trim().toUpperCase() !== 'RETAIL INVOICE')
     ? data.receiptTitle.trim().toUpperCase()
     : data.isCompositionScheme
     ? 'BILL OF SUPPLY'
@@ -165,15 +171,21 @@ export function buildThermalReceiptBinary(
   builder.bold(true).line(title).bold(false);
   builder.line('='.repeat(width));
 
-  // Invoice Meta
+  // Invoice / Challan Meta
   builder.alignLeft();
-  builder.line(`Bill No : ${data.invoiceNo}`);
-  builder.line(`Date    : ${data.date}`);
+  builder.line(`${isChallan ? 'Challan No' : 'Bill No  '} : ${data.invoiceNo}`);
+  builder.line(`${isChallan ? 'Challan Date' : 'Date      '} : ${data.date}`);
   if (data.customerName) {
     builder.line(`Customer: ${data.customerName}`);
   }
   if (data.customerPhone) {
     builder.line(`Mobile  : ${data.customerPhone}`);
+  }
+  if (isChallan && data.challanPurpose) {
+    builder.line(`Purpose : ${data.challanPurpose}`);
+  }
+  if (isChallan && data.vehicleNumber) {
+    builder.line(`Vehicle : ${data.vehicleNumber}`);
   }
   builder.line('-'.repeat(width));
 
@@ -230,40 +242,42 @@ export function buildThermalReceiptBinary(
   builder.doubleSize(false).bold(false);
   builder.line('='.repeat(width));
 
-  if (data.paymentSplits && data.paymentSplits.length > 1) {
-    data.paymentSplits.forEach((s) => {
-      if (s.mode !== 'CREDIT' && s.amount > 0) {
-        builder.line(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+  if (!isChallan) {
+    if (data.paymentSplits && data.paymentSplits.length > 1) {
+      data.paymentSplits.forEach((s) => {
+        if (s.mode !== 'CREDIT' && s.amount > 0) {
+          builder.line(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+        }
+      });
+    } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
+      builder.line(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+    }
+    if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
+      builder.line(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+    }
+    if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
+      const balText = data.partyBalance > 0
+        ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
+        : data.partyBalance < 0
+        ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+        : 'Rs. 0.00';
+      builder.line(padRow('Total Party Bal:', balText, width));
+      builder.line('-'.repeat(width));
+    }
+
+    // UPI Dynamic QR Code
+    if (options.printQr !== false && data.upiId) {
+      const upiUri = `upi://pay?pa=${data.upiId}&pn=${encodeURIComponent(
+        data.companyName
+      )}&am=${data.grandTotal.toFixed(2)}&cu=INR&tn=Invoice_${data.invoiceNo}`;
+
+      builder.alignCenter().line('Scan UPI to Pay:');
+      try {
+        builder.qrCode(upiUri, width === 48 ? 6 : 5);
+        builder.feed(1);
+      } catch (e) {
+        builder.line(`UPI: ${data.upiId}`);
       }
-    });
-  } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
-    builder.line(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
-  }
-  if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
-    builder.line(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
-  }
-  if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
-    const balText = data.partyBalance > 0
-      ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
-      : data.partyBalance < 0
-      ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
-      : 'Rs. 0.00';
-    builder.line(padRow('Total Party Bal:', balText, width));
-    builder.line('-'.repeat(width));
-  }
-
-  // UPI Dynamic QR Code
-  if (options.printQr !== false && data.upiId) {
-    const upiUri = `upi://pay?pa=${data.upiId}&pn=${encodeURIComponent(
-      data.companyName
-    )}&am=${data.grandTotal.toFixed(2)}&cu=INR&tn=Invoice_${data.invoiceNo}`;
-
-    builder.alignCenter().line('Scan UPI to Pay:');
-    try {
-      builder.qrCode(upiUri, width === 48 ? 6 : 5);
-      builder.feed(1);
-    } catch (e) {
-      builder.line(`UPI: ${data.upiId}`);
     }
   }
 
