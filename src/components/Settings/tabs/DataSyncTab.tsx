@@ -1,5 +1,5 @@
-import React from 'react';
-import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict } from '../../../services/pouchdb.ts';
+import React, { useState } from 'react';
+import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict, pouch } from '../../../services/pouchdb.ts';
 
 export interface DataSyncTabProps {
   isSyncingProfile: boolean;
@@ -53,6 +53,46 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   handleResolveConflict,
 }) => {
   const activeConflicts = propConflicts ?? syncState?.conflicts ?? [];
+
+  const [isProbing, setIsProbing] = useState(false);
+  const [probeDiagnostic, setProbeDiagnostic] = useState<{
+    ok: boolean;
+    error?: string;
+    details?: {
+      dbName?: string;
+      docCount?: number;
+      canRead?: boolean;
+      canWrite?: boolean;
+    };
+    testedAt?: string;
+  } | null>(null);
+
+  const handleTestConnection = async () => {
+    const targetUrl = syncUrlInput?.trim();
+    if (!targetUrl) return;
+    setIsProbing(true);
+    setProbeDiagnostic(null);
+    try {
+      if (typeof (pouch as any)?.probeRemoteConnection === 'function') {
+        const result = await (pouch as any).probeRemoteConnection(targetUrl);
+        setProbeDiagnostic({
+          ok: result.ok,
+          error: result.error,
+          details: result.details,
+          testedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        });
+      }
+    } catch (err: any) {
+      setProbeDiagnostic({
+        ok: false,
+        error: err?.message || 'Connection test failed',
+        testedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      });
+    } finally {
+      setIsProbing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {/* 1. Full Database Backup & Restore Card */}
@@ -191,22 +231,62 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
       <section className="bg-secondary-container/60 text-on-secondary-container rounded-2xl p-4 sm:p-5 shadow-sm border border-secondary/20 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm">
-              <span className="material-symbols-outlined text-[22px]">cloud_done</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm ${
+              syncState.status === 'error'
+                ? 'bg-error text-on-error'
+                : syncState.status === 'syncing' || syncState.status === 'connecting'
+                ? 'bg-amber-500 text-white'
+                : 'bg-secondary text-on-secondary'
+            }`}>
+              <span className={`material-symbols-outlined text-[22px] ${
+                syncState.status === 'syncing' || syncState.status === 'connecting' ? 'animate-spin' : ''
+              }`}>
+                {syncState.status === 'error'
+                  ? 'cloud_off'
+                  : syncState.status === 'syncing' || syncState.status === 'connecting'
+                  ? 'sync'
+                  : syncState.status === 'synced' && syncState.remoteUrl
+                  ? 'cloud_done'
+                  : 'offline_pin'}
+              </span>
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
                   Store Data Protected
                 </span>
-                {syncState.remoteUrl && (
-                  <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
-                    Cloud Synced
+                {syncState.remoteUrl ? (
+                  syncState.status === 'synced' ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
+                      Cloud Synced
+                    </span>
+                  ) : syncState.status === 'syncing' ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                      Syncing...
+                    </span>
+                  ) : syncState.status === 'connecting' ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                      Connecting...
+                    </span>
+                  ) : syncState.status === 'error' ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-error text-on-error text-[10px] font-bold uppercase tracking-wider">
+                      Sync Error
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
+                      Local only
+                    </span>
+                  )
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
+                    Local only
                   </span>
                 )}
               </div>
               <span className="text-[11px] text-on-secondary-container/80 truncate">
-                {(syncState.status === 'synced' || syncState.status === 'syncing')
+                {syncState.status === 'error'
+                  ? syncState.error || 'Sync error: check remote CouchDB connection or permissions'
+                  : (syncState.status === 'synced' || syncState.status === 'syncing') && syncState.remoteUrl
                   ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
                   : '100% Offline-First IndexedDB Storage Ready'}
               </span>
@@ -232,6 +312,27 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Sync Error Diagnostic Banner */}
+        {syncState.error && (
+          <div
+            data-testid="sync-error-banner"
+            className="p-3 rounded-xl bg-error/15 border border-error/30 text-error text-xs flex items-start gap-2.5 animate-fade-in"
+          >
+            <span className="material-symbols-outlined text-[20px] text-error flex-shrink-0 mt-0.5">
+              error
+            </span>
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="font-bold">Sync Error / Push Failure</span>
+              <span className="text-[11px] leading-relaxed break-words font-mono">
+                {syncState.error}
+              </span>
+              <span className="text-[10px] opacity-80 mt-0.5">
+                Ensure remote CouchDB credentials are valid, database is writable, and CORS is enabled.
+              </span>
+            </div>
+          </div>
+        )}
 
         {demoNotice && (
           <div className="p-2.5 rounded-xl bg-secondary/15 border border-secondary/30 text-on-secondary-container text-xs font-semibold flex items-center gap-2 animate-fade-in">
@@ -270,15 +371,27 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
             <label className="text-[11px] font-bold text-on-secondary-container">
               Remote CouchDB / Cloudflare Tunnel URL:
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 type="text"
                 data-testid="sync-url-input"
                 placeholder={DEFAULT_COUCHDB_REMOTE_URL || 'https://user:pass@couchdb.yourdomain.com/database'}
                 value={syncUrlInput}
                 onChange={(e) => setSyncUrlInput(e.target.value)}
-                className="flex-1 bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"
+                className="flex-1 min-w-[200px] bg-surface-container-lowest text-on-surface px-3 py-2 rounded-xl text-xs outline-none border border-outline-variant/30 font-mono"
               />
+              <button
+                type="button"
+                data-testid="test-sync-connection-btn"
+                disabled={isProbing || !syncUrlInput.trim()}
+                onClick={handleTestConnection}
+                className="px-3 py-2 bg-secondary/20 text-on-secondary-container border border-secondary/30 rounded-xl text-xs font-bold hover:bg-secondary/30 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <span className={`material-symbols-outlined text-[14px] ${isProbing ? 'animate-spin' : ''}`}>
+                  {isProbing ? 'progress_activity' : 'network_check'}
+                </span>
+                <span>{isProbing ? 'Testing...' : 'Test Connection'}</span>
+              </button>
               <button
                 type="button"
                 onClick={handleConnectSync}
@@ -296,6 +409,51 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 </button>
               )}
             </div>
+
+            <p className="text-[10px] text-on-secondary-container/70 leading-relaxed">
+              This link is saved on the device and restored automatically after app updates. Full database backups also include it.
+            </p>
+
+            {/* Probe Diagnostic Output Card */}
+            {probeDiagnostic && (
+              <div
+                data-testid="sync-probe-diagnostic"
+                className={`p-3 rounded-xl border text-xs flex flex-col gap-1.5 animate-fade-in ${
+                  probeDiagnostic.ok
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                    : 'bg-error/10 border-error/30 text-error'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-[16px]">
+                      {probeDiagnostic.ok ? 'verified' : 'cancel'}
+                    </span>
+                    <span>
+                      {probeDiagnostic.ok ? 'Connection & Write Probe Verified' : 'Probe Failed'}
+                    </span>
+                  </div>
+                  {probeDiagnostic.testedAt && (
+                    <span className="text-[10px] opacity-75 font-mono">
+                      {probeDiagnostic.testedAt}
+                    </span>
+                  )}
+                </div>
+
+                {probeDiagnostic.error && (
+                  <p className="text-[11px] font-mono leading-relaxed">{probeDiagnostic.error}</p>
+                )}
+
+                {probeDiagnostic.details && (
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-medium pt-1 border-t border-current/10">
+                    <div>Database: <span className="font-mono">{probeDiagnostic.details.dbName || 'N/A'}</span></div>
+                    <div>Docs: <span className="font-mono">{probeDiagnostic.details.docCount ?? 'N/A'}</span></div>
+                    <div>Read Reachability: <span className="font-bold">{probeDiagnostic.details.canRead ? 'OK' : 'Failed'}</span></div>
+                    <div>Write Permissions: <span className="font-bold">{probeDiagnostic.details.canWrite ? 'OK (Writable)' : 'Failed (Read-Only/Forbidden)'}</span></div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </section>

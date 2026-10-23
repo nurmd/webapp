@@ -130,6 +130,10 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Abolished clock-skewed last-write-wins (`updatedAt` comparison) for financial documents.
   - Financial records (`invoice`, `purchase`, `voucher`, `expense`, `bank_account`, `cash_bank_txn`, `loan`, `loan_txn`) that undergo concurrent mutations on multiple devices are preserved and enqueued in an operator-visible **Revision Conflict Queue** instead of silently overwriting local unsynced edits.
   - HTTP 409 Put Conflicts: `putDoc()` compares content divergence (`isDocDivergent`); if divergent, it captures both revisions into explicit conflict state rather than performing blind overwrites.
+- **Remote URL Safety & Persistence**:
+  - User-configured CouchDB URLs are never auto-deleted, regardless of host or database name. A sync link must survive app updates and browser-storage resets.
+  - The link is stored redundantly in `localStorage`, Android SharedPreferences (`AndroidBridge.get/set/removePreference`), and a local-only PouchDB doc (`_local/sync_remote_url`, never replicated). Full backups also carry an optional `syncRemoteUrl`.
+  - The service worker (`public/sw.js`) bypasses cross-origin traffic and CouchDB/PouchDB endpoints (`_changes`, `_all_docs`, `_bulk_docs`, `_bulk_get`, `_revs_diff`, `_local`, `_find`, `_design`, `_session`). Replication responses are never cached, and responses to requests carrying `Authorization` are never persisted.
 - **Replicated Tombstones**:
   - Deletions are persisted across devices using replicated tombstone documents (`_id: 'tombstone:${type}:${id}'`, `docType: 'tombstone'`, `deletedAt: ISOString`).
   - `syncAllFromPouch()` consumes remote tombstones via `getAllTombstones()`, ensuring remote deletions are respected locally and never resurrected during sync handshakes.
@@ -209,6 +213,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Included in PouchDB sync reconciliation, real-time incoming changes (`applyIncomingChange`), and cross-tab BroadcastChannel mutations (`applyLocalEntityMutation`).
   - Centralized dangling reference pruning (`pruneDanglingPartyReferences`) cleans unassigned references during local deletion, incoming changes, and full sync reconciliation.
   - Full round-trip backup/restore with backward compatibility for legacy backups omitting group/category collections.
+  - Full backups include an optional `syncRemoteUrl` so a restore after reinstall restores the cloud link. Backups containing this field must be stored securely because it may include CouchDB credentials.
 - **Reactive State & UI Integration (`src/core/store/useDataStore.ts`, `src/components/Parties/`)**:
   - `usePartyGroups()` and `usePartyCategories()` hooks provide selective reactive updates via `useSyncExternalStore`.
   - `PartiesView`: Includes "Groups & Categories" management launcher, Group and Category filter dropdowns with auto-reset for stale IDs, and search token matching on group/category names.

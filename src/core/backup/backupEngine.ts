@@ -42,6 +42,12 @@ export interface DatabaseBackupData {
   auditLogs?: any[];
   allowNegativeStock?: boolean;
   hideBuyPrices?: boolean;
+  /**
+   * Device-scoped cloud sync URL captured in the backup. Optional so that
+   * older backups and backups shared without credentials remain valid.
+   * Contains embedded CouchDB credentials when present: treat backups as secrets.
+   */
+  syncRemoteUrl?: string;
 }
 
 export interface DatabaseBackupBundle {

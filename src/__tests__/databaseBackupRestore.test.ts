@@ -65,6 +65,8 @@ vi.mock('../services/pouchdb.ts', () => {
       migrateFromLocalStorage: vi.fn(async () => {}),
       sync: vi.fn(),
       syncNow: vi.fn(async () => {}),
+      startSync: vi.fn(),
+      getStoredRemoteUrl: vi.fn(() => ''),
       getSyncState: vi.fn(() => ({ status: 'idle', message: 'Offline' })),
       subscribeSync: vi.fn(() => () => {}),
     },
@@ -166,6 +168,14 @@ describe('Database Backup & Restore Engine', () => {
       expect(bundle.data.company.businessName).toBe('Apex Retail Store');
       expect(bundle.metadata?.businessName).toBe('Apex Retail Store');
       expect(bundle.metadata?.gstin).toBe('27AABCU9603R1ZM');
+    });
+
+    it('captures the configured cloud sync link in the backup payload', () => {
+      vi.mocked(pouch.getStoredRemoteUrl).mockReturnValueOnce('https://admin:secret@couch.example.com/gst');
+
+      const bundle = db.createDatabaseBackup();
+
+      expect(bundle.data.syncRemoteUrl).toBe('https://admin:secret@couch.example.com/gst');
     });
 
     it('generates safe, compliant backup filenames', () => {
@@ -373,6 +383,18 @@ describe('Database Backup & Restore Engine', () => {
       corrupted.checksum = '0000000000000000000000000000000000000000000000000000000000000000';
 
       await expect(db.restoreDatabaseBackup(corrupted)).rejects.toThrow('Checksum does not match');
+    });
+
+    it('restores the cloud sync link from a backup when the device is not linked', async () => {
+      vi.mocked(pouch.getStoredRemoteUrl).mockReturnValueOnce('https://admin:secret@couch.example.com/gst');
+      const bundle = db.createDatabaseBackup();
+
+      vi.mocked(pouch.getStoredRemoteUrl).mockReturnValue('');
+      vi.mocked(pouch.startSync).mockClear();
+
+      await db.restoreDatabaseBackup(bundle, 'REPLACE');
+
+      expect(pouch.startSync).toHaveBeenCalledWith('https://admin:secret@couch.example.com/gst');
     });
 
     it('uses dynamic appVersion matching package.json', () => {

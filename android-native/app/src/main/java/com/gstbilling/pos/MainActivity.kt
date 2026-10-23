@@ -400,6 +400,38 @@ class AndroidBridge(
         }
     }
 
+    // Device-scoped preferences. Used to preserve the CouchDB sync link across
+    // WebView storage resets / app updates. Never used for business data.
+    private fun devicePrefs() =
+        context.getSharedPreferences("vyapar_device_prefs", Context.MODE_PRIVATE)
+
+    @JavascriptInterface
+    fun getPreference(key: String): String {
+        return try {
+            devicePrefs().getString(key, "") ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    @JavascriptInterface
+    fun setPreference(key: String, value: String) {
+        try {
+            devicePrefs().edit().putString(key, value).apply()
+        } catch (_: Exception) {
+            // Best-effort persistence.
+        }
+    }
+
+    @JavascriptInterface
+    fun removePreference(key: String) {
+        try {
+            devicePrefs().edit().remove(key).apply()
+        } catch (_: Exception) {
+            // Best-effort persistence.
+        }
+    }
+
     @JavascriptInterface
     fun downloadBackup(filename: String, jsonContent: String) {
         val safeName = if (filename.endsWith(".json")) filename else "$filename.json"

@@ -79,7 +79,9 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
     this.removeTombstone('invoice', invoice.id);
     this.set(STORAGE_KEYS.INVOICES, list);
-    pouch.putDoc('invoice', invoice);
+    Promise.resolve(pouch.putDoc('invoice', invoice)).catch((err) => {
+      console.error(`Failed to push invoice ${invoice.id} to PouchDB:`, err);
+    });
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
     // Update stock levels via pure domain stockEngine (Estimates, Orders, and Delivery Challans are non-sale docs)
@@ -278,7 +280,9 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
     this.removeTombstone('purchase', bill.id);
     this.set(STORAGE_KEYS.PURCHASES, list);
-    pouch.putDoc('purchase', bill);
+    Promise.resolve(pouch.putDoc('purchase', bill)).catch((err) => {
+      console.error(`Failed to push purchase ${bill.id} to PouchDB:`, err);
+    });
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
     // Adjust stock levels and update purchase prices via pure domain stockEngine
@@ -604,7 +608,9 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     const list = [...this.getStockAdjustments()];
     list.unshift(adj);
     this.set(STORAGE_KEYS.ADJUSTMENTS, list);
-    pouch.putDoc('adjustment', adj);
+    Promise.resolve(pouch.putDoc('adjustment', adj)).catch((err) => {
+      console.error(`Failed to push stock adjustment ${adj.id} to PouchDB:`, err);
+    });
     this.broadcastChange('adjustment', 'save', adj.id, adj);
 
     // Update item stock using pure domain stockEngine

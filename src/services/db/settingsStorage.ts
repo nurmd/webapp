@@ -42,9 +42,9 @@ export class SettingsStorage extends StorageEngine {
 
   async syncBusinessProfileAcrossDevices(company: CompanyProfile): Promise<{ success: boolean; lastSyncedAt: string }> {
     this.saveCompany(company);
-    await pouch.syncNow();
+    const syncSuccess = await pouch.syncNow();
     return {
-      success: true,
+      success: Boolean(syncSuccess),
       lastSyncedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     };
   }
@@ -172,9 +172,9 @@ export class SettingsStorage extends StorageEngine {
     } else {
       this.saveSettings(this.getSettings());
     }
-    await pouch.syncNow();
+    const syncSuccess = await pouch.syncNow();
     return {
-      success: true,
+      success: Boolean(syncSuccess),
       lastSyncedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     };
   }

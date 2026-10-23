@@ -138,12 +138,16 @@ export class SyncStorage extends BackupRestoreStorage {
         case 'cash_bank_txn': this.set(STORAGE_KEYS.CASH_BANK_TXNS, this.getCashBankTransactions().filter((t) => t.id !== id)); break;
         case 'party_group': {
           this.set(STORAGE_KEYS.PARTY_GROUPS, this.getPartyGroups().filter((g) => g.id !== id));
-          this.pruneDanglingPartyReferences(false);
+          void this.prunePartyReferencesForDeletedEntity('group', id, false).catch((err) => {
+            console.warn('Failed to prune party group references:', err);
+          });
           break;
         }
         case 'party_category': {
           this.set(STORAGE_KEYS.PARTY_CATEGORIES, this.getPartyCategories().filter((c) => c.id !== id));
-          this.pruneDanglingPartyReferences(false);
+          void this.prunePartyReferencesForDeletedEntity('category', id, false).catch((err) => {
+            console.warn('Failed to prune party category references:', err);
+          });
           break;
         }
       }
@@ -285,21 +289,25 @@ export class SyncStorage extends BackupRestoreStorage {
     this.notifyListeners();
   }
 
-  private pruneDanglingPartyReferences(persistToPouch: boolean = false): void {
-    const existingGroupIds = new Set(this.getPartyGroups().map((g) => g.id));
-    const existingCategoryIds = new Set(this.getPartyCategories().map((c) => c.id));
+  private async prunePartyReferencesForDeletedEntity(
+    type: 'group' | 'category',
+    deletedId: string,
+    persistToPouch: boolean = false
+  ): Promise<void> {
+    const parties = this.getParties();
     let hasChanges = false;
+    const writePromises: Promise<any>[] = [];
 
-    const parties = this.getParties().map((p) => {
+    const updatedParties = parties.map((p) => {
       let changed = false;
       let newGroupId = p.groupId;
       let newCategoryId = p.categoryId;
 
-      if (p.groupId && !existingGroupIds.has(p.groupId)) {
+      if (type === 'group' && p.groupId === deletedId) {
         newGroupId = undefined;
         changed = true;
       }
-      if (p.categoryId && !existingCategoryIds.has(p.categoryId)) {
+      if (type === 'category' && p.categoryId === deletedId) {
         newCategoryId = undefined;
         changed = true;
       }
@@ -313,7 +321,7 @@ export class SyncStorage extends BackupRestoreStorage {
           updatedAt: new Date().toISOString(),
         };
         if (persistToPouch && typeof (pouch as any)?.putDoc === 'function') {
-          pouch.putDoc('party', updated);
+          writePromises.push((pouch as any).putDoc('party', updated));
         }
         return updated;
       }
@@ -321,7 +329,10 @@ export class SyncStorage extends BackupRestoreStorage {
     });
 
     if (hasChanges) {
-      this.set(STORAGE_KEYS.PARTIES, parties);
+      this.set(STORAGE_KEYS.PARTIES, updatedParties);
+      if (writePromises.length > 0) {
+        await Promise.all(writePromises);
+      }
     }
   }
 
@@ -404,13 +415,17 @@ export class SyncStorage extends BackupRestoreStorage {
         case 'party_group': {
           const list = this.getPartyGroups().filter((g) => g.id !== docId);
           this.set(STORAGE_KEYS.PARTY_GROUPS, list);
-          this.pruneDanglingPartyReferences(true);
+          void this.prunePartyReferencesForDeletedEntity('group', docId, true).catch((err) => {
+            console.warn('Failed to prune incoming party group references:', err);
+          });
           break;
         }
         case 'party_category': {
           const list = this.getPartyCategories().filter((c) => c.id !== docId);
           this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
-          this.pruneDanglingPartyReferences(true);
+          void this.prunePartyReferencesForDeletedEntity('category', docId, true).catch((err) => {
+            console.warn('Failed to prune incoming party category references:', err);
+          });
           break;
         }
       }
@@ -845,6 +860,11 @@ export class SyncStorage extends BackupRestoreStorage {
         for (const t of remoteTombstones) {
           if (t && t.targetType && t.targetId && t.deletedAt) {
             this.recordTombstone(t.targetType, t.targetId, t.deletedAt);
+            if (t.targetType === 'party_group') {
+              await this.prunePartyReferencesForDeletedEntity('group', t.targetId, true);
+            } else if (t.targetType === 'party_category') {
+              await this.prunePartyReferencesForDeletedEntity('category', t.targetId, true);
+            }
           }
         }
       }
@@ -961,8 +981,6 @@ export class SyncStorage extends BackupRestoreStorage {
         this.getPartyCategories(),
         remotePartyCategories
       );
-
-      this.pruneDanglingPartyReferences(true);
 
       if (typeof (pouch as any)?.refreshConflicts === 'function') {
         await (pouch as any).refreshConflicts();

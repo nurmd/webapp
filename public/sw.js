@@ -3,7 +3,34 @@
  * Provides resilient offline caching, app shell hydration, and instant updates.
  */
 
-const CACHE_VERSION = 'vyapar-pwa-v1.3.0';
+const CACHE_VERSION = 'vyapar-pwa-v1.3.1';
+
+// CouchDB/PouchDB replication endpoints must never be cached. A stale
+// _changes / _all_docs response can make a device believe it is caught up,
+// and authenticated sync responses must not be persisted in Cache Storage.
+const SYNC_ENDPOINT_MARKERS = [
+  '/_changes',
+  '/_all_docs',
+  '/_bulk_docs',
+  '/_bulk_get',
+  '/_revs_diff',
+  '/_local/',
+  '/_find',
+  '/_design/',
+  '/_session'
+];
+
+function isSyncOrApiRequest(url) {
+  return SYNC_ENDPOINT_MARKERS.some((marker) => url.pathname.includes(marker));
+}
+
+function isCacheableResponse(request, response) {
+  return Boolean(
+    response &&
+    response.status === 200 &&
+    !request.headers.has('Authorization')
+  );
+}
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -48,19 +75,29 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
+  const isFontAsset =
+    url.hostname.includes('fonts.googleapis.com') ||
+    url.hostname.includes('fonts.gstatic.com');
 
   // Skip non-GET requests and cross-origin analytics/APIs unless needed
   if (request.method !== 'GET') return;
 
-  // Ignore chrome-extension and remote sync endpoints
+  // Ignore chrome-extension requests
   if (url.protocol.startsWith('chrome-extension')) return;
+
+  // Never intercept cross-origin CouchDB/PouchDB traffic. Let the browser
+  // handle it directly so sync requests are not cached or replayed.
+  if (url.origin !== self.location.origin && !isFontAsset) return;
+
+  // Bypass same-origin sync/API endpoints as well (self-hosted CouchDB).
+  if (isSyncOrApiRequest(url)) return;
 
   // 1. Navigation requests (SPA HTML page): Network-First, fallback to cached index.html
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response && response.status === 200) {
+          if (isCacheableResponse(request, response)) {
             const clone = response.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
           }
@@ -77,9 +114,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 2. Static hashed assets (/assets/...) & fonts: Cache-First with background revalidation
-  const isStaticAsset = url.pathname.includes('/assets/') ||
-                        url.hostname.includes('fonts.googleapis.com') ||
-                        url.hostname.includes('fonts.gstatic.com');
+  const isStaticAsset = url.pathname.includes('/assets/') || isFontAsset;
 
   if (isStaticAsset) {
     event.respondWith(
@@ -90,7 +125,7 @@ self.addEventListener('fetch', (event) => {
         }
 
         return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
+          if (isCacheableResponse(request, networkResponse)) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_VERSION).then((cache) => {
               cache.put(request, responseClone);
@@ -107,7 +142,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        if (isCacheableResponse(request, networkResponse)) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_VERSION).then((cache) => {
             cache.put(request, responseClone);

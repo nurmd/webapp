@@ -403,18 +403,37 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
-  const handleConnectSync = () => {
-    if (!syncUrlInput.trim()) {
+  const handleConnectSync = async () => {
+    const targetUrl = syncUrlInput.trim();
+    if (!targetUrl) {
       pouch.stopSync();
       return;
     }
     setIsSyncStarting(true);
-    pouch.startSync(syncUrlInput.trim());
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
-      setIsSyncStarting(false);
+
+    // Probe first: do not start a live replication loop against a URL that is
+    // unreachable, read-only, or has bad credentials.
+    if (typeof (pouch as any).probeRemoteConnection === 'function') {
+      try {
+        const probe = await (pouch as any).probeRemoteConnection(targetUrl);
+        if (probe && probe.ok === false) {
+          // Keep the drawer open so the user can read the diagnostic.
+          setIsSyncStarting(false);
+          return;
+        }
+      } catch {
+        setIsSyncStarting(false);
+        return;
+      }
+    }
+
+    pouch.startSync(targetUrl);
+    setIsSyncStarting(false);
+
+    if (!pouch.getSyncState()?.error) {
       setIsSyncConfigOpen(false);
-    }, 800);
+    }
   };
 
   const handleStopSync = () => {

@@ -42,6 +42,9 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
     const partyCategories = this.getPartyCategories();
     const allowNegativeStock = this.getAllowNegativeStock();
     const hideBuyPrices = !this.getBuyPriceVisibility();
+    const syncRemoteUrl = typeof (pouch as any)?.getStoredRemoteUrl === 'function'
+      ? ((pouch as any).getStoredRemoteUrl() as string)
+      : '';
 
     const counts: DatabaseBackupCounts = {
       invoices: invoices.length,
@@ -77,6 +80,7 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       auditLogs,
       allowNegativeStock,
       hideBuyPrices,
+      syncRemoteUrl: syncRemoteUrl || undefined,
     };
 
     const checksum = computeBackupChecksum(data);
@@ -385,7 +389,21 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       throw err;
     }
 
-    // 5. Append restore event to device's immutable audit trail (without overwriting device trail)
+    // 5. Restore the device's cloud sync link when the backup carries one.
+    // Preserve any existing link in MERGE mode; REPLACE intentionally adopts
+    // the backup's device configuration.
+    try {
+      const currentSyncUrl = typeof (pouch as any).getStoredRemoteUrl === 'function'
+        ? ((pouch as any).getStoredRemoteUrl() as string)
+        : '';
+      if (data.syncRemoteUrl && (mode === 'REPLACE' || !currentSyncUrl)) {
+        pouch.startSync(data.syncRemoteUrl);
+      }
+    } catch (syncErr) {
+      console.warn('Cloud sync link restore from backup failed:', syncErr);
+    }
+
+    // 6. Append restore event to device's immutable audit trail (without overwriting device trail)
     try {
       const auditUser = this.getAuditUser();
       auditTrail
@@ -411,7 +429,7 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
       console.warn('Audit trail logging failed during restore:', auditErr);
     }
 
-    // 6. Notify React components & Global listeners
+    // 7. Notify React components & Global listeners
     this.notifyListeners();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(

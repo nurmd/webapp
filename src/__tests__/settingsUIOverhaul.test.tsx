@@ -34,6 +34,10 @@ vi.mock('../services/pouchdb.ts', () => ({
     startSync: vi.fn(),
     stopSync: vi.fn(),
     migrateFromLocalStorage: vi.fn(async () => {}),
+    probeRemoteConnection: vi.fn(async () => ({
+      ok: true,
+      details: { dbName: 'test_db', docCount: 5, canRead: true, canWrite: true },
+    })),
   },
 }));
 
@@ -480,8 +484,9 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     const connectBtn = buttons.find((b) => b.textContent === 'Connect');
     expect(connectBtn).toBeDefined();
 
-    act(() => {
+    await act(async () => {
       connectBtn?.click();
+      await Promise.resolve();
     });
 
     expect(pouch.startSync).toHaveBeenCalledWith('https://admin:pass@remote.cloud.com/store_db');
@@ -647,6 +652,83 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     });
 
     expect(db.getAllowNegativeStock()).toBe(false);
+  });
+
+  // TC-SET-24: DataSyncTab UI shows Local only when remoteUrl is unset and displays error banner
+  it('TC-SET-24: renders Local only when offline and displays error banner on sync failure', () => {
+    act(() => {
+      root.render(
+        <DataSyncTab
+          isSyncingProfile={false}
+          lastProfileSyncTime=""
+          handleSyncAllSettingsAcrossDevices={vi.fn()}
+          profileSyncNotice={null}
+          setIsPairQrModalOpen={vi.fn()}
+          setIsImportProfileModalOpen={vi.fn()}
+          syncState={{
+            status: 'error',
+            remoteUrl: 'https://baduser:badpass@remote.couch.com/db',
+            error: 'Authentication failed (401 Unauthorized)',
+            pendingChanges: 0,
+          }}
+          handleSyncNow={vi.fn()}
+          isSyncStarting={false}
+          isSyncConfigOpen={false}
+          setIsSyncConfigOpen={vi.fn()}
+          syncUrlInput=""
+          setSyncUrlInput={vi.fn()}
+          handleConnectSync={vi.fn()}
+          handleStopSync={vi.fn()}
+        />
+      );
+    });
+
+    const banner = container.querySelector('[data-testid="sync-error-banner"]');
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain('Authentication failed (401 Unauthorized)');
+    expect(container.textContent).toContain('Sync Error');
+  });
+
+  // TC-SET-25: DataSyncTab Test Connection button triggers pouch.probeRemoteConnection
+  it('TC-SET-25: clicking Test Connection triggers pouch.probeRemoteConnection and renders diagnostics', async () => {
+    act(() => {
+      root.render(
+        <DataSyncTab
+          isSyncingProfile={false}
+          lastProfileSyncTime=""
+          handleSyncAllSettingsAcrossDevices={vi.fn()}
+          profileSyncNotice={null}
+          setIsPairQrModalOpen={vi.fn()}
+          setIsImportProfileModalOpen={vi.fn()}
+          syncState={{
+            status: 'offline',
+            remoteUrl: '',
+            pendingChanges: 0,
+          }}
+          handleSyncNow={vi.fn()}
+          isSyncStarting={false}
+          isSyncConfigOpen={true}
+          setIsSyncConfigOpen={vi.fn()}
+          syncUrlInput="https://user:pass@sync.test.com/db"
+          setSyncUrlInput={vi.fn()}
+          handleConnectSync={vi.fn()}
+          handleStopSync={vi.fn()}
+        />
+      );
+    });
+
+    const testBtn = container.querySelector('[data-testid="test-sync-connection-btn"]') as HTMLButtonElement;
+    expect(testBtn).not.toBeNull();
+
+    await act(async () => {
+      testBtn.click();
+    });
+
+    expect(pouch.probeRemoteConnection).toHaveBeenCalledWith('https://user:pass@sync.test.com/db');
+
+    const diag = container.querySelector('[data-testid="sync-probe-diagnostic"]');
+    expect(diag).not.toBeNull();
+    expect(diag?.textContent).toContain('Connection & Write Probe Verified');
   });
 });
 
