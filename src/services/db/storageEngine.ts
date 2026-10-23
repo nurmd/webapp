@@ -8,6 +8,7 @@ import { Expense } from '../../models/expense.ts';
 import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { rbac, UserRole } from '../rbac.ts';
+import { pouch } from '../pouchdb.ts';
 
 export const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -95,14 +96,6 @@ export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
 ];
 
 export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [];
-
-export const DEMO_PARTY_IDS = new Set(['PTY-101', 'PTY-102', 'PTY-103']);
-export const DEMO_ITEM_IDS = new Set(['ITM-001', 'ITM-002', 'ITM-003', 'ITM-004']);
-export const DEMO_INVOICE_IDS = new Set(['INV-SAMPLE-001']);
-export const DEMO_PURCHASE_IDS = new Set(['PUR-001']);
-export const DEMO_EXPENSE_IDS = new Set(['EXP-001', 'EXP-002', 'EXP-003', 'EXP-004']);
-export const DEMO_BANK_IDS = new Set(['ACC_BANK_SBI']);
-export const DEMO_TXN_IDS = new Set(['TXN-INIT-001']);
 
 /**
  * Foundation Storage Engine providing synchronous localStorage persistence,
@@ -379,5 +372,25 @@ export class StorageEngine {
   public isTombstoned(type: string, id: string): boolean {
     const tombstones = this.getTombstones();
     return Boolean(tombstones[`${type}:${id}`]);
+  }
+
+  /**
+   * Safe background fire-and-forget write to PouchDB. Catches rejections to prevent
+   * unhandled promise rejections in synchronous save paths while letting PouchDB surface
+   * write errors to syncState.
+   */
+  protected backgroundPouchPut<T extends { id?: string }>(type: string, doc: T): void {
+    void Promise.resolve(pouch.putDoc(type, doc as any)).catch((err) => {
+      console.warn(`[StorageEngine] Background PouchDB putDoc failed for ${type}:${(doc as any)?.id}:`, err);
+    });
+  }
+
+  /**
+   * Safe background fire-and-forget delete from PouchDB.
+   */
+  protected backgroundPouchDelete(type: string, id: string): void {
+    void Promise.resolve(pouch.deleteDoc(type, id)).catch((err) => {
+      console.warn(`[StorageEngine] Background PouchDB deleteDoc failed for ${type}:${id}:`, err);
+    });
   }
 }

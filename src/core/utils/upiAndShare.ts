@@ -204,6 +204,20 @@ export function getPaymentReminderWhatsAppUrl(
  */
 export function safeOpenExternalUrl(url: string, target: string = '_blank'): void {
   if (typeof window === 'undefined') return;
+
+  // Route WhatsApp links directly through AndroidBridge chooser when running inside native app
+  const isWhatsApp =
+    url.startsWith('https://wa.me/') ||
+    url.startsWith('https://api.whatsapp.com/') ||
+    url.startsWith('whatsapp://');
+  if (isWhatsApp) {
+    const bridge = (window as any).AndroidBridge;
+    if (bridge && typeof bridge.openWhatsAppUrl === 'function') {
+      bridge.openWhatsAppUrl(url);
+      return;
+    }
+  }
+
   try {
     const win = window.open ? window.open(url, target) : null;
     if (!win || win.closed || typeof win.closed === 'undefined') {

@@ -134,6 +134,27 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - User-configured CouchDB URLs are never auto-deleted, regardless of host or database name. A sync link must survive app updates and browser-storage resets.
   - The link is stored redundantly in `localStorage`, Android SharedPreferences (`AndroidBridge.get/set/removePreference`), and a local-only PouchDB doc (`_local/sync_remote_url`, never replicated). Full backups also carry an optional `syncRemoteUrl`.
   - The service worker (`public/sw.js`) bypasses cross-origin traffic and CouchDB/PouchDB endpoints (`_changes`, `_all_docs`, `_bulk_docs`, `_bulk_get`, `_revs_diff`, `_local`, `_find`, `_design`, `_session`). Replication responses are never cached, and responses to requests carrying `Authorization` are never persisted.
+- **Sync Push Path Hardening & Error Latch Isolation**:
+  - `createRemoteDB()` strips inline credentials from the target database URL and passes authentication cleanly via `opts.auth` (with percent-decoded username and password), avoiding Fetch API `Request cannot be constructed from a URL that includes credentials` errors and handling complex special characters (e.g. `:` and `@`) in passwords.
+  - Independent `pushError` and `pullError` tracking decouples replication legs. Push permission denials (403/401) or pull failures surface without latching permanently into `status: 'error'`, and transient errors auto-recover to `synced`/`syncing` as soon as healthy replication reaches idle `paused(null)`.
+  - Background database writes (`partyStorage`, `itemStorage`, `financialStorage`, `settingsStorage`, `invoicePurchaseStorage`) attach `.catch()` handlers to all asynchronous `putDoc` and `deleteDoc` background promises so disk/quota or put-conflict errors surface in `syncState` without triggering unhandled promise rejections.
+  - Initial `PouchService` auto-start is deferred via `setTimeout` to guarantee `StorageService` finishes instantiation and hydration before replication commences.
+  - `startSync()` is asynchronous, dedupes concurrent calls from online, visibility, and UI events, and verifies `shouldSync()` before initiating replication.
+- **Multi-Database Isolation & Company Switching**:
+  - Eliminates single-database cross-contamination by creating dedicated, partitioned local PouchDB databases:
+    - Default local store: `vyapar_fintech_store` (active in offline mode or fresh installs).
+    - Dedicated demo sandbox: `vyapar_demo` (isolated testing sandbox; sync is strictly disabled).
+    - Per-remote databases: `vyapar_remote_<sanitizedPath>_<fnv1aHex>` (e.g. `vyapar_remote_vyapar_prod_4a12bc90`), uniquely mapped via FNV-1a hash to the remote CouchDB endpoint.
+  - `determineActiveLocalDbName()` resolves active local database priority at startup:
+    1. If `pouch.isDemoMode()` is set -> `vyapar_demo`.
+    2. Authoritative `gst_active_local_db` from `localStorage` (if set and non-empty).
+    3. Saved remote URL (read synchronously from `localStorage` or fallback to Android SharedPreferences `AndroidBridge.getPreference('couchdb_remote_url')`) -> maps to `vyapar_remote_*`.
+    4. Default -> `vyapar_fintech_store`.
+  - Persists derived `gst_active_local_db` to `localStorage` at startup.
+  - `shouldSync()` enforces that the active DB matches `getPerRemoteDbName(savedUrl)` and is not demo mode, preventing URL/registry mismatch from ever replicating into an unintended database.
+  - Multi-DB switching helpers (`activateLocalDatabase()`, `switchToRemoteDb()`, `switchToOfflineDb()`, and `enterDemoMode()`) maintain a registry `gst_local_databases` (`LocalDatabaseEntry[]`) and reload the UI.
+  - `SyncStorage` hydration detects DB changes (`if (lastHydratedDb !== activeDb)`) and clears local memory/synced data keys (`STORAGE_KEYS.TOMBSTONES` (`gst_sync_tombstones`), `STORAGE_KEYS.CONFLICTS`, entity collections, and `STORAGE_KEYS.SETTINGS` (`gst_app_settings`, preserving device-local printing and privacy settings)).
+  - `loadDemoData()` strictly enforces: `if (!pouch.isDemoMode()) { throw new Error('Demo data can only be loaded in the isolated demo database. Use the demo-mode switch first.'); }` (saved remote URL remains intact while demo mode is active).
 - **Replicated Tombstones**:
   - Deletions are persisted across devices using replicated tombstone documents (`_id: 'tombstone:${type}:${id}'`, `docType: 'tombstone'`, `deletedAt: ISOString`).
   - `syncAllFromPouch()` consumes remote tombstones via `getAllTombstones()`, ensuring remote deletions are respected locally and never resurrected during sync handshakes.

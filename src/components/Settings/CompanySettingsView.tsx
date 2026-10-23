@@ -15,7 +15,7 @@ import {
 import { CompanyProfile } from '../../models/company.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
-import { pouch, PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL } from '../../services/pouchdb.ts';
+import { pouch, PouchService, PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL } from '../../services/pouchdb.ts';
 import { db } from '../../services/db.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { AppUpdateModal } from '../Update/AppUpdateModal.tsx';
@@ -208,9 +208,14 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
 
   // Sync state
   const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
-  const [syncUrlInput, setSyncUrlInput] = useState(
-    syncState.remoteUrl || localStorage.getItem('couchdb_remote_url') || DEFAULT_COUCHDB_REMOTE_URL
-  );
+  const [syncUrlInput, setSyncUrlInput] = useState(() => {
+    const stored = typeof (pouch as any)?.getStoredRemoteUrl === 'function' ? (pouch as any).getStoredRemoteUrl() : '';
+    return (
+      stored ||
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('couchdb_remote_url') : '') ||
+      DEFAULT_COUCHDB_REMOTE_URL
+    );
+  });
   const [isSyncConfigOpen, setIsSyncConfigOpen] = useState(false);
   const [isSyncStarting, setIsSyncStarting] = useState(false);
   const [isPopulatingDemo, setIsPopulatingDemo] = useState(false);
@@ -428,8 +433,16 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       }
     }
 
-    pouch.startSync(targetUrl);
-    setIsSyncStarting(false);
+    try {
+      if (typeof (PouchService as any)?.switchToRemoteDb === 'function') {
+        (PouchService as any).switchToRemoteDb(targetUrl);
+      }
+      if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+        window.location.reload();
+      }
+    } finally {
+      setIsSyncStarting(false);
+    }
 
     if (!pouch.getSyncState()?.error) {
       setIsSyncConfigOpen(false);
@@ -439,6 +452,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleStopSync = () => {
     pouch.stopSync();
     setSyncUrlInput('');
+    PouchService.switchToOfflineDb();
+    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+      window.location.reload();
+    }
   };
 
   const handleResolveConflict = async (conflictId: string, choice: 'keep_winning' | 'keep_conflicting') => {
@@ -451,17 +468,39 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
-  const handlePopulateDemoData = async () => {
+  const handlePopulateDemoData = () => {
     setIsPopulatingDemo(true);
     try {
-      await db.loadDemoData();
-      setDemoNotice('Demo data populated locally successfully!');
-      setTimeout(() => setDemoNotice(null), 3500);
+      PouchService.enterDemoMode();
+      if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+        window.location.reload();
+      }
     } catch (e: any) {
-      setDemoNotice('Error populating demo data: ' + (e?.message || String(e)));
-      setTimeout(() => setDemoNotice(null), 4000);
+      setDemoNotice(e?.message || 'Error entering demo mode: ' + String(e));
+      setTimeout(() => setDemoNotice(null), 6000);
     } finally {
       setIsPopulatingDemo(false);
+    }
+  };
+
+  const handleSwitchToOffline = () => {
+    PouchService.switchToOfflineDb();
+    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+      window.location.reload();
+    }
+  };
+
+  const handleReconnectCloud = () => {
+    const ok = PouchService.reconnectCloudDb();
+    if (ok && typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+      window.location.reload();
+    }
+  };
+
+  const handleExitDemoMode = () => {
+    PouchService.exitDemoMode();
+    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+      window.location.reload();
     }
   };
 
@@ -869,6 +908,13 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 handleCopySyncCode={handleCopySyncCode}
                 onOpenDatabaseBackup={() => setIsDatabaseBackupModalOpen(true)}
                 handleResolveConflict={handleResolveConflict}
+                activeDbName={typeof (pouch as any)?.getActiveDbName === 'function' ? pouch.getActiveDbName() : undefined}
+                isDemoMode={typeof (pouch as any)?.isDemoMode === 'function' ? pouch.isDemoMode() : false}
+                isRemoteDbActive={typeof (pouch as any)?.isRemoteDbActive === 'function' ? pouch.isRemoteDbActive() : false}
+                savedRemoteUrl={typeof (pouch as any)?.getStoredRemoteUrl === 'function' ? pouch.getStoredRemoteUrl() : undefined}
+                handleSwitchToOffline={handleSwitchToOffline}
+                handleReconnectCloud={handleReconnectCloud}
+                handleExitDemoMode={handleExitDemoMode}
               />
             )}
 

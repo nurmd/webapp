@@ -24,6 +24,17 @@ if (typeof window !== 'undefined') {
 // Mock pouchdb
 vi.mock('../services/pouchdb.ts', () => ({
   DEFAULT_COUCHDB_REMOTE_URL: '',
+  DEFAULT_LOCAL_DB_NAME: 'vyapar_fintech_store',
+  DEMO_LOCAL_DB_NAME: 'vyapar_demo',
+  POUCH_PERSIST_KEYS: {
+    ACTIVE_LOCAL_DB: 'gst_active_local_db',
+    SYNC_REMOTE_URL: 'gst_sync_remote_url',
+    DEMO_MODE: 'gst_demo_mode',
+    PRE_DEMO_DB: 'gst_pre_demo_db',
+    PRE_DEMO_REMOTE: 'gst_pre_demo_remote',
+    LAST_HYDRATED_DB: 'gst_last_hydrated_db',
+    PENDING_DEMO_LOAD: 'gst_pending_demo_load',
+  },
   pouch: {
     putDoc: vi.fn(),
     deleteDoc: vi.fn(),
@@ -39,9 +50,16 @@ vi.mock('../services/pouchdb.ts', () => ({
       details: { dbName: 'test_db', docCount: 5, canRead: true, canWrite: true },
     })),
   },
+  PouchService: {
+    switchToRemoteDb: vi.fn(),
+    switchToOfflineDb: vi.fn(),
+    reconnectCloudDb: vi.fn(),
+    enterDemoMode: vi.fn(),
+    exitDemoMode: vi.fn(),
+  },
 }));
 
-import { pouch } from '../services/pouchdb.ts';
+import { pouch, PouchService } from '../services/pouchdb.ts';
 import { db } from '../services/db.ts';
 import { CompanyProfile } from '../models/company.ts';
 import {
@@ -456,40 +474,58 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
   });
 
   // TC-SET-19: Service Integration - CouchDB Remote URL Connect
-  it('TC-SET-19: configuring CouchDB remote URL and clicking Connect calls pouch.startSync', async () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
+  it('TC-SET-19: configuring CouchDB remote URL and clicking Connect calls PouchService.switchToRemoteDb and does not start sync on old instance', async () => {
+    const originalLocation = window.location;
+    const reloadSpy = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, reload: reloadSpy },
+      writable: true,
+      configurable: true,
     });
 
-    const syncBtn = container.querySelector('[data-testid="category-btn-data_sync"]') as HTMLButtonElement;
-    act(() => {
-      syncBtn.click();
-    });
+    try {
+      act(() => {
+        root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
+      });
 
-    // Open tune config
-    const tuneBtn = container.querySelector('button[aria-label="Configure Sync"]') as HTMLButtonElement;
-    expect(tuneBtn).not.toBeNull();
-    act(() => {
-      tuneBtn.click();
-    });
+      const syncBtn = container.querySelector('[data-testid="category-btn-data_sync"]') as HTMLButtonElement;
+      act(() => {
+        syncBtn.click();
+      });
 
-    // Enter URL using changeInput helper
-    const input = container.querySelector('[data-testid="sync-url-input"]') as HTMLInputElement;
-    expect(input).not.toBeNull();
-    act(() => {
-      changeInput(input, 'https://admin:pass@remote.cloud.com/store_db');
-    });
+      // Open tune config
+      const tuneBtn = container.querySelector('button[aria-label="Configure Sync"]') as HTMLButtonElement;
+      expect(tuneBtn).not.toBeNull();
+      act(() => {
+        tuneBtn.click();
+      });
 
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const connectBtn = buttons.find((b) => b.textContent === 'Connect');
-    expect(connectBtn).toBeDefined();
+      // Enter URL using changeInput helper
+      const input = container.querySelector('[data-testid="sync-url-input"]') as HTMLInputElement;
+      expect(input).not.toBeNull();
+      act(() => {
+        changeInput(input, 'https://admin:pass@remote.cloud.com/store_db');
+      });
 
-    await act(async () => {
-      connectBtn?.click();
-      await Promise.resolve();
-    });
+      const buttons = Array.from(container.querySelectorAll('button'));
+      const connectBtn = buttons.find((b) => b.textContent === 'Connect');
+      expect(connectBtn).toBeDefined();
 
-    expect(pouch.startSync).toHaveBeenCalledWith('https://admin:pass@remote.cloud.com/store_db');
+      await act(async () => {
+        connectBtn?.click();
+        await Promise.resolve();
+      });
+
+      expect(PouchService.switchToRemoteDb).toHaveBeenCalledWith('https://admin:pass@remote.cloud.com/store_db');
+      expect(pouch.startSync).not.toHaveBeenCalled();
+      expect(reloadSpy).toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'location', {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 
   // TC-SET-20: Modal Dismissal - Edit Profile Modal Open & Close

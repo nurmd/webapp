@@ -16,7 +16,7 @@ export class SettingsStorage extends StorageEngine {
   saveCompany(company: CompanyProfile): void {
     const prevCompany = this.getCompany();
     this.set(STORAGE_KEYS.COMPANY, company);
-    pouch.putDoc('company', company);
+    this.backgroundPouchPut('company', company);
     this.broadcastChange('company', 'save', company.id || 'COMP-001', company);
 
     // MCA Audit Trail Hook
@@ -159,9 +159,9 @@ export class SettingsStorage extends StorageEngine {
     this.set(STORAGE_KEYS.SETTINGS, merged);
     if (syncable.company) {
       this.set(STORAGE_KEYS.COMPANY, syncable.company);
-      pouch.putDoc('company', syncable.company);
+      this.backgroundPouchPut('company', syncable.company);
     }
-    pouch.putDoc('settings', merged);
+    this.backgroundPouchPut('settings', merged);
     this.broadcastChange('settings', 'save', 'app_settings', merged);
     this.notifyListeners();
   }

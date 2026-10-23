@@ -7,19 +7,21 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { Expense } from '../../models/expense.ts';
 import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
-import { pouch, type PouchDocChange, type SyncConflict } from '../pouchdb.ts';
+import {
+  pouch,
+  type PouchDocChange,
+  type SyncConflict,
+} from '../pouchdb.ts';
+import {
+  DEFAULT_LOCAL_DB_NAME,
+  DEMO_LOCAL_DB_NAME,
+  POUCH_PERSIST_KEYS,
+} from './localDbConstants.ts';
 import {
   STORAGE_KEYS,
   SyncedSettings,
   DEFAULT_COMPANY,
   DEFAULT_BANK_ACCOUNTS,
-  DEMO_PARTY_IDS,
-  DEMO_ITEM_IDS,
-  DEMO_INVOICE_IDS,
-  DEMO_PURCHASE_IDS,
-  DEMO_EXPENSE_IDS,
-  DEMO_BANK_IDS,
-  DEMO_TXN_IDS,
 } from './storageEngine.ts';
 import {
   DEMO_COMPANY,
@@ -45,8 +47,27 @@ export class SyncStorage extends BackupRestoreStorage {
   constructor() {
     super();
 
-    // Purge any legacy sample/demo data to guarantee clean production state
-    this.purgeDemoData();
+    // Check if the active local database has switched across tabs or reloads.
+    // Clears local cache only when switching databases, preserving legacy migration on initial default DB load:
+    // (lastHydratedDb !== null && lastHydratedDb !== activeDb) || (lastHydratedDb === null && activeDb !== DEFAULT_LOCAL_DB_NAME)
+    const activeDb =
+      typeof (pouch as any)?.getActiveDbName === 'function'
+        ? pouch.getActiveDbName()
+        : DEFAULT_LOCAL_DB_NAME;
+    const lastHydratedDb =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem(POUCH_PERSIST_KEYS.LAST_HYDRATED_DB)
+        : null;
+    const shouldClear =
+      (lastHydratedDb !== null && lastHydratedDb !== activeDb) ||
+      (lastHydratedDb === null && activeDb !== DEFAULT_LOCAL_DB_NAME);
+    if (shouldClear) {
+      this.clearSyncedDataKeys();
+      this.invalidateCache();
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(POUCH_PERSIST_KEYS.LAST_HYDRATED_DB, activeDb);
+    }
 
     // Cross-tab / cross-window multi-device real-time sync channel
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -95,9 +116,23 @@ export class SyncStorage extends BackupRestoreStorage {
     }
 
     // Perform initial PouchDB migration and setup live synchronization hooks
-    setTimeout(() => {
-      pouch
-        .migrateFromLocalStorage({
+    setTimeout(async () => {
+      // 1. If in Demo Mode and demo load is pending, populate the isolated demo DB
+      if (typeof (pouch as any)?.isDemoMode === 'function' && pouch.isDemoMode()) {
+        const isPending =
+          typeof localStorage !== 'undefined' &&
+          localStorage.getItem(POUCH_PERSIST_KEYS.PENDING_DEMO_LOAD) === 'true';
+        if (isPending) {
+          try {
+            localStorage.removeItem(POUCH_PERSIST_KEYS.PENDING_DEMO_LOAD);
+            await this.loadDemoData();
+          } catch (e) {
+            console.error('Failed to populate demo data in demo mode:', e);
+          }
+        }
+      } else if (activeDb === DEFAULT_LOCAL_DB_NAME) {
+        // Only the default offline DB migrates legacy localStorage
+        await pouch.migrateFromLocalStorage({
           company: this.getCompany(),
           parties: this.getParties(),
           items: this.getItems(),
@@ -108,19 +143,73 @@ export class SyncStorage extends BackupRestoreStorage {
           vouchers: this.getVouchers(),
           bankAccounts: this.getBankAccounts(),
           cashBankTxns: this.getCashBankTransactions(),
-        })
-        .then(() => {
-          // Hydrate from PouchDB in case remote CouchDB already had data
-          this.syncAllFromPouch();
         });
+      }
 
-      // Realtime continuous change listener
+      // 2. Hydrate local memory/localStorage from active PouchDB
+      await this.syncAllFromPouch();
+
+      // 3. Realtime continuous change listener
       if (typeof (pouch as any)?.subscribeDataChange === 'function') {
         pouch.subscribeDataChange((change) => {
           this.applyIncomingChange(change);
         });
       }
-    }, 100);
+    }, 50);
+  }
+
+  public clearSyncedDataKeys(): void {
+    if (typeof localStorage === 'undefined') return;
+
+    // Preserve device-local printing and privacy settings if embedded in settings
+    let localPrinting: any = null;
+    try {
+      const rawSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (rawSettings) {
+        const parsed = JSON.parse(rawSettings);
+        if (parsed.printingSettings || parsed.printerWidth || parsed.printerType || parsed.bluetoothPrinterAddress) {
+          localPrinting = {
+            printingSettings: parsed.printingSettings,
+            printerWidth: parsed.printerWidth,
+            printerType: parsed.printerType,
+            bluetoothPrinterAddress: parsed.bluetoothPrinterAddress,
+          };
+        }
+      }
+    } catch {}
+
+    const SYNCED_KEYS = [
+      STORAGE_KEYS.COMPANY,
+      STORAGE_KEYS.PARTIES,
+      STORAGE_KEYS.ITEMS,
+      STORAGE_KEYS.CATEGORIES,
+      STORAGE_KEYS.INVOICES,
+      STORAGE_KEYS.PURCHASES,
+      STORAGE_KEYS.EXPENSES,
+      STORAGE_KEYS.ADJUSTMENTS,
+      STORAGE_KEYS.VOUCHERS,
+      STORAGE_KEYS.BANK_ACCOUNTS,
+      STORAGE_KEYS.CASH_BANK_TXNS,
+      STORAGE_KEYS.LOANS,
+      STORAGE_KEYS.LOAN_TXNS,
+      STORAGE_KEYS.PARTY_GROUPS,
+      STORAGE_KEYS.PARTY_CATEGORIES,
+      STORAGE_KEYS.TOMBSTONES,
+      STORAGE_KEYS.CONFLICTS,
+      STORAGE_KEYS.SETTINGS,
+      'gst_allow_negative_stock',
+    ];
+    for (const key of SYNCED_KEYS) {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    }
+
+    if (localPrinting) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.LOCAL_PRINTING_SETTINGS, JSON.stringify(localPrinting));
+      } catch {}
+    }
   }
 
   public applyLocalEntityMutation(entity: string, action: 'save' | 'delete', id: string, data?: any): void {
@@ -600,77 +689,6 @@ export class SyncStorage extends BackupRestoreStorage {
     this.notifyListeners();
   }
 
-  private purgeDemoData(): void {
-    try {
-      if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-      const PURGE_KEY = 'gst_legacy_sample_purged_v1017';
-      if (localStorage.getItem(PURGE_KEY)) return;
-
-      // 1. Company
-      const comp = this.getCompany();
-      const isFictitious =
-        comp &&
-        (comp.businessName === 'Apex Technologies Private Limited' ||
-          comp.gstin === '27AABCT3518Q1ZS' ||
-          comp.businessName?.toLowerCase().includes('shree ganesh') ||
-          comp.tradeName?.toLowerCase().includes('shree ganesh') ||
-          comp.businessName?.toLowerCase().includes('ganesh'));
-
-      if (isFictitious) {
-        this.set(STORAGE_KEYS.COMPANY, DEFAULT_COMPANY);
-        pouch.putDoc('company', { ...DEFAULT_COMPANY, id: 'company_profile' });
-      }
-
-      // 2. Parties
-      const parties = this.getParties().filter((p) => !DEMO_PARTY_IDS.has(p.id));
-      this.set(STORAGE_KEYS.PARTIES, parties);
-      DEMO_PARTY_IDS.forEach((id) => pouch.deleteDoc('party', id));
-
-      // 3. Items
-      const items = this.getItems().filter((i) => !DEMO_ITEM_IDS.has(i.id));
-      this.set(STORAGE_KEYS.ITEMS, items);
-      DEMO_ITEM_IDS.forEach((id) => pouch.deleteDoc('item', id));
-
-      // 4. Invoices
-      const invoices = this.getInvoices().filter((i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-'));
-      this.set(STORAGE_KEYS.INVOICES, invoices);
-      DEMO_INVOICE_IDS.forEach((id) => pouch.deleteDoc('invoice', id));
-
-      // 5. Purchases
-      const purchases = this.getPurchases().filter((p) => !DEMO_PURCHASE_IDS.has(p.id));
-      this.set(STORAGE_KEYS.PURCHASES, purchases);
-      DEMO_PURCHASE_IDS.forEach((id) => pouch.deleteDoc('purchase', id));
-
-      // 6. Expenses
-      const expenses = this.getExpenses().filter((e) => !DEMO_EXPENSE_IDS.has(e.id));
-      this.set(STORAGE_KEYS.EXPENSES, expenses);
-      DEMO_EXPENSE_IDS.forEach((id) => pouch.deleteDoc('expense', id));
-
-      // 7. Bank Accounts
-      let bankAccounts = this.getBankAccounts().filter((b) => !DEMO_BANK_IDS.has(b.id));
-      bankAccounts = bankAccounts.map((b) => {
-        if (b.id === 'ACC_CASH' && b.openingBalance === 15000) {
-          return { ...b, openingBalance: 0 };
-        }
-        return b;
-      });
-      if (bankAccounts.length === 0) {
-        bankAccounts = DEFAULT_BANK_ACCOUNTS;
-      }
-      this.set(STORAGE_KEYS.BANK_ACCOUNTS, bankAccounts);
-      DEMO_BANK_IDS.forEach((id) => pouch.deleteDoc('bank_account', id));
-
-      // 8. Cash Bank Txns
-      const txns = this.getCashBankTransactions().filter((t) => !DEMO_TXN_IDS.has(t.id));
-      this.set(STORAGE_KEYS.CASH_BANK_TXNS, txns);
-      DEMO_TXN_IDS.forEach((id) => pouch.deleteDoc('cash_bank_txn', id));
-
-      localStorage.setItem(PURGE_KEY, 'true');
-    } catch (e) {
-      console.warn('Error purging demo data:', e);
-    }
-  }
-
   private areEntitiesDivergent(a: any, b: any): boolean {
     if (!a || !b) return true;
     const cleanA = { ...a };
@@ -693,8 +711,7 @@ export class SyncStorage extends BackupRestoreStorage {
     entityType: string,
     storageKey: string,
     localItems: T[],
-    remoteItems: any[],
-    demoFilter?: (item: T) => boolean
+    remoteItems: any[]
   ): T[] {
     const tombstones = this.getTombstones();
     const localMap = new Map<string, T>();
@@ -718,8 +735,6 @@ export class SyncStorage extends BackupRestoreStorage {
 
     // 1. Process local items
     for (const [id, localItem] of localMap.entries()) {
-      if (demoFilter && !demoFilter(localItem)) continue;
-
       const tombstoneKey = `${entityType}:${id}`;
       const tombstone = tombstones[tombstoneKey];
 
@@ -782,7 +797,6 @@ export class SyncStorage extends BackupRestoreStorage {
     // 2. Process remote items not yet in mergedMap
     for (const remoteItem of remoteItems || []) {
       if (!remoteItem || !remoteItem.id) continue;
-      if (demoFilter && !demoFilter(remoteItem)) continue;
 
       const id = remoteItem.id;
       if (mergedMap.has(id)) continue;
@@ -896,36 +910,31 @@ export class SyncStorage extends BackupRestoreStorage {
         'invoice',
         STORAGE_KEYS.INVOICES,
         this.getInvoices(),
-        remoteInvoices,
-        (i) => !DEMO_INVOICE_IDS.has(i.id) && !i.id.startsWith('INV-SAMPLE-')
+        remoteInvoices
       );
       this.reconcileCollection(
         'purchase',
         STORAGE_KEYS.PURCHASES,
         this.getPurchases(),
-        remotePurchases,
-        (p) => !DEMO_PURCHASE_IDS.has(p.id)
+        remotePurchases
       );
       this.reconcileCollection(
         'party',
         STORAGE_KEYS.PARTIES,
         this.getParties(),
-        remoteParties,
-        (p) => !DEMO_PARTY_IDS.has(p.id)
+        remoteParties
       );
       this.reconcileCollection(
         'item',
         STORAGE_KEYS.ITEMS,
         this.getItems(),
-        remoteItems,
-        (i) => !DEMO_ITEM_IDS.has(i.id)
+        remoteItems
       );
       this.reconcileCollection(
         'expense',
         STORAGE_KEYS.EXPENSES,
         this.getExpenses(),
-        remoteExpenses,
-        (e) => !DEMO_EXPENSE_IDS.has(e.id)
+        remoteExpenses
       );
       this.reconcileCollection(
         'adjustment',
@@ -943,19 +952,13 @@ export class SyncStorage extends BackupRestoreStorage {
         'bank_account',
         STORAGE_KEYS.BANK_ACCOUNTS,
         this.getBankAccounts(),
-        remoteBankAccounts.filter((b) => !DEMO_BANK_IDS.has(b.id)).map((b) => {
-          if (b.id === 'ACC_CASH' && b.openingBalance === 15000) {
-            return { ...b, openingBalance: 0 };
-          }
-          return b;
-        })
+        remoteBankAccounts
       );
       this.reconcileCollection(
         'cash_bank_txn',
         STORAGE_KEYS.CASH_BANK_TXNS,
         this.getCashBankTransactions(),
-        remoteCashBankTxns,
-        (t) => !DEMO_TXN_IDS.has(t.id)
+        remoteCashBankTxns
       );
       this.reconcileCollection(
         'loan',
@@ -1034,6 +1037,10 @@ export class SyncStorage extends BackupRestoreStorage {
   }
 
   public async loadDemoData(): Promise<void> {
+    if (!pouch.isDemoMode()) {
+      throw new Error('Demo data can only be loaded in the isolated demo database. Use the demo-mode switch first.');
+    }
+
     try {
       this.saveCompany(DEMO_COMPANY);
       this.set(STORAGE_KEYS.ITEMS, DEMO_ITEMS);

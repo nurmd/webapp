@@ -166,10 +166,14 @@ class MainActivity : Activity() {
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                 if (url == null) return false
-                if (url.startsWith("upi://") ||
-                    url.startsWith("https://wa.me/") ||
+                if (url.startsWith("https://wa.me/") ||
                     url.startsWith("https://api.whatsapp.com/") ||
-                    url.startsWith("whatsapp://") ||
+                    url.startsWith("whatsapp://")
+                ) {
+                    openWhatsAppChooser(url)
+                    return true
+                }
+                if (url.startsWith("upi://") ||
                     url.startsWith("mailto:") ||
                     url.startsWith("tel:")
                 ) {
@@ -374,6 +378,49 @@ class MainActivity : Activity() {
             }
         }
     }
+
+    fun openWhatsAppChooser(url: String) {
+        try {
+            val uri = Uri.parse(url)
+            val pm = packageManager
+            val packages = listOf("com.whatsapp", "com.whatsapp.w4b")
+            val availableIntents = mutableListOf<Intent>()
+
+            for (pkg in packages) {
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    setPackage(pkg)
+                }
+                @Suppress("DEPRECATION")
+                val resolveInfos = pm.queryIntentActivities(intent, 0)
+                if (resolveInfos.isNotEmpty()) {
+                    availableIntents.add(intent)
+                }
+            }
+
+            when {
+                availableIntents.size >= 2 -> {
+                    val primaryIntent = availableIntents.removeAt(0)
+                    val chooserIntent = Intent.createChooser(primaryIntent, "Open with WhatsApp").apply {
+                        putExtra(Intent.EXTRA_INITIAL_INTENTS, availableIntents.toTypedArray())
+                    }
+                    startActivity(chooserIntent)
+                }
+                availableIntents.size == 1 -> {
+                    startActivity(availableIntents[0])
+                }
+                else -> {
+                    try {
+                        val fallbackIntent = Intent(Intent.ACTION_VIEW, uri)
+                        startActivity(Intent.createChooser(fallbackIntent, "Open with"))
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "WhatsApp is not installed", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Unable to open WhatsApp: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 class AndroidBridge(
@@ -383,6 +430,20 @@ class AndroidBridge(
 ) {
     private var downloadThread: Thread? = null
     @Volatile private var isDownloading = false
+
+    @JavascriptInterface
+    fun openWhatsAppUrl(url: String) {
+        (context as? Activity)?.runOnUiThread {
+            (context as? MainActivity)?.openWhatsAppChooser(url) ?: run {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (_: Exception) {
+                    Toast.makeText(context, "Unable to open WhatsApp", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     @JavascriptInterface
     fun exitApp() {

@@ -50,7 +50,7 @@ export class PartyStorage extends SettingsStorage {
     }
     this.removeTombstone('party', partyToSave.id);
     this.set(STORAGE_KEYS.PARTIES, list);
-    pouch.putDoc('party', partyToSave);
+    this.backgroundPouchPut('party', partyToSave);
     this.broadcastChange('party', 'save', partyToSave.id, partyToSave);
     this.recalculatePartyBalance(partyToSave.id);
     this.notifyListeners();
@@ -93,7 +93,7 @@ export class PartyStorage extends SettingsStorage {
 
     this.removeTombstone('party_group', savedGroup.id);
     this.set(STORAGE_KEYS.PARTY_GROUPS, list);
-    pouch.putDoc('party_group', savedGroup);
+    this.backgroundPouchPut('party_group', savedGroup);
     this.broadcastChange('party_group', 'save', savedGroup.id, savedGroup);
     this.notifyListeners();
     return savedGroup;
@@ -103,7 +103,7 @@ export class PartyStorage extends SettingsStorage {
     const list = this.getPartyGroups().filter((g) => g.id !== id);
     this.recordTombstone('party_group', id);
     this.set(STORAGE_KEYS.PARTY_GROUPS, list);
-    pouch.deleteDoc('party_group', id);
+    this.backgroundPouchDelete('party_group', id);
 
     // Unassign this group from all parties referencing it; never delete parties
     const parties = this.getParties();
@@ -112,7 +112,7 @@ export class PartyStorage extends SettingsStorage {
       if (p.groupId === id) {
         partiesChanged = true;
         const updated: Party = { ...p, groupId: undefined, updatedAt: new Date().toISOString() };
-        pouch.putDoc('party', updated);
+        this.backgroundPouchPut('party', updated);
         this.broadcastChange('party', 'save', updated.id, updated);
         return updated;
       }
@@ -164,7 +164,7 @@ export class PartyStorage extends SettingsStorage {
 
     this.removeTombstone('party_category', savedCat.id);
     this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
-    pouch.putDoc('party_category', savedCat);
+    this.backgroundPouchPut('party_category', savedCat);
     this.broadcastChange('party_category', 'save', savedCat.id, savedCat);
     this.notifyListeners();
     return savedCat;
@@ -174,7 +174,7 @@ export class PartyStorage extends SettingsStorage {
     const list = this.getPartyCategories().filter((c) => c.id !== id);
     this.recordTombstone('party_category', id);
     this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
-    pouch.deleteDoc('party_category', id);
+    this.backgroundPouchDelete('party_category', id);
 
     // Unassign this category from all parties referencing it; never delete parties
     const parties = this.getParties();
@@ -183,7 +183,7 @@ export class PartyStorage extends SettingsStorage {
       if (p.categoryId === id) {
         partiesChanged = true;
         const updated: Party = { ...p, categoryId: undefined, updatedAt: new Date().toISOString() };
-        pouch.putDoc('party', updated);
+        this.backgroundPouchPut('party', updated);
         this.broadcastChange('party', 'save', updated.id, updated);
         return updated;
       }
@@ -211,7 +211,7 @@ export class PartyStorage extends SettingsStorage {
       };
       list[idx] = party;
       this.set(STORAGE_KEYS.PARTIES, list);
-      pouch.putDoc('party', party);
+      this.backgroundPouchPut('party', party);
       this.broadcastChange('party', 'save', party.id, party);
       this.recalculatePartyBalance(id);
       this.notifyListeners();
@@ -222,7 +222,7 @@ export class PartyStorage extends SettingsStorage {
     const list = this.getParties().filter((p) => p.id !== id);
     this.recordTombstone('party', id);
     this.set(STORAGE_KEYS.PARTIES, list);
-    pouch.deleteDoc('party', id);
+    this.backgroundPouchDelete('party', id);
     this.broadcastChange('party', 'delete', id);
     this.notifyListeners();
   }
@@ -335,7 +335,7 @@ export class PartyStorage extends SettingsStorage {
       party.updatedAt = new Date().toISOString();
       parties[partyIndex] = party;
       this.set(STORAGE_KEYS.PARTIES, parties);
-      pouch.putDoc('party', party);
+      this.backgroundPouchPut('party', party);
       this.broadcastChange('party', 'save', party.id, party);
       this.notifyListeners();
     }
@@ -513,7 +513,7 @@ export class PartyStorage extends SettingsStorage {
     if (hasChanges) {
       this.set(STORAGE_KEYS.PARTIES, [...parties]);
       changedParties.forEach((p) => {
-        pouch.putDoc('party', p);
+        this.backgroundPouchPut('party', p);
         this.broadcastChange('party', 'save', p.id, p);
       });
       this.notifyListeners();

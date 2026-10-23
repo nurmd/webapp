@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import PouchDB from 'pouchdb-browser';
 
 class TestStorage implements Storage {
   private store: Map<string, string> = new Map();
@@ -13,7 +14,7 @@ class TestStorage implements Storage {
 const testStorage = new TestStorage();
 Object.defineProperty(globalThis, 'localStorage', { value: testStorage, writable: true, configurable: true });
 
-import { pouch, DEFAULT_COUCHDB_REMOTE_URL } from '../services/pouchdb.ts';
+import { pouch, PouchService, DEFAULT_COUCHDB_REMOTE_URL } from '../services/pouchdb.ts';
 
 describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
   beforeEach(() => {
@@ -22,6 +23,7 @@ describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
 
   afterEach(() => {
     testStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it('verifies DEFAULT_COUCHDB_REMOTE_URL contains no embedded credentials', () => {
@@ -155,19 +157,325 @@ describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
       (pouch as any).localDB.put = origPut;
     });
 
-    it('startSync preserves error status and does not clear it when paused with no error', () => {
-      (pouch as any).currentState = {
-        status: 'error',
-        remoteUrl: 'https://user:pass@sync.example.com/db',
-        error: 'Push permission denied (403): User cannot write to remote CouchDB',
-        pendingChanges: 0,
+    it('createRemoteDB sanitizes URL by stripping inline credentials and trailing slashes', () => {
+      const remote = (pouch as any).createRemoteDB('https://alice:secret123@sync.example.com/gst_demo/');
+      expect(remote.name).toBe('https://sync.example.com/gst_demo');
+    });
+
+    it('createRemoteDB parses unencoded special characters in credentials gracefully', () => {
+      const remote = (pouch as any).createRemoteDB('https://alice:p@ss#word@sync.example.com/gst_demo');
+      expect(remote.name).toBe('https://sync.example.com/gst_demo');
+    });
+
+    it('clears transient sync error and transitions to synced when paused without error, while retaining push errors', async () => {
+      const listeners: Record<string, Function> = {};
+      const pushListeners: Record<string, Function> = {};
+      const mockSync = {
+        cancel: vi.fn(),
+        push: {
+          on: vi.fn((event: string, fn: Function) => {
+            pushListeners[event] = fn;
+            return mockSync.push;
+          }),
+        },
+        pull: {
+          on: vi.fn((_event: string, _fn: Function) => {
+            return mockSync.pull;
+          }),
+        },
+        on: vi.fn((event: string, fn: Function) => {
+          listeners[event] = fn;
+          return mockSync;
+        }),
       };
 
-      // Simulate a paused event arriving with no error (idle pull)
-      // Since status is 'error', it must NOT overwrite status with 'synced' or clear error
-      (pouch as any).notifySyncState({});
+      const syncSpy = vi.spyOn(PouchDB, 'sync').mockReturnValue(mockSync as any);
+
+      PouchService.switchToRemoteDb('https://user:pass@sync.example.com/db');
+      await pouch.startSync('https://user:pass@sync.example.com/db');
+
+      // 1. Simulate a transient network error on paused
+      listeners['paused']({ message: 'ETIMEDOUT' });
       expect(pouch.getSyncState().status).toBe('error');
-      expect(pouch.getSyncState().error).toContain('Push permission denied');
+      expect(pouch.getSyncState().error).toContain('ETIMEDOUT');
+
+      // 2. Simulate recovery: paused fires with null/undefined error
+      listeners['paused'](null);
+      expect(pouch.getSyncState().status).toBe('synced');
+      expect(pouch.getSyncState().error).toBeUndefined();
+
+      // 3. Simulate push permission denied (403)
+      pushListeners['error']({ status: 403, message: 'Forbidden' });
+      expect(pouch.getSyncState().status).toBe('error');
+      expect(pouch.getSyncState().error).toContain('Push permission denied (403)');
+
+      // 4. Idle pull pause must NOT wipe the push error
+      listeners['paused'](null);
+      expect(pouch.getSyncState().status).toBe('error');
+      expect(pouch.getSyncState().error).toContain('Push permission denied (403)');
+
+      syncSpy.mockRestore();
+    });
+
+    it('handles fire-and-forget putDoc/deleteDoc rejections gracefully across domain storage entities', async () => {
+      const origPut = (pouch as any).localDB.put;
+      (pouch as any).localDB.put = vi.fn(async () => {
+        throw new Error('QuotaExceeded: Disk full');
+      });
+
+      const { db } = await import('../services/db.ts');
+
+      expect(() => {
+        db.saveParty({
+          id: 'PTY-PUT-ERR',
+          name: 'Error Party',
+          type: 'CUSTOMER',
+          phone: '9999999999',
+          currentBalance: 0,
+          stateCode: '07',
+          billingAddress: 'Street 1',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        });
+      }).not.toThrow();
+
+      expect(() => {
+        db.saveItem({
+          id: 'ITEM-PUT-ERR',
+          name: 'Error Item',
+          currentStock: 10,
+          salePrice: 100,
+          purchasePrice: 80,
+          category: 'Default',
+          gstRate: 18,
+          hsnSacCode: '1234',
+          unit: 'PCS',
+        } as any);
+      }).not.toThrow();
+
+      expect(() => {
+        db.saveVoucher({
+          id: 'VCH-PUT-ERR',
+          voucherNumber: 'V-ERR-1',
+          voucherType: 'PAYMENT',
+          date: '2026-10-23',
+          totalAmount: 50,
+          paymentMode: 'CASH',
+          entries: [],
+        } as any);
+      }).not.toThrow();
+
+      expect(() => {
+        db.saveExpense({
+          id: 'EXP-PUT-ERR',
+          date: '2026-10-23',
+          category: 'General Operational',
+          amount: 20,
+          paymentMode: 'CASH',
+        } as any);
+      }).not.toThrow();
+
+      expect(() => {
+        db.saveCompany({
+          id: 'company_profile',
+          businessName: 'Test Biz',
+        } as any);
+      }).not.toThrow();
+
+      (pouch as any).localDB.put = origPut;
+    });
+
+    it('blocks loadDemoData when not in demo mode, but allows it in demo mode even with saved remote URL', async () => {
+      const { db } = await import('../services/db.ts');
+      const { pouch, PouchService } = await import('../services/pouchdb.ts');
+
+      // 1. Outside demo mode -> rejected
+      testStorage.removeItem('gst_demo_mode');
+      await expect(db.loadDemoData()).rejects.toThrow(
+        /Demo data can only be loaded in the isolated demo database/
+      );
+
+      // 2. In demo mode with remote URL saved -> allowed
+      testStorage.setItem('couchdb_remote_url', 'https://user:pass@sync.example.com/db');
+      PouchService.enterDemoMode();
+      expect(pouch.isDemoMode()).toBe(true);
+      await expect(db.loadDemoData()).resolves.not.toThrow();
+
+      PouchService.exitDemoMode();
+    });
+
+    it('isolates local databases per remote URL and derives deterministic names with FNV-1a hash', async () => {
+      const { computeUrlHash, getPerRemoteDbName } = await import('../services/pouchdb.ts');
+
+      const url1 = 'https://admin:secret123@couch.example.com/company_store';
+      const url2 = 'https://other:pass@couch.example.com/company_store/';
+      const url3 = 'https://admin:secret123@couch.example.com/other_store';
+
+      const name1 = getPerRemoteDbName(url1);
+      const name2 = getPerRemoteDbName(url2);
+      const name3 = getPerRemoteDbName(url3);
+
+      expect(name1).toMatch(/^vyapar_remote_company_store_[0-9a-f]{8}$/);
+      // Stripping credentials and trailing slashes makes normalized names identical
+      expect(name1).toBe(name2);
+      // Different DB path generates different database name
+      expect(name1).not.toBe(name3);
+
+      // Unencoded special characters in password (@, #) must be stripped without changing DB name
+      const urlSpecial1 = 'https://admin:p@ss#123@couch.example.com/company_store';
+      const urlSpecial2 = 'https://admin:different#pass@couch.example.com/company_store';
+      const nameSpecial1 = getPerRemoteDbName(urlSpecial1);
+      const nameSpecial2 = getPerRemoteDbName(urlSpecial2);
+      expect(nameSpecial1).toBe(name1);
+      expect(nameSpecial2).toBe(name1);
+    });
+
+    it('determineActiveLocalDbName respects priority order and reads Android SharedPreferences synchronously', async () => {
+      const { determineActiveLocalDbName, DEFAULT_LOCAL_DB_NAME, DEMO_LOCAL_DB_NAME } = await import('../services/pouchdb.ts');
+
+      testStorage.clear();
+
+      // 1. Empty storage -> default offline database
+      expect(determineActiveLocalDbName()).toBe(DEFAULT_LOCAL_DB_NAME);
+
+      // 2. Synchronous Android SharedPreferences fallback when localStorage is empty
+      (window as any).AndroidBridge = {
+        getPreference: vi.fn((key: string) => (key === 'couchdb_remote_url' ? 'https://sync.example.com/android_db' : '')),
+      };
+      testStorage.clear();
+      const derivedFromAndroid = determineActiveLocalDbName();
+      expect(derivedFromAndroid).toContain('vyapar_remote_android_db_');
+      // Persisted active DB at startup
+      expect(testStorage.getItem('gst_active_local_db')).toBe(derivedFromAndroid);
+      delete (window as any).AndroidBridge;
+
+      // 3. Explicit gst_active_local_db is authoritative
+      testStorage.setItem('gst_active_local_db', 'custom_company_db');
+      expect(determineActiveLocalDbName()).toBe('custom_company_db');
+
+      // 4. Demo mode overrides all
+      testStorage.setItem('gst_demo_mode', 'true');
+      expect(determineActiveLocalDbName()).toBe(DEMO_LOCAL_DB_NAME);
+      testStorage.removeItem('gst_demo_mode');
+      testStorage.removeItem('gst_active_local_db');
+    });
+
+    it('switches between offline, remote, and demo databases cleanly', async () => {
+      const { PouchService, DEFAULT_LOCAL_DB_NAME, DEMO_LOCAL_DB_NAME } = await import('../services/pouchdb.ts');
+
+      // 1. Switch to remote DB
+      testStorage.setItem('gst_last_hydrated_db', 'old_db');
+      const remoteName = PouchService.switchToRemoteDb('https://user:pass@sync.example.com/store');
+      expect(remoteName).toContain('vyapar_remote_store_');
+      expect(testStorage.getItem('gst_active_local_db')).toBe(remoteName);
+      expect(testStorage.getItem('couchdb_remote_url')).toBe('https://user:pass@sync.example.com/store');
+      expect(testStorage.getItem('gst_sync_remote_url')).toBe('https://user:pass@sync.example.com/store');
+      // activateLocalDatabase keeps last hydrated DB marker untouched
+      expect(testStorage.getItem('gst_last_hydrated_db')).toBe('old_db');
+
+      // 2. Switch to offline DB
+      PouchService.switchToOfflineDb();
+      expect(testStorage.getItem('gst_active_local_db')).toBe(DEFAULT_LOCAL_DB_NAME);
+      // Saved remote URL remains preserved
+      expect(testStorage.getItem('couchdb_remote_url')).toBe('https://user:pass@sync.example.com/store');
+
+      // 3. Reconnect cloud
+      const reconnected = PouchService.reconnectCloudDb();
+      expect(reconnected).toBe(true);
+      expect(testStorage.getItem('gst_active_local_db')).toBe(remoteName);
+
+      // 4. Enter and exit demo mode
+      PouchService.enterDemoMode();
+      expect(testStorage.getItem('gst_demo_mode')).toBe('true');
+      expect(testStorage.getItem('gst_active_local_db')).toBe(DEMO_LOCAL_DB_NAME);
+      expect(testStorage.getItem('gst_pre_demo_db')).toBe(remoteName);
+
+      PouchService.exitDemoMode();
+      expect(testStorage.getItem('gst_demo_mode')).toBe('false');
+      expect(testStorage.getItem('gst_active_local_db')).toBe(remoteName);
+
+      // 5. Switch to remote DB without credentials preserves display label without blanking
+      PouchService.switchToRemoteDb('https://sync.example.com/store');
+      const registry = PouchService.getRegisteredDatabases();
+      const entry = registry.find((e) => e.localDbName === remoteName);
+      expect(entry?.label).toBe('Cloud Sync (sync.example.com/store)');
+    });
+
+    it('clearSyncedDataKeys clears synced entities, tombstones, conflicts, and settings while preserving device printing', async () => {
+      const { db } = await import('../services/db.ts');
+
+      testStorage.setItem('gst_sync_tombstones', JSON.stringify({ 'item:ITM-1': { type: 'item', id: 'ITM-1' } }));
+      testStorage.setItem('gst_sync_conflicts', JSON.stringify([{ id: 'conf-1' }]));
+      testStorage.setItem('gst_invoices', JSON.stringify([{ id: 'INV-1' }]));
+      testStorage.setItem('gst_allow_negative_stock', 'true');
+      testStorage.setItem(
+        'gst_app_settings',
+        JSON.stringify({
+          printerWidth: '58mm',
+          printerType: 'thermal',
+          appLanguage: 'Hindi',
+        })
+      );
+
+      db.clearSyncedDataKeys();
+
+      expect(testStorage.getItem('gst_sync_tombstones')).toBeNull();
+      expect(testStorage.getItem('gst_sync_conflicts')).toBeNull();
+      expect(testStorage.getItem('gst_invoices')).toBeNull();
+      expect(testStorage.getItem('gst_allow_negative_stock')).toBeNull();
+      expect(testStorage.getItem('gst_app_settings')).toBeNull();
+
+      // Device-local printing settings preserved
+      const preservedPrinting = JSON.parse(testStorage.getItem('local_device_printing_settings') || '{}');
+      expect(preservedPrinting.printerWidth).toBe('58mm');
+      expect(preservedPrinting.printerType).toBe('thermal');
+    });
+
+    it('deduplicates concurrent startSync calls and initiates single replication', async () => {
+      let syncCallCount = 0;
+
+      const mockSync = {
+        on: vi.fn().mockReturnThis(),
+        cancel: vi.fn(),
+      };
+
+      const syncSpy = vi.spyOn(PouchDB, 'sync').mockImplementation(() => {
+        syncCallCount++;
+        return mockSync as any;
+      });
+
+      // Fire 3 concurrent calls with matching active DB
+      PouchService.switchToRemoteDb('https://user:pass@sync.example.com/db');
+      const p1 = pouch.startSync('https://user:pass@sync.example.com/db');
+      const p2 = pouch.startSync('https://user:pass@sync.example.com/db');
+      const p3 = pouch.startSync('https://user:pass@sync.example.com/db');
+
+      await Promise.all([p1, p2, p3]);
+
+      expect(syncCallCount).toBe(1);
+
+      syncSpy.mockRestore();
+    });
+
+    it('switchToRemoteDb writes both sync URL keys; stopSync removes both and the Android pref', async () => {
+      const bridge = {
+        getPreference: vi.fn(() => ''),
+        setPreference: vi.fn(),
+        removePreference: vi.fn(),
+      };
+      (window as any).AndroidBridge = bridge;
+
+      PouchService.switchToRemoteDb('https://user:pass@sync.example.com/store');
+      expect(testStorage.getItem('couchdb_remote_url')).toBe('https://user:pass@sync.example.com/store');
+      expect(testStorage.getItem('gst_sync_remote_url')).toBe('https://user:pass@sync.example.com/store');
+      expect(bridge.setPreference).toHaveBeenCalledWith('couchdb_remote_url', 'https://user:pass@sync.example.com/store');
+
+      pouch.stopSync();
+      expect(testStorage.getItem('couchdb_remote_url')).toBeNull();
+      expect(testStorage.getItem('gst_sync_remote_url')).toBeNull();
+      expect(bridge.removePreference).toHaveBeenCalledWith('couchdb_remote_url');
+
+      delete (window as any).AndroidBridge;
     });
   });
 });

@@ -11,11 +11,146 @@ export type SyncStatus = 'offline' | 'connecting' | 'synced' | 'syncing' | 'erro
 
 export const DEFAULT_COUCHDB_REMOTE_URL = '';
 
+export {
+  DEFAULT_LOCAL_DB_NAME,
+  DEMO_LOCAL_DB_NAME,
+  POUCH_PERSIST_KEYS,
+  LOCAL_DATABASES_REGISTRY_KEY,
+} from './db/localDbConstants.ts';
+import {
+  DEFAULT_LOCAL_DB_NAME,
+  DEMO_LOCAL_DB_NAME,
+  POUCH_PERSIST_KEYS,
+  LOCAL_DATABASES_REGISTRY_KEY,
+} from './db/localDbConstants.ts';
+
+/**
+ * Computes deterministic 32-bit FNV-1a hex hash of a string.
+ */
+export function computeUrlHash(url: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) {
+    hash ^= url.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Derives a deterministic local PouchDB name for a remote CouchDB URL.
+ * Format: `vyapar_remote_<sanitized-db-name>_<short-hash>`
+ * Normalizes by stripping inline credentials and trailing slashes.
+ */
+export function getPerRemoteDbName(remoteUrl: string): string {
+  const clean = (remoteUrl || '').trim();
+  if (!clean) return DEFAULT_LOCAL_DB_NAME;
+
+  let sanitizedUrl = clean;
+  let pathname = '';
+
+  const credsMatch = clean.match(/^(https?:\/\/)([^/@:]+):(.*)@([^/@:]+)(:\d+)?(\/.*)?$/i);
+  if (credsMatch) {
+    const [, protocol, , , host, port = '', rest = ''] = credsMatch;
+    const cleanRest = (rest || '').replace(/\/+$/, '') || '';
+    pathname = cleanRest;
+    sanitizedUrl = `${protocol}${host}${port}${cleanRest}`;
+  } else {
+    try {
+      const parsed = new URL(clean);
+      pathname = parsed.pathname.replace(/\/+$/, '') || '';
+      sanitizedUrl = `${parsed.origin}${pathname}`;
+    } catch {
+      // If unparseable by new URL(), strip credentials using regex fallback
+      const stripped = clean.replace(/^(https?:\/\/)([^/@:]+):(.*)@/i, '$1');
+      sanitizedUrl = stripped.replace(/\/+$/, '');
+      const protoIndex = sanitizedUrl.indexOf('://');
+      const pathIndex = protoIndex >= 0 ? sanitizedUrl.indexOf('/', protoIndex + 3) : -1;
+      if (pathIndex >= 0) {
+        pathname = sanitizedUrl.substring(pathIndex);
+      }
+    }
+  }
+
+  const segments = pathname.split('/').filter(Boolean);
+  const dbSegment = segments[segments.length - 1] || 'db';
+  const sanitizedDb = dbSegment.toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 24);
+  const hash = computeUrlHash(sanitizedUrl.toLowerCase());
+  return `vyapar_remote_${sanitizedDb}_${hash}`;
+}
+
 // The sync URL is user configuration. It is persisted redundantly so that a
 // browser-storage reset or an app update cannot silently disconnect the device.
 const SYNC_URL_STORAGE_KEY = 'couchdb_remote_url';
 const SYNC_URL_LOCAL_DOC_ID = '_local/sync_remote_url';
 const SYNC_URL_ANDROID_PREF_KEY = 'couchdb_remote_url';
+
+function readAndroidPreferenceSync(key: string): string {
+  try {
+    if (typeof window !== 'undefined') {
+      const bridge = (window as any).AndroidBridge;
+      if (bridge && typeof bridge.getPreference === 'function') {
+        const val = bridge.getPreference(key);
+        return typeof val === 'string' ? val.trim() : '';
+      }
+    }
+  } catch {}
+  return '';
+}
+
+/**
+ * Determines the currently active local PouchDB database name.
+ * Priority:
+ * 1. Demo Mode -> 'vyapar_demo'
+ * 2. Explicitly set active DB in localStorage -> `gst_active_local_db`
+ * 3. Saved remote URL (localStorage or synchronous Android SharedPreferences fallback) -> per-remote DB `vyapar_remote_<name>_<hash>`
+ * 4. Default -> 'vyapar_fintech_store'
+ * Persists the derived active DB at startup so subsequent reads remain consistent across reloads.
+ */
+export function determineActiveLocalDbName(): string {
+  let activeDb: string = DEFAULT_LOCAL_DB_NAME;
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const isDemoMode = localStorage.getItem(POUCH_PERSIST_KEYS.DEMO_MODE) === 'true';
+      if (isDemoMode) {
+        return DEMO_LOCAL_DB_NAME;
+      }
+      const explicit = localStorage.getItem(POUCH_PERSIST_KEYS.ACTIVE_LOCAL_DB);
+      if (explicit && explicit.trim()) {
+        return explicit.trim();
+      }
+      let savedRemote =
+        localStorage.getItem(SYNC_URL_STORAGE_KEY) ||
+        localStorage.getItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL) ||
+        '';
+
+      // Read Android SharedPreferences synchronously if localStorage was wiped or empty
+      if (!savedRemote.trim()) {
+        const fromAndroid = readAndroidPreferenceSync(SYNC_URL_ANDROID_PREF_KEY);
+        if (fromAndroid.trim()) {
+          savedRemote = fromAndroid.trim();
+          try {
+            localStorage.setItem(SYNC_URL_STORAGE_KEY, savedRemote);
+            localStorage.setItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL, savedRemote);
+          } catch {}
+        }
+      }
+
+      if (savedRemote && savedRemote.trim()) {
+        activeDb = getPerRemoteDbName(savedRemote);
+      }
+    }
+  } catch {}
+
+  // Persist the derived active DB at startup
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(POUCH_PERSIST_KEYS.ACTIVE_LOCAL_DB, activeDb);
+    }
+  } catch {}
+
+  return activeDb;
+}
 
 export interface SyncConflict {
   id: string; // e.g. `${docId}#${conflictingRev}`
@@ -58,7 +193,17 @@ export interface PouchDocChange {
 export type SyncListener = (state: PouchSyncState) => void;
 export type DataChangeListener = (change?: PouchDocChange) => void;
 
-class PouchService {
+export interface LocalDatabaseEntry {
+  localDbName: string;
+  remoteUrl?: string;
+  label: string;
+  type: 'offline' | 'demo' | 'remote';
+  lastUsedAt: string;
+}
+
+let activePouchInstance: PouchService | null = null;
+
+export class PouchService {
   private localDB: PouchDB.Database;
   private syncHandler: PouchDB.Replication.Sync<{}> | null = null;
   private listeners: Set<SyncListener> = new Set();
@@ -72,24 +217,206 @@ class PouchService {
     conflicts: [],
     conflictsCount: 0,
   };
+  private pushError: string | null = null;
+  private pullError: string | null = null;
+  private syncStartPromise: Promise<void> | null = null;
+  private activeDbName: string = DEFAULT_LOCAL_DB_NAME;
+
+  public getActiveDbName(): string {
+    return this.activeDbName;
+  }
+
+  public isDemoMode(): boolean {
+    return this.activeDbName === DEMO_LOCAL_DB_NAME;
+  }
+
+  public isRemoteDbActive(): boolean {
+    return this.activeDbName.startsWith('vyapar_remote_');
+  }
+
+  public shouldSync(): boolean {
+    if (this.isDemoMode()) return false;
+    const saved = this.getStoredRemoteUrl();
+    if (!saved || !saved.trim()) return false;
+    return getPerRemoteDbName(saved.trim()) === this.activeDbName;
+  }
+
+  public static activateLocalDatabase(opts: {
+    localDbName: string;
+    remoteUrl?: string;
+    mode?: 'normal' | 'demo';
+    label?: string;
+  }): void {
+    if (typeof localStorage === 'undefined') return;
+
+    const localDbName = opts.localDbName.trim();
+    const isDemo = opts.mode === 'demo' || localDbName === DEMO_LOCAL_DB_NAME;
+    const isRemote = localDbName.startsWith('vyapar_remote_');
+    const type: 'offline' | 'demo' | 'remote' = isDemo ? 'demo' : isRemote ? 'remote' : 'offline';
+
+    const cleanRemoteUrl = (opts.remoteUrl || '').trim();
+
+    localStorage.setItem(POUCH_PERSIST_KEYS.ACTIVE_LOCAL_DB, localDbName);
+    localStorage.setItem(POUCH_PERSIST_KEYS.DEMO_MODE, isDemo ? 'true' : 'false');
+
+    // Synchronous active-instance switch maintained because tests and immediate reloads rely on it.
+    // Callers in production must perform a window.location.reload() before CRUD operations so
+    // that domain caches and PouchDB singletons rehydrate cleanly from the new database.
+    if (activePouchInstance) {
+      if (activePouchInstance.syncHandler) {
+        activePouchInstance.syncHandler.cancel();
+        activePouchInstance.syncHandler = null;
+      }
+      activePouchInstance.activeDbName = localDbName;
+      try {
+        activePouchInstance.localDB = new PouchDB(localDbName, { auto_compaction: true });
+        activePouchInstance.setupChangesListener();
+      } catch {}
+    }
+
+    if (cleanRemoteUrl) {
+      localStorage.setItem(SYNC_URL_STORAGE_KEY, cleanRemoteUrl);
+      localStorage.setItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL, cleanRemoteUrl);
+      try {
+        if (typeof window !== 'undefined') {
+          const bridge = (window as any).AndroidBridge;
+          if (bridge && typeof bridge.setPreference === 'function') {
+            bridge.setPreference('couchdb_remote_url', cleanRemoteUrl);
+          }
+        }
+      } catch {}
+    }
+
+    try {
+      const existingRaw = localStorage.getItem(LOCAL_DATABASES_REGISTRY_KEY);
+      let registry: LocalDatabaseEntry[] = existingRaw ? JSON.parse(existingRaw) : [];
+      if (!Array.isArray(registry)) registry = [];
+
+      const label =
+        opts.label ||
+        (isDemo ? 'Demo Sandbox' : isRemote ? `Cloud Database (${localDbName})` : 'Offline Primary Database');
+
+      const existingIdx = registry.findIndex((e) => e.localDbName === localDbName);
+      const entry: LocalDatabaseEntry = {
+        localDbName,
+        remoteUrl: cleanRemoteUrl || (existingIdx >= 0 ? registry[existingIdx].remoteUrl : undefined),
+        label,
+        type,
+        lastUsedAt: new Date().toISOString(),
+      };
+
+      if (existingIdx >= 0) {
+        registry[existingIdx] = entry;
+      } else {
+        registry.push(entry);
+      }
+
+      localStorage.setItem(LOCAL_DATABASES_REGISTRY_KEY, JSON.stringify(registry));
+    } catch (e) {
+      console.warn('Failed to update local databases registry:', e);
+    }
+  }
+
+  public static getRegisteredDatabases(): LocalDatabaseEntry[] {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(LOCAL_DATABASES_REGISTRY_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      }
+    } catch {}
+    return [
+      {
+        localDbName: DEFAULT_LOCAL_DB_NAME,
+        label: 'Offline Primary Database',
+        type: 'offline',
+        lastUsedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  public static switchToRemoteDb(remoteUrl: string): string {
+    const cleanUrl = (remoteUrl || '').trim();
+    const perRemoteDb = getPerRemoteDbName(cleanUrl);
+
+    // Strip protocol first, then any inline credentials so URLs without credentials are not blanked
+    let displayHostAndDb = cleanUrl.replace(/^https?:\/\//i, '');
+    displayHostAndDb = displayHostAndDb.replace(/^[^/@]+@/, '');
+    displayHostAndDb = displayHostAndDb.replace(/\/+$/, '');
+    const label = `Cloud Sync (${displayHostAndDb || cleanUrl})`;
+
+    PouchService.activateLocalDatabase({
+      localDbName: perRemoteDb,
+      remoteUrl: cleanUrl,
+      mode: 'normal',
+      label,
+    });
+    return perRemoteDb;
+  }
+
+  public static switchToOfflineDb(): void {
+    PouchService.activateLocalDatabase({
+      localDbName: DEFAULT_LOCAL_DB_NAME,
+      mode: 'normal',
+      label: 'Offline Primary Database',
+    });
+  }
+
+  public static reconnectCloudDb(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    const savedRemote =
+      localStorage.getItem(SYNC_URL_STORAGE_KEY) ||
+      localStorage.getItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL) ||
+      '';
+    if (!savedRemote.trim()) return false;
+    PouchService.switchToRemoteDb(savedRemote);
+    return true;
+  }
+
+  public static enterDemoMode(): void {
+    if (typeof localStorage !== 'undefined') {
+      const currentActive = localStorage.getItem(POUCH_PERSIST_KEYS.ACTIVE_LOCAL_DB) || DEFAULT_LOCAL_DB_NAME;
+      const currentRemote =
+        localStorage.getItem(SYNC_URL_STORAGE_KEY) ||
+        localStorage.getItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL) ||
+        '';
+      localStorage.setItem(POUCH_PERSIST_KEYS.PRE_DEMO_DB, currentActive);
+      localStorage.setItem(POUCH_PERSIST_KEYS.PRE_DEMO_REMOTE, currentRemote);
+      localStorage.setItem(POUCH_PERSIST_KEYS.PENDING_DEMO_LOAD, 'true');
+
+      PouchService.activateLocalDatabase({
+        localDbName: DEMO_LOCAL_DB_NAME,
+        mode: 'demo',
+        label: 'Demo Sandbox',
+      });
+    }
+  }
+
+  public static exitDemoMode(): void {
+    if (typeof localStorage !== 'undefined') {
+      const preDb = localStorage.getItem(POUCH_PERSIST_KEYS.PRE_DEMO_DB) || DEFAULT_LOCAL_DB_NAME;
+      const preRemote = localStorage.getItem(POUCH_PERSIST_KEYS.PRE_DEMO_REMOTE) || '';
+
+      PouchService.activateLocalDatabase({
+        localDbName: preDb,
+        remoteUrl: preRemote,
+        mode: 'normal',
+      });
+
+      localStorage.removeItem(POUCH_PERSIST_KEYS.PRE_DEMO_DB);
+      localStorage.removeItem(POUCH_PERSIST_KEYS.PRE_DEMO_REMOTE);
+      localStorage.removeItem(POUCH_PERSIST_KEYS.PENDING_DEMO_LOAD);
+    }
+  }
 
   constructor() {
+    activePouchInstance = this;
+    this.activeDbName = determineActiveLocalDbName();
     try {
-      this.localDB = new PouchDB('vyapar_fintech_store', { auto_compaction: true });
-
-      // Listen for local and remote changes continuously
-      this.localDB
-        .changes({ since: 'now', live: true, include_docs: true })
-        .on('change', (change) => {
-          this.notifyDataChange({
-            id: change.id,
-            doc: change.doc,
-            deleted: change.deleted,
-          });
-        })
-        .on('error', (err) => {
-          console.warn('PouchDB changes feed error:', err);
-        });
+      this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
+      this.setupChangesListener();
     } catch {
       this.localDB = {
         changes: () => ({ on: () => ({ on: () => {} }) }),
@@ -102,33 +429,38 @@ class PouchService {
     }
 
     // Auto-reconnect when device comes online or screen/app becomes visible.
-    // Never auto-delete a user-configured URL here; the URL is restored from
-    // localStorage, Android SharedPreferences, or the local-only PouchDB doc.
+    // Sync runs strictly when shouldSync() is true (activeDb is vyapar_remote_* and URL is saved).
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
+        if (!this.shouldSync()) return;
         const saved = this.getStoredRemoteUrl();
         if (saved) {
-          this.startSync(saved);
+          void this.startSync(saved);
         }
       });
       document.addEventListener('visibilitychange', () => {
+        if (!this.shouldSync()) return;
         if (document.visibilityState === 'visible') {
           const saved = this.getStoredRemoteUrl();
           if (saved && (!this.syncHandler || this.currentState.status === 'error' || this.currentState.status === 'offline')) {
-            this.startSync(saved);
+            void this.startSync(saved);
           }
         }
       });
     }
 
-    // Restore the explicitly configured remote URL. A legacy demo URL is kept
-    // (with a visible security warning) instead of being silently deleted.
-    const savedRemote = this.getStoredRemoteUrl();
-    if (savedRemote) {
-      this.startSync(savedRemote);
-    } else {
-      this.restorePersistedRemoteUrl().catch(() => {});
-    }
+    // Auto-sync gate on startup (50ms deferred).
+    // Sync only starts when shouldSync() is true (activeDb is vyapar_remote_* and URL is saved).
+    setTimeout(() => {
+      if (!this.shouldSync()) {
+        console.info(`[PouchDB] Auto-sync disarmed for database '${this.activeDbName}'.`);
+        return;
+      }
+      const savedRemote = this.getStoredRemoteUrl();
+      if (savedRemote) {
+        void this.startSync(savedRemote);
+      }
+    }, 50);
   }
 
   private getAndroidBridge(): any {
@@ -173,13 +505,15 @@ class PouchService {
 
   /**
    * Returns the configured remote URL without side effects. Checks
-   * localStorage first (fast path), then Android SharedPreferences.
+   * localStorage 'couchdb_remote_url', then 'gst_sync_remote_url', then Android SharedPreferences.
    */
   public getStoredRemoteUrl(): string {
     try {
       if (typeof localStorage !== 'undefined') {
         const saved = localStorage.getItem(SYNC_URL_STORAGE_KEY);
         if (saved && saved.trim()) return saved.trim();
+        const alt = localStorage.getItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL);
+        if (alt && alt.trim()) return alt.trim();
       }
     } catch {
       // Storage may be unavailable in private browsing.
@@ -197,6 +531,7 @@ class PouchService {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(SYNC_URL_STORAGE_KEY, clean);
+        localStorage.setItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL, clean);
       }
     } catch {
       // Ignore localStorage failures; Android prefs remain available.
@@ -226,6 +561,7 @@ class PouchService {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(SYNC_URL_STORAGE_KEY);
+        localStorage.removeItem(POUCH_PERSIST_KEYS.SYNC_REMOTE_URL);
       }
     } catch {
       // Ignore.
@@ -237,39 +573,6 @@ class PouchService {
       await this.localDB.remove(existing);
     } catch {
       // Already absent.
-    }
-  }
-
-  private async restorePersistedRemoteUrl(): Promise<void> {
-    const fromPrefs = this.readAndroidPreference(SYNC_URL_ANDROID_PREF_KEY);
-    if (fromPrefs) {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(SYNC_URL_STORAGE_KEY, fromPrefs);
-        }
-      } catch {
-        // Ignore.
-      }
-      this.startSync(fromPrefs);
-      return;
-    }
-
-    try {
-      const doc = (await this.localDB.get(SYNC_URL_LOCAL_DOC_ID)) as any;
-      const url = typeof doc?.remoteUrl === 'string' ? doc.remoteUrl.trim() : '';
-      if (url) {
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(SYNC_URL_STORAGE_KEY, url);
-          }
-        } catch {
-          // Ignore.
-        }
-        this.writeAndroidPreference(SYNC_URL_ANDROID_PREF_KEY, url);
-        this.startSync(url);
-      }
-    } catch {
-      // No persisted URL.
     }
   }
 
@@ -301,31 +604,111 @@ class PouchService {
 
   private createRemoteDB(remoteUrl: string): PouchDB.Database {
     const cleanUrl = remoteUrl.trim();
+    let sanitizedUrl = cleanUrl;
     let authConfig: { username?: string; password?: string } | undefined;
 
-    try {
-      const parsed = new URL(cleanUrl);
-      if (parsed.username || parsed.password) {
-        authConfig = {
-          username: decodeURIComponent(parsed.username),
-          password: decodeURIComponent(parsed.password),
-        };
+    // Check for credentials in URL (including unencoded special characters like #, :, or @ in passwords)
+    const credsMatch = cleanUrl.match(/^(https?:\/\/)([^/@:]+):(.*)@([^/@:]+)(:\d+)?(\/.*)?$/i);
+    if (credsMatch) {
+      const [, protocol, username, password, host, port = '', rest = ''] = credsMatch;
+      authConfig = {
+        username: decodeURIComponent(username),
+        password: decodeURIComponent(password),
+      };
+      const cleanRest = (rest || '').replace(/\/+$/, '') || '';
+      sanitizedUrl = `${protocol}${host}${port}${cleanRest}`;
+    } else {
+      try {
+        const parsed = new URL(cleanUrl);
+        if (parsed.username || parsed.password) {
+          authConfig = {
+            username: decodeURIComponent(parsed.username),
+            password: decodeURIComponent(parsed.password),
+          };
+        }
+        const cleanPath = parsed.pathname.replace(/\/+$/, '') || '';
+        sanitizedUrl = `${parsed.origin}${cleanPath}${parsed.search}`;
+      } catch {
+        // Retain cleanUrl as-is if unparseable
       }
-    } catch {
-      // Retain cleanUrl as-is if unparseable
     }
 
-    return new PouchDB(cleanUrl, {
+    return new PouchDB(sanitizedUrl, {
       skip_setup: true,
       auth: authConfig?.username ? { username: authConfig.username, password: authConfig.password || '' } : undefined,
     });
   }
 
-  public startSync(remoteUrl: string): void {
+  private changesHandler: any = null;
+
+  private setupChangesListener(): void {
+    if (this.changesHandler && typeof this.changesHandler.cancel === 'function') {
+      try {
+        this.changesHandler.cancel();
+      } catch {}
+      this.changesHandler = null;
+    }
+    try {
+      this.changesHandler = this.localDB
+        .changes({ since: 'now', live: true, include_docs: true })
+        .on('change', (change: any) => {
+          this.notifyDataChange({
+            id: change.id,
+            doc: change.doc,
+            deleted: change.deleted,
+          });
+        })
+        .on('error', (err: any) => {
+          console.warn('PouchDB changes feed error:', err);
+        });
+    } catch {}
+  }
+
+  public async startSync(remoteUrl: string): Promise<void> {
+    if (this.isDemoMode()) {
+      this.notifySyncState({
+        status: 'offline',
+        error: 'Cloud Sync is disabled in Demo Mode. Return to your live database first.',
+      });
+      return;
+    }
+
+    const cleanUrl = (remoteUrl || '').trim();
+    if (!cleanUrl) {
+      if (this.syncHandler) {
+        this.syncHandler.cancel();
+        this.syncHandler = null;
+      }
+      void this.removePersistedRemoteUrl();
+      this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined, pendingChanges: 0 });
+      return;
+    }
+
+    const targetDbName = getPerRemoteDbName(cleanUrl);
+    if (this.activeDbName !== targetDbName) {
+      this.notifySyncState({
+        status: 'offline',
+        error: `Active database '${this.activeDbName}' does not match cloud target '${targetDbName}'. Please reconnect or switch databases first.`,
+      });
+      return;
+    }
+
+    if (this.syncStartPromise) {
+      return this.syncStartPromise;
+    }
+    this.syncStartPromise = this.doStartSync(cleanUrl).finally(() => {
+      this.syncStartPromise = null;
+    });
+    return this.syncStartPromise;
+  }
+
+  private async doStartSync(remoteUrl: string): Promise<void> {
     if (this.syncHandler) {
       this.syncHandler.cancel();
       this.syncHandler = null;
     }
+    this.pushError = null;
+    this.pullError = null;
 
     if (!remoteUrl.trim()) {
       void this.removePersistedRemoteUrl();
@@ -341,7 +724,7 @@ class PouchService {
     } catch {
       // Ignore localStorage failures; Android prefs/local doc remain.
     }
-    void this.persistRemoteUrl(cleanUrl);
+    await this.persistRemoteUrl(cleanUrl);
 
     this.notifySyncState({ status: 'connecting', remoteUrl: cleanUrl, error: undefined });
 
@@ -364,38 +747,69 @@ class PouchService {
         },
       });
 
-      // Capture push-specific replication errors & permission denial
+      // Capture push-specific replication events, errors & permission denial
       if ((this.syncHandler as any).push) {
         (this.syncHandler as any).push
+          .on('change', () => {
+            this.pushError = null;
+          })
+          .on('paused', (err: any) => {
+            if (!err) {
+              this.pushError = null;
+              if (!this.pullError && this.currentState.status === 'error') {
+                this.notifySyncState({ status: 'synced', error: undefined, lastSyncedAt: new Date().toISOString() });
+              }
+            }
+          })
           .on('error', (err: any) => {
             console.error('PouchDB sync push error:', err);
             const msg = err?.message || String(err);
             const errMsg = err?.status === 403 || err?.status === 401
               ? `Push permission denied (${err.status}): User cannot write to remote CouchDB`
               : `Push sync error: ${msg}`;
+            this.pushError = errMsg;
             this.notifySyncState({ status: 'error', error: errMsg });
           })
           .on('denied', (err: any) => {
             console.error('PouchDB sync push denied:', err);
-            this.notifySyncState({ status: 'error', error: `Push Denied: ${err?.message || err || 'Write access rejected'}` });
+            const errMsg = `Push Denied: ${err?.message || err || 'Write access rejected'}`;
+            this.pushError = errMsg;
+            this.notifySyncState({ status: 'error', error: errMsg });
           });
       }
 
-      // Capture pull-specific replication errors & permission denial
+      // Capture pull-specific replication events, errors & permission denial
       if ((this.syncHandler as any).pull) {
         (this.syncHandler as any).pull
+          .on('change', () => {
+            this.pullError = null;
+          })
+          .on('paused', (err: any) => {
+            if (!err) {
+              this.pullError = null;
+              if (!this.pushError && this.currentState.status === 'error') {
+                this.notifySyncState({ status: 'synced', error: undefined, lastSyncedAt: new Date().toISOString() });
+              }
+            }
+          })
           .on('error', (err: any) => {
             console.error('PouchDB sync pull error:', err);
-            this.notifySyncState({ status: 'error', error: `Pull sync error: ${err?.message || err}` });
+            const errMsg = `Pull sync error: ${err?.message || err}`;
+            this.pullError = errMsg;
+            this.notifySyncState({ status: 'error', error: errMsg });
           })
           .on('denied', (err: any) => {
             console.error('PouchDB sync pull denied:', err);
-            this.notifySyncState({ status: 'error', error: `Pull Denied: ${err?.message || err || 'Read access rejected'}` });
+            const errMsg = `Pull Denied: ${err?.message || err || 'Read access rejected'}`;
+            this.pullError = errMsg;
+            this.notifySyncState({ status: 'error', error: errMsg });
           });
       }
 
       this.syncHandler
         .on('change', (info) => {
+          this.pushError = null;
+          this.pullError = null;
           this.notifySyncState({
             status: 'syncing',
             lastSyncedAt: new Date().toISOString(),
@@ -410,20 +824,26 @@ class PouchService {
           if (err) {
             this.notifySyncState({ status: 'error', error: String(err?.message || err) });
           } else {
-            // Do not clear error if an active push/pull/auth error is present
-            if (this.currentState.status !== 'error') {
+            const activeError = this.pushError || this.pullError;
+            if (activeError) {
+              this.notifySyncState({ status: 'error', error: activeError });
+            } else {
               this.notifySyncState({ status: 'synced', error: undefined, lastSyncedAt: new Date().toISOString() });
               this.refreshConflicts().catch(() => {});
             }
           }
         })
         .on('active', () => {
-          if (this.currentState.status !== 'error') {
+          const activeError = this.pushError || this.pullError;
+          if (activeError) {
             this.notifySyncState({ status: 'syncing' });
+          } else {
+            this.notifySyncState({ status: 'syncing', error: undefined });
           }
         })
         .on('denied', (err: any) => {
-          this.notifySyncState({ status: 'error', error: 'Authentication Denied: ' + (err?.message || err || '') });
+          const errMsg = 'Authentication Denied: ' + (err?.message || err || '');
+          this.notifySyncState({ status: 'error', error: errMsg });
         })
         .on('error', (err: any) => {
           this.notifySyncState({ status: 'error', error: String(err?.message || err) });
@@ -540,11 +960,32 @@ class PouchService {
       this.syncHandler.cancel();
       this.syncHandler = null;
     }
+    this.pushError = null;
+    this.pullError = null;
     void this.removePersistedRemoteUrl();
     this.notifySyncState({ status: 'offline', remoteUrl: '', error: undefined, pendingChanges: 0 });
   }
 
   public async syncNow(): Promise<boolean> {
+    if (!this.shouldSync()) {
+      let reason = `Manual sync is only available when a cloud database is active (current: '${this.activeDbName}').`;
+      if (this.isDemoMode()) {
+        reason = 'Sync is disabled while Demo Database is active.';
+      } else {
+        const saved = this.getStoredRemoteUrl();
+        if (!saved || !saved.trim()) {
+          reason = 'No remote CouchDB URL configured.';
+        } else if (getPerRemoteDbName(saved.trim()) !== this.activeDbName) {
+          reason = `Active database '${this.activeDbName}' does not match cloud target '${getPerRemoteDbName(saved.trim())}'. Reconnect or switch databases first.`;
+        }
+      }
+      this.notifySyncState({
+        status: 'offline',
+        error: reason,
+      });
+      return false;
+    }
+
     const savedRemote = this.getStoredRemoteUrl();
     if (savedRemote) {
       this.notifySyncState({ status: 'syncing' });
@@ -552,6 +993,8 @@ class PouchService {
         const remoteDB = this.createRemoteDB(savedRemote);
         await PouchDB.replicate(remoteDB, this.localDB, { batch_size: 100 });
         await PouchDB.replicate(this.localDB, remoteDB, { batch_size: 100 });
+        this.pushError = null;
+        this.pullError = null;
         this.notifySyncState({
           status: 'synced',
           lastSyncedAt: new Date().toISOString(),

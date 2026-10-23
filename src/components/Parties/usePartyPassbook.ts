@@ -6,6 +6,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { printPartyLedgerStatement } from '../../core/utils/ledgerStatementPrinter.ts';
+import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
 
 export interface PassbookEntry {
   id: string;
@@ -396,7 +397,7 @@ export function usePartyPassbook({
 
     const clean = party.phone.replace(/\D/g, '');
     const phone = clean.length === 10 ? `91${clean}` : clean;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+    safeOpenExternalUrl(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
   };
 
   return {

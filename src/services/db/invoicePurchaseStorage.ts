@@ -79,9 +79,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
     this.removeTombstone('invoice', invoice.id);
     this.set(STORAGE_KEYS.INVOICES, list);
-    Promise.resolve(pouch.putDoc('invoice', invoice)).catch((err) => {
-      console.error(`Failed to push invoice ${invoice.id} to PouchDB:`, err);
-    });
+    this.backgroundPouchPut('invoice', invoice);
     this.broadcastChange('invoice', 'save', invoice.id, invoice);
 
     // Update stock levels via pure domain stockEngine (Estimates, Orders, and Delivery Challans are non-sale docs)
@@ -166,7 +164,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     const list = this.getInvoices().filter((i) => i.id !== id);
     this.recordTombstone('invoice', id);
     this.set(STORAGE_KEYS.INVOICES, list);
-    pouch.deleteDoc('invoice', id);
+    this.backgroundPouchDelete('invoice', id);
     this.broadcastChange('invoice', 'delete', id);
 
     // Statutory Audit Trail: Reverse linked posted vouchers instead of hard-deleting
@@ -280,9 +278,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
     this.removeTombstone('purchase', bill.id);
     this.set(STORAGE_KEYS.PURCHASES, list);
-    Promise.resolve(pouch.putDoc('purchase', bill)).catch((err) => {
-      console.error(`Failed to push purchase ${bill.id} to PouchDB:`, err);
-    });
+    this.backgroundPouchPut('purchase', bill);
     this.broadcastChange('purchase', 'save', bill.id, bill);
 
     // Adjust stock levels and update purchase prices via pure domain stockEngine
@@ -494,7 +490,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     const list = this.getPurchases().filter((b) => b.id !== id);
     this.recordTombstone('purchase', id);
     this.set(STORAGE_KEYS.PURCHASES, list);
-    pouch.deleteDoc('purchase', id);
+    this.backgroundPouchDelete('purchase', id);
     this.broadcastChange('purchase', 'delete', id);
 
     // Statutory Audit Trail: Reverse paired RCM journal voucher upon bill deletion (no hard-deletes)
@@ -608,9 +604,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     const list = [...this.getStockAdjustments()];
     list.unshift(adj);
     this.set(STORAGE_KEYS.ADJUSTMENTS, list);
-    Promise.resolve(pouch.putDoc('adjustment', adj)).catch((err) => {
-      console.error(`Failed to push stock adjustment ${adj.id} to PouchDB:`, err);
-    });
+    this.backgroundPouchPut('adjustment', adj);
     this.broadcastChange('adjustment', 'save', adj.id, adj);
 
     // Update item stock using pure domain stockEngine

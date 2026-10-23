@@ -1,6 +1,7 @@
 import { Invoice } from '../models/invoice.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { formatINR, formatDate } from '../core/utils/formatters.ts';
+import { safeOpenExternalUrl } from '../core/utils/upiAndShare.ts';
 
 export type TemplateLanguage = 'en' | 'hi' | 'hinglish';
 export type MessagePurpose = 'invoice' | 'reminder' | 'statement';
@@ -85,5 +86,5 @@ export function openWhatsAppShare(
 
   const phoneParam = cleanPhone ? `phone=91${cleanPhone.slice(-10)}&` : '';
   const url = `https://api.whatsapp.com/send?${phoneParam}text=${encodeURIComponent(message)}`;
-  window.open(url, '_blank');
+  safeOpenExternalUrl(url);
 }

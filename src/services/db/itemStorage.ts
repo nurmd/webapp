@@ -24,7 +24,7 @@ export class ItemStorage extends PartyStorage {
     }
     this.removeTombstone('item', item.id);
     this.set(STORAGE_KEYS.ITEMS, list);
-    pouch.putDoc('item', item);
+    this.backgroundPouchPut('item', item);
     this.broadcastChange('item', 'save', item.id, item);
     this.notifyListeners();
   }
@@ -33,7 +33,7 @@ export class ItemStorage extends PartyStorage {
     const list = this.getItems().filter((i) => i.id !== id);
     this.recordTombstone('item', id);
     this.set(STORAGE_KEYS.ITEMS, list);
-    pouch.deleteDoc('item', id);
+    this.backgroundPouchDelete('item', id);
     this.broadcastChange('item', 'delete', id);
     this.notifyListeners();
   }
@@ -52,7 +52,7 @@ export class ItemStorage extends PartyStorage {
     for (const updated of updatedItems) {
       const orig = currentItems.find((i) => i.id === updated.id);
       if (!orig || orig.currentStock !== updated.currentStock || orig.purchasePrice !== updated.purchasePrice) {
-        pouch.putDoc('item', updated);
+        this.backgroundPouchPut('item', updated);
         this.broadcastChange('item', 'save', updated.id, updated);
       }
     }

@@ -20,6 +20,17 @@ if (typeof window !== 'undefined') {
 
 vi.mock('../services/pouchdb.ts', () => ({
   DEFAULT_COUCHDB_REMOTE_URL: '',
+  DEFAULT_LOCAL_DB_NAME: 'vyapar_fintech_store',
+  DEMO_LOCAL_DB_NAME: 'vyapar_demo',
+  POUCH_PERSIST_KEYS: {
+    ACTIVE_LOCAL_DB: 'gst_active_local_db',
+    SYNC_REMOTE_URL: 'gst_sync_remote_url',
+    DEMO_MODE: 'gst_demo_mode',
+    PRE_DEMO_DB: 'gst_pre_demo_db',
+    PRE_DEMO_REMOTE: 'gst_pre_demo_remote',
+    LAST_HYDRATED_DB: 'gst_last_hydrated_db',
+    PENDING_DEMO_LOAD: 'gst_pending_demo_load',
+  },
   pouch: {
     putDoc: vi.fn(async () => {}),
     putDocStrict: vi.fn(async () => {}),

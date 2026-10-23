@@ -25,6 +25,14 @@ export interface DataSyncTabProps {
   demoNotice?: string | null;
   conflicts?: SyncConflict[];
   handleResolveConflict?: (conflictId: string, choice: 'keep_winning' | 'keep_conflicting') => void;
+  // Multi-DB isolation & switching
+  activeDbName?: string;
+  isDemoMode?: boolean;
+  isRemoteDbActive?: boolean;
+  savedRemoteUrl?: string;
+  handleSwitchToOffline?: () => void;
+  handleReconnectCloud?: () => void;
+  handleExitDemoMode?: () => void;
 }
 
 export const DataSyncTab: React.FC<DataSyncTabProps> = ({
@@ -51,8 +59,20 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   demoNotice = null,
   conflicts: propConflicts,
   handleResolveConflict,
+  activeDbName,
+  isDemoMode = false,
+  isRemoteDbActive = false,
+  savedRemoteUrl,
+  handleSwitchToOffline,
+  handleReconnectCloud,
+  handleExitDemoMode,
 }) => {
   const activeConflicts = propConflicts ?? syncState?.conflicts ?? [];
+  const hasSavedUrl = Boolean(
+    syncState?.remoteUrl?.trim() ||
+    savedRemoteUrl?.trim() ||
+    (typeof (pouch as any)?.getStoredRemoteUrl === 'function' && (pouch as any).getStoredRemoteUrl()?.trim())
+  );
 
   const [isProbing, setIsProbing] = useState(false);
   const [probeDiagnostic, setProbeDiagnostic] = useState<{
@@ -255,7 +275,11 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
                   Store Data Protected
                 </span>
-                {syncState.remoteUrl ? (
+                {isDemoMode ? (
+                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
+                    Demo Sandbox ({activeDbName || 'vyapar_demo'})
+                  </span>
+                ) : isRemoteDbActive && hasSavedUrl ? (
                   syncState.status === 'synced' ? (
                     <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
                       Cloud Synced
@@ -274,20 +298,26 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                     </span>
                   ) : (
                     <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
-                      Local only
+                      Cloud Paused
                     </span>
                   )
                 ) : (
                   <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
-                    Local only
+                    Offline Primary
                   </span>
                 )}
               </div>
               <span className="text-[11px] text-on-secondary-container/80 truncate">
-                {syncState.status === 'error'
+                {isDemoMode
+                  ? 'Demo Sandbox: Changes are isolated to vyapar_demo and will not sync to cloud'
+                  : syncState.status === 'error'
                   ? syncState.error || 'Sync error: check remote CouchDB connection or permissions'
-                  : (syncState.status === 'synced' || syncState.status === 'syncing') && syncState.remoteUrl
+                  : (syncState.status === 'synced' || syncState.status === 'syncing') && syncState.remoteUrl && isRemoteDbActive
                   ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
+                  : isRemoteDbActive
+                  ? 'Cloud Database Active (Sync paused / idle)'
+                  : hasSavedUrl
+                  ? 'Offline Database Active (Cloud sync link saved)'
                   : '100% Offline-First IndexedDB Storage Ready'}
               </span>
             </div>
@@ -344,27 +374,77 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
         {/* Collapsible Sync Settings */}
         {isSyncConfigOpen && (
           <div className="pt-2 border-t border-secondary/20 flex flex-col gap-2.5 animate-fade-in">
-            {handlePopulateDemoData && (
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-on-surface">Local Demo Dataset</span>
-                  <span className="text-[10px] text-on-surface-variant">
-                    Populate sample items, parties, invoices, and vouchers locally
-                  </span>
+            {/* Local Database Mode Switcher */}
+            <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-bold text-on-surface">Active Local Database</span>
+                <span className="text-[10px] text-on-surface-variant font-mono">
+                  {activeDbName || 'vyapar_fintech_store'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {isRemoteDbActive && handleSwitchToOffline && (
+                  <button
+                    type="button"
+                    data-testid="switch-to-offline-btn"
+                    onClick={handleSwitchToOffline}
+                    className="px-2.5 py-1.5 rounded-lg bg-surface-container text-on-surface text-xs font-bold flex items-center gap-1 hover:bg-surface-container-high transition-colors cursor-pointer"
+                    title="Switch to offline primary database (vyapar_fintech_store). Saved remote link is preserved."
+                  >
+                    <span className="material-symbols-outlined text-[14px]">cloud_off</span>
+                    <span>Use offline database</span>
+                  </button>
+                )}
+                {!isRemoteDbActive && !isDemoMode && hasSavedUrl && handleReconnectCloud && (
+                  <button
+                    type="button"
+                    data-testid="reconnect-cloud-btn"
+                    onClick={handleReconnectCloud}
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer"
+                    title="Reconnect to cloud-synced database"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">cloud_sync</span>
+                    <span>Reconnect cloud</span>
+                  </button>
+                )}
+                {isDemoMode && handleExitDemoMode && (
+                  <button
+                    type="button"
+                    data-testid="exit-demo-mode-btn"
+                    onClick={handleExitDemoMode}
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer"
+                    title="Exit demo sandbox and return to your live business data"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">exit_to_app</span>
+                    <span>Return to Live Data</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {handlePopulateDemoData && !isDemoMode && (
+              <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-container-lowest/80 border border-secondary/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-on-surface">Demo Sandbox Database</span>
+                    <span className="text-[10px] text-on-surface-variant">
+                      Explore sample items, parties, invoices, and vouchers in an isolated sandbox
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid="populate-demo-data-btn"
+                    disabled={isPopulatingDemo}
+                    onClick={handlePopulateDemoData}
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50 transition-colors shrink-0"
+                    title="Switch to isolated Demo Sandbox database"
+                  >
+                    <span className={`material-symbols-outlined text-[14px] ${isPopulatingDemo ? 'animate-spin' : ''}`}>
+                      {isPopulatingDemo ? 'progress_activity' : 'dataset'}
+                    </span>
+                    <span>{isPopulatingDemo ? 'Opening...' : 'Open Demo Sandbox'}</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  data-testid="populate-demo-data-btn"
-                  disabled={isPopulatingDemo}
-                  onClick={handlePopulateDemoData}
-                  className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs disabled:opacity-50 transition-colors shrink-0"
-                  title="Populate demo invoices, purchases, items, parties and accounting records locally"
-                >
-                  <span className={`material-symbols-outlined text-[14px] ${isPopulatingDemo ? 'animate-spin' : ''}`}>
-                    {isPopulatingDemo ? 'progress_activity' : 'dataset'}
-                  </span>
-                  <span>{isPopulatingDemo ? 'Populating...' : 'Populate Demo Data'}</span>
-                </button>
               </div>
             )}
 
@@ -399,7 +479,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
               >
                 Connect
               </button>
-              {syncState.remoteUrl && (
+              {hasSavedUrl && (
                 <button
                   type="button"
                   onClick={handleStopSync}
