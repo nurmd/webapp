@@ -160,8 +160,9 @@ export class FinancialStorage extends ItemStorage {
 
   // Bank Accounts
   getBankAccounts(): BankAccount[] {
-    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, DEFAULT_BANK_ACCOUNTS);
-    return list && list.length > 0 ? list : DEFAULT_BANK_ACCOUNTS;
+    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []);
+    if (list && list.length > 0) return list;
+    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : [];
   }
 
   saveBankAccount(account: BankAccount): void {

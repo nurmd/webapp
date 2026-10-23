@@ -1,10 +1,11 @@
 {
-  "version": "1.2.28",
+  "version": "1.2.29",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-23T06:28:02.924Z",
+  "buildTime": "2026-10-23T07:27:27.011Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "Hotfix: prevents the offline default Cash account (opening balance 0) from being pushed into a new cloud database before the first pull",
     "Per-remote local databases isolate each CouchDB cloud link",
     "Demo sandbox now runs in a dedicated local database and never syncs to production",
     "Cloud sync link survives app updates, storage resets, and backup/restore",

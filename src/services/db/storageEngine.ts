@@ -321,8 +321,30 @@ export class StorageEngine {
     return this.get<Expense[]>(STORAGE_KEYS.EXPENSES, []);
   }
 
+  /**
+   * The default Cash account is a seed for a brand-new offline database only.
+   * Per-remote and demo databases are authoritative for their own accounts;
+   * synthesizing ACC_CASH there can conflict with the remote ACC_CASH before
+   * the initial pull finishes.
+   */
+  protected shouldSeedDefaultBankAccounts(): boolean {
+    try {
+      if (typeof (pouch as any)?.isRemoteDbActive === 'function' && (pouch as any).isRemoteDbActive()) {
+        return false;
+      }
+      if (typeof (pouch as any)?.isDemoMode === 'function' && (pouch as any).isDemoMode()) {
+        return false;
+      }
+    } catch {
+      // Fall through to the offline default.
+    }
+    return true;
+  }
+
   getBankAccounts(): BankAccount[] {
-    return this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, DEFAULT_BANK_ACCOUNTS);
+    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []);
+    if (list && list.length > 0) return list;
+    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : [];
   }
 
   getCashBankTransactions(): CashBankTransaction[] {

@@ -15,6 +15,7 @@ const testStorage = new TestStorage();
 Object.defineProperty(globalThis, 'localStorage', { value: testStorage, writable: true, configurable: true });
 
 import { pouch, PouchService, DEFAULT_COUCHDB_REMOTE_URL } from '../services/pouchdb.ts';
+import { FinancialStorage } from '../services/db/financialStorage.ts';
 
 describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
   beforeEach(() => {
@@ -476,6 +477,35 @@ describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
       expect(bridge.removePreference).toHaveBeenCalledWith('couchdb_remote_url');
 
       delete (window as any).AndroidBridge;
+    });
+
+    it('does not synthesize the default Cash account for a remote DB', () => {
+      const store = new FinancialStorage();
+      vi.spyOn(pouch, 'isRemoteDbActive').mockReturnValue(true);
+      vi.spyOn(pouch, 'isDemoMode').mockReturnValue(false);
+
+      // A newly created per-remote DB has no bank-account key yet. It must not
+      // expose the offline ACC_CASH seed, otherwise syncAllFromPouch() pushes
+      // openingBalance 0 over the production ACC_CASH before the first pull.
+      expect(store.getBankAccounts()).toEqual([]);
+    });
+
+    it('does not synthesize the default Cash account for the demo DB', () => {
+      const store = new FinancialStorage();
+      vi.spyOn(pouch, 'isRemoteDbActive').mockReturnValue(false);
+      vi.spyOn(pouch, 'isDemoMode').mockReturnValue(true);
+
+      expect(store.getBankAccounts()).toEqual([]);
+    });
+
+    it('still seeds the default Cash account for the offline database', () => {
+      const store = new FinancialStorage();
+      vi.spyOn(pouch, 'isRemoteDbActive').mockReturnValue(false);
+      vi.spyOn(pouch, 'isDemoMode').mockReturnValue(false);
+
+      const accounts = store.getBankAccounts();
+      expect(accounts.map((a) => a.id)).toContain('ACC_CASH');
+      expect(accounts[0].openingBalance).toBe(0);
     });
   });
 });
