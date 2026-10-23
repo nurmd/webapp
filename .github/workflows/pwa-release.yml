@@ -55,15 +55,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         with:
           tag_name: ${{ steps.pkg_version.outputs.VERSION }}
-          name: "Vyapar Books PRO ${{ steps.pkg_version.outputs.VERSION }}"
           draft: false
           prerelease: false
-          generate_release_notes: true
+          # The APK is built and signed locally, then uploaded to the release
+          # separately. Never upload the tracked dist-android artifact from CI:
+          # it can be stale (for example, the previous release's APK).
           files: |
             dist-pwa/vyapar-pwa.tar.gz
             dist-pwa/vyapar-pwa.tar.gz.sha256
-            dist-android/GSTBilling-Vyapar.apk
-            dist-android/GSTBilling-Vyapar.apk.sha256
             public/version.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
