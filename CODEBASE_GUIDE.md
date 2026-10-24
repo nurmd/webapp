@@ -159,6 +159,14 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Deletions are persisted across devices using replicated tombstone documents (`_id: 'tombstone:${type}:${id}'`, `docType: 'tombstone'`, `deletedAt: ISOString`).
   - `syncAllFromPouch()` consumes remote tombstones via `getAllTombstones()`, ensuring remote deletions are respected locally and never resurrected during sync handshakes.
   - Local domain stores (`invoicePurchaseStorage`, `partyStorage`, `itemStorage`, `financialStorage`) clear tombstones on save and record tombstones on delete.
+- **Read-Only Conflict Manifest & Backup Export (`src/services/conflictManifest.ts`, `scripts/conflict-manifest.ts`)**:
+  - `npm run conflict:manifest` reads CouchDB through `COUCHDB_URL` using **GET requests only** (`/`, `/_all_docs?conflicts=true`, and `/{doc}?rev=`). It never PUTs, POSTs, or deletes.
+  - Produces a dependency-ordered, credential-redacted manifest, a full-body backup of every winning and conflicting revision, a human summary, and `SHA256SUMS` in `~/conflict-review/<timestamp>/` with directory mode `0700` and files mode `0600`.
+  - The shareable manifest redacts password/token/API-key/sync-URL values while preserving field names; the backup intentionally contains full bodies and must be treated as sensitive.
+  - `node --experimental-strip-types scripts/conflict-manifest.ts --verify-only FILE` re-hashes every revision, content hash, document index, and root hash before any restore attempt.
+  - The exporter fails closed if any conflict revision cannot be fetched: the manifest warns that the bundle is incomplete, backup verification reports the missing revision, and the CLI exits non-zero.
+  - Resolution remains manual and per-document in the Data & Sync conflict queue. Use the manifest's dependency warnings (company/settings → catalog → parties → financial documents) before accepting any branch.
+  - When the source does not expose all documents, the manifest explicitly warns that dependency counts are limited rather than silently under-reporting references.
 
 ### C. Ledger Reversals & Double-Entry Integrity (`src/core/accounting/`, `src/services/db/reconcileAndRepair.ts`)
 - **No Hard-Deletes of Posted Vouchers**:
@@ -342,6 +350,7 @@ npm run build
 - `auditTrail.test.ts`: MCA audit log hashing, chain verification, tamper detection.
 - `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
 - `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
+- `conflictManifest.test.ts`: Synthetic 31-document/48-revision conflict inventory, dependency-order warnings, credential redaction, backup round-trip hashes, and tamper detection.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.
 
 ---
