@@ -387,6 +387,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     return cart.reduce((s, c) => s + c.qty, 0);
   }, [cart]);
 
+  const isAllGstExempt = useMemo(() => {
+    return cart.length > 0 && cart.every((c) => (Number(c.item.gstRate) || 0) === 0);
+  }, [cart]);
+
   // Cash change calculation
   const numCashTendered = parseFloat(cashTendered) || 0;
   const cashChangeDue = Math.max(0, numCashTendered - finalPayableTotal);
@@ -915,6 +919,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 return (
                   <div
                     key={item.id}
+                    data-testid={`pos-item-${item.id}`}
                     onClick={() => addToCart(item)}
                     className={`bg-surface-container-lowest rounded-xl p-3 shadow-xs border transition-all cursor-pointer flex flex-col justify-between select-none relative group ${
                       inCartQty > 0
@@ -1114,7 +1119,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         <div className="flex-shrink-0 px-3 py-2 bg-surface-container-lowest/80 border-b border-outline-variant/20 flex items-center justify-between text-xs">
           <span className="font-bold text-on-surface flex items-center gap-1.5">
             <span className="material-symbols-outlined text-secondary text-[17px]">shopping_cart</span>
-            <span>Current Bill ({totalCartCount})</span>
+            <span>Current Bill ({totalCartCount} {totalCartCount === 1 ? 'Item' : 'Items'})</span>
           </span>
 
           <div className="flex items-center gap-2">
@@ -1166,7 +1171,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       {item.name}
                     </span>
                     <span className="text-[10px] text-outline">
-                      {item.unit}{isGstActive && item.gstRate > 0 ? ` • ${item.gstRate}% GST` : ''}
+                      {item.unit}{isGstActive ? (Number(item.gstRate) > 0 ? ` • ${item.gstRate}% GST` : ' • GST Exempt (0%)') : ''}
                     </span>
                   </div>
 
@@ -1287,16 +1292,25 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
                   </div>
                   <div className="flex justify-between text-outline text-[11px] items-center">
-                    <button
-                      type="button"
-                      onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
-                      className="flex items-center gap-0.5 text-secondary font-semibold hover:underline cursor-pointer"
-                    >
-                      <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
-                      <span className="material-symbols-outlined text-[13px]">
-                        {showTaxBreakdown ? 'expand_less' : 'expand_more'}
+                    {isAllGstExempt ? (
+                      <span className="flex items-center gap-1.5 text-secondary font-semibold">
+                        <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold">
+                          GST Exempt (0%)
+                        </span>
                       </span>
-                    </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+                        className="flex items-center gap-0.5 text-secondary font-semibold hover:underline cursor-pointer"
+                      >
+                        <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
+                        <span className="material-symbols-outlined text-[13px]">
+                          {showTaxBreakdown ? 'expand_less' : 'expand_more'}
+                        </span>
+                      </button>
+                    )}
                     <span className="font-tabular-data">{formatINR(calcSummary.totalTax)}</span>
                   </div>
 
@@ -1458,7 +1472,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     shopping_cart
                   </span>
                   <span className="text-sm font-bold text-on-surface">
-                    Current Bill ({totalCartCount} Items)
+                    Current Bill ({totalCartCount} {totalCartCount === 1 ? 'Item' : 'Items'})
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1549,8 +1563,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       <span>Taxable Subtotal</span>
                       <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
                     </div>
-                    <div className="flex justify-between text-outline text-[11px]">
-                      <span>GST Total</span>
+                    <div className="flex justify-between text-outline text-[11px] items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span>GST Total</span>
+                        {isAllGstExempt && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold">
+                            GST Exempt (0%)
+                          </span>
+                        )}
+                      </span>
                       <span>{formatINR(calcSummary.totalTax)}</span>
                     </div>
                   </>

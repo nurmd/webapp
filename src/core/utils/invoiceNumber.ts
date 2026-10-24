@@ -103,21 +103,25 @@ export function generateNextInvoiceNumber(
     'i'
   );
 
+  const hasEmbeddedFinancialYear = /\d{2,4}[-/]\d{2,4}/.test(cleanPrefix);
+
   invoices.forEach((inv) => {
     const raw = inv.invoiceNumber ? inv.invoiceNumber.trim() : '';
     if (!raw) return;
 
-    const yearMatch = raw.match(yearPattern);
-    if (yearMatch && yearMatch[1]) {
-      hasMatchingYearPattern = true;
-      const seq = parseInt(yearMatch[1], 10);
-      if (!isNaN(seq) && seq > maxSeq) {
-        maxSeq = seq;
+    if (!hasEmbeddedFinancialYear) {
+      const yearMatch = raw.match(yearPattern);
+      if (yearMatch && yearMatch[1]) {
+        hasMatchingYearPattern = true;
+        const seq = parseInt(yearMatch[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+        return;
       }
-      return;
     }
 
-    if (!hasMatchingYearPattern) {
+    if (hasEmbeddedFinancialYear || !hasMatchingYearPattern) {
       const fallbackMatch = raw.match(fallbackPattern);
       if (fallbackMatch && fallbackMatch[1]) {
         const seq = parseInt(fallbackMatch[1], 10);
@@ -129,11 +133,11 @@ export function generateNextInvoiceNumber(
   });
 
   // Format base: use prefix + year if not already included in prefix
-  const includeYearInPattern = !cleanPrefix.includes(yearStr);
+  const includeYearInPattern = !cleanPrefix.includes(yearStr) && !hasEmbeddedFinancialYear;
   const basePrefix = includeYearInPattern ? `${cleanPrefix}${yearStr}-` : cleanPrefix;
 
   let candidateSeq = maxSeq + 1;
-  const paddingLength = Math.max(3, String(candidateSeq).length);
+  const paddingLength = Math.max(cleanPrefix.endsWith('/') ? 4 : 3, String(candidateSeq).length);
 
   while (true) {
     const padded = String(candidateSeq).padStart(paddingLength, '0');
@@ -411,7 +415,20 @@ export function getDocumentSeriesConfig(
   // Backwards compatibility for SALES_INVOICE: parse legacy invoicePrefix if defined
   if (docType === 'SALES_INVOICE' && company?.invoicePrefix) {
     const raw = company.invoicePrefix.trim();
-    // If raw looks like "INV-2026-" or "INV-"
+
+    // 1. If raw contains an Indian Financial Year pattern like "INV/26-27/" or "INV-26-27-"
+    const matchFY = raw.match(/^(.*?)[-/](\d{2,4}[-/]\d{2,4})[-/]?$/);
+    if (matchFY) {
+      return {
+        prefix: matchFY[1] || 'INV',
+        separator: raw.includes('/') ? '/' : '-',
+        yearFormat: 'YY_YY',
+        paddingDigits: 4,
+        startingNumber: 1,
+      };
+    }
+
+    // 2. If raw looks like "INV-2026-" or "BHW-2026-"
     const matchYear = raw.match(/^(.*?)[-/](\d{4})[-/]?$/);
     if (matchYear) {
       return {

@@ -95,6 +95,9 @@ export const DEFAULT_BANK_ACCOUNTS: BankAccount[] = [
   },
 ];
 
+// Stable empty array constant to guarantee referential identity across useSyncExternalStore snapshots
+export const EMPTY_BANK_ACCOUNTS: BankAccount[] = [];
+
 export const DEFAULT_CASH_BANK_TXNS: CashBankTransaction[] = [];
 
 /**
@@ -342,9 +345,9 @@ export class StorageEngine {
   }
 
   getBankAccounts(): BankAccount[] {
-    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []);
+    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, EMPTY_BANK_ACCOUNTS);
     if (list && list.length > 0) return list;
-    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : [];
+    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : EMPTY_BANK_ACCOUNTS;
   }
 
   getCashBankTransactions(): CashBankTransaction[] {

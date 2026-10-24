@@ -414,6 +414,14 @@ export class PouchService {
   constructor() {
     activePouchInstance = this;
     this.activeDbName = determineActiveLocalDbName();
+    this.currentState = {
+      status: 'offline',
+      remoteUrl: this.getStoredRemoteUrl() || '',
+      pendingChanges: 0,
+      conflicts: [],
+      conflictsCount: 0,
+      lastSyncedAt: this.getPersistedLastSyncedAt(),
+    };
     try {
       this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
       this.setupChangesListener();
@@ -437,6 +445,9 @@ export class PouchService {
         if (saved) {
           void this.startSync(saved);
         }
+      });
+      window.addEventListener('offline', () => {
+        this.notifySyncState({ status: 'offline' });
       });
       document.addEventListener('visibilitychange', () => {
         if (!this.shouldSync()) return;
@@ -501,6 +512,33 @@ export class PouchService {
     } catch {
       // Best-effort only.
     }
+  }
+
+  private getLastSyncedAtKey(dbName: string = this.activeDbName): string {
+    return `${POUCH_PERSIST_KEYS.LAST_SYNCED_AT}_${dbName}`;
+  }
+
+  public getPersistedLastSyncedAt(dbName: string = this.activeDbName): string | undefined {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const perDb = localStorage.getItem(this.getLastSyncedAtKey(dbName));
+        if (perDb && perDb.trim()) return perDb.trim();
+      }
+    } catch {}
+    const pref = this.readAndroidPreference(this.getLastSyncedAtKey(dbName));
+    return pref || undefined;
+  }
+
+  private persistLastSyncedAt(timestamp: string): void {
+    if (!timestamp || !timestamp.trim()) return;
+    const clean = timestamp.trim();
+    const dbKey = this.getLastSyncedAtKey();
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(dbKey, clean);
+      }
+    } catch {}
+    this.writeAndroidPreference(dbKey, clean);
   }
 
   /**
@@ -594,6 +632,9 @@ export class PouchService {
   }
 
   private notifySyncState(partial: Partial<PouchSyncState>) {
+    if (partial.lastSyncedAt) {
+      this.persistLastSyncedAt(partial.lastSyncedAt);
+    }
     this.currentState = { ...this.currentState, ...partial };
     this.listeners.forEach((l) => l(this.currentState));
   }
@@ -807,13 +848,12 @@ export class PouchService {
       }
 
       this.syncHandler
-        .on('change', (info) => {
+        .on('change', () => {
           this.pushError = null;
           this.pullError = null;
           this.notifySyncState({
             status: 'syncing',
             lastSyncedAt: new Date().toISOString(),
-            pendingChanges: info.change?.docs?.length || 0,
             error: undefined,
           });
           // Docs pulled into localDB trigger localDB.changes automatically.
@@ -828,7 +868,12 @@ export class PouchService {
             if (activeError) {
               this.notifySyncState({ status: 'error', error: activeError });
             } else {
-              this.notifySyncState({ status: 'synced', error: undefined, lastSyncedAt: new Date().toISOString() });
+              this.notifySyncState({
+                status: 'synced',
+                error: undefined,
+                lastSyncedAt: new Date().toISOString(),
+                pendingChanges: 0,
+              });
               this.refreshConflicts().catch(() => {});
             }
           }
@@ -986,6 +1031,14 @@ export class PouchService {
       return false;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.notifySyncState({
+        status: 'offline',
+        error: 'Cannot sync: Device is offline. Please check your internet connection.',
+      });
+      return false;
+    }
+
     const savedRemote = this.getStoredRemoteUrl();
     if (savedRemote) {
       this.notifySyncState({ status: 'syncing' });
@@ -995,13 +1048,15 @@ export class PouchService {
         await PouchDB.replicate(this.localDB, remoteDB, { batch_size: 100 });
         this.pushError = null;
         this.pullError = null;
+        const now = new Date().toISOString();
         this.notifySyncState({
           status: 'synced',
-          lastSyncedAt: new Date().toISOString(),
+          lastSyncedAt: now,
           error: undefined,
           pendingChanges: 0,
         });
         this.notifyDataChange();
+        await this.refreshConflicts().catch(() => {});
         return true;
       } catch (err: any) {
         console.warn('Manual syncNow error:', err);
@@ -1110,6 +1165,9 @@ export class PouchService {
         doc: { ...doc, docType: type },
         deleted: false,
       });
+      this.notifySyncState({
+        pendingChanges: (this.currentState.pendingChanges || 0) + 1,
+      });
       this.refreshConflicts().catch(() => {});
     } catch (e: any) {
       console.error(`PouchDB putDoc error [${docId}]:`, e);
@@ -1157,6 +1215,9 @@ export class PouchService {
       this.notifyDataChange({
         id: docId,
         deleted: true,
+      });
+      this.notifySyncState({
+        pendingChanges: (this.currentState.pendingChanges || 0) + 1,
       });
       this.refreshConflicts().catch(() => {});
     } catch (e: any) {

@@ -491,7 +491,7 @@ export const PurchaseHeaderMeta: React.FC<PurchaseHeaderMetaProps> = ({
               }`}
               title="Reverse Charge Mechanism (Section 9(3)/9(4) CGST Act)"
             >
-              <span className="text-[9px] uppercase font-bold text-outline">RCM:</span>
+              <span className="text-[10px] font-bold text-outline">Reverse Charge (RCM):</span>
               <span className="font-bold">{isRcm ? 'YES' : 'NO'}</span>
             </button>
           )}

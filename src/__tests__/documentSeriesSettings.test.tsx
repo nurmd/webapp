@@ -46,6 +46,7 @@ import {
   formatDocumentNumberPreview,
   getDocumentSeriesConfig,
   generateNextDocumentNumber,
+  generateNextInvoiceNumber,
   getFinancialYearString,
 } from '../core/utils/invoiceNumber.ts';
 import { InvoicePrefixSettingsModal } from '../components/Settings/modals/InvoicePrefixSettingsModal.tsx';
@@ -183,6 +184,50 @@ describe('Full Functional Invoice & Document Prefix Settings', () => {
     expect(nextPos).toBe('POS-0002');
     expect(nextEst).toBe('EST-2026-0001');
     expect(nextCn).toBe('CN-2026-0001');
+  });
+
+  it('correctly parses legacy invoicePrefix "INV/26-27/" without duplicating financial year', () => {
+    const legacyCompany: Partial<CompanyProfile> = {
+      ...mockCompany,
+      invoicePrefix: 'INV/26-27/',
+      documentSeries: undefined,
+    };
+
+    // 1. With empty invoices: returns INV/26-27/0001 (NOT INV/26-27/2026/0001)
+    const next1 = generateNextDocumentNumber('SALES_INVOICE', legacyCompany, []);
+    expect(next1).toBe('INV/26-27/0001');
+
+    // 2. Increments sequentially when prior number exists
+    const next2 = generateNextDocumentNumber('SALES_INVOICE', legacyCompany, [
+      { id: '1', invoiceNumber: 'INV/26-27/0001' },
+    ]);
+    expect(next2).toBe('INV/26-27/0002');
+
+    // 3. Preserves unrelated numbers like BHW-2026-0001
+    const next3 = generateNextDocumentNumber('SALES_INVOICE', legacyCompany, [
+      { id: 'bhw-1', invoiceNumber: 'BHW-2026-0001' },
+    ]);
+    expect(next3).toBe('INV/26-27/0001');
+
+    // 4. generateNextInvoiceNumber utility also handles INV/26-27/
+    const nextLegacyHelper = generateNextInvoiceNumber('INV/26-27/', []);
+    expect(nextLegacyHelper).toBe('INV/26-27/0001');
+  });
+
+  it('preserves legacy prefix pattern like "BHW-2026-" and increments sequentially', () => {
+    const bhwCompany: Partial<CompanyProfile> = {
+      ...mockCompany,
+      invoicePrefix: 'BHW-2026-',
+      documentSeries: undefined,
+    };
+
+    const next1 = generateNextDocumentNumber('SALES_INVOICE', bhwCompany, []);
+    expect(next1).toBe('BHW-2026-0001');
+
+    const next2 = generateNextDocumentNumber('SALES_INVOICE', bhwCompany, [
+      { id: '1', invoiceNumber: 'BHW-2026-0001' },
+    ]);
+    expect(next2).toBe('BHW-2026-0002');
   });
 
   it('InvoicePrefixSettingsModal renders, allows switching document tabs, and saves settings', async () => {

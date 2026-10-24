@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { BankAccount } from '../../models/bankAccount.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
@@ -23,7 +24,7 @@ interface PartiesViewProps {
   vouchers?: Voucher[];
   bankAccounts?: BankAccount[];
   initialSegment?: 'CUSTOMERS' | 'SUPPLIERS';
-  initialStatusFilter?: 'ALL' | 'OVERDUE' | 'SETTLED';
+  initialStatusFilter?: 'ALL' | 'OVERDUE' | 'SETTLED' | 'CREDITS';
   onSaveParty: (party: Party) => void;
   onDeleteParty: (id: string) => void;
   onRecordPartyPayment?: (
@@ -69,7 +70,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
   // Segmented switch: Customers vs Suppliers (Simplified clean layout)
   const [activeSegment, setActiveSegment] = useState<'CUSTOMERS' | 'SUPPLIERS'>(initialSegment);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED'>(initialStatusFilter);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'SETTLED' | 'CREDITS'>(initialStatusFilter);
   // Party Sort Mode: loops RECENT -> NAME -> AMOUNT -> RECENT on repeated clicks when active
   const [sortMode, setSortMode] = useState<'RECENT' | 'NAME' | 'AMOUNT'>('RECENT');
   const [search, setSearch] = useState('');
@@ -228,18 +229,18 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   const suppliers = parties.filter((p) => p.type === 'SUPPLIER');
 
   // Metrics
-  const totalReceivables = customers
-    .filter((p) => p.currentBalance > 0)
-    .reduce((s, p) => s + p.currentBalance, 0);
-
-  const totalPayables = suppliers
-    .filter((p) => p.currentBalance < 0)
-    .reduce((s, p) => s + Math.abs(p.currentBalance), 0);
+  const { totalReceivables, totalPayables, creditCustomers, advanceSuppliers } = useMemo(
+    () => computePartyDues(parties),
+    [parties]
+  );
 
   const overdueCustomersCount = customers.filter((p) => p.currentBalance > 0).length;
   const overdueSuppliersCount = suppliers.filter((p) => p.currentBalance < 0).length;
   const settledCustomersCount = customers.filter((p) => p.currentBalance === 0).length;
   const settledSuppliersCount = suppliers.filter((p) => p.currentBalance === 0).length;
+  const creditCustomersCount = creditCustomers.length;
+  const advanceSuppliersCount = advanceSuppliers.length;
+  const activeCreditCount = activeSegment === 'CUSTOMERS' ? creditCustomersCount : advanceSuppliersCount;
 
   const activePartiesList = activeSegment === 'CUSTOMERS' ? customers : suppliers;
 
@@ -276,6 +277,9 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
       }
     }
 
+    if (statusFilter === 'CREDITS') {
+      return activeSegment === 'CUSTOMERS' ? p.currentBalance < 0 : p.currentBalance > 0;
+    }
     if (statusFilter === 'OVERDUE') {
       return activeSegment === 'CUSTOMERS' ? p.currentBalance > 0 : p.currentBalance < 0;
     }
@@ -393,7 +397,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   }
 
   return (
-    <div className="flex flex-col w-full pb-28 max-w-7xl mx-auto px-margin-mobile md:px-6 py-2 sm:py-3 gap-2 sm:gap-3">
+    <div className="flex flex-col w-full pb-36 sm:pb-40 max-w-7xl mx-auto px-margin-mobile md:px-6 py-2 sm:py-3 gap-2 sm:gap-3">
       {/* 1. Unified 1-Glance Financial Balance Summary */}
       <section className="pt-0.5">
         <div className="bg-surface-container-lowest rounded-2xl p-3 sm:p-4 shadow-sm border border-outline-variant/20 grid grid-cols-2 divide-x divide-outline-variant/20">
@@ -594,6 +598,22 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Settled ({activeSegment === 'CUSTOMERS' ? settledCustomersCount : settledSuppliersCount})</span>
           </button>
+          {activeCreditCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('CREDITS')}
+              className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                statusFilter === 'CREDITS'
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span>
+                {activeSegment === 'CUSTOMERS' ? 'Credits' : 'Advances'} ({activeCreditCount})
+              </span>
+            </button>
+          )}
 
           {/* Group Filter Select */}
           {partyGroups.length > 0 && (
@@ -679,6 +699,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             const isReceivable = party.currentBalance > 0;
             const isPayable = party.currentBalance < 0;
             const isSettled = party.currentBalance === 0;
+            const isCustomerCredit = party.type === 'CUSTOMER' && party.currentBalance < 0;
+            const isSupplierAdvance = party.type === 'SUPPLIER' && party.currentBalance > 0;
 
             return (
               <div
@@ -715,7 +737,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant mt-0.5 truncate">
-                      <span>{party.phone}</span>
+                      <span>{!party.phone || party.phone.trim() === '' || party.phone.trim() === '00' || party.phone.trim() === '0' ? 'No phone' : party.phone}</span>
                       {party.billingAddress && party.billingAddress !== 'Local Counter' && (
                         <>
                           <span className="text-outline-variant">•</span>
@@ -783,7 +805,15 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                           : 'text-secondary bg-secondary/10'
                       }`}
                     >
-                      {isReceivable ? 'To Collect' : isPayable ? 'To Pay' : 'Settled'}
+                      {isCustomerCredit
+                        ? 'Credit'
+                        : isSupplierAdvance
+                        ? 'Advance'
+                        : isReceivable
+                        ? 'To Collect'
+                        : isPayable
+                        ? 'To Pay'
+                        : 'Settled'}
                     </span>
                   </div>
 

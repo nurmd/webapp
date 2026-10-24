@@ -46,6 +46,7 @@ export interface StockValuationSummary {
   saleValuation: number;
   potentialGrossProfit: number;
   potentialMarginPct: number;
+  needRestockCount: number;
   lowStockCount: number;
   outOfStockCount: number;
   negativeStockCount: number;
@@ -204,7 +205,7 @@ export function aggregateStockValuation(items: InventoryItem[]): StockValuationS
   let negativeStockCount = 0;
 
   for (const item of items) {
-    if (item.isDisabled) continue;
+    if (item.isDisabled || item.isActive === false) continue;
 
     const stock = item.currentStock || 0;
     totalQuantity += stock;
@@ -214,10 +215,11 @@ export function aggregateStockValuation(items: InventoryItem[]): StockValuationS
       saleValuation += stock * (item.salePrice || 0);
     }
 
+    const threshold = item.minStockAlert ?? 5;
     if (stock <= 0) {
       if (stock === 0) outOfStockCount++;
       else negativeStockCount++;
-    } else if (item.minStockAlert !== undefined && stock <= item.minStockAlert) {
+    } else if (stock <= threshold) {
       lowStockCount++;
     }
   }
@@ -229,13 +231,16 @@ export function aggregateStockValuation(items: InventoryItem[]): StockValuationS
     ? Math.round(((potentialGrossProfit / saleValuation) * 100) * 100) / 100
     : 0;
 
+  const needRestockCount = lowStockCount + outOfStockCount + negativeStockCount;
+
   return {
-    totalItems: items.filter((i) => !i.isDisabled).length,
+    totalItems: items.filter((i) => !i.isDisabled && i.isActive !== false).length,
     totalQuantity: Math.round(totalQuantity * 100) / 100,
     purchaseValuation,
     saleValuation,
     potentialGrossProfit,
     potentialMarginPct,
+    needRestockCount,
     lowStockCount,
     outOfStockCount,
     negativeStockCount,

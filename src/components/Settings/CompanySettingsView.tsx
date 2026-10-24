@@ -190,7 +190,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   // Multi-Device Profile Sync State
   const [isSyncingProfile, setIsSyncingProfile] = useState(false);
   const [profileSyncNotice, setProfileSyncNotice] = useState<string | null>(null);
-  const [lastProfileSyncTime, setLastProfileSyncTime] = useState<string>('Just now');
+  const [lastProfileSyncTime, setLastProfileSyncTime] = useState<string>('');
   const [isPairQrModalOpen, setIsPairQrModalOpen] = useState(false);
   const [isImportProfileModalOpen, setIsImportProfileModalOpen] = useState(false);
   const [importProfileInput, setImportProfileInput] = useState('');
@@ -208,6 +208,37 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
 
   // Sync state
   const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
+
+  const dataSyncBadge = useMemo(() => {
+    const conflictsCount = (syncState.conflicts?.length || 0) || (syncState.conflictsCount || 0);
+    if (conflictsCount > 0) {
+      return 'Conflicts';
+    }
+    const hasRemoteUrl = Boolean(syncState.remoteUrl?.trim());
+    if (!hasRemoteUrl) {
+      return 'Offline-First';
+    }
+    if (syncState.status === 'error') {
+      return 'Sync Error';
+    }
+    if (syncState.status === 'syncing' || syncState.status === 'connecting') {
+      return 'Syncing...';
+    }
+    if ((syncState.pendingChanges || 0) > 0) {
+      return 'Sync Pending';
+    }
+    if (!syncState.lastSyncedAt || !syncState.lastSyncedAt.trim()) {
+      return 'Check Sync';
+    }
+    const syncTimeMs = new Date(syncState.lastSyncedAt).getTime();
+    if (isNaN(syncTimeMs) || Date.now() - syncTimeMs > 30 * 60 * 1000) {
+      return 'Check Sync';
+    }
+    if (syncState.status === 'synced') {
+      return 'Cloud Sync';
+    }
+    return 'Cloud Paused';
+  }, [syncState]);
   const [syncUrlInput, setSyncUrlInput] = useState(() => {
     const stored = typeof (pouch as any)?.getStoredRemoteUrl === 'function' ? (pouch as any).getStoredRemoteUrl() : '';
     return (
@@ -403,6 +434,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     try {
       await pouch.syncNow();
       await db.syncAllFromPouch();
+      if (typeof (pouch as any)?.refreshConflicts === 'function') {
+        await (pouch as any).refreshConflicts().catch(() => {});
+      }
     } finally {
       setIsSyncStarting(false);
     }
@@ -742,15 +776,19 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold truncate leading-tight">{cat.label}</span>
-                        {cat.badge && (
+                        {(cat.id === 'data_sync' ? dataSyncBadge : cat.badge) && (
                           <span
                             className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              isSelected
+                              (cat.id === 'data_sync' ? dataSyncBadge : cat.badge) === 'Conflicts'
+                                ? 'bg-rose-500/20 text-rose-700 dark:text-rose-300'
+                                : (cat.id === 'data_sync' ? dataSyncBadge : cat.badge) === 'Cloud Sync'
+                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                : isSelected
                                 ? 'bg-on-secondary/20 text-on-secondary'
                                 : 'bg-surface-container text-on-surface-variant'
                             }`}
                           >
-                            {cat.badge}
+                            {cat.id === 'data_sync' ? dataSyncBadge : cat.badge}
                           </span>
                         )}
                       </div>
@@ -904,6 +942,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 handlePopulateDemoData={handlePopulateDemoData}
                 isPopulatingDemo={isPopulatingDemo}
                 demoNotice={demoNotice}
+                conflicts={syncState.conflicts}
                 copiedSyncCode={copiedSyncCode}
                 handleCopySyncCode={handleCopySyncCode}
                 onOpenDatabaseBackup={() => setIsDatabaseBackupModalOpen(true)}

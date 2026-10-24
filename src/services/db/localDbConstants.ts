@@ -14,6 +14,7 @@ export const POUCH_PERSIST_KEYS = {
   PRE_DEMO_REMOTE: 'gst_pre_demo_remote',
   LAST_HYDRATED_DB: 'gst_last_hydrated_db',
   PENDING_DEMO_LOAD: 'gst_pending_demo_load',
+  LAST_SYNCED_AT: 'gst_pouch_last_synced_at',
 } as const;
 
 export const LOCAL_DATABASES_REGISTRY_KEY = 'gst_local_databases';

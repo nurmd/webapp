@@ -245,12 +245,20 @@ export const App: React.FC = () => {
   const activeTabRef = React.useRef(activeTab);
   activeTabRef.current = activeTab;
   const previousTabRef = React.useRef<AppTab>('dashboard');
+  const hasSyncedPartyBalances = React.useRef(false);
 
   React.useEffect(() => {
     rbac.migrateLegacyPins().catch((err) => {
       console.error('Failed to migrate legacy PINs:', err);
     });
-    db.syncAllPartyBalances();
+    if (!hasSyncedPartyBalances.current) {
+      hasSyncedPartyBalances.current = true;
+      try {
+        db.syncAllPartyBalances();
+      } catch (err) {
+        console.warn('Failed to sync party balances on startup:', err);
+      }
+    }
     initBackNavigation(() => {
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');

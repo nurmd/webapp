@@ -22,11 +22,16 @@ export function computeCashBankSummary(params: {
   vouchers?: Voucher[];
   transactions: CashBankTransaction[];
 }): CashBankFinancialSummary {
-  const { accounts, invoices, purchases, expenses, vouchers = [], transactions } = params;
+  const accounts = params.accounts || [];
+  const invoices = params.invoices || [];
+  const purchases = params.purchases || [];
+  const expenses = params.expenses || [];
+  const vouchers = params.vouchers || [];
+  const transactions = params.transactions || [];
 
   // Identify primary / default bank account
-  const defaultBank = accounts.find((a) => a.accountType === 'BANK' && a.isDefault) ||
-    accounts.find((a) => a.accountType === 'BANK') || {
+  const defaultBank = accounts.find((a) => a && a.accountType === 'BANK' && a.isDefault) ||
+    accounts.find((a) => a && a.accountType === 'BANK') || {
       id: 'ACC_BANK_DEFAULT',
       accountName: 'Primary Bank Account',
       accountType: 'BANK' as const,
@@ -38,11 +43,12 @@ export function computeCashBankSummary(params: {
   // 1. Initialize balances with opening balances
   const balances: Record<string, number> = {};
   accounts.forEach((acc) => {
+    if (!acc) return;
     balances[acc.id] = acc.openingBalance || 0;
   });
 
   if (balances['ACC_CASH'] === undefined) {
-    const cashAcc = accounts.find((a) => a.accountType === 'CASH');
+    const cashAcc = accounts.find((a) => a && a.accountType === 'CASH');
     balances['ACC_CASH'] = cashAcc ? (cashAcc.openingBalance || 0) : 0;
   }
 
@@ -51,19 +57,31 @@ export function computeCashBankSummary(params: {
   let todayInflow = 0;
   let todayOutflow = 0;
 
+  // Voucher credit offsets are allocated per party. Process documents in
+  // chronological order so the allocation is deterministic and does not depend
+  // on array order after a sync, restore, or local edit. Without this, all
+  // walk-in invoices share CUSTOM_PARTY and an older receipt can consume a
+  // newer invoice's cash/bank row (or vice versa).
+  const chronological = <T extends { date?: string; createdAt?: string }>(a: T, b: T): number => {
+    const aKey = `${a.date || ''}|${a.createdAt || ''}`;
+    const bKey = `${b.date || ''}|${b.createdAt || ''}`;
+    return aKey.localeCompare(bKey);
+  };
+
   // 2. Process Sales Invoices (Inflow from upfront payments without vouchers)
   // Calculate total voucher receipts per party so we only count unvouchered upfront invoice payments
   const partyVoucherReceipts: Record<string, number> = {};
   vouchers.forEach((v) => {
-    if (v.isReversed || v.isCancelled) return;
+    if (!v || v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'RECEIPT') {
-      v.entries.forEach((e) => {
+      (v.entries || []).forEach((e) => {
+        if (!e) return;
         if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
           const key = e.accountId.toLowerCase();
-          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + v.totalAmount;
+          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
         } else if (e.accountName) {
           const key = e.accountName.trim().toLowerCase();
-          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + v.totalAmount;
+          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
         }
       });
     }
@@ -72,7 +90,9 @@ export function computeCashBankSummary(params: {
   // Track remaining voucher credit per party to offset against invoice paidAmount
   const remainingVoucherCredit = { ...partyVoucherReceipts };
 
-  invoices.forEach((inv) => {
+  const orderedInvoices = [...invoices].sort(chronological);
+  orderedInvoices.forEach((inv) => {
+    if (!inv) return;
     const paid = typeof inv.paidAmount === 'number'
       ? inv.paidAmount
       : (inv.paymentStatus === 'PAID' ? inv.grandTotal : 0);
@@ -165,15 +185,16 @@ export function computeCashBankSummary(params: {
   // 3. Process Purchases (Outflow from upfront payments without vouchers)
   const supplierVoucherPayments: Record<string, number> = {};
   vouchers.forEach((v) => {
-    if (v.isReversed || v.isCancelled) return;
+    if (!v || v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'PAYMENT') {
-      v.entries.forEach((e) => {
+      (v.entries || []).forEach((e) => {
+        if (!e) return;
         if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
           const key = e.accountId.toLowerCase();
-          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + v.totalAmount;
+          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
         } else if (e.accountName) {
           const key = e.accountName.trim().toLowerCase();
-          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + v.totalAmount;
+          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
         }
       });
     }
@@ -181,7 +202,9 @@ export function computeCashBankSummary(params: {
 
   const remainingVoucherDebit = { ...supplierVoucherPayments };
 
-  purchases.forEach((pur) => {
+  const orderedPurchases = [...purchases].sort(chronological);
+  orderedPurchases.forEach((pur) => {
+    if (!pur) return;
     const paid = typeof pur.paidAmount === 'number'
       ? pur.paidAmount
       : (pur.paymentStatus === 'PAID' ? pur.grandTotal : 0);
@@ -272,12 +295,12 @@ export function computeCashBankSummary(params: {
 
   // 4. Process Expenses (Outflow)
   expenses.forEach((exp) => {
-    if (exp.amount > 0) {
+    if (exp && exp.amount > 0) {
       const isCash = exp.paymentMode === 'CASH';
       const targetAccId = isCash ? 'ACC_CASH' : ((exp as any).bankAccountId || defaultBank.id);
       const targetAccName = isCash
         ? 'Cash in Hand'
-        : (accounts.find((a) => a.id === targetAccId)?.accountName || (exp as any).bankAccountName || defaultBank.accountName);
+        : (accounts.find((a) => a && a.id === targetAccId)?.accountName || (exp as any).bankAccountName || defaultBank.accountName);
 
       balances[targetAccId] = (balances[targetAccId] || 0) - exp.amount;
 
@@ -306,20 +329,21 @@ export function computeCashBankSummary(params: {
 
   // 5. Process Payment Vouchers (Receipts / Payments with specific accounts)
   vouchers.forEach((v) => {
-    if (v.isReversed || v.isCancelled) return;
+    if (!v || v.isReversed || v.isCancelled) return;
+    const vEntries = v.entries || [];
     // Process explicit receipt / payment vouchers that affect cash or bank
     if (v.voucherType === 'RECEIPT') {
-      const bankIds = new Set(accounts.map((a) => a.id));
+      const bankIds = new Set(accounts.filter(Boolean).map((a) => a.id));
       bankIds.add('ACC_BANK');
       bankIds.add('ACC_BANK_SBI');
       bankIds.add('ACC_BANK_DEFAULT');
 
-      const cashOrBankEntries = v.entries.filter(
-        (e) => (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.debit > 0
+      const cashOrBankEntries = vEntries.filter(
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.debit > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
-        const matchedAcc = accounts.find((a) => a.id === entry.accountId);
+        const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
         const amt = entry.debit;
@@ -345,17 +369,17 @@ export function computeCashBankSummary(params: {
         });
       });
     } else if (v.voucherType === 'PAYMENT') {
-      const bankIds = new Set(accounts.map((a) => a.id));
+      const bankIds = new Set(accounts.filter(Boolean).map((a) => a.id));
       bankIds.add('ACC_BANK');
       bankIds.add('ACC_BANK_SBI');
       bankIds.add('ACC_BANK_DEFAULT');
 
-      const cashOrBankEntries = v.entries.filter(
-        (e) => (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.credit > 0
+      const cashOrBankEntries = vEntries.filter(
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.credit > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
-        const matchedAcc = accounts.find((a) => a.id === entry.accountId);
+        const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
         const amt = entry.credit;
@@ -381,8 +405,8 @@ export function computeCashBankSummary(params: {
         });
       });
     } else if (v.voucherType === 'CONTRA') {
-      const creditEntry = v.entries.find((e) => e.credit > 0);
-      const debitEntry = v.entries.find((e) => e.debit > 0);
+      const creditEntry = vEntries.find((e) => e && e.credit > 0);
+      const debitEntry = vEntries.find((e) => e && e.debit > 0);
       if (creditEntry && debitEntry) {
         const fromAccId = creditEntry.accountId || 'ACC_CASH';
         const toAccId = debitEntry.accountId || defaultBank.id;
@@ -445,6 +469,7 @@ export function computeCashBankSummary(params: {
 
   // 6. Process Explicit Cash & Bank Transactions (Contra transfers, Direct In/Out)
   transactions.forEach((txn) => {
+    if (!txn) return;
     const amt = txn.amount || 0;
     if (amt <= 0) return;
 

@@ -9,6 +9,7 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
 import { CURRENT_APP_VERSION } from '../../services/updateService.ts';
+import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
 
 interface NavigationMenuHubViewProps {
   company: CompanyProfile;
@@ -74,6 +75,105 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   const [copiedReferral, setCopiedReferral] = useState(false);
   const [syncState, setSyncState] = useState<PouchSyncState>(pouch.getSyncState());
 
+  const hubSyncStatus = useMemo(() => {
+    const conflictsCount = (syncState.conflicts?.length || 0) || (syncState.conflictsCount || 0);
+    const pendingChanges = syncState.pendingChanges || 0;
+    if (conflictsCount > 0) {
+      return {
+        text: 'Conflicts',
+        type: 'warning' as const,
+        icon: 'warning',
+        subtitle: `${conflictsCount} conflict revision(s) require review`,
+      };
+    }
+
+    const hasRemoteUrl = Boolean(syncState.remoteUrl?.trim());
+    if (!hasRemoteUrl) {
+      return {
+        text: 'Offline-First',
+        type: 'neutral' as const,
+        icon: 'offline_pin',
+        subtitle: '100% Offline-First IndexedDB Local Storage',
+      };
+    }
+
+    if (syncState.status === 'offline') {
+      return {
+        text: 'Offline',
+        type: 'neutral' as const,
+        icon: 'cloud_off',
+        subtitle:
+          pendingChanges > 0
+            ? `Device offline • ${pendingChanges} local change${pendingChanges > 1 ? 's' : ''} pending upload`
+            : 'Device offline. Local changes will sync when reconnected.',
+      };
+    }
+
+    if (syncState.status === 'error') {
+      return {
+        text: 'Sync Error',
+        type: 'error' as const,
+        icon: 'cloud_off',
+        subtitle: syncState.error || 'Cloud sync connection error',
+      };
+    }
+
+    if (syncState.status === 'syncing' || syncState.status === 'connecting') {
+      return {
+        text: 'Syncing...',
+        type: 'warning' as const,
+        icon: 'sync',
+        subtitle: 'Continuous 2-Way Multi-Device Live Sync Active',
+      };
+    }
+
+    if (pendingChanges > 0) {
+      return {
+        text: 'Sync Pending',
+        type: 'warning' as const,
+        icon: 'cloud_upload',
+        subtitle: `${pendingChanges} local change${pendingChanges > 1 ? 's' : ''} pending upload`,
+      };
+    }
+
+    // Stale or missing lastSyncedAt
+    if (!syncState.lastSyncedAt || !syncState.lastSyncedAt.trim()) {
+      return {
+        text: 'Check Sync',
+        type: 'warning' as const,
+        icon: 'cloud_queue',
+        subtitle: 'No recent cloud sync verified',
+      };
+    }
+
+    const syncTimeMs = new Date(syncState.lastSyncedAt).getTime();
+    const isStale = isNaN(syncTimeMs) || Date.now() - syncTimeMs > 30 * 60 * 1000;
+    if (isStale) {
+      return {
+        text: 'Check Sync',
+        type: 'warning' as const,
+        icon: 'cloud_queue',
+        subtitle: 'Cloud sync stale (>30m ago)',
+      };
+    }
+
+    if (syncState.status === 'synced') {
+      return {
+        text: 'Cloud Live',
+        type: 'success' as const,
+        icon: 'cloud_done',
+        subtitle: 'Continuous 2-Way Multi-Device Live Sync Active',
+      };
+    }
+
+    return {
+      text: 'Cloud Paused',
+      type: 'neutral' as const,
+      icon: 'pause_circle',
+      subtitle: 'Cloud Database Active (Sync paused / idle)',
+    };
+  }, [syncState]);
+
   React.useEffect(() => {
     const unsub = pouch.subscribeSync((state) => {
       setSyncState(state);
@@ -102,7 +202,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   }, [suppliers]);
 
   const lowStockItems = useMemo(() => {
-    return items.filter((item) => item.currentStock <= (item.minStockAlert || 5));
+    return getItemsNeedingRestock(items);
   }, [items]);
 
   const unpaidInvoicesCount = useMemo(() => {
@@ -524,16 +624,12 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'auto_backup_sync',
       title: 'Continuous CouchDB / IndexedDB Sync',
-      subtitle: (syncState.status === 'synced' || syncState.status === 'syncing')
-        ? 'Continuous 2-Way Multi-Device Live Sync Active'
-        : '100% Offline-First IndexedDB Local Storage',
+      subtitle: hubSyncStatus.subtitle,
       icon: 'cloud_sync',
       category: 'settings',
-      badge: (syncState.status === 'synced' || syncState.status === 'syncing')
-        ? { text: 'Cloud Live', type: 'success' }
-        : { text: 'Offline Ready', type: 'neutral' },
+      badge: { text: hubSyncStatus.text, type: hubSyncStatus.type },
       action: () => onNavigate('settings'),
-      keywords: ['sync', 'cloud', 'couchdb', 'multi-device'],
+      keywords: ['sync', 'cloud', 'couchdb', 'multi-device', 'conflicts'],
     },
     {
       id: 'database_backup_restore',
@@ -753,9 +849,9 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
               </span>
               <span className="font-label-sm text-xs text-secondary font-bold flex items-center gap-1 truncate">
                 <span className="material-symbols-outlined text-[14px]">
-                  {(syncState.status === 'synced' || syncState.status === 'syncing') ? 'cloud_done' : 'offline_pin'}
+                  {hubSyncStatus.icon}
                 </span>
-                {(syncState.status === 'synced' || syncState.status === 'syncing') ? 'Cloud Live' : 'Offline 100%'}
+                {hubSyncStatus.text}
               </span>
             </div>
           </div>

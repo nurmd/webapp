@@ -4,7 +4,7 @@ import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
-import { STORAGE_KEYS, DEFAULT_BANK_ACCOUNTS, DEFAULT_CASH_BANK_TXNS } from './storageEngine.ts';
+import { STORAGE_KEYS, DEFAULT_BANK_ACCOUNTS, DEFAULT_CASH_BANK_TXNS, EMPTY_BANK_ACCOUNTS } from './storageEngine.ts';
 import { ItemStorage } from './itemStorage.ts';
 
 /**
@@ -160,9 +160,9 @@ export class FinancialStorage extends ItemStorage {
 
   // Bank Accounts
   getBankAccounts(): BankAccount[] {
-    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, []);
+    const list = this.get<BankAccount[]>(STORAGE_KEYS.BANK_ACCOUNTS, EMPTY_BANK_ACCOUNTS);
     if (list && list.length > 0) return list;
-    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : [];
+    return this.shouldSeedDefaultBankAccounts() ? DEFAULT_BANK_ACCOUNTS : EMPTY_BANK_ACCOUNTS;
   }
 
   saveBankAccount(account: BankAccount): void {

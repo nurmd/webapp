@@ -240,22 +240,28 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-on-surface-variant truncate">
-                <a href={`tel:${party.phone}`} className="text-secondary font-medium hover:underline">
-                  {party.phone}
-                </a>
+                {!party.phone || !party.phone.trim() || party.phone.trim() === '00' || party.phone.trim() === '0' ? (
+                  <span>No phone</span>
+                ) : (
+                  <a href={`tel:${party.phone}`} className="text-secondary font-medium hover:underline">
+                    {party.phone}
+                  </a>
+                )}
               </p>
             </div>
           </div>
 
           {/* Quick Header Tools (Call, WhatsApp, Edit) */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            <a
-              href={`tel:${party.phone}`}
-              className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors"
-              title="Call"
-            >
-              <span className="material-symbols-outlined text-[17px]">call</span>
-            </a>
+            {party.phone && party.phone.trim() !== '00' && party.phone.trim() !== '0' && (
+              <a
+                href={`tel:${party.phone}`}
+                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors"
+                title="Call"
+              >
+                <span className="material-symbols-outlined text-[17px]">call</span>
+              </a>
+            )}
 
             <button
               type="button"

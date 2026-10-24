@@ -42,19 +42,41 @@ export const subscribeToDataStore = (listener: () => void): (() => void) => {
 // 2. Stable Snapshot Getters
 // ---------------------------------------------------------------------------
 
-export const getCompanySnapshot = (): CompanyProfile => db.getCompany();
-export const getPartiesSnapshot = (): Party[] => db.getParties();
-export const getPartyGroupsSnapshot = (): PartyGroup[] => db.getPartyGroups();
-export const getPartyCategoriesSnapshot = (): PartyCategory[] => db.getPartyCategories();
-export const getItemsSnapshot = (): InventoryItem[] => db.getItems();
-export const getInvoicesSnapshot = (): Invoice[] => db.getInvoices();
-export const getPurchasesSnapshot = (): PurchaseBill[] => db.getPurchases();
-export const getExpensesSnapshot = (): Expense[] => db.getExpenses();
-export const getVouchersSnapshot = (): Voucher[] => db.getVouchers();
-export const getBankAccountsSnapshot = (): BankAccount[] => db.getBankAccounts();
-export const getCashBankTxnsSnapshot = (): CashBankTransaction[] => db.getCashBankTransactions();
-export const getSettingsSnapshot = (): SyncedSettings => db.getSettings();
-export const getStockAdjustmentsSnapshot = (): StockAdjustment[] => db.getStockAdjustments();
+/**
+ * Defensive snapshot stabilizer.
+ * Guarantees referential identity for empty array fallbacks across useSyncExternalStore calls,
+ * permanently guarding against React Error #185 (Maximum update depth exceeded).
+ */
+function createStableSnapshotGetter<T>(getter: () => T): () => T {
+  let cached: T = getter();
+  return () => {
+    const next = getter();
+    if (Object.is(cached, next)) {
+      return cached;
+    }
+    if (Array.isArray(cached) && Array.isArray(next)) {
+      if (cached.length === 0 && next.length === 0) {
+        return cached;
+      }
+    }
+    cached = next;
+    return next;
+  };
+}
+
+export const getCompanySnapshot = createStableSnapshotGetter((): CompanyProfile => db.getCompany());
+export const getPartiesSnapshot = createStableSnapshotGetter((): Party[] => db.getParties());
+export const getPartyGroupsSnapshot = createStableSnapshotGetter((): PartyGroup[] => db.getPartyGroups());
+export const getPartyCategoriesSnapshot = createStableSnapshotGetter((): PartyCategory[] => db.getPartyCategories());
+export const getItemsSnapshot = createStableSnapshotGetter((): InventoryItem[] => db.getItems());
+export const getInvoicesSnapshot = createStableSnapshotGetter((): Invoice[] => db.getInvoices());
+export const getPurchasesSnapshot = createStableSnapshotGetter((): PurchaseBill[] => db.getPurchases());
+export const getExpensesSnapshot = createStableSnapshotGetter((): Expense[] => db.getExpenses());
+export const getVouchersSnapshot = createStableSnapshotGetter((): Voucher[] => db.getVouchers());
+export const getBankAccountsSnapshot = createStableSnapshotGetter((): BankAccount[] => db.getBankAccounts());
+export const getCashBankTxnsSnapshot = createStableSnapshotGetter((): CashBankTransaction[] => db.getCashBankTransactions());
+export const getSettingsSnapshot = createStableSnapshotGetter((): SyncedSettings => db.getSettings());
+export const getStockAdjustmentsSnapshot = createStableSnapshotGetter((): StockAdjustment[] => db.getStockAdjustments());
 
 // ---------------------------------------------------------------------------
 // 3. Domain-Specific Reactive Hooks

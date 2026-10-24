@@ -1074,7 +1074,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             accentColor="secondary"
           />
 
-          <div className="h-8" aria-hidden="true" />
+          <div className="h-28 sm:h-32" aria-hidden="true" />
         </div>
       </main>
 

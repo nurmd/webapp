@@ -1,16 +1,18 @@
 {
-  "version": "1.2.29",
+  "version": "1.2.30",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-23T07:27:27.011Z",
+  "buildTime": "2026-10-24T07:19:55.977Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Hotfix: prevents the offline default Cash account (opening balance 0) from being pushed into a new cloud database before the first pull",
-    "Per-remote local databases isolate each CouchDB cloud link",
-    "Demo sandbox now runs in a dedicated local database and never syncs to production",
-    "Cloud sync link survives app updates, storage resets, and backup/restore",
-    "Choose between WhatsApp and WhatsApp Business when sharing on Android",
-    "Offline, reconnect, and return-to-live-data controls for safer switching",
-    "Sync diagnostics and replication hardening for reliable multi-device use"
+    "Cash & Bank balance now matches the passbook, and invoice receipts with voucher credits are allocated chronologically",
+    "Party dues use one consistent calculation; customer credits and supplier advances are shown separately",
+    "Low-stock and out-of-stock items are unified under Need Restock, while strict Low counts remain in reports",
+    "Data & Sync now shows real per-database last-sync time, pending changes, offline/paused/error states, and manual conflict review",
+    "Unresolved conflicts are never labeled Cloud Synced or Cloud Live",
+    "Fixed the first-launch crash caused by unstable empty bank-account snapshots",
+    "Invoice numbering correctly handles the INV/26-27/ prefix without duplicating the financial year",
+    "New Invoice and POS polish: 4-digit dates, Reverse Charge (RCM), singular item counts, GST Exempt (0%), and a roomier action dock",
+    "WhatsApp sharing lets you choose WhatsApp or WhatsApp Business"
   ]
 }

@@ -46,7 +46,9 @@ interface ReportsNavListProps {
     receivablesTotal: string;
     payablesTotal: string;
     stockValuation: string;
+    needRestockCount?: number;
     lowStockCount: number;
+    outOfStockCount?: number;
     liquidBalance: string;
     activeBankCount: number;
     activeLoanCount: number;
@@ -67,7 +69,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
       iconBg: 'bg-indigo-500/10 dark:bg-indigo-500/20',
       iconColor: 'text-indigo-600 dark:text-indigo-400',
       badge: 'CA Ready',
-      chips: [`${metrics.gstTaxInvoices} Tax Records`, '3.1 & 4 ITC'],
+      chips: [`${metrics.gstTaxInvoices} Tax Records`, 'GSTR-3B 3.1 & 4 ITC'],
     },
     {
       id: 'sales_revenue',
@@ -103,8 +105,20 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
       icon: Package,
       iconBg: 'bg-cyan-500/10 dark:bg-cyan-500/20',
       iconColor: 'text-cyan-600 dark:text-cyan-400',
-      badge: metrics.lowStockCount > 0 ? `${metrics.lowStockCount} Low` : undefined,
-      chips: [`Valuation: ${metrics.stockValuation}`, `${metrics.lowStockCount} Low Stock`],
+      badge: (() => {
+        const need = metrics.needRestockCount ?? (metrics.lowStockCount + (metrics.outOfStockCount || 0));
+        const out = metrics.outOfStockCount || 0;
+        if (need <= 0) return undefined;
+        return `${metrics.lowStockCount} Low, ${out} Out`;
+      })(),
+      chips: [
+        `Valuation: ${metrics.stockValuation}`,
+        (() => {
+          const need = metrics.needRestockCount ?? (metrics.lowStockCount + (metrics.outOfStockCount || 0));
+          const out = metrics.outOfStockCount || 0;
+          return `${need} Need Restock (${metrics.lowStockCount} Low, ${out} Out)`;
+        })(),
+      ],
     },
   ];
 

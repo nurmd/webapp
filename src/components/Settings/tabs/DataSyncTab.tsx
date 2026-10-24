@@ -1,5 +1,312 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict, pouch } from '../../../services/pouchdb.ts';
+
+export type TruthfulSyncState = 'syncing' | 'online' | 'offline' | 'error' | 'paused' | 'pending' | 'conflict';
+
+export interface TruthfulSyncStatusInfo {
+  state: TruthfulSyncState;
+  badgeLabel: string;
+  badgeColorClass: string;
+  iconName: string;
+  iconContainerClass: string;
+  isSpinning: boolean;
+  description: string;
+  formattedLastSynced: string;
+  pendingChanges: number;
+  conflictsCount: number;
+}
+
+export function formatLastSyncedTime(timestamp?: string | null): string {
+  if (!timestamp || !timestamp.trim()) {
+    return 'Never';
+  }
+  const clean = timestamp.trim();
+  try {
+    const date = new Date(clean);
+    if (isNaN(date.getTime())) {
+      return clean;
+    }
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const timeStr = date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    if (isToday) {
+      return `Today at ${timeStr}`;
+    }
+    const dateStr = date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    return `${dateStr}, ${timeStr}`;
+  } catch {
+    return clean;
+  }
+}
+
+export function formatConflictTimestamp(timestamp?: string | null): string {
+  if (!timestamp || !timestamp.trim() || timestamp.trim().toUpperCase() === 'N/A') {
+    return 'Timestamp unavailable';
+  }
+  const clean = timestamp.trim();
+  const date = new Date(clean);
+  if (isNaN(date.getTime())) {
+    return 'Timestamp unavailable';
+  }
+  return formatLastSyncedTime(clean);
+}
+
+export function getConflictHumanLabel(conflict: SyncConflict): string | null {
+  const doc = conflict.winningDoc || conflict.conflictingDoc;
+  if (!doc) return null;
+  const label =
+    doc.businessName ||
+    doc.tradeName ||
+    doc.name ||
+    doc.partyName ||
+    doc.invoiceNumber ||
+    doc.voucherNumber ||
+    doc.accountName ||
+    doc.title ||
+    null;
+  return typeof label === 'string' && label.trim() ? label.trim() : null;
+}
+
+export function deriveSyncStatus({
+  syncState,
+  conflicts,
+  isSyncStarting = false,
+  isDemoMode = false,
+  isRemoteDbActive = false,
+  hasSavedUrl = false,
+  activeDbName,
+  isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true,
+}: {
+  syncState?: PouchSyncState | null;
+  conflicts?: SyncConflict[];
+  isSyncStarting?: boolean;
+  isDemoMode?: boolean;
+  isRemoteDbActive?: boolean;
+  hasSavedUrl?: boolean;
+  activeDbName?: string;
+  isOnline?: boolean;
+}): TruthfulSyncStatusInfo {
+  const activeConflicts = conflicts ?? syncState?.conflicts ?? [];
+  const conflictsCount = Math.max(activeConflicts.length, syncState?.conflictsCount || 0);
+  const pendingChanges = syncState?.pendingChanges || 0;
+  const formattedLastSynced = formatLastSyncedTime(syncState?.lastSyncedAt);
+
+  // 1. Demo Mode Sandbox
+  if (isDemoMode) {
+    return {
+      state: 'paused',
+      badgeLabel: `Demo Sandbox (${activeDbName || 'vyapar_demo'})`,
+      badgeColorClass: 'bg-amber-500 text-white',
+      iconName: 'dataset',
+      iconContainerClass: 'bg-amber-500 text-white',
+      isSpinning: false,
+      description: 'Demo Sandbox: Changes are isolated to vyapar_demo and will not sync to cloud',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 2. Offline MUST win over a stale error string (device network disconnected)
+  if (!isOnline) {
+    return {
+      state: 'offline',
+      badgeLabel: 'Offline',
+      badgeColorClass: 'bg-surface-variant text-on-surface-variant',
+      iconName: 'cloud_off',
+      iconContainerClass: 'bg-surface-variant text-on-surface-variant',
+      isSpinning: false,
+      description: 'Device is offline. Local changes will sync when reconnected.',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 3. Explicit Error State (when online)
+  if (syncState?.status === 'error' || Boolean(syncState?.error)) {
+    return {
+      state: 'error',
+      badgeLabel: 'Sync Error',
+      badgeColorClass: 'bg-error text-on-error',
+      iconName: 'cloud_off',
+      iconContainerClass: 'bg-error text-on-error',
+      isSpinning: false,
+      description: syncState?.error || 'Sync error: check remote CouchDB connection or permissions',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 4. Sync In Progress (active replication or connecting)
+  if (isSyncStarting || syncState?.status === 'syncing' || syncState?.status === 'connecting') {
+    const isConnectingOnly = syncState?.status === 'connecting' && !isSyncStarting;
+    return {
+      state: 'syncing',
+      badgeLabel: isConnectingOnly ? 'Connecting...' : 'Syncing...',
+      badgeColorClass: 'bg-amber-500 text-white',
+      iconName: 'sync',
+      iconContainerClass: 'bg-amber-500 text-white',
+      isSpinning: true,
+      description: isConnectingOnly
+        ? 'Connecting to remote CouchDB...'
+        : 'Continuous 2-Way CouchDB Multi-Device Sync Active',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 5. Offline Primary (No cloud DB configured or offline local DB)
+  if (!isRemoteDbActive || !hasSavedUrl) {
+    return {
+      state: 'offline',
+      badgeLabel: 'Offline Primary',
+      badgeColorClass: 'bg-surface-variant text-on-surface-variant',
+      iconName: 'offline_pin',
+      iconContainerClass: 'bg-surface-variant text-on-surface-variant',
+      isSpinning: false,
+      description: hasSavedUrl
+        ? 'Offline Database Active (Cloud sync link saved)'
+        : '100% Offline-First IndexedDB Storage Ready',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // From here on: Cloud DB is configured & active, and device is online.
+
+  // 6. Unresolved Conflicts: NEVER claim "Cloud Synced" while unresolved conflicts exist!
+  if (conflictsCount > 0) {
+    return {
+      state: 'conflict',
+      badgeLabel: 'Review Conflicts',
+      badgeColorClass: 'bg-rose-500 text-white',
+      iconName: 'warning',
+      iconContainerClass: 'bg-rose-500 text-white',
+      isSpinning: false,
+      description: `${conflictsCount} conflict revision${conflictsCount > 1 ? 's require' : ' requires'} manual per-document review. Nothing will be auto-resolved.`,
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // From here on: Cloud DB is configured & active, and device is online.
+
+  // 6. Paused/idle replication when status is explicitly 'offline' and no pending local changes
+  if (syncState?.status === 'offline' && pendingChanges === 0) {
+    return {
+      state: 'paused',
+      badgeLabel: 'Cloud Paused',
+      badgeColorClass: 'bg-surface-variant text-on-surface-variant',
+      iconName: 'pause_circle',
+      iconContainerClass: 'bg-surface-variant text-on-surface-variant',
+      isSpinning: false,
+      description: 'Cloud Database Active (Sync paused / idle)',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 7. Pending changes > 0: do NOT claim Cloud Synced
+  if (pendingChanges > 0) {
+    return {
+      state: 'pending',
+      badgeLabel: 'Sync Pending',
+      badgeColorClass: 'bg-amber-500 text-white',
+      iconName: 'cloud_upload',
+      iconContainerClass: 'bg-amber-500 text-white',
+      isSpinning: false,
+      description: `${pendingChanges} local change${pendingChanges > 1 ? 's' : ''} pending upload. Tap "Sync Now" to synchronize.`,
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 8. Missing lastSyncedAt: do NOT claim Cloud Synced
+  if (!syncState?.lastSyncedAt || !syncState.lastSyncedAt.trim()) {
+    return {
+      state: 'paused',
+      badgeLabel: 'Sync Unverified',
+      badgeColorClass: 'bg-amber-500 text-white',
+      iconName: 'cloud_queue',
+      iconContainerClass: 'bg-amber-500 text-white',
+      isSpinning: false,
+      description: 'No successful cloud sync has been recorded yet. Tap "Sync Now" to verify.',
+      formattedLastSynced: 'Never',
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 9. Stale lastSyncedAt (> 30 minutes old): do NOT claim Cloud Synced
+  const syncDate = new Date(syncState.lastSyncedAt);
+  const syncTimeMs = syncDate.getTime();
+  const isStale = isNaN(syncTimeMs) || (Date.now() - syncTimeMs > 30 * 60 * 1000);
+
+  if (isStale) {
+    return {
+      state: 'paused',
+      badgeLabel: 'Check Sync',
+      badgeColorClass: 'bg-amber-500 text-white',
+      iconName: 'cloud_queue',
+      iconContainerClass: 'bg-amber-500 text-white',
+      isSpinning: false,
+      description: `Last synced at ${formattedLastSynced}. Tap "Sync Now" to confirm cloud status.`,
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 10. Verified recent clean sync (status synced, pendingChanges == 0, lastSyncedAt <= 30 mins)
+  if (syncState?.status === 'synced') {
+    return {
+      state: 'online',
+      badgeLabel: 'Cloud Synced',
+      badgeColorClass: 'bg-secondary text-on-secondary',
+      iconName: 'cloud_done',
+      iconContainerClass: 'bg-secondary text-on-secondary',
+      isSpinning: false,
+      description: 'Continuous 2-Way CouchDB Multi-Device Sync Active',
+      formattedLastSynced,
+      pendingChanges,
+      conflictsCount,
+    };
+  }
+
+  // 11. Cloud DB configured & Online, fallback idle/paused
+  return {
+    state: 'paused',
+    badgeLabel: 'Cloud Paused',
+    badgeColorClass: 'bg-surface-variant text-on-surface-variant',
+    iconName: 'pause_circle',
+    iconContainerClass: 'bg-surface-variant text-on-surface-variant',
+    isSpinning: false,
+    description: 'Cloud Database Active (Sync paused / idle)',
+    formattedLastSynced,
+    pendingChanges,
+    conflictsCount,
+  };
+}
 
 export interface DataSyncTabProps {
   isSyncingProfile: boolean;
@@ -30,6 +337,7 @@ export interface DataSyncTabProps {
   isDemoMode?: boolean;
   isRemoteDbActive?: boolean;
   savedRemoteUrl?: string;
+  isOnline?: boolean;
   handleSwitchToOffline?: () => void;
   handleReconnectCloud?: () => void;
   handleExitDemoMode?: () => void;
@@ -63,16 +371,52 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   isDemoMode = false,
   isRemoteDbActive = false,
   savedRemoteUrl,
+  isOnline: propIsOnline,
   handleSwitchToOffline,
   handleReconnectCloud,
   handleExitDemoMode,
 }) => {
   const activeConflicts = propConflicts ?? syncState?.conflicts ?? [];
+  const uniqueDocCount = new Set(activeConflicts.map((c) => c.docId || `${c.docType}:${c.entityId}`)).size;
   const hasSavedUrl = Boolean(
     syncState?.remoteUrl?.trim() ||
     savedRemoteUrl?.trim() ||
     (typeof (pouch as any)?.getStoredRemoteUrl === 'function' && (pouch as any).getStoredRemoteUrl()?.trim())
   );
+
+  const [networkOnline, setNetworkOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  useEffect(() => {
+    const onOnline = () => setNetworkOnline(true);
+    const onOffline = () => setNetworkOnline(false);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', onOnline);
+      window.addEventListener('offline', onOffline);
+      return () => {
+        window.removeEventListener('online', onOnline);
+        window.removeEventListener('offline', onOffline);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof (pouch as any)?.refreshConflicts === 'function') {
+      pouch.refreshConflicts().catch(() => {});
+    }
+  }, []);
+
+  const effectiveOnline = propIsOnline !== undefined ? propIsOnline : networkOnline;
+
+  const derived = deriveSyncStatus({
+    syncState,
+    conflicts: activeConflicts,
+    isSyncStarting,
+    isDemoMode,
+    isRemoteDbActive,
+    hasSavedUrl,
+    activeDbName,
+    isOnline: effectiveOnline,
+  });
 
   const [isProbing, setIsProbing] = useState(false);
   const [probeDiagnostic, setProbeDiagnostic] = useState<{
@@ -174,8 +518,8 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 </span>
                 <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
               </div>
-              <span className="text-[11px] text-on-surface-variant truncate">
-                Last Synced: {lastProfileSyncTime} • All counter devices paired
+              <span className="text-[11px] text-on-surface-variant truncate" data-testid="last-settings-sync-time">
+                Settings last synced: {formatLastSyncedTime(lastProfileSyncTime)}
               </span>
             </div>
           </div>
@@ -251,75 +595,55 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
       <section className="bg-secondary-container/60 text-on-secondary-container rounded-2xl p-4 sm:p-5 shadow-sm border border-secondary/20 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm ${
-              syncState.status === 'error'
-                ? 'bg-error text-on-error'
-                : syncState.status === 'syncing' || syncState.status === 'connecting'
-                ? 'bg-amber-500 text-white'
-                : 'bg-secondary text-on-secondary'
-            }`}>
-              <span className={`material-symbols-outlined text-[22px] ${
-                syncState.status === 'syncing' || syncState.status === 'connecting' ? 'animate-spin' : ''
-              }`}>
-                {syncState.status === 'error'
-                  ? 'cloud_off'
-                  : syncState.status === 'syncing' || syncState.status === 'connecting'
-                  ? 'sync'
-                  : syncState.status === 'synced' && syncState.remoteUrl
-                  ? 'cloud_done'
-                  : 'offline_pin'}
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-on-secondary flex-shrink-0 shadow-sm ${derived.iconContainerClass}`}>
+              <span className={`material-symbols-outlined text-[22px] ${derived.isSpinning ? 'animate-spin' : ''}`}>
+                {derived.iconName}
               </span>
             </div>
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
                   Store Data Protected
                 </span>
-                {isDemoMode ? (
-                  <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
-                    Demo Sandbox ({activeDbName || 'vyapar_demo'})
+                <span
+                  data-testid="sync-status-badge"
+                  data-sync-state={derived.state}
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${derived.badgeColorClass}`}
+                >
+                  {derived.badgeLabel}
+                </span>
+                {derived.pendingChanges > 0 && (
+                  <span
+                    data-testid="sync-pending-badge"
+                    className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-200 text-[10px] font-bold"
+                  >
+                    {derived.pendingChanges} Pending
                   </span>
-                ) : isRemoteDbActive && hasSavedUrl ? (
-                  syncState.status === 'synced' ? (
-                    <span className="px-1.5 py-0.5 rounded-md bg-secondary text-on-secondary text-[10px] font-bold uppercase tracking-wider">
-                      Cloud Synced
-                    </span>
-                  ) : syncState.status === 'syncing' ? (
-                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
-                      Syncing...
-                    </span>
-                  ) : syncState.status === 'connecting' ? (
-                    <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold uppercase tracking-wider">
-                      Connecting...
-                    </span>
-                  ) : syncState.status === 'error' ? (
-                    <span className="px-1.5 py-0.5 rounded-md bg-error text-on-error text-[10px] font-bold uppercase tracking-wider">
-                      Sync Error
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
-                      Cloud Paused
-                    </span>
-                  )
-                ) : (
-                  <span className="px-1.5 py-0.5 rounded-md bg-surface-variant text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
-                    Offline Primary
+                )}
+                {activeConflicts.length > 0 && (
+                  <span
+                    data-testid="sync-conflicts-notice-badge"
+                    className="px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-900 dark:text-rose-200 text-[10px] font-bold"
+                  >
+                    {activeConflicts.length} Conflict Revision{activeConflicts.length > 1 ? 's' : ''} ({uniqueDocCount} Document{uniqueDocCount > 1 ? 's' : ''}) • Review Required
                   </span>
                 )}
               </div>
-              <span className="text-[11px] text-on-secondary-container/80 truncate">
-                {isDemoMode
-                  ? 'Demo Sandbox: Changes are isolated to vyapar_demo and will not sync to cloud'
-                  : syncState.status === 'error'
-                  ? syncState.error || 'Sync error: check remote CouchDB connection or permissions'
-                  : (syncState.status === 'synced' || syncState.status === 'syncing') && syncState.remoteUrl && isRemoteDbActive
-                  ? 'Continuous 2-Way CouchDB Multi-Device Sync Active'
-                  : isRemoteDbActive
-                  ? 'Cloud Database Active (Sync paused / idle)'
-                  : hasSavedUrl
-                  ? 'Offline Database Active (Cloud sync link saved)'
-                  : '100% Offline-First IndexedDB Storage Ready'}
-              </span>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-on-secondary-container/80 pt-0.5">
+                <span data-testid="last-couchdb-sync-time" className="font-medium">
+                  Last Synced: {derived.formattedLastSynced}
+                </span>
+                <span>•</span>
+                <span className="truncate">{derived.description}</span>
+                {derived.pendingChanges > 0 && (
+                  <>
+                    <span>•</span>
+                    <span data-testid="sync-pending-changes" className="text-amber-800 dark:text-amber-200 font-semibold">
+                      {derived.pendingChanges} local change{derived.pendingChanges > 1 ? 's' : ''} pending
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -565,93 +889,107 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                   data-testid="conflict-queue-badge"
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     activeConflicts.length > 0
-                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
                       : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
                   }`}
                 >
                   {activeConflicts.length > 0
-                    ? `${activeConflicts.length} Unresolved Conflict${activeConflicts.length > 1 ? 's' : ''}`
+                    ? `${activeConflicts.length} Unresolved Conflict${activeConflicts.length > 1 ? 's' : ''} (${uniqueDocCount} Document${uniqueDocCount > 1 ? 's' : ''})`
                     : '0 Conflicts • Verified Clean'}
                 </span>
               </div>
               <span className="text-[11px] text-on-surface-variant truncate">
-                PouchDB _rev branch resolution &amp; multi-terminal concurrent mutation safety
+                {activeConflicts.length > 0
+                  ? `${activeConflicts.length} conflicting revision branch${activeConflicts.length > 1 ? 'es' : ''} across ${uniqueDocCount} document${uniqueDocCount > 1 ? 's' : ''}. Select a version to retain for each document.`
+                  : 'PouchDB _rev branch resolution & multi-terminal concurrent mutation safety'}
               </span>
             </div>
           </div>
 
           {activeConflicts.length > 0 && (
-            <span className="text-xs text-amber-600 font-semibold flex items-center gap-1">
-              Action required
+            <span
+              data-testid="conflict-review-required-label"
+              className="text-xs text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[15px]">rate_review</span>
+              <span>Review required</span>
             </span>
           )}
         </div>
 
         {activeConflicts.length > 0 ? (
           <div className="flex flex-col gap-3 pt-2 border-t border-outline-variant/15">
-            {activeConflicts.map((conflict) => (
-              <div
-                key={conflict.id}
-                data-testid={`conflict-item-${conflict.docId}`}
-                className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[10px] font-mono font-bold uppercase">
-                      {conflict.docType}
-                    </span>
-                    <span className="text-xs font-bold text-on-surface truncate">
-                      {conflict.entityId}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-on-surface-variant font-mono">
-                    {conflict.detectedAt ? new Date(conflict.detectedAt).toLocaleTimeString() : ''}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-on-surface">Version A (Winning / Local)</span>
-                      <span className="text-[10px] text-on-surface-variant font-mono">
-                        {conflict.winningRev ? conflict.winningRev.slice(0, 8) + '...' : 'rev-1'}
+            {activeConflicts.map((conflict) => {
+              const humanLabel = getConflictHumanLabel(conflict);
+              return (
+                <div
+                  key={conflict.id}
+                  data-testid={`conflict-item-${conflict.docId}`}
+                  className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col gap-2.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[10px] font-mono font-bold uppercase">
+                        {conflict.docType}
                       </span>
+                      <span className="text-xs font-bold text-on-surface truncate font-mono">
+                        {conflict.entityId}
+                      </span>
+                      {humanLabel && (
+                        <span
+                          data-testid={`conflict-label-${conflict.docId}`}
+                          className="text-xs font-semibold text-on-surface-variant truncate"
+                        >
+                          • {humanLabel}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[11px] text-on-surface-variant font-mono truncate">
-                      Updated: {conflict.winningDoc?.updatedAt || 'N/A'}
-                    </p>
-                    <button
-                      type="button"
-                      data-testid={`resolve-winning-${conflict.docId}`}
-                      onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_winning')}
-                      className="mt-1 px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold cursor-pointer hover:opacity-90 transition-opacity"
-                    >
-                      Keep Version A
-                    </button>
                   </div>
 
-                  <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-on-surface">Version B (Conflicting / Remote)</span>
-                      <span className="text-[10px] text-on-surface-variant font-mono">
-                        {conflict.conflictingRev ? conflict.conflictingRev.slice(0, 8) + '...' : 'rev-2'}
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-on-surface">Version A (Winning Revision)</span>
+                        <span className="text-[10px] text-on-surface-variant font-mono">
+                          {conflict.winningRev ? conflict.winningRev.slice(0, 8) + '...' : 'rev-1'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant font-mono truncate">
+                        Updated: {formatConflictTimestamp(conflict.winningDoc?.updatedAt || conflict.winningDoc?.syncedAt || conflict.winningDoc?.createdAt)}
+                      </p>
+                      <button
+                        type="button"
+                        data-testid={`resolve-winning-${conflict.docId}`}
+                        onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_winning')}
+                        className="mt-1 px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold cursor-pointer hover:opacity-90 transition-opacity"
+                      >
+                        Keep Version A
+                      </button>
                     </div>
-                    <p className="text-[11px] text-on-surface-variant font-mono truncate">
-                      Updated: {conflict.conflictingDoc?.updatedAt || 'N/A'}
-                    </p>
-                    <button
-                      type="button"
-                      data-testid={`resolve-conflicting-${conflict.docId}`}
-                      onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_conflicting')}
-                      className="mt-1 px-2.5 py-1.5 rounded-lg bg-outline-variant/50 text-on-surface text-xs font-bold cursor-pointer hover:bg-outline-variant transition-colors"
-                    >
-                      Keep Version B
-                    </button>
+
+                    <div className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-on-surface">Version B (Conflicting Revision)</span>
+                        <span className="text-[10px] text-on-surface-variant font-mono">
+                          {conflict.conflictingRev ? conflict.conflictingRev.slice(0, 8) + '...' : 'rev-2'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant font-mono truncate">
+                        Updated: {formatConflictTimestamp(conflict.conflictingDoc?.updatedAt || conflict.conflictingDoc?.syncedAt || conflict.conflictingDoc?.createdAt)}
+                      </p>
+                      <button
+                        type="button"
+                        data-testid={`resolve-conflicting-${conflict.docId}`}
+                        onClick={() => handleResolveConflict && handleResolveConflict(conflict.id, 'keep_conflicting')}
+                        className="mt-1 px-2.5 py-1.5 rounded-lg bg-outline-variant/50 text-on-surface text-xs font-bold cursor-pointer hover:bg-outline-variant transition-colors"
+                      >
+                        Keep Version B
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2 text-xs text-on-surface-variant">

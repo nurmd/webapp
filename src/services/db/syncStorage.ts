@@ -113,6 +113,26 @@ export class SyncStorage extends BackupRestoreStorage {
         }
         this.notifyListeners();
       });
+
+      // Diagnostic instrumentation to record hydration / database state in case of unexpected errors
+      window.addEventListener('error', (event) => {
+        if (event.message?.includes('185') || event.message?.includes('Maximum update depth')) {
+          const diagState = {
+            time: new Date().toISOString(),
+            error: event.message,
+            activeDb: typeof (pouch as any)?.getActiveDbName === 'function' ? pouch.getActiveDbName() : 'unknown',
+            lastHydratedDb: typeof localStorage !== 'undefined' ? localStorage.getItem(POUCH_PERSIST_KEYS.LAST_HYDRATED_DB) : 'unknown',
+            isRemoteActive: typeof (pouch as any)?.isRemoteDbActive === 'function' ? pouch.isRemoteDbActive() : false,
+            isDemoMode: typeof (pouch as any)?.isDemoMode === 'function' ? pouch.isDemoMode() : false,
+            bankAccountsCount: this.getBankAccounts().length,
+            partiesCount: this.getParties().length,
+          };
+          try {
+            localStorage.setItem('gst_diag_last_mount_crash', JSON.stringify(diagState));
+          } catch {}
+          console.error('[DIAGNOSTIC] First-launch mount error state recorded:', diagState);
+        }
+      });
     }
 
     // Perform initial PouchDB migration and setup live synchronization hooks

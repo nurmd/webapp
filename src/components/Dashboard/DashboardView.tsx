@@ -23,6 +23,9 @@ import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { db } from '../../services/db.ts';
 import { getOverdueDays } from '../../core/accounting/aging.ts';
+import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
+import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
+import { computePartyDues } from '../../core/accounting/partyDues.ts';
 
 export type ActivityType = 'SALE' | 'PURCHASE' | 'VOUCHER' | 'EXPENSE';
 export type CashFlowDirection = 'IN' | 'OUT';
@@ -161,33 +164,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return activeInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
   }, [activeInvoices]);
 
-  const { totalReceivables, totalPayables, debtorParties, creditorParties } = useMemo(() => {
-    let rec = 0;
-    let pay = 0;
-    const debtors: Party[] = [];
-    const creditors: Party[] = [];
-
-    for (const p of activeParties) {
-      if (p.currentBalance > 0) {
-        rec += p.currentBalance;
-        debtors.push(p);
-      } else if (p.currentBalance < 0) {
-        pay += Math.abs(p.currentBalance);
-        creditors.push(p);
-      }
-    }
-
-    return {
-      totalReceivables: rec,
-      totalPayables: pay,
-      debtorParties: debtors,
-      creditorParties: creditors,
-    };
-  }, [activeParties]);
+  const { totalReceivables, totalPayables, debtorParties, creditorParties } = useMemo(
+    () => computePartyDues(activeParties),
+    [activeParties]
+  );
 
   const lowStockItems = useMemo(() => {
-    return activeItems.filter((i) => i.currentStock <= i.minStockAlert);
+    return getItemsNeedingRestock(activeItems);
   }, [activeItems]);
+
+  const bankAccounts = db.getBankAccounts() || [];
+  const cashBankTransactions = db.getCashBankTransactions() || [];
+
+  const totalCashBankBalance = useMemo(() => {
+    const summary = computeCashBankSummary({
+      accounts: bankAccounts,
+      transactions: cashBankTransactions,
+      invoices: activeInvoices,
+      purchases: activePurchases,
+      expenses: activeExpenses,
+      vouchers: activeVouchers,
+    });
+    return summary.totalLiquidBalance;
+  }, [
+    bankAccounts,
+    cashBankTransactions,
+    activeInvoices,
+    activePurchases,
+    activeVouchers,
+    activeExpenses,
+  ]);
 
   // 1. Build Consolidated Multi-Entity Activity Timeline (R1)
   const allActivities = useMemo(() => {
@@ -686,7 +692,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 py-3 max-w-7xl mx-auto">
-      {/* 1. Low Stock Notice (Only visible when items are low on stock) */}
+      {/* 1. Restock Notice (visible when items are low or out of stock) */}
       {lowStockItems.length > 0 && (
         <div
           onClick={() => onNavigateTab('inventory')}
@@ -695,7 +701,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium min-w-0">
             <span className="material-symbols-outlined text-[18px] text-amber-600 flex-shrink-0">warning</span>
             <span className="truncate">
-              <strong>{lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''}</strong> running low on stock
+              <strong>{lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''}</strong>{' '}
+              {lowStockItems.length === 1 ? 'needs restocking' : 'need restocking'}
             </span>
           </div>
           <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0 ml-2">
@@ -826,9 +833,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0 text-secondary font-bold text-xs group-hover:underline">
-              <span>Passbook</span>
-              <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <span
+                data-testid="dashboard-cash-bank-balance"
+                className="font-tabular-data text-xs sm:text-sm font-bold text-on-surface"
+              >
+                {formatINR(totalCashBankBalance || 0)}
+              </span>
+              <div className="flex items-center gap-1 text-secondary font-bold text-xs group-hover:underline">
+                <span>Passbook</span>
+                <span className="material-symbols-outlined text-[15px]">chevron_right</span>
+              </div>
             </div>
           </div>
         </section>

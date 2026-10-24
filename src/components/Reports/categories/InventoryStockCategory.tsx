@@ -2,6 +2,7 @@ import React, { useMemo, useEffect } from 'react';
 import { InventoryItem } from '../../../models/item.ts';
 import { CompanyProfile } from '../../../models/company.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
+import { isItemNeedingRestock, isItemActive } from '../../../core/utils/itemStatus.ts';
 import {
   aggregateStockValuation,
   StockValuationSummary,
@@ -27,7 +28,7 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
   onRegisterExportHandlers,
 }) => {
   const activeItems = useMemo(
-    () => items.filter((item) => !item.isDisabled),
+    () => items.filter(isItemActive),
     [items]
   );
 
@@ -43,10 +44,7 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
     let list = activeItems;
 
     if (subReport === 'low_stock') {
-      list = list.filter((i) => {
-        const minAlert = i.minStockAlert !== undefined ? i.minStockAlert : 5;
-        return (i.currentStock || 0) <= minAlert;
-      });
+      list = list.filter(isItemNeedingRestock);
     }
 
     if (q) {
@@ -138,7 +136,10 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
         { label: 'Total Valuation (Cost)', value: formatINR(totalCost) },
         { label: 'Total Valuation (Sale)', value: formatINR(totalSale) },
         { label: 'Expected Gross Margin', value: `${avgMargin.toFixed(1)}%` },
-        { label: 'Low Stock Items', value: String(stockValuation.lowStockCount) },
+        {
+          label: 'Need Restock',
+          value: `${stockValuation.needRestockCount} (${stockValuation.lowStockCount} Low, ${stockValuation.outOfStockCount + stockValuation.negativeStockCount} Out)`,
+        },
       ],
       headers: ['Item Name', 'Category', 'HSN Code', 'Stock', 'Unit', 'Buy Price (₹)', 'Sell Price (₹)', 'Valuation @ Cost (₹)', 'Valuation @ Sale (₹)', 'Status'],
       rows: filteredItems.map((i) => {

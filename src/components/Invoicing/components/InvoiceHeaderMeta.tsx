@@ -78,7 +78,7 @@ function formatDateDisplay(dateStr: string): string {
   try {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      return `${parts[2]}/${parts[1]}/${parts[0].slice(2)}`;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
   } catch {}
   return dateStr;
@@ -609,7 +609,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
                   : 'Reverse Charge Mechanism is INACTIVE (Forward Charge)'
               }
             >
-              <span className="text-[9px] uppercase font-bold text-outline">RCM</span>
+              <span className="text-[10px] font-bold text-outline">Reverse Charge (RCM)</span>
               <span
                 className={`w-2 h-2 rounded-full transition-colors ${
                   isRcm ? 'bg-amber-500 shadow-xs' : 'bg-outline-variant/60'

@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { db } from '../../services/db.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { countLowStockItems, isItemNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { InventoryItemCard } from './InventoryItemCard.tsx';
 import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
@@ -295,8 +296,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
   // Financial Metrics (Tactile Fintech Card)
   const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
-  const lowStockItems = items.filter((i) => i.currentStock <= i.minStockAlert);
-  const lowStockCount = lowStockItems.length;
+  const lowStockCount = useMemo(() => countLowStockItems(items), [items]);
   const categories = useMemo(() => {
     const managed = db.getCategories().map((c) => c.name);
     const fromItems = items.map((i) => i.category);
@@ -350,7 +350,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         if (filterStockStatus === 'IN_STOCK' && item.currentStock <= 0) {
           return false;
         }
-        if (filterStockStatus === 'LOW_STOCK' && (item.currentStock > item.minStockAlert || item.currentStock <= 0)) {
+        if (filterStockStatus === 'LOW_STOCK' && !isItemNeedingRestock(item)) {
           return false;
         }
         if (filterStockStatus === 'OUT_OF_STOCK' && item.currentStock > 0) {
@@ -416,7 +416,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-24 bg-surface min-h-screen">
+    <div className="flex flex-col w-full pb-36 sm:pb-40 bg-surface min-h-screen">
       <div className="flex flex-col w-full max-w-7xl mx-auto md:px-6">
         {/* Top Stock Value & Financial Valuation Summary (Tactile Fintech Card) */}
         <section className="px-margin-mobile pt-space-sm pb-space-xs">
@@ -553,7 +553,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     {filterStockStatus === 'IN_STOCK'
                       ? 'In Stock'
                       : filterStockStatus === 'LOW_STOCK'
-                      ? 'Low Stock'
+                      ? 'Need Restock'
                       : 'Out of Stock'}
                   </span>
                   <span className="material-symbols-outlined text-[13px]">close</span>
@@ -686,7 +686,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 setFilterStockStatus(filterStockStatus === 'LOW_STOCK' ? 'ALL' : 'LOW_STOCK');
               }}
             >
-              Low Stock ({lowStockCount})
+              Need Restock ({lowStockCount})
             </button>
 
             {disabledItemsCount > 0 && (
@@ -726,7 +726,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Inventory Line Items Feed */}
-        <section className="px-margin-mobile md:px-0 grid grid-cols-1 md:grid-cols-2 gap-space-sm pb-28">
+        <section className="px-margin-mobile md:px-0 grid grid-cols-1 md:grid-cols-2 gap-space-sm pb-36 sm:pb-40">
           {filtered.length === 0 ? (
             <div className="md:col-span-2 w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant">
               <span className="material-symbols-outlined text-[36px] text-outline mb-2">

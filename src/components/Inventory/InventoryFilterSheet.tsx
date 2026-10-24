@@ -111,7 +111,7 @@ export const InventoryFilterSheet: React.FC<InventoryFilterSheetProps> = ({
             {[
               { id: 'ALL', label: 'All' },
               { id: 'IN_STOCK', label: 'In Stock' },
-              { id: 'LOW_STOCK', label: 'Low' },
+              { id: 'LOW_STOCK', label: 'Restock' },
               { id: 'OUT_OF_STOCK', label: 'Out' },
             ].map((s) => (
               <button

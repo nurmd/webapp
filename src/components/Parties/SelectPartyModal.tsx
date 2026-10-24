@@ -325,7 +325,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                         )}
                       </div>
                       <span className="text-[11px] text-on-surface-variant truncate">
-                        {party.phone} • {party.billingAddress || `State ${party.stateCode}`}
+                        {(!party.phone || !party.phone.trim() || party.phone.trim() === '00' || party.phone.trim() === '0' ? 'No phone' : party.phone)} • {party.billingAddress || `State ${party.stateCode}`}
                       </span>
                     </div>
                   </div>
