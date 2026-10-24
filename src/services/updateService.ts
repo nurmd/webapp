@@ -219,12 +219,11 @@ class UpdateService {
       (a: any) => a.name && a.name.endsWith('.sha256')
     );
 
-    const defaultRawApkUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`;
-    const defaultRawShaUrl = `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`;
-
     const dynamicNotes = notes.length > 0 
       ? notes 
       : await this.fetchDynamicReleaseNotes(repo, cleanVersion);
+
+    const hasApkAsset = !!apkAsset?.browser_download_url;
 
     return {
       version: cleanVersion,
@@ -232,11 +231,13 @@ class UpdateService {
       releaseDate: data.published_at ? data.published_at.split('T')[0] : new Date().toISOString().split('T')[0],
       releaseTitle: data.name || `Vyapar PRO v${cleanVersion}`,
       releaseNotes: dynamicNotes,
-      apkUrl: apkAsset?.browser_download_url || defaultRawApkUrl,
-      apkSize: apkAsset?.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : '5.4 MB'),
+      apkUrl: hasApkAsset ? apkAsset.browser_download_url : '',
+      apkSize: hasApkAsset
+        ? (apkAsset.size ? `${(apkAsset.size / (1024 * 1024)).toFixed(1)} MB` : (isPwa ? 'Web PWA' : 'Android APK'))
+        : (isPwa ? 'Web PWA' : 'Release page'),
       sha256: parsedSha256,
-      sha256Url: shaAsset?.browser_download_url || defaultRawShaUrl,
-      htmlUrl: data.html_url,
+      sha256Url: hasApkAsset ? shaAsset?.browser_download_url : undefined,
+      htmlUrl: data.html_url || `https://github.com/${repo}/releases`,
       isPwa,
       pwaTarballUrl: pwaAsset?.browser_download_url,
       isMandatory: false,
@@ -348,10 +349,10 @@ class UpdateService {
             releaseDate: vData.buildTime ? vData.buildTime.split('T')[0] : new Date().toISOString().split('T')[0],
             releaseTitle: `Vyapar PRO v${rawVersion}`,
             releaseNotes: notes,
-            apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
-            apkSize: isPwa ? 'Web PWA' : '5.4 MB',
-            sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
-            htmlUrl: `https://github.com/${repo}`,
+            apkUrl: '',
+            apkSize: isPwa ? 'Web PWA' : 'Release page',
+            sha256Url: undefined,
+            htmlUrl: `https://github.com/${repo}/releases`,
             isPwa,
           };
 
@@ -396,10 +397,10 @@ class UpdateService {
           releaseDate: new Date().toISOString().split('T')[0],
           releaseTitle: `Vyapar PRO v${githubVersion} (GitHub Master)`,
           releaseNotes: dynamicNotes,
-          apkUrl: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk`,
-          apkSize: isPwa ? 'Web PWA' : '5.4 MB',
-          sha256Url: `https://raw.githubusercontent.com/${repo}/master/dist-android/GSTBilling-Vyapar.apk.sha256`,
-          htmlUrl: `https://github.com/${repo}`,
+          apkUrl: '',
+          apkSize: isPwa ? 'Web PWA' : 'Release page',
+          sha256Url: undefined,
+          htmlUrl: `https://github.com/${repo}/releases`,
           isPwa,
           commitMessage: commitMsg,
         };
@@ -565,6 +566,11 @@ class UpdateService {
   }
 
   public startInternalDownload(options: OtaDownloadOptions): () => void {
+    if (!options.apkUrl || !options.apkUrl.trim()) {
+      options.onError?.('Cannot download: No APK URL available for this release.', false);
+      return () => {};
+    }
+
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
 
     if (bridge && typeof bridge.startInternalDownload === 'function') {
@@ -673,6 +679,19 @@ class UpdateService {
     }
     if (typeof window !== 'undefined') {
       window.open(apkUrl, '_blank');
+    }
+  }
+
+  public openReleasePage(url?: string): void {
+    const repo = this.getGitHubRepo();
+    const targetUrl = (url && url.trim()) ? url.trim() : `https://github.com/${repo}/releases`;
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
+    if (bridge && typeof bridge.openUrl === 'function') {
+      bridge.openUrl(targetUrl);
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.open(targetUrl, '_blank');
     }
   }
 }

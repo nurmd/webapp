@@ -36,6 +36,11 @@ jobs:
           bash scripts/generate-version.sh
           npm run build
 
+      - name: Verify Types & Test Suite
+        run: |
+          npx tsc --noEmit
+          npm run test:all -- --reporter=dot
+
       - name: Package PWA Tarball
         run: |
           mkdir -p dist-pwa

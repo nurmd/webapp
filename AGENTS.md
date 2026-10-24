@@ -113,6 +113,6 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 
 ## 14. Code-Split Asset Parity & APK Build Sequencing
 - `challenger2M5ApkPackageStress.test.ts` validates that all code-split `.js` chunks in `dist/assets/` match the contents of `dist-android/GSTBilling-Vyapar.apk`.
-- Whenever modifying frontend code that changes Vite chunk hashes, run `./scripts/build-apk.sh` before running `npm test`.
+- Whenever modifying frontend code that changes Vite chunk hashes, run `npm run build` before `npm run test:all`; build the APK before publishing.
 
 

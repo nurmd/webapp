@@ -119,8 +119,8 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     container.remove();
   });
 
-  // TC-SET-01: Navigation Menu - 7 Categories Render
-  it('TC-SET-01: renders all 7 category navigation buttons with labels, subtitles, and icons', () => {
+  // TC-SET-01 & TC-SET-02: Navigation Menu & Default View
+  it('TC-SET-01 & TC-SET-02: renders all 7 category navigation buttons and defaults to Business Profile view', () => {
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
     });
@@ -144,148 +144,99 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     // Assert Lucide SVG icons are present in the sidebar
     const svgs = container.querySelectorAll('[data-testid="settings-sidebar"] svg');
     expect(svgs.length).toBeGreaterThanOrEqual(7);
-  });
 
-  // TC-SET-02: Default View - Initial Selection
-  it('TC-SET-02: renders Category 1 (Business Profile) as active by default on mount', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
-    // Verify Business Profile content is rendered
+    // Verify Business Profile content is rendered by default
     expect(container.textContent).toContain('Vyapar Demo Mart');
     expect(container.textContent).toContain('27AABCU9603R1ZN');
     expect(container.textContent).toContain('GST Portal Verified');
     expect(container.textContent).toContain('GST & Legal Tax Configuration');
   });
 
-  // TC-SET-03: Category Switch - Billing & Invoices
-  it('TC-SET-03: clicking "Billing & Invoices" renders invoice series, payment QR, default format, and alerts', () => {
+  // TC-SET-03 to TC-SET-08: Sequential Category Switching
+  it('TC-SET-03 to TC-SET-08: switches sequentially through categories 2 through 7 and renders expected content', () => {
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
     });
 
+    // TC-SET-03: Billing & Invoices
     const billingBtn = container.querySelector('[data-testid="category-btn-billing_invoices"]') as HTMLButtonElement;
     act(() => {
       billingBtn.click();
     });
-
     expect(container.textContent).toContain('Invoice Numbering & Prefix');
     expect(container.textContent).toContain('Payment QR & Bank Details');
     expect(container.textContent).toContain('Default Print Format');
     expect(container.textContent).toContain('Automated WhatsApp & SMS Alerts');
-  });
 
-  // TC-SET-04: Category Switch - Inventory & Items
-  it('TC-SET-04: clicking "Inventory & Items" renders ItemSettingsTab with Negative Stock and Buy Price controls', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // TC-SET-04: Inventory & Items
     const itemsBtn = container.querySelector('[data-testid="category-btn-inventory_items"]') as HTMLButtonElement;
     act(() => {
       itemsBtn.click();
     });
-
     expect(container.textContent).toContain('Items & Inventory Settings');
     expect(container.textContent).toContain('Allow Negative Stock');
     expect(container.textContent).toContain('Show Buy / Purchase Prices');
-  });
 
-  // TC-SET-05: Category Switch - Hardware & Printing
-  it('TC-SET-05: clicking "Hardware & Printing" renders PrintSettingsView with A4 and Thermal slip options', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // TC-SET-05: Hardware & Printing
     const printBtn = container.querySelector('[data-testid="category-btn-hardware_printing"]') as HTMLButtonElement;
     act(() => {
       printBtn.click();
     });
-
     expect(container.textContent).toContain('Print & Invoice Settings');
     expect(container.textContent).toContain('A4 Laser');
     expect(container.textContent).toContain('Thermal POS');
-  });
 
-  // TC-SET-06: Category Switch - App Preferences
-  it('TC-SET-06: clicking "App Preferences" renders App Language, App Lock PIN, and OTA update card', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // TC-SET-06: App Preferences
     const prefBtn = container.querySelector('[data-testid="category-btn-app_preferences"]') as HTMLButtonElement;
     act(() => {
       prefBtn.click();
     });
-
     expect(container.textContent).toContain('App Updates & OTA');
     expect(container.textContent).toContain('App Language');
     expect(container.textContent).toContain('App Lock & 4-Digit PIN');
-  });
 
-  // TC-SET-07: Category Switch - Data & Sync
-  it('TC-SET-07: clicking "Data & Sync" renders multi-device sync, Pair via QR, and CouchDB cloud sync', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // TC-SET-07: Data & Sync
     const syncBtn = container.querySelector('[data-testid="category-btn-data_sync"]') as HTMLButtonElement;
     act(() => {
       syncBtn.click();
     });
-
     expect(container.textContent).toContain('Sync All Settings Across Devices');
     expect(container.textContent).toContain('Pair via QR');
     expect(container.textContent).toContain('Import Settings');
     expect(container.textContent).toContain('Store Data Protected');
     expect(container.textContent).toContain('Sync Now');
-  });
 
-  // TC-SET-08: Category Switch - Security & Audit
-  it('TC-SET-08: clicking "Security & Audit" renders AuditLogView with MCA Rule 3(1) trail', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // TC-SET-08: Security & Audit
     const auditBtn = container.querySelector('[data-testid="category-btn-security_audit"]') as HTMLButtonElement;
     act(() => {
       auditBtn.click();
     });
-
     expect(container.textContent).toContain('Audit Trail');
   });
 
-  // TC-SET-09: Custom Events - Legacy Tab Compatibility
-  it('TC-SET-09: dispatches switch_settings_tab with legacy "items" detail and switches to inventory_items', () => {
+  // TC-SET-09 & TC-SET-10: Custom Events - Tab Navigation
+  it('TC-SET-09 & TC-SET-10: handles switch_settings_tab custom events for legacy and direct categories', () => {
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
     });
 
+    // Legacy 'items' event switches to inventory_items
     act(() => {
       window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'items' }));
     });
-
     expect(container.textContent).toContain('Items & Inventory Settings');
     expect(container.textContent).toContain('Allow Negative Stock');
-  });
 
-  // TC-SET-10: Custom Events - Direct Category Event
-  it('TC-SET-10: dispatches switch_settings_tab with direct "billing_invoices" detail and switches view', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
+    // Direct 'billing_invoices' event switches to billing_invoices
     act(() => {
       window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: 'billing_invoices' }));
     });
-
     expect(container.textContent).toContain('Invoice Numbering & Prefix');
     expect(container.textContent).toContain('Payment QR & Bank Details');
   });
 
-  // TC-SET-11: Mobile Ergonomics - Mobile List-to-Detail
-  it('TC-SET-11: selecting a category on mobile opens the detail view and displays the Back button', () => {
+  // TC-SET-11 & TC-SET-12: Mobile Navigation - List to Detail and Back
+  it('TC-SET-11 & TC-SET-12: opens detail view with back button on mobile, and returns to category list on back click', () => {
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
     });
@@ -295,25 +246,11 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
       prefBtn.click();
     });
 
-    const backBtn = container.querySelector('[data-testid="mobile-back-btn"]');
+    const backBtn = container.querySelector('[data-testid="mobile-back-btn"]') as HTMLButtonElement;
     expect(backBtn).not.toBeNull();
     expect(backBtn?.textContent).toContain('Back to Settings');
-  });
 
-  // TC-SET-12: Mobile Ergonomics - Mobile Back Button
-  it('TC-SET-12: clicking "Back to Settings" on mobile detail view returns to category list', () => {
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
-    // Enter detail view
-    const prefBtn = container.querySelector('[data-testid="category-btn-app_preferences"]') as HTMLButtonElement;
-    act(() => {
-      prefBtn.click();
-    });
-
-    // Click back button
-    const backBtn = container.querySelector('[data-testid="mobile-back-btn"]') as HTMLButtonElement;
+    // Click back button to return
     act(() => {
       backBtn.click();
     });
@@ -373,9 +310,10 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     expect(testStorage.getItem('defaultPrintOption')).toBe('Thermal-80mm');
   });
 
-  // TC-SET-15: State Persistence - Allow Negative Stock
-  it('TC-SET-15: toggling Allow Negative Stock calls db.setAllowNegativeStock', () => {
+  // TC-SET-15 & TC-SET-16: Inventory & Items Settings Persistence
+  it('TC-SET-15 & TC-SET-16: toggles Allow Negative Stock and Buy Price Visibility calling db setters', () => {
     const negStockSpy = vi.spyOn(db, 'setAllowNegativeStock');
+    const buyPriceSpy = vi.spyOn(db, 'setBuyPriceVisibility');
 
     act(() => {
       root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
@@ -394,20 +332,6 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
     });
 
     expect(negStockSpy).toHaveBeenCalledWith(true);
-  });
-
-  // TC-SET-16: State Persistence - Buy Price Visibility
-  it('TC-SET-16: toggling Buy Price Visibility calls db.setBuyPriceVisibility', () => {
-    const buyPriceSpy = vi.spyOn(db, 'setBuyPriceVisibility');
-
-    act(() => {
-      root.render(<CompanySettingsView company={sampleCompany} onSave={vi.fn()} />);
-    });
-
-    const itemsBtn = container.querySelector('[data-testid="category-btn-inventory_items"]') as HTMLButtonElement;
-    act(() => {
-      itemsBtn.click();
-    });
 
     // The buy price checkbox is the second checkbox on ItemSettingsTab
     const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];

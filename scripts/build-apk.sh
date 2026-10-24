@@ -5,10 +5,11 @@ echo "=========================================================="
 echo "   Building GST Billing & Accounting Android APK"
 echo "=========================================================="
 
-APP_DIR="/data/data/com.termux/files/home/gst-billing-app"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 NATIVE_DIR="$APP_DIR/android-native"
-ANDROID_JAR="/data/data/com.termux/files/home/android-sdk/platforms/android-26/android.jar"
-KOTLIN_LIB="/data/data/com.termux/files/usr/opt/kotlin/lib/kotlin-stdlib.jar"
+ANDROID_JAR="${ANDROID_JAR:-/data/data/com.termux/files/home/android-sdk/platforms/android-26/android.jar}"
+KOTLIN_LIB="${KOTLIN_LIB:-/data/data/com.termux/files/usr/opt/kotlin/lib/kotlin-stdlib.jar}"
 
 cd "$APP_DIR"
 

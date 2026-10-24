@@ -337,7 +337,7 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
     vi.restoreAllMocks();
   });
 
-  it('1. Mounts Reports Hub with Top Business Performance Card displaying all 6 core metrics', async () => {
+  it('1. Mounts Reports Hub with Top Performance Card (6 core metrics) and all 10 selectable navigation cards', async () => {
     await act(async () => {
       root.render(
         <BusinessReportsView
@@ -372,25 +372,6 @@ describe('Reports Hub & Dedicated Pages Redesign Integration Suite (reportsHubVi
     expect(container.textContent).toContain('Opening Stock');
     // 6. Closing Stock
     expect(container.textContent).toContain('Closing Stock');
-  });
-
-  it('2. Renders all 10 selectable navigation report cards across Operations and Financials', async () => {
-    await act(async () => {
-      root.render(
-        <BusinessReportsView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          expenses={mockExpenses}
-          items={mockItems}
-          parties={mockParties}
-          bankAccounts={mockBankAccounts}
-          cashBankTxns={mockCashBankTxns}
-          loans={mockLoans}
-          loanTransactions={mockLoanTransactions}
-        />
-      );
-    });
 
     // Section 1: Operations & Tax Compliance
     expect(container.textContent).toContain('Operations & Tax Compliance');

@@ -316,8 +316,14 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
 
 All features must maintain 100% test coverage with zero regressions:
 ```bash
-# Run full Vitest suite
+# Run core Vitest suite (fast)
 npm test
+
+# Run heavy UI integration suites
+npm run test:ui
+
+# Run the full suite (CI/release gate)
+npm run test:all
 
 # Run TypeScript compilation check
 npx tsc --noEmit
@@ -347,8 +353,8 @@ Refer to [`.agents/skills/vyapar-release/SKILL.md`](file:///data/data/com.termux
 3. Run `./scripts/generate-version.sh` (extracts recent git commit subjects into `public/version.json`).
 4. Run `./scripts/build-apk.sh` (produces signed `dist-android/GSTBilling-Vyapar.apk` and mirrors to `~/storage/downloads/`).
 5. Run `./scripts/package-pwa.sh` (produces `dist-pwa/vyapar-pwa.tar.gz`).
-6. Run `npx tsc --noEmit && npm test` (all 25 suites must pass 100% green).
-   > **Note**: Building the APK before testing ensures that all Vite code-split chunks in `dist/assets/` match the packaged APK archive for `challenger2M5ApkPackageStress.test.ts`.
+6. Run `npx tsc --noEmit && npm run test:all` (full suite must pass 100% green).
+   > **Note**: Run `npm run build` before `npm run test:all` so `dist/assets` exists for bundle-integrity tests. Build the APK separately for release artifacts.
 7. Git commit, tag `vX.Y.Z`, push `master` and tag.
 8. Upload release assets via `gh release upload`.
 

@@ -82,11 +82,14 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
       versionCode: 10035,
       releaseDate: new Date().toISOString().split('T')[0],
       releaseTitle: `Vyapar PRO v${CURRENT_APP_VERSION}`,
-      apkUrl: 'https://github.com/nurmd/webapp/releases/latest',
-      apkSize: isPwa ? 'PWA Web' : '20.2 MB',
+      apkUrl: '',
+      apkSize: isPwa ? 'PWA Web' : 'Release page',
+      htmlUrl: `https://github.com/${updateService.getGitHubRepo()}/releases`,
       isPwa,
       releaseNotes: resolvedNotes,
     }),
+    apkUrl: activeRelease?.apkUrl || '',
+    apkSize: activeRelease?.apkSize || (isPwa ? 'PWA Web' : 'Release page'),
     releaseNotes: resolvedNotes,
   };
 
@@ -101,6 +104,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   };
 
   const handleStartDownload = () => {
+    if (!info.apkUrl) {
+      updateService.openReleasePage(info.htmlUrl || '');
+      return;
+    }
+
     setStatus('downloading');
     setDownloadProgress(0);
     setLoadedBytes(0);
@@ -138,7 +146,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
       handleApplyPwaUpdate();
     } else {
       updateService.clearTempApk();
-      handleStartDownload();
+      if (!info.apkUrl) {
+        updateService.openReleasePage(info.htmlUrl || '');
+      } else {
+        handleStartDownload();
+      }
     }
   };
 
@@ -423,14 +435,27 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
               >
                 Later
               </button>
-              <button
-                type="button"
-                onClick={handleStartDownload}
-                className="flex-1 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                <span>Download &amp; Verify ({info.apkSize})</span>
-              </button>
+              {info.apkUrl ? (
+                <button
+                  type="button"
+                  data-testid="btn-download-apk"
+                  onClick={handleStartDownload}
+                  className="flex-1 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  <span>Download &amp; Verify ({info.apkSize})</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="btn-open-github-release"
+                  onClick={() => updateService.openReleasePage(info.htmlUrl || '')}
+                  className="flex-1 py-2.5 bg-secondary text-on-secondary rounded-xl text-xs font-bold shadow-md hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                  <span>Open GitHub Release</span>
+                </button>
+              )}
             </>
           )}
         </div>

@@ -1,18 +1,14 @@
 {
-  "version": "1.2.30",
+  "version": "1.2.31",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-24T07:19:55.977Z",
+  "buildTime": "2026-10-24T11:17:49.524Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Cash & Bank balance now matches the passbook, and invoice receipts with voucher credits are allocated chronologically",
-    "Party dues use one consistent calculation; customer credits and supplier advances are shown separately",
-    "Low-stock and out-of-stock items are unified under Need Restock, while strict Low counts remain in reports",
-    "Data & Sync now shows real per-database last-sync time, pending changes, offline/paused/error states, and manual conflict review",
-    "Unresolved conflicts are never labeled Cloud Synced or Cloud Live",
-    "Fixed the first-launch crash caused by unstable empty bank-account snapshots",
-    "Invoice numbering correctly handles the INV/26-27/ prefix without duplicating the financial year",
-    "New Invoice and POS polish: 4-digit dates, Reverse Charge (RCM), singular item counts, GST Exempt (0%), and a roomier action dock",
-    "WhatsApp sharing lets you choose WhatsApp or WhatsApp Business"
+    "App updates now use signed GitHub release assets only, with SHA-256 verification",
+    "If a release has no Android APK asset, the update dialog opens the GitHub release page instead of using a stale raw APK",
+    "Release verification now checks the APK version, signature, and checksums before publishing",
+    "CI builds the production bundle before running the full test suite, so clean checkouts verify correctly",
+    "No accounting, tax, sync, or local data behavior changed in this update"
   ]
 }
