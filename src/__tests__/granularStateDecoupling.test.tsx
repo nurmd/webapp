@@ -138,15 +138,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
     root = null;
   });
 
-  // Helper to flush batched DB notifications
-  const flushDbNotifications = () => {
-    if (typeof (db as any).notify === 'function') {
-      (db as any).notify();
-    } else {
-      (db as any).notifyListeners();
-    }
-  };
-
   // ==========================================================================
   // 1. In-Memory Referential Stability Across Unrelated Domain Mutations
   // ==========================================================================
@@ -260,7 +251,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             amount: 999,
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -328,7 +318,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             amount: 2500,
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -385,7 +374,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             name: 'Green Energy Ltd',
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -442,7 +430,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             amount: 150,
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -456,7 +443,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             name: 'Chrome Test Party',
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -469,7 +455,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
           ...currentCompany,
           businessName: 'Decoupled Enterprises Ltd',
         });
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -526,7 +511,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             name: 'BN Party',
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -604,7 +588,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             type: 'SUPPLIER',
           })
         );
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -656,7 +639,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
 
       act(() => {
         (db as any).applyLocalEntityMutation('expense', 'save', externalExpense.id, externalExpense);
-        flushDbNotifications();
       });
 
       await new Promise((r) => setTimeout(r, 25));
@@ -700,7 +682,6 @@ describe('Milestone 3: Granular State Decoupling & Render Isolation Suite', () =
             name: 'Leak Test Item',
           })
         );
-        flushDbNotifications();
       }).not.toThrow();
 
       await new Promise((r) => setTimeout(r, 25));
