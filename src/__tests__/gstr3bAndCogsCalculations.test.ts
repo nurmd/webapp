@@ -18,7 +18,7 @@ import { PurchaseBill } from '../models/purchase.ts';
 import { Expense } from '../models/expense.ts';
 import { InventoryItem } from '../models/item.ts';
 
-describe('Challenger Rep 2: Empirical Stress Test Suite for Calculations Engine', () => {
+describe('GSTR-3B, COGS, Aging & Stock Valuation Calculation Suite', () => {
   // =========================================================================
   // Dimension 1: Aging Bucket Boundaries & Date Handling
   // =========================================================================

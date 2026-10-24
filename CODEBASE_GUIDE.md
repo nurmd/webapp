@@ -340,21 +340,21 @@ npm run build
 - `customerOpeningBalanceLedger.test.tsx`: Opening balance preservation across invoice lifecycles.
 - `itemEnhancements.test.tsx`: Duplicate item warning, transaction bill previews, floating search bar.
 - `auditTrail.test.ts`: MCA audit log hashing, chain verification, tamper detection.
-- `challenger2M5ApkPackageStress.test.ts`: APK signature, Android manifest, badging, version code.
-- `challengerM5DynamicSplittingStress.test.tsx`: Chunk architecture & lazy unwrapping validation.
+- `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
+- `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
+- `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.
 
 ---
 
 ## 8. Release & Deployment Pipeline
 
-Refer to [`.agents/skills/vyapar-release/SKILL.md`](file:///data/data/com.termux/files/home/gst-billing-app/.agents/skills/vyapar-release/SKILL.md) for detailed execution:
-1. Bump version in `package.json` (e.g. `1.1.27`).
-2. Update `challenger2M5ApkPackageStress.test.ts` versionCode (`X*10000 + Y*100 + Z`).
-3. Run `./scripts/generate-version.sh` (extracts recent git commit subjects into `public/version.json`).
-4. Run `./scripts/build-apk.sh` (produces signed `dist-android/GSTBilling-Vyapar.apk` and mirrors to `~/storage/downloads/`).
-5. Run `./scripts/package-pwa.sh` (produces `dist-pwa/vyapar-pwa.tar.gz`).
-6. Run `npx tsc --noEmit && npm run test:all` (full suite must pass 100% green).
-   > **Note**: Run `npm run build` before `npm run test:all` so `dist/assets` exists for bundle-integrity tests. Build the APK separately for release artifacts.
-7. Git commit, tag `vX.Y.Z`, push `master` and tag.
-8. Upload release assets via `gh release upload`.
+Refer to [`.agents/skills/vyapar-release/SKILL.md`](./.agents/skills/vyapar-release/SKILL.md) for detailed execution:
+1. Bump version in `package.json` and sync `public/version.json` via `./scripts/generate-version.sh`.
+2. Run `./scripts/build-apk.sh` (Vite build, version sync, signed `dist-android/GSTBilling-Vyapar.apk`, SHA-256).
+3. Run `npx tsc --noEmit && npm run test:all` after the build so `dist/assets` exists for bundle-integrity tests.
+4. Run `./scripts/package-pwa.sh` and copy release artifacts to `~/release-artifacts/vX.Y.Z/`.
+5. Run `./scripts/verify-release.sh` (badging, versionCode, checksum, signature).
+6. Git commit, create annotated tag `vX.Y.Z`, push the tag first, then `master`.
+7. Wait for the GitHub release workflow, upload the signed APK and SHA-256, and include the checksum in the release body.
+8. Verify release assets, latest release status, APK badging, and signature.
 

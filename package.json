@@ -10,7 +10,7 @@
     "build:hsn": "node scripts/buildHsnCatalog.mjs",
     "build:apk": "bash scripts/build-apk.sh",
     "preview": "vite preview",
-    "test": "vitest run --exclude \"**/settingsUIOverhaul.test.tsx\" --exclude \"**/reportsHubView.test.tsx\" --exclude \"**/challenger*.{ts,tsx}\"",
+    "test": "vitest run --exclude \"**/settingsUIOverhaul.test.tsx\" --exclude \"**/reportsHubView.test.tsx\"",
     "test:ui": "vitest run src/__tests__/settingsUIOverhaul.test.tsx src/__tests__/reportsHubView.test.tsx",
     "test:all": "vitest run",
     "test:watch": "vitest",
