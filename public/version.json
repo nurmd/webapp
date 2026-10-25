@@ -1,13 +1,14 @@
 {
-  "version": "1.2.34",
+  "version": "1.2.35",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-25T05:52:08.763Z",
+  "buildTime": "2026-10-25T07:56:34.461Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "WhatsApp sharing validates Indian mobile numbers and avoids malformed contact links",
-    "Both WhatsApp share dialogs warn in Demo Mode and offer a Copy Message fallback",
-    "Invalid or missing numbers open the WhatsApp chooser safely instead of a broken chat link",
-    "WhatsApp intent, modal, and native chooser contracts now have regression coverage"
+    "Support diagnostics exports local-only troubleshooting data with privacy-safe host and database references",
+    "Support diagnostics reuses the Android native save bridge so exports work in the app, not just the browser",
+    "WhatsApp share dialogs now prefill party phone numbers for existing and new invoices",
+    "Added a manual conflict-review runbook and read-only conflict guidance",
+    "Hardened render-isolation regression tests to remove timing flakiness"
   ]
 }
