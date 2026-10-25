@@ -7,6 +7,12 @@ import {
   formatWhatsAppMessage,
   openWhatsAppShare,
 } from '../../services/whatsappService.ts';
+import {
+  normalizeWhatsAppPhone,
+  getWhatsAppPhoneErrorMessage,
+} from '../../core/utils/whatsappIntent.ts';
+import { isDemoModeActive } from '../../core/utils/demoMode.ts';
+import { showAppToast } from '../../services/toast.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 interface WhatsAppShareModalProps {
@@ -28,15 +34,39 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [language, setLanguage] = useState<TemplateLanguage>('en');
   const [purpose, setPurpose] = useState<MessagePurpose>('invoice');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const messagePreview = formatWhatsAppMessage(company, invoice, {
     language,
     purpose,
   });
 
+  const handleCopy = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(messagePreview);
+      setCopied(true);
+      showAppToast('Message copied to clipboard!');
+      setTimeout(() => setCopied(false), 2500);
+    } else {
+      showAppToast('Unable to access clipboard.');
+    }
+  };
+
   const handleSend = () => {
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone) {
+      const validation = normalizeWhatsAppPhone(trimmedPhone);
+      if (!validation.valid) {
+        const err = getWhatsAppPhoneErrorMessage(validation);
+        setPhoneError(err);
+        showAppToast(err);
+        return;
+      }
+    }
+    setPhoneError('');
     openWhatsAppShare(company, invoice, {
-      phoneNumber: phone,
+      phoneNumber: trimmedPhone || undefined,
       language,
       purpose,
     });
@@ -72,6 +102,21 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
         {/* Configuration Options */}
         <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+          {/* Demo Mode Guardrail Warning */}
+          {isDemoModeActive() && (
+            <div
+              data-testid="whatsapp-demo-warning"
+              className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5"
+            >
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px] shrink-0 mt-0.5">
+                info
+              </span>
+              <p className="leading-relaxed">
+                Demo Mode: this message uses demo data. Sending opens your real WhatsApp app; no production records are changed.
+              </p>
+            </div>
+          )}
+
           {/* Recipient Phone */}
           <div>
             <label className="block text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">
@@ -80,14 +125,22 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             <div className="flex items-center bg-surface border border-outline-variant/40 rounded-xl px-3 py-2 text-sm text-on-surface font-mono">
               <span className="text-on-surface-variant font-bold mr-1">+91</span>
               <input
+                data-testid="whatsapp-phone-input"
                 type="tel"
-                maxLength={10}
                 placeholder="9876543210 (Optional)"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (phoneError) setPhoneError('');
+                }}
                 className="w-full bg-transparent outline-none"
               />
             </div>
+            {phoneError && (
+              <p data-testid="whatsapp-phone-error" className="text-xs text-error mt-1 font-medium">
+                {phoneError}
+              </p>
+            )}
           </div>
 
           {/* Purpose Selector */}
@@ -186,7 +239,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         </div>
 
         {/* Footer Action */}
-        <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low/40 flex items-center justify-between">
+        <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low/40 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -195,14 +248,29 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             Cancel
           </button>
 
-          <button
-            type="button"
-            onClick={handleSend}
-            className="px-6 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#20bd5a] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <span className="material-symbols-outlined text-[18px]">send</span>
-            <span>Send on WhatsApp</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="whatsapp-copy-button"
+              onClick={handleCopy}
+              className="px-4 py-2 border border-secondary text-secondary rounded-xl text-xs font-bold hover:bg-secondary/10 cursor-pointer flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {copied ? 'check' : 'content_copy'}
+              </span>
+              <span>{copied ? 'Copied' : 'Copy Message'}</span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="whatsapp-send-button"
+              onClick={handleSend}
+              className="px-6 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#20bd5a] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">send</span>
+              <span>Send on WhatsApp</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

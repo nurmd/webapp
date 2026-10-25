@@ -2,6 +2,7 @@ import { Invoice } from '../models/invoice.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { formatINR, formatDate } from '../core/utils/formatters.ts';
 import { safeOpenExternalUrl } from '../core/utils/upiAndShare.ts';
+import { buildWhatsAppSendUrl } from '../core/utils/whatsappIntent.ts';
 
 export type TemplateLanguage = 'en' | 'hi' | 'hinglish';
 export type MessagePurpose = 'invoice' | 'reminder' | 'statement';
@@ -80,11 +81,10 @@ export function openWhatsAppShare(
   } = {}
 ): void {
   const message = formatWhatsAppMessage(company, invoice, options);
-  const cleanPhone = options.phoneNumber
-    ? options.phoneNumber.replace(/\D/g, '')
-    : '';
-
-  const phoneParam = cleanPhone ? `phone=91${cleanPhone.slice(-10)}&` : '';
-  const url = `https://api.whatsapp.com/send?${phoneParam}text=${encodeURIComponent(message)}`;
+  const { url } = buildWhatsAppSendUrl({
+    phone: options.phoneNumber,
+    text: message,
+    channel: 'api',
+  });
   safeOpenExternalUrl(url);
 }

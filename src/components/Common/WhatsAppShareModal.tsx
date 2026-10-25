@@ -8,6 +8,11 @@ import {
   WhatsAppTemplateType,
   WhatsAppLanguage,
 } from '../../core/utils/upiAndShare.ts';
+import {
+  normalizeWhatsAppPhone,
+  getWhatsAppPhoneErrorMessage,
+} from '../../core/utils/whatsappIntent.ts';
+import { isDemoModeActive } from '../../core/utils/demoMode.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
 
@@ -41,7 +46,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     return true;
   }, isOpen, 35);
 
-  const defaultPhone = initialPhone || invoice?.partyPhone || party?.phone || '';
+  const defaultPhone = initialPhone !== undefined ? initialPhone : (invoice?.partyPhone || party?.phone || '');
   const [phone, setPhone] = useState<string>(defaultPhone);
   const [template, setTemplate] = useState<WhatsAppTemplateType>(
     initialTemplate || (invoice ? 'INVOICE_DELIVERY' : 'PARTY_STATEMENT')
@@ -49,13 +54,14 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [language, setLanguage] = useState<WhatsAppLanguage>('EN');
   const [customNote, setCustomNote] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [phoneError, setPhoneError] = useState<string>('');
 
   // Re-sync phone if defaultPhone changes
   React.useEffect(() => {
     if (defaultPhone) setPhone(defaultPhone);
   }, [defaultPhone]);
 
-  const { text, cleanPhone, whatsappUrl } = useMemo(() => {
+  const { text, whatsappUrl } = useMemo(() => {
     return buildWhatsAppMessage(
       company,
       {
@@ -77,10 +83,14 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   if (!isOpen) return null;
 
   const handleSend = () => {
-    if (!cleanPhone || cleanPhone.length < 10) {
-      showAppToast('Please enter a valid 10-digit phone number.');
+    const validation = normalizeWhatsAppPhone(phone);
+    if (!validation.valid) {
+      const errorMsg = getWhatsAppPhoneErrorMessage(validation);
+      setPhoneError(errorMsg);
+      showAppToast(errorMsg);
       return;
     }
+    setPhoneError('');
     safeOpenExternalUrl(whatsappUrl);
     showAppToast('Opening WhatsApp...');
     onClose();
@@ -125,6 +135,21 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
         {/* Scrollable Configuration Body */}
         <div className="p-5 space-y-4 overflow-y-auto flex-1 text-sm">
+          {/* Demo Mode Guardrail Warning */}
+          {isDemoModeActive() && (
+            <div
+              data-testid="whatsapp-demo-warning"
+              className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5"
+            >
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px] shrink-0 mt-0.5">
+                info
+              </span>
+              <p className="leading-relaxed">
+                Demo Mode: this message uses demo data. Sending opens your real WhatsApp app; no production records are changed.
+              </p>
+            </div>
+          )}
+
           {/* Recipient Phone */}
           <div>
             <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
@@ -135,13 +160,22 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 +91
               </span>
               <input
+                data-testid="whatsapp-phone-input"
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (phoneError) setPhoneError('');
+                }}
                 placeholder="9876543210"
                 className="w-full pl-11 pr-3 py-2.5 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary"
               />
             </div>
+            {phoneError && (
+              <p data-testid="whatsapp-phone-error" className="text-xs text-error mt-1.5 font-medium">
+                {phoneError}
+              </p>
+            )}
           </div>
 
           {/* Template & Tone Selector */}
@@ -285,6 +319,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           </button>
           <button
             type="button"
+            data-testid="whatsapp-copy-button"
             onClick={handleCopy}
             className="px-4 py-2.5 rounded-xl border border-secondary text-secondary text-xs font-bold hover:bg-secondary/10 flex items-center gap-1.5 cursor-pointer"
           >
@@ -293,6 +328,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           </button>
           <button
             type="button"
+            data-testid="whatsapp-send-button"
             onClick={handleSend}
             className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer transition-transform"
           >

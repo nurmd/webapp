@@ -1,6 +1,11 @@
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
+import {
+  normalizeWhatsAppPhone,
+  buildWhatsAppSendUrl,
+  isWhatsAppIntentUrl,
+} from './whatsappIntent.ts';
 
 export type WhatsAppTemplateType =
   | 'INVOICE_DELIVERY'
@@ -19,11 +24,8 @@ export interface WhatsAppMessageOptions {
 }
 
 export function cleanIndianPhoneNumber(rawPhone?: string): string {
-  if (!rawPhone) return '';
-  const digits = rawPhone.replace(/\D/g, '');
-  if (digits.length === 10) return `91${digits}`;
-  if (digits.length === 12 && digits.startsWith('91')) return digits;
-  return digits;
+  const normalized = normalizeWhatsAppPhone(rawPhone);
+  return normalized.valid ? normalized.e164 : '';
 }
 
 export function getUpiPaymentUrl(company: CompanyProfile, invoiceOrAmount: Invoice | number, notePrefix: string = 'Bill'): string {
@@ -57,7 +59,6 @@ export function buildWhatsAppMessage(
   const template = options.template || (data.invoice ? 'INVOICE_DELIVERY' : 'PARTY_STATEMENT');
   const lang = options.language || 'EN';
   const rawPhone = options.partyPhone || data.partyPhone || data.invoice?.partyPhone || data.party?.phone || '';
-  const cleanPhone = cleanIndianPhoneNumber(rawPhone);
 
   const companyName = company.tradeName || company.businessName || 'Our Business';
   const partyName = data.partyName || data.invoice?.partyName || data.party?.name || 'Valued Customer';
@@ -172,8 +173,17 @@ export function buildWhatsAppMessage(
     text += `\n\n📝 *Note:* ${options.customNote.trim()}`;
   }
 
-  const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-  return { text, cleanPhone, whatsappUrl };
+  const sendResult = buildWhatsAppSendUrl({
+    phone: rawPhone,
+    text,
+    channel: 'app',
+  });
+
+  return {
+    text,
+    cleanPhone: sendResult.phone.valid ? sendResult.phone.e164 : '',
+    whatsappUrl: sendResult.url,
+  };
 }
 
 /**
@@ -194,41 +204,49 @@ export function getPaymentReminderWhatsAppUrl(
   companyName: string,
   upiId?: string
 ): string {
-  const cleanPhone = cleanIndianPhoneNumber(partyPhone);
   const text = `Namaste ${partyName},\n\nThis is a gentle payment reminder from *${companyName}*.\nYour outstanding balance is *₹${balanceAmount.toLocaleString('en-IN')}*.\n\n${upiId ? `*Pay immediately via UPI:* ${upiId}\n\n` : ''}Please let us know once paid. Thank you!`;
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+  const result = buildWhatsAppSendUrl({
+    phone: partyPhone,
+    text,
+    channel: 'app',
+  });
+  return result.url;
 }
+
+export type OpenExternalUrlResult = 'bridge' | 'window' | 'anchor' | 'location' | 'failed';
 
 /**
  * Safely opens an external URL (such as WhatsApp web/app link) in a new window or current tab.
  */
-export function safeOpenExternalUrl(url: string, target: string = '_blank'): void {
-  if (typeof window === 'undefined') return;
+export function safeOpenExternalUrl(url: string, target: string = '_blank'): OpenExternalUrlResult {
+  if (typeof window === 'undefined') return 'failed';
 
   // Route WhatsApp links directly through AndroidBridge chooser when running inside native app
-  const isWhatsApp =
-    url.startsWith('https://wa.me/') ||
-    url.startsWith('https://api.whatsapp.com/') ||
-    url.startsWith('whatsapp://');
-  if (isWhatsApp) {
+  if (isWhatsAppIntentUrl(url)) {
     const bridge = (window as any).AndroidBridge;
     if (bridge && typeof bridge.openWhatsAppUrl === 'function') {
-      bridge.openWhatsAppUrl(url);
-      return;
+      try {
+        bridge.openWhatsAppUrl(url);
+        return 'bridge';
+      } catch (_e) {
+        // Fall through to browser/anchor fallback if bridge throws
+      }
     }
   }
 
   try {
     const win = window.open ? window.open(url, target) : null;
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = target;
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+    if (win && !win.closed && typeof win.closed !== 'undefined') {
+      return 'window';
     }
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = target;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return 'anchor';
   } catch (_e) {
     try {
       const a = document.createElement('a');
@@ -238,10 +256,14 @@ export function safeOpenExternalUrl(url: string, target: string = '_blank'): voi
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      return 'anchor';
     } catch {
       try {
         window.location.assign(url);
-      } catch {}
+        return 'location';
+      } catch {
+        return 'failed';
+      }
     }
   }
 }

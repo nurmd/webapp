@@ -312,6 +312,29 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
 
+### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
+- **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:
+  - Pure helper with zero dependencies on React, PouchDB, or storage.
+  - Normalizes 5 accepted Indian mobile formats (`9876543210`, `+91 98765 43210`, `91-98765-43210`, `09876543210`, `0091 98765 43210`) into standard E.164 (`919876543210`) and national 10-digit formats.
+  - Rejects empty input, < 10 digits (`TOO_SHORT`), > 10 digits (`TOO_LONG`), non-6-9 prefix (`INVALID_MOBILE`), and non-+91 country codes (`UNSUPPORTED_COUNTRY_CODE`).
+  - Supports deep links via `buildWhatsAppSendUrl`: `channel: 'app'` (`https://wa.me/<e164>?text=...` or `https://wa.me/?text=...`) and `channel: 'api'` (`https://api.whatsapp.com/send?phone=<e164>&text=...` or `https://api.whatsapp.com/send?text=...`).
+  - URL text payload is encoded exactly once (`encodeURIComponent`) to preserve newlines, emoji (`🙏`), `&`, `#`, `%`, and spaces without double encoding.
+- **JavaScript Bridge & Fallback Routing (`src/core/utils/upiAndShare.ts`)**:
+  - `isWhatsAppIntentUrl` matches `https://wa.me/`, `https://api.whatsapp.com/`, and `whatsapp://`.
+  - When running inside the native Android WebView, links route via `window.AndroidBridge.openWhatsAppUrl(url)`.
+  - The bridge call is wrapped in a `try/catch` block; if the native bridge throws, execution falls through gracefully to `window.open` / anchor click fallback without crashing.
+- **Demo Mode Guardrail & Copy Message Fallback**:
+  - Modals (`Common/WhatsAppShareModal.tsx` and `WhatsApp/WhatsAppShareModal.tsx`) check `isDemoModeActive()` (`POUCH_PERSIST_KEYS.DEMO_MODE`).
+  - When active, a non-blocking warning banner (`whatsapp-demo-warning`) alerts the merchant that sample demo data is being sent and real WhatsApp will be opened without changing production records.
+  - Both modals provide a 1-tap **Copy message** action (`whatsapp-copy-button`) with clipboard feedback, serving as the graceful fallback when WhatsApp is not installed.
+  - Neither modal accepts or performs production data mutations.
+- **Native Intent Chooser Contract (`MainActivity.kt` & `AndroidManifest.xml`)**:
+  - Android manifest declares `<queries>` for both `com.whatsapp` and `com.whatsapp.w4b` (WhatsApp Business).
+  - When both packages are installed, `MainActivity.kt` builds `Intent.createChooser` with `EXTRA_INITIAL_INTENTS` to prompt the user.
+  - When only one package is installed, it launches that package directly.
+  - When neither is installed, it triggers an "Open with" fallback chooser and displays "WhatsApp is not installed".
+  - *Note:* Real physical/emulator smoke testing with WhatsApp installed remains pending because no such environment is available on this build host. Static contract testing (`whatsAppNativeContract.test.ts`) guards against native drift.
+
 ---
 
 ## 6. App Shell & Detached Scroll Architecture

@@ -110,8 +110,21 @@ describe('Milestone 2: Direct WhatsApp Messaging & Payment Reminders', () => {
   it('normalizes Indian phone numbers correctly for WhatsApp URLs', () => {
     expect(cleanIndianPhoneNumber('9876543210')).toBe('919876543210');
     expect(cleanIndianPhoneNumber('+91 98765 43210')).toBe('919876543210');
-    expect(cleanIndianPhoneNumber('09876543210')).toBe('09876543210');
+    expect(cleanIndianPhoneNumber('09876543210')).toBe('919876543210');
     expect(cleanIndianPhoneNumber('')).toBe('');
+  });
+
+  it('falls back to a WhatsApp chooser URL for invalid phones instead of emitting a malformed phone parameter', () => {
+    const res = buildWhatsAppMessage(
+      mockCompany,
+      { invoice: mockInvoice },
+      { template: 'INVOICE_DELIVERY', language: 'EN', partyPhone: '12345' }
+    );
+
+    expect(res.cleanPhone).toBe('');
+    expect(res.whatsappUrl).toContain('https://wa.me/?text=');
+    expect(res.whatsappUrl).not.toContain('phone=');
+    expect(res.whatsappUrl).not.toContain('wa.me/12345');
   });
 
   it('builds English invoice delivery message with embedded UPI and Bank details', () => {
