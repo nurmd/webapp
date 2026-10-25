@@ -1,15 +1,15 @@
 {
-  "version": "1.2.36",
+  "version": "1.2.37",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-25T10:17:51.523Z",
+  "buildTime": "2026-10-25T11:30:27.543Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "add edit and delete options for payment in and out transactions",
+    "v1.2.36 payment transactions and walk-in customer",
     "add payment in/out views, system walk-in customer, and bank statement deep linking",
     "v1.2.35 support diagnostics and sharing",
     "add support diagnostics and sharing fixes",
-    "v1.2.34 whatsapp validation hardening",
-    "harden intent validation and fallback",
-    "v1.2.33 cash/bank reconciliation audit"
+    "v1.2.34 whatsapp validation hardening"
   ]
 }
