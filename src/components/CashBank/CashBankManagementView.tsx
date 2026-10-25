@@ -11,6 +11,7 @@ import { CashBankTransferModal } from './CashBankTransferModal.tsx';
 import { DirectCashBankModal } from './DirectCashBankModal.tsx';
 import { AddEditBankAccountModal } from './AddEditBankAccountModal.tsx';
 import { CashBankTransactionDetailModal } from './CashBankTransactionDetailModal.tsx';
+import { CashBankReconciliationPanel } from './CashBankReconciliationPanel.tsx';
 import { AppTab } from '../Shell/Drawer.tsx';
 
 interface CashBankManagementViewProps {
@@ -56,6 +57,9 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   // Transaction Detail Modal State
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Reconciliation Panel State
+  const [isReconciliationOpen, setIsReconciliationOpen] = useState(false);
 
   // Filters
   const [accountFilter, setAccountFilter] = useState<'ALL' | 'CASH' | 'BANK'>('ALL');
@@ -157,6 +161,18 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button
             type="button"
+            data-testid="cash-bank-reconcile-button"
+            onClick={() => setIsReconciliationOpen(true)}
+            className="h-9 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-xs font-bold active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+            title="Reconcile Cash & Bank Balances"
+            aria-label="Reconcile Cash & Bank Balances"
+          >
+            <span className="material-symbols-outlined text-[16px] text-primary">fact_check</span>
+            <span className="hidden sm:inline">Reconcile</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               setTransferInitialType('DEPOSIT');
               setIsTransferModalOpen(true);
@@ -196,6 +212,33 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Conditional Informational Banner for Negative Total Balance */}
+      {summary.totalLiquidBalance < 0 && (
+        <div
+          data-testid="cash-bank-negative-balance-note"
+          className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-start justify-between gap-3 text-xs text-amber-900 dark:text-amber-200"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <span className="material-symbols-outlined text-[18px] text-amber-600 flex-shrink-0 mt-0.5">
+              info
+            </span>
+            <div className="min-w-0">
+              <span className="font-bold block">Negative Cash & Bank Balance</span>
+              <p className="mt-0.5 leading-relaxed">
+                This is a negative ledger balance from recorded entries, not a calculation error. Open Reconcile for the per-account explanation.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReconciliationOpen(true)}
+            className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-amber-500/30 font-bold text-xs hover:bg-surface-container text-on-surface cursor-pointer"
+          >
+            Reconcile
+          </button>
+        </div>
+      )}
 
       {/* 2. Compact Financial Summary Strip (3 Metrics on Single Row) */}
       <section className="grid grid-cols-3 gap-2 p-2.5 sm:p-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
@@ -791,6 +834,13 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         onSaveTransaction={onSaveTransaction}
         onDeleteTransaction={onDeleteTransaction}
         onNavigateTab={onNavigateTab}
+      />
+
+      <CashBankReconciliationPanel
+        isOpen={isReconciliationOpen}
+        onClose={() => setIsReconciliationOpen(false)}
+        accounts={accounts}
+        summary={summary}
       />
     </div>
   );

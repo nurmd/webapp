@@ -252,6 +252,26 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - `PartyGroupsCategoriesModal`: Tabbed palette editor for groups and categories with duplicate name validation and RBAC deletion protection (`rbac.canDeleteParty()`).
   - `AddEditPartyModal`: Live group and category assignment dropdowns with "Unassigned" default and "Party Type" classification.
 
+### I. Read-Only Cash/Bank Reconciliation Audit (`cashBankReconciliation.ts`, `CashBankReconciliationPanel.tsx`)
+- **What the Report Shows**:
+  - Comprehensive per-account audit: configured opening balance, total inflows, total outflows, net movement, computed closing balance, ledger closing balance, and difference.
+  - Verification of the fundamental double-entry equation: `Opening + Inflows − Outflows = Closing`.
+  - Detailed breakdown of inflows and outflows grouped by transaction source (Sales receipts, Purchase payments, Expenses, Party vouchers, Contra transfers, Direct in/out).
+  - Explicit audit signals and issue flagging: negative opening balance, negative closing balance, lack of recorded inflows, unconfigured account IDs found in transactions, ledger mismatch, and candidate duplicate outflows.
+- **Why a Negative Balance Can Be Real**:
+  - The cash/bank ledger balance can legitimately be negative when opening balances are negative or when recorded outflows (expenses, vendor payments, drawings, bank transfers) exceed opening balance and recorded inflows.
+  - A negative total or account balance is a **real ledger position arising from recorded entries, not a calculation error**. Possible real-world causes include unrecorded cash infusions/funding, unrecorded sales/receipts, bank overdraft facilities, or duplicate outflow entries.
+- **Strictly Read-Only Guarantee**:
+  - The reconciliation engine is a pure, zero-dependency service with no mutations, network calls, or database writes.
+  - The UI panel is strictly read-only: it contains no "Fix", "Adjust", "Auto-resolve", "Repair", or "Write" actions.
+  - The app will **never** silently auto-adjust or alter account balances or voucher entries. Any adjustments or corrections must be entered manually and explicitly by the user with proper source documents.
+- **Duplicate Payment Candidates as Review Signals**:
+  - Only non-contra outflow entries sharing the exact account, date, amount (to 2 decimals), and non-empty reference number are flagged.
+  - Candidates are surfaced strictly as review signals for manual verification, not proof of error or duplicate payments.
+- **Exporting the Reconciliation Report**:
+  - Users can export the complete audit via the "Export CSV" button in the Balance Reconciliation panel.
+  - Generates RFC 4180-compliant CSV files with UTF-8 BOM and CWE-1236 formula sanitization, including distinct sections for Account Summaries, Source Breakdowns, and Duplicate Candidates. Filename format: `cash_bank_reconciliation_YYYY-MM-DD.csv`.
+
 ---
 
 ## 5. Key Presentation Flows & Navigation

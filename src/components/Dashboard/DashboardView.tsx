@@ -868,12 +868,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <span
-                data-testid="dashboard-cash-bank-balance"
-                className="font-tabular-data text-xs sm:text-sm font-bold text-on-surface"
-              >
-                {formatINR(totalCashBankBalance || 0)}
-              </span>
+              <div className="flex flex-col items-end">
+                <span
+                  data-testid="dashboard-cash-bank-balance"
+                  className="font-tabular-data text-xs sm:text-sm font-bold text-on-surface"
+                >
+                  {formatINR(totalCashBankBalance || 0)}
+                </span>
+                {totalCashBankBalance < 0 && (
+                  <span
+                    data-testid="dashboard-cash-bank-negative-note"
+                    title="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
+                    aria-label="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
+                    className="text-[10px] text-amber-700 dark:text-amber-400 font-medium"
+                  >
+                    Negative ledger balance
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1 text-secondary font-bold text-xs group-hover:underline">
                 <span>Passbook</span>
                 <span className="material-symbols-outlined text-[15px]">chevron_right</span>
