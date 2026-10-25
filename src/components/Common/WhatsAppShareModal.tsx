@@ -46,7 +46,11 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     return true;
   }, isOpen, 35);
 
-  const defaultPhone = initialPhone !== undefined ? initialPhone : (invoice?.partyPhone || party?.phone || '');
+  const defaultPhone =
+    (initialPhone && initialPhone.trim()) ||
+    (invoice?.partyPhone && invoice.partyPhone.trim()) ||
+    (party?.phone && party.phone.trim()) ||
+    '';
   const [phone, setPhone] = useState<string>(defaultPhone);
   const [template, setTemplate] = useState<WhatsAppTemplateType>(
     initialTemplate || (invoice ? 'INVOICE_DELIVERY' : 'PARTY_STATEMENT')

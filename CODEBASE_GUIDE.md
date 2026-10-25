@@ -171,7 +171,26 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - When the source does not expose all documents, the manifest explicitly warns that dependency counts are limited rather than silently under-reporting references.
   - The Data & Sync conflict queue also provides a read-only, collapsed-by-default detail view (`src/services/conflictDiff.ts`, `src/components/Settings/tabs/DataSyncTab.tsx`). It shows full document/revision IDs, changed fields with Version A/B values, recursive redaction for passwords, tokens, API keys, sync URLs, and credentials, plus explicit unavailable-payload and metadata-only warnings. It never resolves a conflict, merges branches, or writes to PouchDB/CouchDB.
 
-### C. Ledger Reversals & Double-Entry Integrity (`src/core/accounting/`, `src/services/db/reconcileAndRepair.ts`)
+### C. Local-Only Support Diagnostics (`src/core/utils/supportDiagnostics.ts`, `src/services/supportDiagnosticsService.ts`)
+- **Schema & Architecture (`SupportDiagnosticsBundle` schemaVersion `1.0.0`)**:
+  - Pure, dependency-free builder and defensive collector service (`SupportDiagnosticsService`).
+  - Bundle contains:
+    - `app`: Application name, version (from `package.json`), build timestamp, and runtime platform (`android` vs `web`).
+    - `environment`: Online status, user agent, locale language, and timezone.
+    - `database`: Active database reference (privacy-safe: `offline-primary`, `demo`, `remote-db-<hash>`, `custom-db-<hash>`), demo mode indicator, and remote database active indicator. Raw local PouchDB names are never emitted.
+    - `sync`: Current status, remote host/database (as non-reversible references `host-<hash>[:port]` and `db-<hash>`, with literal IP addresses and loopback preserved with ports), pending changes count, last synced timestamp, sanitized coarse error string, and conflict summary.
+    - `sync.conflictSummary`: Aggregate conflict count (`revisions`), unique conflicted document count (`uniqueDocuments`), and distribution breakdown `byDocType`.
+    - `recordCounts`: Defensive record counts across `company`, `parties`, `items`, `invoices`, `purchases`, `expenses`, `vouchers`, `bankAccounts`, and `cashBankTransactions`.
+    - `privacyFlags`: Guarantees `localOnly: true`, `noDocumentBodies: true`, `noBusinessIdentifiers: true`, `noCredentials: true`, accompanied by human-readable `redactionList`.
+    - `warnings`: Sanitized and length-truncated operational warnings.
+- **Privacy & Redaction Guarantees**:
+  - Remote URLs & Identifiers: Strips usernames, passwords, auth tokens, query parameters, and URL fragments. Remote hostnames, remote database names, and active database names are represented as non-reversible references (`host-<short-hash>`, `db-<short-hash>`, `remote-db-<short-hash>`, `custom-db-<short-hash>`); readable business hostnames are excluded while literal IP addresses and `localhost` loopback remain readable with ports.
+  - Free-Form Error/Warning Sanitization: Recursively redacts basic auth credentials, Bearer tokens, password/secret/token key-value assignments, `file://` URLs, Windows paths (`C:\...`), and local POSIX paths (`/home/...`, `/data/...`, `/sdcard/...`, `/mnt/...`, `/proc/...`, `/run/...`).
+  - Strict Exclusion: Document payloads, customer names, vendor names, GSTINs, and revision hashes are strictly excluded from the diagnostics bundle.
+  - Zero Mutations: Diagnostics collection is read-only; it never invokes write methods (`putDoc`, `deleteDoc`), conflict resolution (`resolveConflict`), or sync triggers (`syncNow`, `startSync`, `stopSync`).
+  - Export: Serializes bundle to an offline JSON `Blob`, initiates browser anchor download with safe filename (`support-diagnostics-YYYY-MM-DDTHH-mm-ss-sssZ.json`), and revokes the object URL after download initiation (intentionally deferred by 1000 ms to avoid cancelling downloads on WebViews/Safari).
+
+### D. Ledger Reversals & Double-Entry Integrity (`src/core/accounting/`, `src/services/db/reconcileAndRepair.ts`)
 - **No Hard-Deletes of Posted Vouchers**:
   - Deleting an invoice or purchase bill NEVER purges historical accounting vouchers.
   - Instead, the system posts an automated Contra/Reversal Journal Voucher (`VCH-REV-SAL-*` / `VCH-REV-PUR-*`) with debits and credits exactly swapped, referencing the original voucher ID, and marks the original voucher `isReversed: true`.
@@ -328,6 +347,18 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - When active, a non-blocking warning banner (`whatsapp-demo-warning`) alerts the merchant that sample demo data is being sent and real WhatsApp will be opened without changing production records.
   - Both modals provide a 1-tap **Copy message** action (`whatsapp-copy-button`) with clipboard feedback, serving as the graceful fallback when WhatsApp is not installed.
   - Neither modal accepts or performs production data mutations.
+- **Party Phone Prefill & Fallback Hierarchy**:
+  - **Folder Share Modal (`src/components/WhatsApp/WhatsAppShareModal.tsx`)**:
+    - Initializes the phone input directly with `invoice.partyPhone?.trim() || ''`.
+    - Automatically prefills party phone numbers already stored on invoice records for Invoice Preview and Table Grid share workflows.
+  - **Common Share Modal (`src/components/Common/WhatsAppShareModal.tsx`)**:
+    - Resolves the default phone value using strict priority fallback order:
+      1. `initialPhone` (if non-empty / trimmed)
+      2. `invoice.partyPhone` (if non-empty / trimmed)
+      3. `party.phone` (if non-empty / trimmed)
+      4. `''` (empty string)
+    - Prevents empty string prop overrides (`initialPhone=""`) from masking pre-existing invoice or party phone numbers.
+    - Explicit user clears in the input field remain cleared after mount; the reactive re-synchronization effect only updates state if the resolved `defaultPhone` reference changes.
 - **Native Intent Chooser Contract (`MainActivity.kt` & `AndroidManifest.xml`)**:
   - Android manifest declares `<queries>` for both `com.whatsapp` and `com.whatsapp.w4b` (WhatsApp Business).
   - When both packages are installed, `MainActivity.kt` builds `Intent.createChooser` with `EXTRA_INITIAL_INTENTS` to prompt the user.
@@ -397,6 +428,11 @@ npm run build
 - `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
 - `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
 - `conflictManifest.test.ts`: Synthetic 31-document/48-revision conflict inventory, dependency-order warnings, credential redaction, backup round-trip hashes, and tamper detection.
+- `supportDiagnostics.test.ts`: Pure support diagnostics builder, URL credential redaction, path sanitization, and conflict aggregation.
+- `supportDiagnosticsService.test.ts`: Defensive collector service, zero-mutation guarantee, and local download helper.
+- `supportDiagnosticsUI.test.tsx`: Support diagnostics UI card, release gate assertions, truthful sync/conflict verification, and privacy assertions.
+- `whatsAppModals.test.tsx`: WhatsApp modal phone prefill hierarchy, validation, clipboard fallback, and demo guardrails.
+- `granularStateDecoupling.test.tsx`: Fine-grained render isolation and `useSyncExternalStore` reactive stability across domain mutations.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.
 
 ---

@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict, pouch } from '../../../services/pouchdb.ts';
+import {
+  collectSupportDiagnostics,
+  downloadSupportDiagnostics,
+} from '../../../services/supportDiagnosticsService.ts';
 import {
   computeConflictDiff,
   isHighRiskConflict,
@@ -390,6 +394,57 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
 
   const [networkOnline, setNetworkOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   const [expandedConflicts, setExpandedConflicts] = useState<Record<string, boolean>>({});
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<{
+    state: 'idle' | 'preparing' | 'success' | 'error';
+    filename?: string;
+    message?: string;
+  }>({ state: 'idle' });
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleDownloadDiagnostics = async () => {
+    try {
+      setDiagnosticsStatus({ state: 'preparing', message: 'Preparing…' });
+      const bundle = collectSupportDiagnostics({
+        syncState,
+        conflicts: activeConflicts,
+        activeDbName,
+        isDemoMode,
+        isRemoteDbActive,
+      });
+      const res = await downloadSupportDiagnostics(bundle);
+      if (!isMountedRef.current) return;
+      if (res.success) {
+        setDiagnosticsStatus({
+          state: 'success',
+          filename: res.filename,
+          message: `Diagnostics bundle saved: ${res.filename}`,
+        });
+      } else if (res.cancelled) {
+        setDiagnosticsStatus({
+          state: 'error',
+          message: res.message || 'Export cancelled.',
+        });
+      } else {
+        setDiagnosticsStatus({
+          state: 'error',
+          message: res.message || 'Unable to save diagnostics file in this environment.',
+        });
+      }
+    } catch {
+      if (!isMountedRef.current) return;
+      setDiagnosticsStatus({
+        state: 'error',
+        message: 'Failed to generate support diagnostics.',
+      });
+    }
+  };
 
   const toggleConflictDetails = (conflictId: string) => {
     setExpandedConflicts((prev) => ({
@@ -1158,6 +1213,65 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
           <div className="pt-2 border-t border-outline-variant/15 flex items-center gap-2 text-xs text-on-surface-variant">
             <span className="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
             <span>No revision conflicts detected across devices. Multi-terminal sync state is clean.</span>
+          </div>
+        )}
+      </section>
+
+      {/* 4. Support Diagnostics Card */}
+      <section
+        data-testid="support-diagnostics-section"
+        className="p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex flex-col gap-4 shadow-sm"
+      >
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-[20px]">troubleshoot</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-on-surface">Support Diagnostics</h3>
+              <p className="text-xs text-on-surface-variant">
+                Export an offline-only diagnostic bundle to share with technical support.
+              </p>
+            </div>
+          </div>
+          <button
+            data-testid="download-support-diagnostics"
+            onClick={handleDownloadDiagnostics}
+            disabled={diagnosticsStatus.state === 'preparing'}
+            className="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] text-on-surface text-xs font-semibold flex items-center gap-2 border border-outline-variant/20 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {diagnosticsStatus.state === 'preparing' ? 'hourglass_empty' : 'download'}
+            </span>
+            <span>{diagnosticsStatus.state === 'preparing' ? 'Preparing…' : 'Export Diagnostics'}</span>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-on-surface-variant leading-relaxed">
+          This local-only diagnostic bundle excludes credentials, document bodies, business identifiers, and local paths. It is never uploaded automatically and remains on your device until you choose to share it.
+        </p>
+
+        {diagnosticsStatus.state !== 'idle' && (
+          <div
+            data-testid="support-diagnostics-status"
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+              diagnosticsStatus.state === 'preparing'
+                ? 'bg-blue-50/50 border-blue-200 text-blue-900 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-300'
+                : diagnosticsStatus.state === 'success'
+                ? 'bg-emerald-50/50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300'
+                : 'bg-red-50/50 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-300'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {diagnosticsStatus.state === 'preparing'
+                ? 'sync'
+                : diagnosticsStatus.state === 'success'
+                ? 'check_circle'
+                : 'error'}
+            </span>
+            <span className="font-mono text-[11px]">
+              {diagnosticsStatus.message}
+            </span>
           </div>
         )}
       </section>

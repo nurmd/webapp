@@ -8,6 +8,7 @@ import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
+import { db } from '../../services/db.ts';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -37,6 +38,22 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
     onClose();
     return true;
   }, !!invoice, 25);
+
+  const party = React.useMemo(() => {
+    if (!invoice || (!invoice.partyName && !invoice.partyId)) return null;
+    try {
+      const parties = db.getParties();
+      return (
+        parties.find(
+          (p) =>
+            (invoice.partyId && p.id === invoice.partyId) ||
+            (invoice.partyName && p.name.trim().toLowerCase() === invoice.partyName.trim().toLowerCase())
+        ) || null
+      );
+    } catch {
+      return null;
+    }
+  }, [invoice?.partyId, invoice?.partyName]);
 
   if (!invoice) return null;
 
@@ -372,8 +389,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           onClose={() => setIsWhatsAppOpen(false)}
           company={company}
           invoice={invoice}
+          party={party || undefined}
           initialPartyName={invoice.partyName}
-          initialPhone={invoice.partyPhone}
+          initialPhone={invoice.partyPhone || party?.phone}
           initialBalance={invoice.balanceAmount}
           initialTemplate="INVOICE_DELIVERY"
         />

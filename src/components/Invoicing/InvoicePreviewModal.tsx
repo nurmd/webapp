@@ -2111,6 +2111,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           invoice={invoice}
           company={company}
           onClose={() => setIsWhatsAppModalOpen(false)}
+          initialPhone={party?.phone}
         />
       )}
 

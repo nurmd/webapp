@@ -19,12 +19,14 @@ interface WhatsAppShareModalProps {
   invoice: Invoice;
   company: CompanyProfile;
   onClose: () => void;
+  initialPhone?: string;
 }
 
 export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   invoice,
   company,
   onClose,
+  initialPhone,
 }) => {
   useBackNavigation(() => {
     onClose();
@@ -33,7 +35,11 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
   const [language, setLanguage] = useState<TemplateLanguage>('en');
   const [purpose, setPurpose] = useState<MessagePurpose>('invoice');
-  const [phone, setPhone] = useState('');
+  const resolvedPhone =
+    (initialPhone && initialPhone.trim()) ||
+    (invoice.partyPhone && invoice.partyPhone.trim()) ||
+    '';
+  const [phone, setPhone] = useState(resolvedPhone);
   const [phoneError, setPhoneError] = useState('');
   const [copied, setCopied] = useState(false);
 

@@ -570,6 +570,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       dueDate: dueDate || undefined,
       partyId: selectedParty?.id,
       partyName: selectedParty?.name || 'Cash Counter Customer',
+      partyPhone: selectedParty?.phone || undefined,
       partyGstin: isGstActive ? selectedParty?.gstin : undefined,
       partyAddress: selectedParty?.billingAddress || 'Local Counter',
       partyPincode: selectedParty?.pincode,

@@ -183,6 +183,10 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         ? 'DEBIT_NOTE'
         : 'SALES_INVOICE';
 
+    const selectedParty = parties.find(
+      (p) => p.id === selectedPartyId || (customerName && p.name.trim().toLowerCase() === customerName.trim().toLowerCase())
+    );
+
     const newInvoice: Invoice = {
       id: 'INV-' + Date.now(),
       invoiceNumber: generateNextDocumentNumber(docType, company, db.getInvoices()),
@@ -190,6 +194,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       date: invoiceDate,
       partyId: selectedPartyId,
       partyName: customerName,
+      partyPhone: selectedParty?.phone || undefined,
       partyGstin: customerGstin || undefined,
       partyAddress: customerAddress,
       partyStateCode: posStateCode,
