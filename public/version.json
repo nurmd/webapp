@@ -1,15 +1,13 @@
 {
-  "version": "1.2.33",
+  "version": "1.2.34",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-25T05:11:30.996Z",
+  "buildTime": "2026-10-25T05:52:08.763Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Cash & Bank now has a read-only Reconcile report that explains each account’s opening balance, inflows, outflows, and closing balance",
-    "Negative balances are identified as real ledger positions, with source breakdowns and clear warnings instead of implying a calculation error",
-    "The audit flags unconfigured account IDs and candidate duplicate outflows for manual review; it never posts adjustments or writes data",
-    "Reconciliation exports as an audit-friendly CSV with account, source, and duplicate-candidate sections",
-    "PWA updater now selects the exact tarball asset URL instead of also matching its checksum asset",
-    "No tax, invoice numbering, conflict, or existing business data was changed in this update"
+    "WhatsApp sharing validates Indian mobile numbers and avoids malformed contact links",
+    "Both WhatsApp share dialogs warn in Demo Mode and offer a Copy Message fallback",
+    "Invalid or missing numbers open the WhatsApp chooser safely instead of a broken chat link",
+    "WhatsApp intent, modal, and native chooser contracts now have regression coverage"
   ]
 }
