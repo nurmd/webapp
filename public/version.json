@@ -1,14 +1,15 @@
 {
-  "version": "1.2.32",
+  "version": "1.2.33",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-25T04:22:13.543Z",
+  "buildTime": "2026-10-25T05:11:30.996Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Conflict review now shows full document and revision IDs plus field-by-field Version A and Version B differences",
-    "Sensitive values are redacted in the conflict diff, and unavailable revision bodies are called out explicitly",
-    "Dashboard labels purchase challans as GRN and uses the matched party name for receipt vouchers",
-    "Conflict manifest and backup export remain read-only; no automatic resolution or production writes",
-    "No tax, invoice numbering, or existing business data was changed in this update"
+    "Cash & Bank now has a read-only Reconcile report that explains each account’s opening balance, inflows, outflows, and closing balance",
+    "Negative balances are identified as real ledger positions, with source breakdowns and clear warnings instead of implying a calculation error",
+    "The audit flags unconfigured account IDs and candidate duplicate outflows for manual review; it never posts adjustments or writes data",
+    "Reconciliation exports as an audit-friendly CSV with account, source, and duplicate-candidate sections",
+    "PWA updater now selects the exact tarball asset URL instead of also matching its checksum asset",
+    "No tax, invoice numbering, conflict, or existing business data was changed in this update"
   ]
 }
