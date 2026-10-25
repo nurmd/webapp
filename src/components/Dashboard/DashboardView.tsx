@@ -254,19 +254,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       });
     });
 
-    // B. Purchase Bills (Money Out - Rose)
+    // B. Purchase Documents (Money Out - Rose)
     activePurchases.forEach((pur) => {
       if (!pur) return;
       const isPaid = pur.paymentStatus === 'PAID' || (pur.balanceAmount || 0) <= 0.01;
       const isPartial = !isPaid && (pur.paidAmount || 0) > 0;
       const status: 'PAID' | 'UNPAID' | 'PARTIAL' = isPaid ? 'PAID' : isPartial ? 'PARTIAL' : 'UNPAID';
       const purItems = pur.items || [];
+      const purchaseTypeLabel =
+        pur.purchaseType === 'CHALLAN'
+          ? 'Purchase Challan (GRN)'
+          : pur.purchaseType === 'PO'
+          ? 'Purchase Order'
+          : pur.purchaseType === 'RETURN'
+          ? 'Purchase Return'
+          : 'Purchase Bill';
 
       feed.push({
         id: `pur-${pur.id}`,
         rawId: pur.id,
         type: 'PURCHASE',
-        typeLabel: 'Purchase Bill',
+        typeLabel: purchaseTypeLabel,
         flow: 'OUT',
         partyName: pur.supplierName || 'Unknown Supplier',
         partyId: pur.supplierId,
@@ -281,7 +289,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         paymentStatus: status,
         description: purItems.length > 0
           ? `${purItems.length} item${purItems.length > 1 ? 's' : ''} (${purItems.map((i) => i.name).slice(0, 2).join(', ')})`
-          : 'Purchase Bill',
+          : pur.purchaseType === 'CHALLAN'
+          ? 'Goods Received Note'
+          : purchaseTypeLabel,
         rawPurchase: pur,
       });
     });
@@ -302,10 +312,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const isReceipt = v.voucherType === 'RECEIPT';
       const flow: CashFlowDirection = isReceipt ? 'IN' : 'OUT';
 
-      // Determine party name from entries safely
+      // Resolve the real party from the voucher entries. Bank/discount lines often
+      // appear before the party line, so never use the first non-cash entry blindly.
       const entries = v.entries || [];
-      const nonCashBankEntry = entries.find(
-        (e) => e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK' && e.accountId !== 'ACC_ROUND_OFF'
+      const normalizedName = (value?: string) => (value || '').trim().toLowerCase();
+      const partyEntry = entries.find((entry) =>
+        activeParties.some((party) => party.id === entry.accountId)
+      ) || entries.find((entry) =>
+        activeParties.some((party) => party.name && normalizedName(party.name) === normalizedName(entry.accountName))
+      );
+      const matchedParty = partyEntry
+        ? activeParties.find(
+            (party) =>
+              party.id === partyEntry.accountId ||
+              (party.name && normalizedName(party.name) === normalizedName(partyEntry.accountName))
+          )
+        : undefined;
+      const bankAccountIds = new Set(bankAccounts.map((account) => account.id));
+      const systemAccountIds = new Set([
+        'ACC_CASH',
+        'ACC_BANK',
+        'ACC_ROUND_OFF',
+        'ACC_EXPENSE_DISCOUNT',
+        'ACC_INCOME_DISCOUNT',
+      ]);
+      const isBankLedger = (accountId?: string) =>
+        accountId === 'ACC_BANK' || (!!accountId && bankAccountIds.has(accountId));
+      const fallbackPartyEntry = entries.find(
+        (entry) => !systemAccountIds.has(entry.accountId) && !isBankLedger(entry.accountId)
       );
       const fallbackPartyName =
         v.voucherType === 'CONTRA'
@@ -315,12 +349,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           : isReceipt
           ? 'Receipt Party'
           : 'Payment Party';
-      const partyName = nonCashBankEntry?.accountName || fallbackPartyName;
-      const partyId = nonCashBankEntry?.accountId;
+      const partyName = matchedParty?.name || fallbackPartyEntry?.accountName || fallbackPartyName;
+      const partyId = matchedParty?.id || fallbackPartyEntry?.accountId;
 
       // Extract payment mode from entries
       const cashLines = entries.filter((e) => e.accountId === 'ACC_CASH' && (e.debit > 0 || e.credit > 0));
-      const bankLines = entries.filter((e) => e.accountId === 'ACC_BANK' && (e.debit > 0 || e.credit > 0));
+      const bankLines = entries.filter((e) => isBankLedger(e.accountId) && (e.debit > 0 || e.credit > 0));
       const isSplit = cashLines.length > 0 && bankLines.length > 0;
       const vMode = isSplit
         ? 'SPLIT'

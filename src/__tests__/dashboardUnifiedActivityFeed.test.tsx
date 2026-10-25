@@ -403,6 +403,91 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('CREDIT');
   });
 
+  it('labels inward GRN challans as Purchase Challan instead of Purchase Bill', () => {
+    const grnChallan: PurchaseBill = {
+      ...mockPurchases[0],
+      id: 'grn_1',
+      billNumber: 'GRN-2026-001',
+      purchaseType: 'CHALLAN',
+      challanStatus: 'RECEIVED',
+      items: [],
+      grandTotal: 0,
+      balanceAmount: 0,
+      paymentStatus: 'PAID',
+    };
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[]}
+          purchases={[grnChallan]}
+          vouchers={[]}
+          expenses={[]}
+          items={mockItems}
+          parties={mockParties}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    const identifier = Array.from(container.querySelectorAll('span')).find(
+      (el) => el.textContent?.trim() === 'GRN-2026-001'
+    );
+    const card = identifier?.closest('.group');
+
+    expect(card?.textContent).toContain('Purchase Challan (GRN)');
+    expect(card?.textContent).toContain('Goods Received Note');
+    expect(card?.textContent).not.toContain('Purchase Bill');
+  });
+
+  it('prefers the voucher party name over bank and discount entry labels', () => {
+    const receipt: Voucher = {
+      id: 'vch_rcpt_party_header',
+      voucherNumber: 'RCPT-2026-009',
+      voucherType: 'RECEIPT',
+      date: '2026-10-15',
+      entries: [
+        { accountId: 'ACC_BANK_SBI', accountName: 'SBI Collection Account', debit: 5000, credit: 0 },
+        { accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: 100, credit: 0 },
+        { accountId: 'party_cust_1', accountName: 'Sharma Electronics', debit: 0, credit: 5100 },
+      ],
+      narration: 'NOTE: advance received against dues',
+      totalAmount: 5100,
+      createdAt: '2026-10-15T12:00:00Z',
+    };
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[]}
+          purchases={[]}
+          vouchers={[receipt]}
+          expenses={[]}
+          items={mockItems}
+          parties={mockParties}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    const identifier = Array.from(container.querySelectorAll('span')).find(
+      (el) => el.textContent?.trim() === 'RCPT-2026-009'
+    );
+    const card = identifier?.closest('.group');
+
+    expect(card?.textContent).toContain('Sharma Electronics');
+    expect(card?.textContent).not.toContain('SBI Collection Account');
+    expect(card?.textContent).not.toContain('Discount Allowed');
+  });
+
   // ==========================================
   // R2: Real-Time Search & Type Filtering
   // ==========================================
