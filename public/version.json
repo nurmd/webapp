@@ -1,14 +1,14 @@
 {
-  "version": "1.2.31",
+  "version": "1.2.32",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-24T11:17:49.524Z",
+  "buildTime": "2026-10-25T04:22:13.543Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "App updates now use signed GitHub release assets only, with SHA-256 verification",
-    "If a release has no Android APK asset, the update dialog opens the GitHub release page instead of using a stale raw APK",
-    "Release verification now checks the APK version, signature, and checksums before publishing",
-    "CI builds the production bundle before running the full test suite, so clean checkouts verify correctly",
-    "No accounting, tax, sync, or local data behavior changed in this update"
+    "Conflict review now shows full document and revision IDs plus field-by-field Version A and Version B differences",
+    "Sensitive values are redacted in the conflict diff, and unavailable revision bodies are called out explicitly",
+    "Dashboard labels purchase challans as GRN and uses the matched party name for receipt vouchers",
+    "Conflict manifest and backup export remain read-only; no automatic resolution or production writes",
+    "No tax, invoice numbering, or existing business data was changed in this update"
   ]
 }
