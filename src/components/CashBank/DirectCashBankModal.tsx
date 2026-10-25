@@ -32,11 +32,26 @@ export const DirectCashBankModal: React.FC<DirectCashBankModalProps> = ({
     preselectedAccountId || accounts[0]?.id || 'ACC_CASH'
   );
   const [amount, setAmount] = useState<string>('');
-  const [reasonCategory, setReasonCategory] = useState<string>('Capital / Owner Investment');
+  const [reasonCategory, setReasonCategory] = useState<string>(
+    initialFlow === 'ADD_MONEY' ? 'Capital / Owner Investment' : 'Owner Drawings / Personal'
+  );
   const [referenceNo, setReferenceNo] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setFlow(initialFlow);
+      setAccountId(preselectedAccountId || accounts[0]?.id || 'ACC_CASH');
+      setAmount('');
+      setReasonCategory(initialFlow === 'ADD_MONEY' ? 'Capital / Owner Investment' : 'Owner Drawings / Personal');
+      setReferenceNo('');
+      setNotes('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setError(null);
+    }
+  }, [isOpen, initialFlow, preselectedAccountId, accounts]);
 
   if (!isOpen) return null;
 

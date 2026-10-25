@@ -33,6 +33,9 @@ interface BankStatementCategoryProps {
   vouchers?: Voucher[];
   searchQuery?: string;
   dateRangeLabel: string;
+  dateRangeStart?: string;
+  dateRangeEnd?: string;
+  initialAccountId?: string;
   onRegisterExportHandlers?: (handlers: { exportCsv?: () => void; exportPdf?: () => void }) => void;
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
@@ -49,6 +52,9 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
   vouchers = [],
   searchQuery = '',
   dateRangeLabel,
+  dateRangeStart,
+  dateRangeEnd,
+  initialAccountId,
   onRegisterExportHandlers,
   onSaveTransaction,
   onDeleteTransaction,
@@ -66,7 +72,18 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       updatedAt: '',
     };
 
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(defaultAccount.id);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    if (initialAccountId && accounts.some((a) => a.id === initialAccountId)) {
+      return initialAccountId;
+    }
+    return defaultAccount.id;
+  });
+
+  useEffect(() => {
+    if (initialAccountId && accounts.some((a) => a.id === initialAccountId)) {
+      setSelectedAccountId(initialAccountId);
+    }
+  }, [initialAccountId, accounts]);
   // Default to chronological ascending order (standard banking passbook format)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -107,29 +124,50 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
   // Filter entries for the selected bank account and compute running balance
   const accountEntries = useMemo(() => {
     const isTargetCash = selectedAccount.accountType === 'CASH' || selectedAccount.id === 'ACC_CASH';
+    const isDefaultBank = !isTargetCash && (selectedAccount.id === defaultAccount.id || selectedAccount.isDefault);
 
-    // Filter relevant entries
+    // Filter relevant entries for the selected account
     const entries = financialSummary.ledgerEntries.filter((e) => {
       if (isTargetCash) {
         return e.category === 'CASH' || e.accountId === 'ACC_CASH';
       }
-      return e.category === 'BANK' && (e.accountId === selectedAccount.id || e.accountId === 'ACC_BANK_DEFAULT');
+      if (isDefaultBank) {
+        return e.category === 'BANK' && (e.accountId === selectedAccount.id || e.accountId === 'ACC_BANK' || e.accountId === 'ACC_BANK_DEFAULT');
+      }
+      return e.category === 'BANK' && e.accountId === selectedAccount.id;
     });
 
-    // 1. Sort chronologically ascending with deterministic tie-breaker to compute accurate running balance
+    // 1. Sort chronologically ascending with deterministic tie-breaker
     entries.sort((a, b) => {
       const dateDiff = a.date.localeCompare(b.date);
       if (dateDiff !== 0) return dateDiff;
       return a.id.localeCompare(b.id);
     });
 
-    let currentBalance = selectedAccount.openingBalance || 0;
+    // 2. Compute period opening balance and isolate period entries
+    let periodOpeningBalance = selectedAccount.openingBalance || 0;
+    const periodEntries: UnifiedLedgerEntry[] = [];
+
+    entries.forEach((entry) => {
+      if (dateRangeStart && entry.date < dateRangeStart) {
+        if (entry.flow === 'IN') {
+          periodOpeningBalance += entry.amount;
+        } else {
+          periodOpeningBalance -= entry.amount;
+        }
+      } else if (!dateRangeEnd || entry.date <= dateRangeEnd) {
+        periodEntries.push(entry);
+      }
+    });
+    periodOpeningBalance = Math.round(periodOpeningBalance * 100) / 100;
+
+    let currentBalance = periodOpeningBalance;
     const entriesWithRunningBalance: Array<UnifiedLedgerEntry & { calculatedRunningBalance: number; chronoIndex: number }> = [];
 
     let totalDeposits = 0;
     let totalWithdrawals = 0;
 
-    entries.forEach((entry, idx) => {
+    periodEntries.forEach((entry, idx) => {
       if (entry.flow === 'IN') {
         currentBalance += entry.amount;
         totalDeposits += entry.amount;
@@ -145,7 +183,7 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       });
     });
 
-    // 2. Order for display based on selected sortOrder
+    // 3. Order for display based on selected sortOrder
     const displayList = [...entriesWithRunningBalance];
     if (sortOrder === 'desc') {
       displayList.sort((a, b) => b.chronoIndex - a.chronoIndex);
@@ -153,7 +191,7 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       displayList.sort((a, b) => a.chronoIndex - b.chronoIndex);
     }
 
-    // 3. Apply search filter if any
+    // 4. Apply search filter if any
     let filtered = displayList;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -169,20 +207,22 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
 
     return {
       entries: filtered,
+      periodOpeningBalance,
       totalDeposits: Math.round(totalDeposits * 100) / 100,
       totalWithdrawals: Math.round(totalWithdrawals * 100) / 100,
       closingBalance: Math.round(currentBalance * 100) / 100,
     };
-  }, [financialSummary, selectedAccount, sortOrder, searchQuery]);
+  }, [financialSummary, selectedAccount, defaultAccount.id, sortOrder, searchQuery, dateRangeStart, dateRangeEnd]);
 
   const showOpeningRow = useMemo(() => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
       'opening balance brought forward b/f'.includes(q) ||
+      (dateRangeStart && dateRangeStart.includes(q)) ||
       (selectedAccount.openingBalanceDate && selectedAccount.openingBalanceDate.includes(q))
     );
-  }, [searchQuery, selectedAccount.openingBalanceDate]);
+  }, [searchQuery, dateRangeStart, selectedAccount.openingBalanceDate]);
 
   // Register Export Handlers
   useEffect(() => {
@@ -193,14 +233,14 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
       const rows: (string | number)[][] = [];
 
       const openingRow = [
-        selectedAccount.openingBalanceDate || 'Opening',
+        dateRangeStart || selectedAccount.openingBalanceDate || 'Opening',
         'OPENING',
-        'Opening Balance Brought Forward (B/F)',
+        dateRangeStart ? `Period Opening Balance (as of ${dateRangeStart})` : 'Opening Balance Brought Forward (B/F)',
         '-',
         'OPENING',
         0,
         0,
-        selectedAccount.openingBalance || 0,
+        accountEntries.periodOpeningBalance,
       ];
 
       if (sortOrder === 'asc') {
@@ -243,14 +283,14 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
 
     const exportPdf = () => {
       const openingRow = [
-        selectedAccount.openingBalanceDate || 'Opening',
+        dateRangeStart || selectedAccount.openingBalanceDate || 'Opening',
         'OPENING',
-        'Opening Balance Brought Forward (B/F)',
+        dateRangeStart ? `Period Opening Balance (as of ${dateRangeStart})` : 'Opening Balance Brought Forward (B/F)',
         '-',
         '-',
         '-',
         '-',
-        formatINR(selectedAccount.openingBalance || 0),
+        formatINR(accountEntries.periodOpeningBalance),
       ];
 
       const txnRows = accountEntries.entries.map((e) => {
@@ -277,7 +317,7 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         company,
         dateRangeLabel,
         kpis: [
-          { label: 'Opening Balance', value: formatINR(selectedAccount.openingBalance || 0) },
+          { label: 'Period Opening Balance', value: formatINR(accountEntries.periodOpeningBalance) },
           { label: 'Total Deposits (Credit)', value: `+${formatINR(accountEntries.totalDeposits)}` },
           { label: 'Total Withdrawals (Debit)', value: `-${formatINR(accountEntries.totalWithdrawals)}` },
           { label: 'Closing Balance', value: formatINR(accountEntries.closingBalance) },
@@ -299,12 +339,12 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
     };
 
     onRegisterExportHandlers({ exportCsv, exportPdf });
-  }, [accountEntries, selectedAccount, company, dateRangeLabel, onRegisterExportHandlers, sortOrder]);
+  }, [accountEntries, selectedAccount, company, dateRangeLabel, dateRangeStart, onRegisterExportHandlers, sortOrder]);
 
   const openingRowNode = (
     <tr key="opening-balance-row" className="bg-surface-container-low/60 font-medium border-b border-outline-variant/30 text-on-surface">
       <td className="py-3 px-4 whitespace-nowrap text-on-surface-variant font-mono text-xs">
-        {selectedAccount.openingBalanceDate || 'Opening'}
+        {dateRangeStart || selectedAccount.openingBalanceDate || 'Opening'}
       </td>
       <td className="py-3 px-4">
         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
@@ -312,14 +352,18 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         </span>
       </td>
       <td className="py-3 px-4 text-on-surface">
-        <div className="font-bold text-xs sm:text-sm">Opening Balance Brought Forward (B/F)</div>
-        <div className="text-[11px] text-on-surface-variant">Baseline account balance</div>
+        <div className="font-bold text-xs sm:text-sm">
+          Opening Balance Brought Forward (B/F)
+        </div>
+        <div className="text-[11px] text-on-surface-variant">
+          {dateRangeStart ? `Period Opening Balance (as of ${dateRangeStart}) • Calculated baseline before selected period` : 'Baseline account balance'}
+        </div>
       </td>
       <td className="py-3 px-4 font-mono text-xs text-on-surface-variant">-</td>
       <td className="py-3 px-4 text-right font-mono text-on-surface-variant">-</td>
       <td className="py-3 px-4 text-right font-mono text-on-surface-variant">-</td>
       <td className="py-3 px-4 text-right font-mono font-bold text-on-surface">
-        {formatINR(selectedAccount.openingBalance || 0)}
+        {formatINR(accountEntries.periodOpeningBalance)}
       </td>
     </tr>
   );
@@ -369,10 +413,10 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
             Opening Balance
           </div>
           <div className="text-sm sm:text-xl font-bold font-mono text-on-surface my-0.5 sm:my-1">
-            {formatINR(selectedAccount.openingBalance || 0)}
+            {formatINR(accountEntries.periodOpeningBalance)}
           </div>
           <div className="text-[10px] sm:text-[11px] text-on-surface-variant">
-            Start balance (B/F)
+            {dateRangeStart ? `As of ${dateRangeStart}` : 'Start balance (B/F)'}
           </div>
         </div>
 

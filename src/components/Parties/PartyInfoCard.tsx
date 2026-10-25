@@ -3,6 +3,7 @@ import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { isSystemParty } from '../../core/utils/systemParties.ts';
 
 export interface PartyInfoCardProps {
   party: Party;
@@ -106,14 +107,16 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 • {party.openingBalanceDate}
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => onEditParty(party)}
-              className="p-0.5 text-on-surface-variant hover:text-secondary rounded cursor-pointer ml-1"
-              title="Edit Opening Balance"
-            >
-              <span className="material-symbols-outlined text-[13px]">edit</span>
-            </button>
+            {!isSystemParty(party) && (
+              <button
+                type="button"
+                onClick={() => onEditParty(party)}
+                className="p-0.5 text-on-surface-variant hover:text-secondary rounded cursor-pointer ml-1"
+                title="Edit Opening Balance"
+              >
+                <span className="material-symbols-outlined text-[13px]">edit</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -186,14 +189,16 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 ) : (
                   <span className="text-outline italic">Not set</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => onEditParty(party)}
-                  className="text-secondary font-semibold hover:underline cursor-pointer text-[10px] flex items-center gap-0.5"
-                >
-                  <span className="material-symbols-outlined text-[12px]">edit</span>
-                  <span>{party.openingBalance ? 'Edit' : 'Set'}</span>
-                </button>
+                {!isSystemParty(party) && (
+                  <button
+                    type="button"
+                    onClick={() => onEditParty(party)}
+                    className="text-secondary font-semibold hover:underline cursor-pointer text-[10px] flex items-center gap-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">edit</span>
+                    <span>{party.openingBalance ? 'Edit' : 'Set'}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

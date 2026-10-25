@@ -5,6 +5,7 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { isSystemParty, createWalkInCustomer } from '../../core/utils/systemParties.ts';
 
 interface SelectPosPartyModalProps {
   isOpen: boolean;
@@ -107,8 +108,9 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Filter customers
-  const customerParties = parties.filter((p) => p.type === 'CUSTOMER');
+  // Filter customers (Exclude system walk-in customer from registered list to avoid duplicate rows)
+  const systemParty = parties.find(isSystemParty) || createWalkInCustomer(db.getCompany().stateCode || '27', 0);
+  const customerParties = parties.filter((p) => p.type === 'CUSTOMER' && !isSystemParty(p));
   const filtered = customerParties.filter((p) => {
     const q = search.toLowerCase();
     return (
@@ -343,14 +345,15 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
               </button>
             </div>
 
-            {/* Default Walk-in Customer Option */}
+            {/* Default Walk-in Customer Option (Represents System Party) */}
             <div
+              data-testid="default-pos-walkin-row"
               onClick={() => {
-                onSelectParty(null);
+                onSelectParty(systemParty);
                 onClose();
               }}
               className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                !selectedParty
+                !selectedParty || isSystemParty(selectedParty)
                   ? 'bg-secondary-container/20 border-secondary ring-1 ring-secondary'
                   : 'bg-surface-container-low/60 border-outline-variant/20 hover:border-secondary/50'
               }`}
@@ -361,7 +364,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                 </div>
                 <div>
                   <div className="text-xs font-bold text-on-surface flex items-center gap-1.5">
-                    <span>Walk-in Retail Customer</span>
+                    <span>{systemParty ? systemParty.name : 'Walk-in Retail Customer'}</span>
                     <span className="text-[10px] bg-secondary-container/60 text-on-secondary-container px-1.5 py-0.2 rounded font-semibold">
                       Default B2C
                     </span>
@@ -369,7 +372,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                   <div className="text-[11px] text-outline">Counter cash/UPI retail sale without ledger account</div>
                 </div>
               </div>
-              {!selectedParty && (
+              {(!selectedParty || isSystemParty(selectedParty)) && (
                 <span className="material-symbols-outlined text-secondary text-[20px]">check_circle</span>
               )}
             </div>

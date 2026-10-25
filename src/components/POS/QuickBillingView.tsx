@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { InventoryItem } from '../../models/item.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
+import { isSystemParty, SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
@@ -49,12 +50,17 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [catalogViewMode, setCatalogViewMode] = useState<'GRID' | 'LIST'>('GRID');
 
-  // Customer state
-  const [customer, setCustomer] = useState<PosCustomerState>({
-    party: null,
-    phone: '',
-    isB2b: false,
-    stateCode: company.stateCode || '27',
+  // Customer state: Initial POS customer defaults to system walk-in customer when available
+  const systemParty = useMemo(() => parties?.find(isSystemParty) || null, [parties]);
+  const [customer, setCustomer] = useState<PosCustomerState>(() => {
+    const sysParty = parties?.find(isSystemParty);
+    return {
+      party: sysParty || null,
+      phone: sysParty?.phone || '',
+      isB2b: !!sysParty?.gstin,
+      gstin: sysParty?.gstin,
+      stateCode: sysParty?.stateCode || company.stateCode || '27',
+    };
   });
 
   // Discounts and Adjustments
@@ -467,10 +473,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     setHeldBills([]);
   };
 
-  // Customer Party Select
+  // Customer Party Select: resolving null selection to system walk-in customer
   const handleSelectCustomer = (party: Party | null) => {
-    if (party) {
-      const freshParty = (party.id ? db.getParties().find((p) => p.id === party.id) : null) || party;
+    const resolvedParty = party || systemParty;
+    if (resolvedParty) {
+      const freshParty = (resolvedParty.id ? db.getParties().find((p) => p.id === resolvedParty.id) : null) || resolvedParty;
       setCustomer({
         party: freshParty,
         phone: freshParty.phone || '',
@@ -633,6 +640,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           },
         ];
 
+    const activeParty = customer.party || (customer.phone ? null : systemParty);
+
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
       invoiceNumber: generateNextDocumentNumber(
@@ -643,14 +652,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       invoiceType: isB2bInvoice ? 'B2B' : 'B2CS',
       isGstInvoice: isGstActive,
       date: new Date().toISOString().split('T')[0],
-      partyId: customer.party?.id,
-      partyName: customer.party
-        ? customer.party.name
+      partyId: activeParty ? activeParty.id : (customer.phone ? undefined : SYSTEM_WALK_IN_PARTY_ID),
+      partyName: activeParty
+        ? activeParty.name
         : customer.phone
         ? `Retail (${customer.phone})`
-        : 'Walk-in Retail Customer',
-      partyGstin: isGstActive ? customer.gstin : undefined,
-      partyAddress: customer.party?.billingAddress || 'Local Retail Counter',
+        : SYSTEM_WALK_IN_PARTY_NAME,
+      partyGstin: isGstActive ? (activeParty?.gstin || customer.gstin) : undefined,
+      partyAddress: activeParty?.billingAddress || 'Local Counter',
       partyStateCode: customer.stateCode,
       placeOfSupplyStateCode: customer.stateCode,
       isIntraState,
@@ -699,10 +708,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     // Reset Form for next sale
     setCart([]);
     setCustomer({
-      party: null,
-      phone: '',
-      isB2b: false,
-      stateCode: company.stateCode || '27',
+      party: systemParty,
+      phone: systemParty?.phone || '',
+      isB2b: !!systemParty?.gstin,
+      gstin: systemParty?.gstin,
+      stateCode: systemParty?.stateCode || company.stateCode || '27',
     });
     setCartDiscountValue(0);
     setAdditionalCharges(0);

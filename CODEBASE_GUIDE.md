@@ -99,12 +99,18 @@ gst-billing-app/
   - **When disabled (`false`)**: Decrement operations clamp available stock at `0` to prevent negative quantities.
   - **When enabled (`true`)**: Decrements drop past zero (e.g. `10 - 15 = -5`).
 
-### C. Double-Entry Accounting & Ledger (`src/core/accounting/`, `src/components/Parties/usePartyPassbook.ts`)
+### C. Double-Entry Accounting & Ledger (`src/core/accounting/`, `src/components/Parties/usePartyPassbook.ts`, `src/core/utils/systemParties.ts`)
 - **Signed Party Balances**:
   - `TO_RECEIVE` / Customer receivable: Positive balance (`+`).
   - `TO_PAY` / Supplier payable / Customer advance: Negative balance (`-`).
 - **Passbook Baseline Invariant**:
   - The `OPENING` transaction entry MUST ALWAYS be anchored at **index 0** as the starting baseline in the passbook ledger statement. Subsequent sales, purchases, and vouchers calculate running balances chronologically from this baseline.
+- **System Walk-in Customer Invariant (`systemParties.ts`)**:
+  - Canonical system party `SYSTEM_WALK_IN_PARTY_ID = 'CUSTOM_PARTY'`, `name: 'Walk-in Customer'`.
+  - Pure virtual balance aggregation (`computeWalkInVirtualBalance`): dynamically aggregates unpaid, non-cancelled retail invoices matching historical walk-in variants without DB migrations.
+  - Pinned at index 0 of Customers list with `isSystem: true` and a dedicated `System` badge.
+  - Read-only profile: Edit and Delete buttons are strictly hidden; hard-coded deletion guard protects against programmatic deletion.
+  - POS Integration: In `SelectPosPartyModal`, selecting the default counter row selects this canonical system party; duplicate walk-in records in the registered customer list are filtered out.
 
 ### D. Audit Trail Engine (`src/services/auditTrail.ts`)
 - Implements Indian Ministry of Corporate Affairs (MCA) audit trail mandates.
@@ -386,6 +392,10 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
     - Acts as the primary navigational directory for all core business hubs (Overview/Dashboard, Sales, Purchases, Parties, Inventory, Accounting, Reports, Settings, Print Settings).
     - Features a dedicated Overview category pill and direct Dashboard card.
     - Features a Settings gear shortcut on the merchant card and categorized Settings links.
+- **Payment In & Payment Out Views (`src/components/Payments/PaymentTransactionsView.tsx`)**:
+  - Distinct top-level `payment_in` (Sales group) and `payment_out` (Purchases group) pages with RBAC permissioning (CASHIER has access to `payment_in`; ACCOUNTANT and OWNER have access to both).
+  - Uses `computeCashBankSummary` without duplicate math, excluding CONTRA transfers. Defaults to `ALL_TIME` date preset, supports live account filtering, text search, count & sum summary cards, and direct cash/bank modal creation.
+  - Cash & Bank Deep-Linking: Statements icon button on cash and bank cards routes directly to Reports -> Bank Statement with `THIS_FY` preselected and period opening balance dynamically calculated.
 - **Dynamic Code Splitting & Performance Architecture**:
   - **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
     ```typescript
@@ -431,6 +441,7 @@ npm run build
 - `supportDiagnostics.test.ts`: Pure support diagnostics builder, URL credential redaction, path sanitization, and conflict aggregation.
 - `supportDiagnosticsService.test.ts`: Defensive collector service, zero-mutation guarantee, and local download helper.
 - `supportDiagnosticsUI.test.tsx`: Support diagnostics UI card, release gate assertions, truthful sync/conflict verification, and privacy assertions.
+- `paymentTransactionsAndSystemParties.test.tsx`: Payment In/Out navigation, RBAC access, CONTRA exclusion, calculation parity, Cash/Bank statement deep linking, Walk-in Customer system invariants, delete guards, and POS customer selection.
 - `whatsAppModals.test.tsx`: WhatsApp modal phone prefill hierarchy, validation, clipboard fallback, and demo guardrails.
 - `granularStateDecoupling.test.tsx`: Fine-grained render isolation and `useSyncExternalStore` reactive stability across domain mutations.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.

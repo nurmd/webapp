@@ -39,6 +39,7 @@ export interface Party {
   openingBalanceType?: BalanceType; // 'TO_RECEIVE' | 'TO_PAY'
   openingBalanceDate?: string; // YYYY-MM-DD
   currentBalance: number; // Signed: Positive: Receivable (Dr), Negative: Payable (Cr)
+  isSystem?: boolean;
   groupId?: string;
   categoryId?: string;
   createdAt: string;

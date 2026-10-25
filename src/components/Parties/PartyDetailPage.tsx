@@ -17,6 +17,7 @@ import { VoucherEditorModal } from './VoucherEditorModal.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
+import { isSystemParty } from '../../core/utils/systemParties.ts';
 
 export type { PassbookEntry } from './usePartyPassbook.ts';
 
@@ -154,6 +155,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   }, true, 15);
 
   const handleDelete = () => {
+    if (isSystemParty(party)) return;
     setIsDeletePartyConfirmOpen(true);
   };
 
@@ -273,17 +275,19 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               <span className="material-symbols-outlined text-[17px]">chat</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => onEditParty(party)}
-              className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-              title="Edit Profile"
-              aria-label="Edit party profile"
-            >
-              <span className="material-symbols-outlined text-[17px]">edit</span>
-            </button>
+            {!isSystemParty(party) && (
+              <button
+                type="button"
+                onClick={() => onEditParty(party)}
+                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+                title="Edit Profile"
+                aria-label="Edit party profile"
+              >
+                <span className="material-symbols-outlined text-[17px]">edit</span>
+              </button>
+            )}
 
-            {onDeleteParty && (
+            {!isSystemParty(party) && onDeleteParty && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -560,7 +564,11 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
           recordName={party.name}
           description="Are you sure you want to delete this party? This removes them from your active contacts list."
           confirmText="Delete Party"
-          onConfirm={() => onDeleteParty?.(party.id)}
+          onConfirm={() => {
+            if (!isSystemParty(party)) {
+              onDeleteParty?.(party.id);
+            }
+          }}
           onClose={() => setIsDeletePartyConfirmOpen(false)}
         />
       )}

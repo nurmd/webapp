@@ -16,6 +16,7 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
+import { isSystemParty } from '../../core/utils/systemParties.ts';
 
 interface PartiesViewProps {
   parties: Party[];
@@ -289,9 +290,15 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     return true;
   });
 
-  // Sorted parties according to active sort mode (Default: latest transaction against party)
+  // Sorted parties according to active sort mode (Default: latest transaction against party; System Walk-in Customer pinned first)
   const sortedParties = useMemo(() => {
     return [...filtered].sort((a, b) => {
+      if (activeSegment === 'CUSTOMERS') {
+        const aSys = isSystemParty(a);
+        const bSys = isSystemParty(b);
+        if (aSys && !bSys) return -1;
+        if (!aSys && bSys) return 1;
+      }
       if (sortMode === 'NAME') {
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
       }
@@ -308,7 +315,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
       }
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
-  }, [filtered, sortMode, partyLatestTxMap]);
+  }, [filtered, sortMode, partyLatestTxMap, activeSegment]);
 
   const handleOpenAddModal = () => {
     setEditingParty(null);
@@ -723,10 +730,18 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                   </div>
 
                   <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span data-testid="party-card-name" className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
                         {party.name}
                       </span>
+                      {isSystemParty(party) && (
+                        <span
+                          data-testid="system-party-badge"
+                          className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-secondary/15 text-secondary border border-secondary/20 flex-shrink-0"
+                        >
+                          System
+                        </span>
+                      )}
                       {isGstActive && party.gstin && (
                         <span
                           className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0"

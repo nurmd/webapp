@@ -27,6 +27,7 @@ interface CashBankManagementViewProps {
   onSaveTransaction: (txn: CashBankTransaction) => void;
   onDeleteTransaction: (id: string) => void;
   onNavigateTab: (tab: AppTab) => void;
+  onOpenAccountStatement?: (accountId: string) => void;
 }
 
 export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
@@ -42,6 +43,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
+  onOpenAccountStatement,
 }) => {
   // Navigation / Modal States
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -372,19 +374,35 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setTransferInitialType('DEPOSIT');
-                  setIsTransferModalOpen(true);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
-                title="Deposit cash to bank"
-              >
-                <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                <span>To Bank</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  data-testid="account-statement-ACC_CASH"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenAccountStatement?.('ACC_CASH');
+                  }}
+                  className="w-7 h-7 rounded-lg bg-surface-container text-on-surface-variant hover:text-emerald-700 dark:hover:text-emerald-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                  title="View Account Statement"
+                  aria-label="View statement for Cash in Hand"
+                >
+                  <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTransferInitialType('DEPOSIT');
+                    setIsTransferModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] hover:bg-emerald-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                  title="Deposit cash to bank"
+                >
+                  <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                  <span>To Bank</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -439,6 +457,20 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      data-testid={`account-statement-${acc.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenAccountStatement?.(acc.id);
+                      }}
+                      className="w-7 h-7 rounded-lg bg-surface-container text-on-surface-variant hover:text-blue-700 dark:hover:text-blue-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                      title="View Account Statement"
+                      aria-label={`View statement for ${acc.accountName}`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={(e) => {

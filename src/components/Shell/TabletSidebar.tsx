@@ -61,11 +61,13 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
       category: 'Transactions',
       items: [
         { id: 'sales', label: 'Sales & Invoices', icon: 'point_of_sale' },
+        { id: 'payment_in', label: 'Payment In', icon: 'call_received' },
         { id: 'delivery_challans', label: 'Delivery Challans', icon: 'local_shipping' },
         { id: 'quotations', label: 'Quotations / Estimates', icon: 'request_quote' },
         { id: 'sales_orders', label: 'Sale Orders', icon: 'assignment' },
         { id: 'sales_returns', label: 'Sale Returns (CN)', icon: 'assignment_return' },
         { id: 'purchases', label: 'Purchases & Bills', icon: 'shopping_bag' },
+        { id: 'payment_out', label: 'Payment Out', icon: 'call_made' },
         { id: 'purchase_orders', label: 'Purchase Orders', icon: 'add_shopping_cart' },
         { id: 'purchase_challans', label: 'Purchase Challans (GRN)', icon: 'move_to_inbox' },
         { id: 'purchase_returns', label: 'Purchase Returns (DN)', icon: 'assignment_turned_in' },

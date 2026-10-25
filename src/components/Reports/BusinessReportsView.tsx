@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   ShieldCheck,
   TrendingUp,
@@ -67,6 +67,8 @@ export interface BusinessReportsViewProps {
   loans?: LoanAccount[];
   loanTransactions?: LoanTransaction[];
   initialReportPage?: ReportCategoryKey | null;
+  initialAccountId?: string;
+  initialDatePreset?: DatePreset;
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onNavigateTab?: (tab: any) => void;
@@ -170,6 +172,8 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   loans,
   loanTransactions,
   initialReportPage = null,
+  initialAccountId,
+  initialDatePreset,
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
@@ -189,10 +193,22 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const [activeSubReport, setActiveSubReport] = useState<string>('gstr1');
 
   // Filtering State
-  const [datePreset, setDatePreset] = useState<DatePreset>('THIS_MONTH');
+  const [datePreset, setDatePreset] = useState<DatePreset>(initialDatePreset || 'THIS_MONTH');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    if (initialReportPage) {
+      setActiveReportPage(initialReportPage);
+    }
+  }, [initialReportPage]);
+
+  useEffect(() => {
+    if (initialDatePreset) {
+      setDatePreset(initialDatePreset);
+    }
+  }, [initialDatePreset]);
 
   // Fallbacks for bank accounts and loans if not provided in props
   const resolvedBankAccounts = useMemo(() => {
@@ -533,12 +549,15 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             company={company}
             accounts={resolvedBankAccounts}
             transactions={resolvedCashBankTxns}
-            invoices={periodInvoices}
-            purchases={periodPurchases}
-            expenses={periodExpenses}
+            invoices={invoices}
+            purchases={purchases}
+            expenses={expenses}
             vouchers={vouchers}
             searchQuery={searchQuery}
             dateRangeLabel={dateBounds.label}
+            dateRangeStart={dateBounds.start}
+            dateRangeEnd={dateBounds.end}
+            initialAccountId={initialAccountId}
             onRegisterExportHandlers={(handlers) => {
               exportHandlersRef.current = handlers;
             }}

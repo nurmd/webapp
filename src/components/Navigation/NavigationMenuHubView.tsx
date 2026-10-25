@@ -281,6 +281,15 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         : ['sales', 'bill', 'invoice', 'cash', 'credit', 'sales ledger', 'ledger'],
     },
     {
+      id: 'payment_in_hub',
+      title: 'Payment In',
+      subtitle: 'Record customer payments, receipts & money-in ledger entries',
+      icon: 'call_received',
+      category: 'sales',
+      action: () => onNavigate('payment_in'),
+      keywords: ['payment in', 'receipt', 'money in', 'collection', 'payment', 'inflow'],
+    },
+    {
       id: 'sale_quotation',
       title: 'Quotation / Estimate',
       subtitle: 'Convert estimates & proforma bills directly into invoices',
@@ -343,6 +352,15 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       keywords: isGstActive
         ? ['purchase', 'vendor bill', 'inward', 'itc', 'procurement', 'purchase ledger', 'ledger']
         : ['purchase', 'vendor bill', 'inward', 'procurement', 'purchase ledger', 'ledger'],
+    },
+    {
+      id: 'payment_out_hub',
+      title: 'Payment Out',
+      subtitle: 'Record supplier payments, expenses & money-out ledger entries',
+      icon: 'call_made',
+      category: 'purchases',
+      action: () => onNavigate('payment_out'),
+      keywords: ['payment out', 'payment', 'money out', 'disbursement', 'payout', 'vendor payment', 'outflow'],
     },
     {
       id: 'purchase_orders',

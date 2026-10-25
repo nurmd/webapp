@@ -40,6 +40,7 @@ import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
+import { withWalkInCustomer, isSystemParty } from './core/utils/systemParties.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
@@ -102,6 +103,9 @@ const PurchaseChallansView = React.lazy(() =>
 );
 const PurchaseReturnsView = React.lazy(() =>
   import('./components/Returns/PurchaseReturnsView.tsx').then((m) => ({ default: m.PurchaseReturnsView }))
+);
+const PaymentTransactionsView = React.lazy(() =>
+  import('./components/Payments/PaymentTransactionsView.tsx').then((m) => ({ default: m.PaymentTransactionsView }))
 );
 
 // Heavy Modals (Dynamic Code-Splitting with named-export unwrapping)
@@ -183,7 +187,7 @@ export const App: React.FC = () => {
 
   // React 18 Granular External Store Subscriptions
   const company = useCompany();
-  const parties = useParties();
+  const rawParties = useParties();
   const items = useItems();
   const invoices = useInvoices();
   const purchases = usePurchases();
@@ -191,6 +195,10 @@ export const App: React.FC = () => {
   const vouchers = useVouchers();
   const bankAccounts = useBankAccounts();
   const cashBankTxns = useCashBankTxns();
+
+  const parties = useMemo(() => {
+    return withWalkInCustomer(rawParties, company.stateCode, invoices);
+  }, [rawParties, company.stateCode, invoices]);
 
   // Modals state
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
@@ -907,6 +915,10 @@ export const App: React.FC = () => {
   }, []);
 
   const handleDeleteParty = useCallback((id: string) => {
+    if (isSystemParty(id)) {
+      alert('System party cannot be deleted.');
+      return;
+    }
     if (!rbac.canDeleteParty(activeUser.role)) {
       alert('Permission Denied: Only Business Owners can delete customer/supplier accounts. Please switch user role.');
       setIsRoleSwitchOpen(true);
@@ -1030,18 +1042,36 @@ export const App: React.FC = () => {
     }
   }, [activeTab]);
 
+  const [reportsDeepLink, setReportsDeepLink] = useState<{
+    report: 'bank_statement';
+    accountId: string;
+    datePreset: 'THIS_FY';
+  } | null>(null);
+
   const handleSelectTab = useCallback((tab: AppTab) => {
     if (!rbac.canAccessTab(tab, activeUser.role)) {
       setIsRoleSwitchOpen(true);
       return;
     }
     setActiveTab((curTab) => {
+      if (curTab === 'reports' && tab !== 'reports') {
+        setReportsDeepLink(null);
+      }
       if (tab !== curTab) {
         previousTabRef.current = curTab;
       }
       return tab;
     });
   }, [activeUser.role]);
+
+  const handleOpenAccountStatement = useCallback((accountId: string) => {
+    setReportsDeepLink({
+      report: 'bank_statement',
+      accountId,
+      datePreset: 'THIS_FY',
+    });
+    handleSelectTab('reports');
+  }, [handleSelectTab]);
 
   // Navigation Chrome Callbacks
   const handleOpenMore = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
@@ -1141,6 +1171,22 @@ export const App: React.FC = () => {
           />
         )}
 
+        {activeTab === 'payment_in' && (
+          <PaymentTransactionsView
+            flow="IN"
+            company={company}
+            accounts={bankAccounts}
+            transactions={cashBankTxns}
+            invoices={invoices}
+            purchases={purchases}
+            expenses={expenses}
+            vouchers={vouchers}
+            onSaveTransaction={handleSaveCashBankTxn}
+            onDeleteTransaction={handleDeleteCashBankTxn}
+            onNavigateTab={handleSelectTab}
+          />
+        )}
+
         {activeTab === 'quotations' && (
           <QuotationsEstimatesView
             company={company}
@@ -1197,6 +1243,22 @@ export const App: React.FC = () => {
             onSavePurchase={handleSavePurchase}
             onDeletePurchase={handleDeletePurchase}
             onEditPurchase={handleEditPurchase}
+          />
+        )}
+
+        {activeTab === 'payment_out' && (
+          <PaymentTransactionsView
+            flow="OUT"
+            company={company}
+            accounts={bankAccounts}
+            transactions={cashBankTxns}
+            invoices={invoices}
+            purchases={purchases}
+            expenses={expenses}
+            vouchers={vouchers}
+            onSaveTransaction={handleSaveCashBankTxn}
+            onDeleteTransaction={handleDeleteCashBankTxn}
+            onNavigateTab={handleSelectTab}
           />
         )}
 
@@ -1303,6 +1365,7 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onOpenAccountStatement={handleOpenAccountStatement}
           />
         )}
 
@@ -1317,6 +1380,9 @@ export const App: React.FC = () => {
             vouchers={vouchers}
             bankAccounts={bankAccounts}
             cashBankTxns={cashBankTxns}
+            initialReportPage={reportsDeepLink?.report}
+            initialAccountId={reportsDeepLink?.accountId}
+            initialDatePreset={reportsDeepLink?.datePreset}
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
