@@ -1035,6 +1035,29 @@ export const App: React.FC = () => {
     });
   }, [activeUser.role]);
 
+  const handleSaveVoucher = useCallback((voucher: Voucher) => {
+    db.saveVoucher(voucher);
+  }, []);
+
+  const handleDeleteVoucher = useCallback((id: string) => {
+    if (!rbac.canDeleteVoucher(activeUser.role)) {
+      alert('Permission Denied: Only Business Owners can delete accounting vouchers. Please switch user role.');
+      setIsRoleSwitchOpen(true);
+      return;
+    }
+    const vch = db.getVouchers().find((v) => v.id === id);
+    setDeleteConfirmation({
+      isOpen: true,
+      title: 'Delete Accounting Voucher?',
+      recordName: vch ? `${vch.voucherType} #${vch.voucherNumber}` : undefined,
+      description: 'Are you sure you want to delete this accounting voucher? This action will reverse any party ledger impacts.',
+      confirmText: 'Delete Voucher',
+      onConfirm: () => {
+        db.deleteVoucher(id);
+      },
+    });
+  }, [activeUser.role]);
+
   useEffect(() => {
     const mainEl = document.getElementById('main-content-scroll');
     if (mainEl) {
@@ -1184,6 +1207,14 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onSaveVoucher={handleSaveVoucher}
+            onDeleteVoucher={handleDeleteVoucher}
+            onSaveExpense={handleSaveExpense}
+            onDeleteExpense={handleDeleteExpense}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onEditPurchase={handleEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
           />
         )}
 
@@ -1259,6 +1290,14 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onSaveVoucher={handleSaveVoucher}
+            onDeleteVoucher={handleDeleteVoucher}
+            onSaveExpense={handleSaveExpense}
+            onDeleteExpense={handleDeleteExpense}
+            onEditInvoice={handleEditInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+            onEditPurchase={handleEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
           />
         )}
 

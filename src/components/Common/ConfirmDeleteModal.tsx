@@ -72,6 +72,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
           </button>
           <button
             type="button"
+            data-testid="confirm-modal-delete-button"
             onClick={() => {
               onConfirm();
               onClose();

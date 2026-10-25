@@ -458,6 +458,119 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
 
       expect(container.textContent).toContain('Owner Drawings');
     });
+
+    it('PaymentTransactionsView renders row-level Edit and Delete buttons and supports deletion via ConfirmDeleteModal', async () => {
+      const onSaveTransaction = vi.fn();
+      const onDeleteTransaction = vi.fn();
+      const onNavigateTab = vi.fn();
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[directAddTxn]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+          />
+        );
+      });
+
+      // Entry id is LEDGER-TXN-TXN-ADD-1
+      const editBtn = container.querySelector('[data-testid="edit-payment-LEDGER-TXN-TXN-ADD-1"]') as HTMLElement;
+      const deleteBtn = container.querySelector('[data-testid="delete-payment-LEDGER-TXN-TXN-ADD-1"]') as HTMLElement;
+
+      expect(editBtn).toBeDefined();
+      expect(deleteBtn).toBeDefined();
+
+      // Clicking row delete button prompts confirmation modal
+      await act(async () => {
+        deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(container.textContent).toContain('Delete Transaction?');
+
+      // Click Confirm Delete in modal
+      const confirmBtn = container.querySelector('[data-testid="confirm-modal-delete-button"]') as HTMLElement;
+      expect(confirmBtn).toBeDefined();
+
+      await act(async () => {
+        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(onDeleteTransaction).toHaveBeenCalledWith('TXN-ADD-1');
+    });
+
+    it('PaymentTransactionsView supports editing and deleting Party Vouchers', async () => {
+      const onSaveVoucher = vi.fn();
+      const onDeleteVoucher = vi.fn();
+      const onSaveTransaction = vi.fn();
+      const onDeleteTransaction = vi.fn();
+      const onNavigateTab = vi.fn();
+
+      const receiptVoucher = {
+        id: 'VCH-001',
+        voucherNumber: 'RCPT-101',
+        voucherType: 'RECEIPT' as const,
+        date: '2026-05-18',
+        narration: 'Payment received from Customer Bob',
+        totalAmount: 3500,
+        entries: [
+          { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 3500, credit: 0 },
+          { accountId: 'PTY-BOB', accountName: 'Bob', debit: 0, credit: 3500 },
+        ],
+        createdAt: '2026-05-18T10:00:00.000Z',
+      };
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[receiptVoucher as any]}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+            onSaveVoucher={onSaveVoucher}
+            onDeleteVoucher={onDeleteVoucher}
+          />
+        );
+      });
+
+      expect(container.textContent).toContain('Payment received from Customer Bob');
+      expect(container.textContent).toContain('3,500');
+
+      // Find delete button on voucher row (LEDGER-VCH-VCH-001-0)
+      const vchDeleteBtn = container.querySelector('[data-testid="delete-payment-LEDGER-VCH-VCH-001-0"]') as HTMLElement;
+      expect(vchDeleteBtn).toBeDefined();
+
+      await act(async () => {
+        vchDeleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(container.textContent).toContain('Delete Accounting Voucher?');
+      expect(container.textContent).toContain('RCPT-101');
+
+      const confirmBtn = container.querySelector('[data-testid="confirm-modal-delete-button"]') as HTMLElement;
+      expect(confirmBtn).toBeDefined();
+
+      await act(async () => {
+        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(onDeleteVoucher).toHaveBeenCalledWith('VCH-001');
+    });
   });
 
   describe('4. Cash & Bank Statement Icon and Deep-Link Statement Flow', () => {
