@@ -39,8 +39,8 @@ TARBALL_URL=""
 LATEST_TAG=""
 
 if [ "$HTTP_CODE" = "200" ] && [ -f "$RELEASE_JSON" ]; then
-  LATEST_TAG=$(grep -Po '"tag_name":\s*"\K[^"]+' "$RELEASE_JSON" || true)
-  TARBALL_URL=$(grep -Po '"browser_download_url":\s*"\Khttps://[^"]*vyapar-pwa\.tar\.gz' "$RELEASE_JSON" || true)
+  LATEST_TAG=$(grep -Po '"tag_name":\s*"\K[^"]+' "$RELEASE_JSON" | head -n1 || true)
+  TARBALL_URL=$(grep -Po '"browser_download_url":\s*"\Khttps://[^"]*vyapar-pwa\.tar\.gz(?=")' "$RELEASE_JSON" | head -n1 || true)
 fi
 
 # 2. Download the update archive
