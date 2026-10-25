@@ -58,6 +58,8 @@ gst-billing-app/
     ├── services/              # Stateful platform services & persistence
     │   ├── db.ts              # Primary storage coordinator & repository layer
     │   ├── pouchdb.ts         # PouchDB / CouchDB continuous 2-way sync
+    │   ├── conflictManifest.ts # Read-only conflict review manifest/backup builder
+    │   ├── conflictDiff.ts    # Conflict field diffing and sensitive-value redaction
     │   ├── auditTrail.ts      # MCA-compliant SHA-256 tamper-evident audit logger
     │   ├── pinSecurity.ts     # Salted PIN hashing & user verification
     │   └── updateService.ts   # OTA updater & version checker
@@ -167,6 +169,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - The exporter fails closed if any conflict revision cannot be fetched: the manifest warns that the bundle is incomplete, backup verification reports the missing revision, and the CLI exits non-zero.
   - Resolution remains manual and per-document in the Data & Sync conflict queue. Use the manifest's dependency warnings (company/settings → catalog → parties → financial documents) before accepting any branch.
   - When the source does not expose all documents, the manifest explicitly warns that dependency counts are limited rather than silently under-reporting references.
+  - The Data & Sync conflict queue also provides a read-only, collapsed-by-default detail view (`src/services/conflictDiff.ts`, `src/components/Settings/tabs/DataSyncTab.tsx`). It shows full document/revision IDs, changed fields with Version A/B values, recursive redaction for passwords, tokens, API keys, sync URLs, and credentials, plus explicit unavailable-payload and metadata-only warnings. It never resolves a conflict, merges branches, or writes to PouchDB/CouchDB.
 
 ### C. Ledger Reversals & Double-Entry Integrity (`src/core/accounting/`, `src/services/db/reconcileAndRepair.ts`)
 - **No Hard-Deletes of Posted Vouchers**:

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict, pouch } from '../../../services/pouchdb.ts';
+import {
+  computeConflictDiff,
+  isHighRiskConflict,
+} from '../../../services/conflictDiff.ts';
 
 export type TruthfulSyncState = 'syncing' | 'online' | 'offline' | 'error' | 'paused' | 'pending' | 'conflict';
 
@@ -385,6 +389,14 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   );
 
   const [networkOnline, setNetworkOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [expandedConflicts, setExpandedConflicts] = useState<Record<string, boolean>>({});
+
+  const toggleConflictDetails = (conflictId: string) => {
+    setExpandedConflicts((prev) => ({
+      ...prev,
+      [conflictId]: !prev[conflictId],
+    }));
+  };
 
   useEffect(() => {
     const onOnline = () => setNetworkOnline(true);
@@ -921,6 +933,8 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
           <div className="flex flex-col gap-3 pt-2 border-t border-outline-variant/15">
             {activeConflicts.map((conflict) => {
               const humanLabel = getConflictHumanLabel(conflict);
+              const isExpanded = Boolean(expandedConflicts[conflict.id]);
+
               return (
                 <div
                   key={conflict.id}
@@ -944,6 +958,19 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                         </span>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      data-testid={`conflict-details-toggle-${conflict.id}`}
+                      aria-expanded={isExpanded}
+                      onClick={() => toggleConflictDetails(conflict.id)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
+                      <span>{isExpanded ? 'Hide details' : 'View details'}</span>
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -987,6 +1014,142 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  {isExpanded && (() => {
+                    const diffResult = computeConflictDiff(conflict.winningDoc, conflict.conflictingDoc);
+                    const isHighRisk = isHighRiskConflict(conflict);
+
+                    return (
+                      <div
+                        data-testid={`conflict-details-${conflict.id}`}
+                        className="pt-2.5 border-t border-amber-500/20 flex flex-col gap-2.5 text-xs"
+                      >
+                        {isHighRisk && (
+                          <div
+                            data-testid={`conflict-risk-caution-${conflict.id}`}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] font-medium"
+                          >
+                            <span className="material-symbols-outlined text-[15px] text-amber-600 dark:text-amber-400 shrink-0">
+                              warning
+                            </span>
+                            <span>
+                              High-risk entity ({conflict.docType}): Review differences carefully before choosing a winning revision to avoid data loss.
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2.5 rounded-lg bg-surface-container/60 border border-outline-variant/15 text-[11px]">
+                          <div>
+                            <span className="font-bold text-on-surface-variant block text-[10px] uppercase tracking-wide">
+                              Full Document ID
+                            </span>
+                            <span className="font-mono text-on-surface break-all select-all">
+                              {conflict.docId}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-on-surface-variant block text-[10px] uppercase tracking-wide">
+                              Detected At
+                            </span>
+                            <span className="font-mono text-on-surface">
+                              {formatConflictTimestamp(conflict.detectedAt)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-on-surface-variant block text-[10px] uppercase tracking-wide">
+                              Full Winning Revision (A)
+                            </span>
+                            <span className="font-mono text-on-surface break-all select-all">
+                              {conflict.winningRev || 'Unavailable'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-on-surface-variant block text-[10px] uppercase tracking-wide">
+                              Full Conflicting Revision (B)
+                            </span>
+                            <span className="font-mono text-on-surface break-all select-all">
+                              {conflict.conflictingRev || 'Unavailable'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!diffResult.isAvailable ? (
+                          <div
+                            data-testid={`conflict-details-unavailable-${conflict.id}`}
+                            className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2"
+                          >
+                            <span className="material-symbols-outlined text-[18px] text-rose-600 shrink-0">
+                              error
+                            </span>
+                            <span>
+                              {diffResult.unavailableReason || 'Document revision bodies are unavailable for comparison.'}
+                            </span>
+                          </div>
+                        ) : !diffResult.hasDifferences ? (
+                          <div
+                            data-testid={`conflict-details-empty-${conflict.id}`}
+                            className="p-3 rounded-lg bg-surface-container/50 border border-outline-variant/20 text-on-surface-variant text-xs flex items-center gap-2"
+                          >
+                            <span className="material-symbols-outlined text-[18px] text-primary shrink-0">
+                              info
+                            </span>
+                            <span>No field-level differences; branches differ only in revision metadata.</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                                Changed Fields ({diffResult.differences.length})
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              {diffResult.differences.map((diff) => (
+                                <div
+                                  key={diff.field}
+                                  data-testid={`conflict-detail-field-${conflict.id}-${diff.field}`}
+                                  className="p-2.5 rounded-lg bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5"
+                                >
+                                  <span className="text-xs font-mono font-bold text-on-surface">
+                                    {diff.field}
+                                  </span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    <div className="p-2 rounded bg-surface/80 border border-outline-variant/15 flex flex-col gap-1">
+                                      <span className="text-[10px] font-bold text-secondary uppercase tracking-wider">
+                                        Version A
+                                      </span>
+                                      {diff.isWinningObject ? (
+                                        <pre className="text-[11px] font-mono text-on-surface overflow-x-auto max-h-48 whitespace-pre-wrap break-all bg-surface-container-highest/40 p-1.5 rounded">
+                                          {diff.winningFormatted}
+                                        </pre>
+                                      ) : (
+                                        <span className="text-[11px] font-mono text-on-surface break-all">
+                                          {diff.winningFormatted}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="p-2 rounded bg-surface/80 border border-outline-variant/15 flex flex-col gap-1">
+                                      <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                                        Version B
+                                      </span>
+                                      {diff.isConflictingObject ? (
+                                        <pre className="text-[11px] font-mono text-on-surface overflow-x-auto max-h-48 whitespace-pre-wrap break-all bg-surface-container-highest/40 p-1.5 rounded">
+                                          {diff.conflictingFormatted}
+                                        </pre>
+                                      ) : (
+                                        <span className="text-[11px] font-mono text-on-surface break-all">
+                                          {diff.conflictingFormatted}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
