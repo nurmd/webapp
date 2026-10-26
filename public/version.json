@@ -1,14 +1,14 @@
 {
-  "version": "1.2.39",
+  "version": "1.2.40",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-26T05:36:55.268Z",
+  "buildTime": "2026-10-26T12:05:07.382Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Start a clean audit epoch: existing audit records remain preserved as a read-only Legacy archive",
-    "New audit events begin at epoch 2, sequence #0001, with a fresh cryptographic genesis chain",
-    "Security & Audit defaults to the Current Epoch, with Current, Legacy, and All scope filters and a neutral legacy notice",
-    "Audit CSV and JSON exports now include epoch and legacy status",
-    "Billing, tax, inventory, and financial calculations are unchanged"
+    "GST inclusive and exclusive pricing support across catalog, sales, purchases, and POS",
+    "Bidirectional rate synchronization with active pricing mode tracking",
+    "Enhanced A4 invoice, simplified bill, and thermal receipts with dual rate and CESS display",
+    "Robust legacy draft and POS held bill normalization with backward compatibility",
+    "Statutory stock valuation and accounting integrity preserved across all transaction flows"
   ]
 }
