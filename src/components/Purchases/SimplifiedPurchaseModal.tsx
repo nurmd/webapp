@@ -2,6 +2,7 @@ import React from 'react';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
+import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
@@ -144,37 +145,55 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
               </thead>
               <tbody className="divide-y divide-outline-variant/15 text-on-surface">
                 {bill.items && bill.items.length > 0 ? (
-                  bill.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-surface-container-low/40">
-                      <td className="py-1.5 px-2.5 min-w-0 text-left">
-                        <div className="truncate font-bold text-on-surface" title={item.name}>
-                          {item.name}
-                        </div>
-                        <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                          {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                          {isGstActive && item.hsnSacCode && <span>•</span>}
-                          {isGstActive && (
-                            <span className="text-orange-600 dark:text-orange-400 font-semibold">
-                              GST {item.gstRate || 0}%
-                            </span>
+                  bill.items.map((item, idx) => {
+                    const isGst = isGstActive && !company.isCompositionScheme;
+                    const priceMode = item.priceMode ?? 'EXCLUSIVE';
+                    const storedInclusive = Number(item.unitPriceInclusive);
+                    const inclusiveRate =
+                      priceMode === 'INCLUSIVE'
+                        ? (Number.isFinite(storedInclusive) && storedInclusive > 0
+                            ? storedInclusive
+                            : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0))
+                        : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0);
+                    const cess = Number(item.cessRate) || 0;
+                    return (
+                      <tr key={idx} className="hover:bg-surface-container-low/40">
+                        <td className="py-1.5 px-2.5 min-w-0 text-left">
+                          <div className="truncate font-bold text-on-surface" title={item.name}>
+                            {item.name}
+                          </div>
+                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
+                            {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
+                            {isGstActive && item.hsnSacCode && <span>•</span>}
+                            {isGst && (
+                              <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                                GST {item.gstRate || 0}%
+                              </span>
+                            )}
+                            {isGst && cess > 0 && <span>• CESS {cess}%</span>}
+                          </div>
+                        </td>
+                        <td className="py-1.5 px-2 text-center min-w-0">
+                          <div className="font-mono font-medium text-on-surface truncate text-center">
+                            {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
+                          </div>
+                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
+                            @ {formatINR(item.unitPrice)}
+                          </div>
+                          {isGst && (
+                            <div className="text-[9px] text-on-surface-variant font-mono truncate text-center">
+                              Incl. {formatINR(inclusiveRate)}
+                            </div>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-1.5 px-2 text-center min-w-0">
-                        <div className="font-mono font-medium text-on-surface truncate text-center">
-                          {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
-                        </div>
-                        <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
-                          @ {formatINR(item.unitPrice)}
-                        </div>
-                      </td>
-                      <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
-                        <div className="w-full text-right flex justify-end">
-                          <span>{formatINR(item.totalAmount)}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
+                          <div className="w-full text-right flex justify-end">
+                            <span>{formatINR(item.totalAmount)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={3} className="py-4 text-center text-on-surface-variant text-xs">
@@ -188,28 +207,43 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         </div>
 
         {/* Financial Breakdown */}
-        <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-          {isGstActive && (
-            <>
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Taxable Amount</span>
-                <span className="font-bold text-on-surface">{formatINR(bill.totalTaxableAmount)}</span>
-              </div>
-              <div className="flex justify-between text-on-surface-variant text-[11px]">
-                <span>Total Tax (GST / ITC)</span>
-                <span className="font-bold text-orange-600 dark:text-orange-400">
-                  {formatINR(bill.totalTax)}
+        {(() => {
+          const isGst = isGstActive && !company.isCompositionScheme;
+          const totalCess = isGst ? (Number(bill.totalCess) || 0) : 0;
+          const gstOnly = Math.max(0, (Number(bill.totalTax) || 0) - totalCess);
+          return (
+            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
+              {isGst && (
+                <>
+                  <div className="flex justify-between text-on-surface-variant text-[11px]">
+                    <span>Taxable Amount</span>
+                    <span className="font-bold text-on-surface">{formatINR(bill.totalTaxableAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-on-surface-variant text-[11px]">
+                    <span>{totalCess > 0 ? 'GST / ITC' : 'Total Tax (GST / ITC)'}</span>
+                    <span className="font-bold text-orange-600 dark:text-orange-400">
+                      {formatINR(totalCess > 0 ? gstOnly : bill.totalTax)}
+                    </span>
+                  </div>
+                  {totalCess > 0 && (
+                    <div className="flex justify-between text-on-surface-variant text-[11px]">
+                      <span>CESS</span>
+                      <span className="font-bold text-orange-600 dark:text-orange-400">
+                        {formatINR(totalCess)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
+                <span>Total Bill Value</span>
+                <span className="font-black text-on-surface font-currency-display-mobile">
+                  {formatINR(bill.grandTotal)}
                 </span>
               </div>
-            </>
-          )}
-          <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
-            <span>Total Bill Value</span>
-            <span className="font-black text-on-surface font-currency-display-mobile">
-              {formatINR(bill.grandTotal)}
-            </span>
-          </div>
-        </div>
+            </div>
+          );
+        })()}
 
         {/* Compact Status / Payment Bar */}
         {isChallan ? (

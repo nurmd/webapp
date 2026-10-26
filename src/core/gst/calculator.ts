@@ -1,3 +1,14 @@
+import {
+  PriceMode,
+  exclusiveFromInclusive,
+  inclusiveFromExclusive,
+  calculateRateFromTotal,
+  round2,
+} from './pricing';
+
+export type { PriceMode };
+export { exclusiveFromInclusive, inclusiveFromExclusive, calculateRateFromTotal, round2 };
+
 export interface GstTaxBreakdown {
   taxableAmount: number;
   cgstRate: number;
@@ -37,7 +48,9 @@ export function isUtgstState(stateCode?: string): boolean {
 
 export interface InvoiceItemCalculationInput {
   quantity: number;
-  unitPrice: number;
+  unitPrice?: number;
+  unitPriceInclusive?: number;
+  priceMode?: PriceMode;
   discountPercent?: number;
   discountAmount?: number;
   gstRate: number; // e.g. 0, 0.1, 0.25, 3, 5, 12, 18, 28
@@ -48,11 +61,19 @@ export interface InvoiceItemCalculationInput {
 export interface CalculatedItem extends GstTaxBreakdown {
   grossAmount: number;
   discountAmount: number;
+  grossAmountExclusive?: number;
+  grossAmountInclusive?: number;
+  priceMode?: PriceMode;
+  unitPriceExclusive?: number;
+  unitPriceInclusive?: number;
+  netInclusiveAmount?: number;
 }
 
 export interface InvoiceCalculationSummary {
   items: CalculatedItem[];
   totalGrossAmount: number;
+  totalGrossAmountExclusive?: number;
+  totalGrossAmountInclusive?: number;
   totalDiscount: number;
   totalTaxableAmount: number;
   totalCgst: number;
@@ -72,14 +93,18 @@ export interface InvoiceCalculationSummary {
  * Calculates GST components for a single line item.
  * 
  * Rules:
- * 1. Computes Gross Amount = quantity * unitPrice.
- * 2. Applies flat discount amount or percentage discount.
- * 3. Taxable Amount = Gross Amount - Discount Amount.
- * 4. Tax bifurcation:
+ * 1. Price Mode support:
+ *    - EXCLUSIVE (default): gross = qty * exclusiveRate, discount on exclusive gross, taxable = gross - discount.
+ *    - INCLUSIVE: gross = qty * inclusiveRate, discount on inclusive gross, netInclusive = gross - discount.
+ *      Inclusive covers GST only; CESS is added on top.
+ *      taxable = round2(netInclusive * 100 / (100 + gstRate))
+ *      gst = round2(netInclusive - taxable)
+ * 2. Tax bifurcation:
  *    - Intra-State (Non-UT State): CGST (50% of GST rate) + SGST (50% of GST rate).
  *    - Intra-State (Union Territory): CGST (50% of GST rate) + UTGST (50% of GST rate), SGST = 0.
  *    - Inter-State (Different State/UT): IGST (100% of GST rate).
- * 5. Applies Compensation Cess (percentage of taxable value and/or fixed per-unit cess).
+ *    In inclusive mode, CGST and SGST/UTGST sum exactly to total GST without losing a paisa.
+ * 3. Applies Compensation Cess (percentage of taxable value and/or fixed per-unit cess).
  * 
  * @param input - Item input details including quantity, unit price, discounts, and GST/Cess rates.
  * @param isIntraState - True if Supplier State matches Recipient Place of Supply (POS).
@@ -91,17 +116,107 @@ export function calculateItemGst(
   isIntraState: boolean,
   isUtOrPos: boolean | string = false
 ): CalculatedItem {
-  const grossAmount = Number((input.quantity * input.unitPrice).toFixed(2));
+  const isUt = typeof isUtOrPos === 'string' ? isUtgstState(isUtOrPos) : Boolean(isUtOrPos);
+  const isInclusive = input.priceMode === 'INCLUSIVE';
+
+  if (isInclusive) {
+    const inclusiveRate = input.unitPriceInclusive !== undefined
+      ? input.unitPriceInclusive
+      : (input.unitPrice !== undefined ? input.unitPrice : 0);
+
+    // In INCLUSIVE mode, the inclusive rate is authoritative; derive exclusive from it and ignore supplied unitPrice
+    const exclusiveRate = exclusiveFromInclusive(inclusiveRate, input.gstRate);
+
+    const grossInclusive = round2(input.quantity * inclusiveRate);
+
+    let discount = 0;
+    if (input.discountAmount && input.discountAmount > 0) {
+      discount = Math.min(grossInclusive, input.discountAmount);
+    } else if (input.discountPercent && input.discountPercent > 0) {
+      discount = Math.min(grossInclusive, round2((grossInclusive * input.discountPercent) / 100));
+    }
+
+    const netInclusive = Math.max(0, round2(grossInclusive - discount));
+    const taxableAmount = input.gstRate > 0
+      ? round2((netInclusive * 100) / (100 + input.gstRate))
+      : netInclusive;
+    const gst = round2(netInclusive - taxableAmount);
+
+    let cgstRate = 0;
+    let cgstAmount = 0;
+    let sgstRate = 0;
+    let sgstAmount = 0;
+    let utgstRate = 0;
+    let utgstAmount = 0;
+    let igstRate = 0;
+    let igstAmount = 0;
+
+    if (isIntraState) {
+      if (isUt) {
+        cgstRate = input.gstRate / 2;
+        utgstRate = input.gstRate / 2;
+        cgstAmount = round2(gst / 2);
+        utgstAmount = round2(gst - cgstAmount);
+      } else {
+        cgstRate = input.gstRate / 2;
+        sgstRate = input.gstRate / 2;
+        cgstAmount = round2(gst / 2);
+        sgstAmount = round2(gst - cgstAmount);
+      }
+    } else {
+      igstRate = input.gstRate;
+      igstAmount = gst;
+    }
+
+    const cessPercent = input.cessPercent || 0;
+    const cessPerUnit = input.cessPerUnit || 0;
+    const cessAmount = round2(((taxableAmount * cessPercent) / 100) + (input.quantity * cessPerUnit));
+
+    const totalTax = round2(cgstAmount + sgstAmount + utgstAmount + igstAmount + cessAmount);
+    const totalAmount = round2(netInclusive + cessAmount);
+
+    const grossAmountExclusive = round2(input.quantity * exclusiveRate);
+    const grossAmountInclusive = grossInclusive;
+
+    return {
+      grossAmount: grossInclusive,
+      discountAmount: discount,
+      taxableAmount,
+      cgstRate,
+      cgstAmount,
+      sgstRate,
+      sgstAmount,
+      utgstRate,
+      utgstAmount,
+      igstRate,
+      igstAmount,
+      cessRate: cessPercent,
+      cessAmount,
+      totalTax,
+      totalAmount,
+      priceMode: 'INCLUSIVE',
+      unitPriceExclusive: exclusiveRate,
+      unitPriceInclusive: inclusiveRate,
+      grossAmountExclusive,
+      grossAmountInclusive,
+      netInclusiveAmount: netInclusive,
+    };
+  }
+
+  // EXCLUSIVE MODE (backward compatible)
+  const exclusiveRate = input.unitPrice !== undefined
+    ? input.unitPrice
+    : (input.unitPriceInclusive !== undefined ? exclusiveFromInclusive(input.unitPriceInclusive, input.gstRate) : 0);
+  const grossAmount = Number((input.quantity * exclusiveRate).toFixed(2));
 
   let discount = 0;
   if (input.discountAmount && input.discountAmount > 0) {
-    discount = input.discountAmount;
+    discount = Math.min(grossAmount, input.discountAmount);
   } else if (input.discountPercent && input.discountPercent > 0) {
-    discount = Number(((grossAmount * input.discountPercent) / 100).toFixed(2));
+    discount = Math.min(grossAmount, Number(((grossAmount * input.discountPercent) / 100).toFixed(2)));
   }
 
   const taxableAmount = Math.max(0, Number((grossAmount - discount).toFixed(2)));
-  const isUt = typeof isUtOrPos === 'string' ? isUtgstState(isUtOrPos) : Boolean(isUtOrPos);
 
   let cgstRate = 0;
   let cgstAmount = 0;
@@ -140,6 +255,11 @@ export function calculateItemGst(
   const totalTax = Number((cgstAmount + sgstAmount + utgstAmount + igstAmount + cessAmount).toFixed(2));
   const totalAmount = Number((taxableAmount + totalTax).toFixed(2));
 
+  // In EXCLUSIVE mode, the exclusive rate is authoritative; derive inclusive from it and ignore supplied unitPriceInclusive
+  const inclusiveRate = inclusiveFromExclusive(exclusiveRate, input.gstRate);
+  const grossAmountExclusive = grossAmount;
+  const grossAmountInclusive = round2(input.quantity * inclusiveRate);
+
   return {
     grossAmount,
     discountAmount: discount,
@@ -156,6 +276,11 @@ export function calculateItemGst(
     cessAmount,
     totalTax,
     totalAmount,
+    priceMode: 'EXCLUSIVE',
+    unitPriceExclusive: exclusiveRate,
+    unitPriceInclusive: inclusiveRate,
+    grossAmountExclusive,
+    grossAmountInclusive,
   };
 }
 
@@ -185,6 +310,8 @@ export function calculateInvoice(
   const calculatedItems = items.map((item) => calculateItemGst(item, isIntraState, isUt));
 
   let totalGrossAmount = 0;
+  let totalGrossAmountExclusive = 0;
+  let totalGrossAmountInclusive = 0;
   let totalDiscount = 0;
   let totalTaxableAmount = 0;
   let totalCgst = 0;
@@ -195,6 +322,8 @@ export function calculateInvoice(
 
   for (const item of calculatedItems) {
     totalGrossAmount += item.grossAmount;
+    totalGrossAmountExclusive += item.grossAmountExclusive ?? item.grossAmount;
+    totalGrossAmountInclusive += item.grossAmountInclusive ?? item.grossAmount;
     totalDiscount += item.discountAmount;
     totalTaxableAmount += item.taxableAmount;
     totalCgst += item.cgstAmount;
@@ -205,6 +334,8 @@ export function calculateInvoice(
   }
 
   totalGrossAmount = Number(totalGrossAmount.toFixed(2));
+  totalGrossAmountExclusive = Number(totalGrossAmountExclusive.toFixed(2));
+  totalGrossAmountInclusive = Number(totalGrossAmountInclusive.toFixed(2));
   totalDiscount = Number(totalDiscount.toFixed(2));
   totalTaxableAmount = Number(totalTaxableAmount.toFixed(2));
   totalCgst = Number(totalCgst.toFixed(2));
@@ -223,6 +354,8 @@ export function calculateInvoice(
   return {
     items: calculatedItems,
     totalGrossAmount,
+    totalGrossAmountExclusive,
+    totalGrossAmountInclusive,
     totalDiscount,
     totalTaxableAmount,
     totalCgst,

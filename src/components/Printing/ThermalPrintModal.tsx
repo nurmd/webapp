@@ -69,6 +69,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
     companyAddress: thermalSettings.showAddress ? company.address : '',
     gstin: thermalSettings.showGstin ? company.gstin : '',
+    isGst: company.isGstEnabled !== false,
     phone: thermalSettings.showPhone ? company.phone : '',
     receiptTitle: isDeliveryChallan
       ? 'DELIVERY CHALLAN'
@@ -83,6 +84,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       name: i.name,
       qty: i.quantity,
       rate: i.unitPrice,
+      rateInclusive: i.unitPriceInclusive,
+      cessRate: i.cessRate,
       amount: i.totalAmount,
     })),
     taxableAmount: invoice.totalTaxableAmount,
@@ -90,6 +93,10 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalCgst : 0,
     sgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalSgst : 0,
     igstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalIgst : 0,
+    totalCess:
+      !company.isCompositionScheme && thermalSettings.showTaxBreakdown
+        ? invoice.totalCess
+        : 0,
     shippingAmount: invoice.shippingAmount,
     roundOff: invoice.roundOff,
     grandTotal: invoice.grandTotal,

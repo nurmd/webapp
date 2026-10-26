@@ -119,7 +119,7 @@ describe('Suite 1: Statutory Indian GST Calculations', () => {
   it('TC-CALC-08: Discount exceeding gross amount clamps taxable amount to zero without negative tax', () => {
     const item = calculateItemGst({ quantity: 1, unitPrice: 500, discountAmount: 600, gstRate: 18 }, true);
     expect(item.grossAmount).toBe(500);
-    expect(item.discountAmount).toBe(600);
+    expect(item.discountAmount).toBe(500);
     expect(item.taxableAmount).toBe(0);
     expect(item.cgstAmount).toBe(0);
     expect(item.sgstAmount).toBe(0);

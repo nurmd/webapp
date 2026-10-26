@@ -1,4 +1,4 @@
-import type { UnitOfMeasurement } from './item.ts';
+import type { UnitOfMeasurement, ItemPriceMode } from './item.ts';
 
 export type InvoiceType =
   | 'B2B'           // Registered business to registered business
@@ -35,6 +35,8 @@ export interface InvoiceItemEntry {
   unit: UnitOfMeasurement;
   quantity: number;
   unitPrice: number;
+  unitPriceInclusive?: number;
+  priceMode?: ItemPriceMode;
   pricePerUnit?: number;              // Optional alias for unitPrice
   rate?: number;                      // Optional alias for unitPrice
   mrp?: number;

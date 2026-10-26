@@ -196,6 +196,10 @@ export function buildThermalReceiptBinary(
     return left + ' '.repeat(space) + right;
   };
 
+  const showGstDetails = Boolean(
+    (data.isGst ?? Boolean(data.gstin)) && !data.isCompositionScheme
+  );
+
   if (width === 32) {
     builder.bold(true).line('ITEM DESCRIPTION').bold(false);
     builder.bold(true).line('   ' + 'QTY'.padStart(5) + ' ' + 'RATE'.padStart(9) + ' ' + 'TOTAL'.padStart(11)).bold(false);
@@ -207,6 +211,25 @@ export function buildThermalReceiptBinary(
       const rateStr = item.rate.toFixed(2).padStart(9);
       const amtStr = item.amount.toFixed(2).padStart(11);
       builder.line('   ' + qtyStr + ' ' + rateStr + ' ' + amtStr);
+
+      if (showGstDetails) {
+        const hasIncl = typeof item.rateInclusive === 'number' && item.rateInclusive !== item.rate;
+        const hasCess = Boolean(item.cessRate && item.cessRate > 0);
+        if (hasIncl && hasCess) {
+          const inclStr = `   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`;
+          const cessStr = `CESS: ${item.cessRate}%`;
+          if (inclStr.length + 1 + cessStr.length <= width) {
+            builder.line(`${inclStr} ${cessStr}`);
+          } else {
+            builder.line(inclStr.substring(0, width));
+            builder.line(`   ${cessStr}`.substring(0, width));
+          }
+        } else if (hasIncl) {
+          builder.line(`   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`.substring(0, width));
+        } else if (hasCess) {
+          builder.line(`   CESS: ${item.cessRate}%`.substring(0, width));
+        }
+      }
     }
   } else {
     builder.bold(true).line('ITEM DESCRIPTION     ' + 'QTY'.padStart(6) + ' ' + 'RATE'.padStart(9) + ' ' + 'TOTAL'.padStart(10)).bold(false);
@@ -218,6 +241,25 @@ export function buildThermalReceiptBinary(
       const rateStr = item.rate.toFixed(2).padStart(9);
       const amtStr = item.amount.toFixed(2).padStart(10);
       builder.line(`${name} ${qtyStr} ${rateStr} ${amtStr}`);
+
+      if (showGstDetails) {
+        const hasIncl = typeof item.rateInclusive === 'number' && item.rateInclusive !== item.rate;
+        const hasCess = Boolean(item.cessRate && item.cessRate > 0);
+        if (hasIncl && hasCess) {
+          const inclStr = `   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`;
+          const cessStr = `CESS: ${item.cessRate}%`;
+          if (inclStr.length + 1 + cessStr.length <= width) {
+            builder.line(`${inclStr} ${cessStr}`);
+          } else {
+            builder.line(inclStr.substring(0, width));
+            builder.line(`   ${cessStr}`.substring(0, width));
+          }
+        } else if (hasIncl) {
+          builder.line(`   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`.substring(0, width));
+        } else if (hasCess) {
+          builder.line(`   CESS: ${item.cessRate}%`.substring(0, width));
+        }
+      }
     }
   }
   builder.line('-'.repeat(width));
@@ -233,6 +275,9 @@ export function buildThermalReceiptBinary(
     }
     if (data.igstAmount > 0) {
       builder.line(padRow('IGST Total:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+    }
+    if (showGstDetails && data.totalCess && data.totalCess > 0) {
+      builder.line(padRow('CESS Total:', `Rs. ${data.totalCess.toFixed(2)}`, width));
     }
   }
 

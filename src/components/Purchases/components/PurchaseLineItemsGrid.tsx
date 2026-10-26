@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
+import type { ItemPriceMode } from '../../../models/item.ts';
 
 export interface PurchaseGridRow {
   itemId: string;
@@ -9,6 +10,9 @@ export interface PurchaseGridRow {
   quantity: number;
   unit: string;
   unitPrice: number;
+  unitPriceInclusive?: number;
+  priceMode?: ItemPriceMode;
+  cessRate?: number;
   mrp?: number;
   discountPercent: number;
   discountAmount?: number;
@@ -31,6 +35,27 @@ export interface PurchaseLineItemsGridProps {
   onEditItem: (index: number) => void;
   onRemoveItem: (index: number) => void;
   onOpenScanner: () => void;
+}
+
+function getRowTotal(row: PurchaseGridRow, calcItem?: { totalAmount: number }): number {
+  if (calcItem && typeof calcItem.totalAmount === 'number') {
+    return calcItem.totalAmount;
+  }
+  const qty = Number(row.quantity) || 0;
+  const disc = Math.min(100, Math.max(0, Number(row.discountPercent) || 0));
+  const discMultiplier = 1 - disc / 100;
+  const gst = Number(row.gstRate) || 0;
+  const cess = Number(row.cessRate) || 0;
+
+  if (row.priceMode === 'INCLUSIVE' && row.unitPriceInclusive !== undefined) {
+    const incl = Number(row.unitPriceInclusive) || 0;
+    const net = qty * incl * discMultiplier;
+    const taxable = gst > 0 ? (net * 100) / (100 + gst) : net;
+    return net + (taxable * cess) / 100;
+  }
+
+  const excl = Number(row.unitPrice) || 0;
+  return qty * excl * discMultiplier * (1 + (gst + cess) / 100);
 }
 
 export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
@@ -129,7 +154,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
               <tbody className="divide-y divide-outline-variant/15 text-xs">
                 {rows.map((row, idx) => {
                   const itemCalc = calcItems[idx];
-                  const rowTotal = itemCalc?.totalAmount || (row.quantity * row.unitPrice * (1 - (row.discountPercent || 0) / 100));
+                  const rowTotal = getRowTotal(row, itemCalc);
                   return (
                     <tr
                       key={idx}
@@ -158,7 +183,12 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                         {formatQuantity(row.quantity, 4)} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
-                        {formatINR(row.unitPrice)}
+                        <div>{formatINR(row.unitPrice)}</div>
+                        {isGstActive && row.unitPriceInclusive !== undefined && (
+                          <div className="text-[10px] text-on-surface-variant font-normal">
+                            Incl. {formatINR(row.unitPriceInclusive)}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data">
                         {row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0) ? (
@@ -171,7 +201,12 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                       </td>
                       {isGstActive && (
                         <td className="py-2.5 px-3 text-right font-tabular-data text-on-surface-variant font-medium">
-                          {row.gstRate}%
+                          <div>{row.gstRate}%</div>
+                          {(row.cessRate || 0) > 0 && (
+                            <div className="text-[10px] text-on-surface-variant/80 font-normal">
+                              CESS {row.cessRate}%
+                            </div>
+                          )}
                         </td>
                       )}
                       <td className="py-2.5 px-4 text-right font-tabular-data font-bold text-on-surface text-sm">
@@ -198,7 +233,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
           <div className="sm:hidden divide-y divide-outline-variant/15">
             {rows.map((row, idx) => {
               const itemCalc = calcItems[idx];
-              const rowTotal = itemCalc?.totalAmount || (row.quantity * row.unitPrice * (1 - (row.discountPercent || 0) / 100));
+              const rowTotal = getRowTotal(row, itemCalc);
               return (
                 <div
                   key={idx}
@@ -221,12 +256,18 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-on-surface-variant mt-2 pt-1.5 border-t border-outline-variant/10">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-on-surface">
                         {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
                       <span>×</span>
-                      <span>{formatINR(row.unitPrice)}</span>
+                      {isGstActive && row.unitPriceInclusive !== undefined ? (
+                        <span className="font-semibold text-on-surface">
+                          Excl. {formatINR(row.unitPrice)} · Incl. {formatINR(row.unitPriceInclusive)}
+                        </span>
+                      ) : (
+                        <span>{formatINR(row.unitPrice)}</span>
+                      )}
                       {(row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0)) && (
                         <span className="text-orange-600 dark:text-orange-400 font-semibold">
                           (-{row.discountPercent > 0 ? `${row.discountPercent}%` : `₹${row.discountAmount}`})
@@ -235,7 +276,7 @@ export const PurchaseLineItemsGrid: React.FC<PurchaseLineItemsGridProps> = ({
                     </div>
                     {isGstActive && (
                       <span className="font-medium">
-                        GST {row.gstRate}% {row.hsnSacCode ? `· HSN ${row.hsnSacCode}` : ''}
+                        GST {row.gstRate}%{(row.cessRate || 0) > 0 ? ` · CESS ${row.cessRate}%` : ''} {row.hsnSacCode ? `· HSN ${row.hsnSacCode}` : ''}
                       </span>
                     )}
                   </div>

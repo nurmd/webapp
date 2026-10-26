@@ -1186,6 +1186,62 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       // Customer should now automatically default to Walk-in Customer
       expect(container.textContent).toContain('Walk-in Customer');
     });
+
+    it('QuickBillingView walk-in sale persistence', async () => {
+      const mockItem = {
+        id: 'ITEM-WALKIN-1',
+        name: 'Hammer',
+        salePrice: 250,
+        purchasePrice: 200,
+        gstRate: 18,
+        currentStock: 10,
+        minStockAlert: 2,
+        unit: 'PCS' as const,
+        category: 'Hardware',
+        hsnSacCode: '8205',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      const walkIn = createWalkInCustomer(mockCompany.stateCode, 0);
+      const onCompleteSale = vi.fn();
+
+      await act(async () => {
+        root.render(
+          <QuickBillingView
+            company={mockCompany}
+            items={[mockItem as any]}
+            parties={[walkIn]}
+            onCompleteSale={onCompleteSale}
+          />
+        );
+      });
+
+      // Item should be displayed in catalog grid
+      const itemEl = container.querySelector('[data-testid="pos-item-ITEM-WALKIN-1"]');
+      expect(itemEl).toBeDefined();
+
+      // Add item to cart
+      await act(async () => {
+        itemEl?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      // Find and click the complete sale / charge button
+      const chargeBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Charge')
+      );
+      expect(chargeBtn).toBeDefined();
+
+      await act(async () => {
+        chargeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      // Assert onCompleteSale receives a payload with partyId CUSTOM_PARTY and partyName "Walk-in Customer"
+      expect(onCompleteSale).toHaveBeenCalledTimes(1);
+      const salePayload = onCompleteSale.mock.calls[0][0];
+      expect(salePayload.partyId).toBe('CUSTOM_PARTY');
+      expect(salePayload.partyName).toBe('Walk-in Customer');
+    });
   });
 
   describe('6. Android Hardware Back Navigation Hardening', () => {

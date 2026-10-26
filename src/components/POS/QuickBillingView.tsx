@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { InventoryItem } from '../../models/item.ts';
+import { InventoryItem, ItemPriceMode } from '../../models/item.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { isSystemParty, SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
+import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
@@ -15,7 +16,7 @@ import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
-import { PosCartItem, PosCustomerState, HeldBill } from './types.ts';
+import { PosCartItem, PosCustomerState, HeldBill, createPosCartItem } from './types.ts';
 import { SelectPosPartyModal } from './SelectPosPartyModal.tsx';
 import { CustomItemModal } from './CustomItemModal.tsx';
 import { HoldBillsModal } from './HoldBillsModal.tsx';
@@ -336,16 +337,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           c.item.id === item.id ? { ...c, qty: c.qty + initialQty } : c
         );
       }
-      return [
-        ...prevCart,
-        {
-          item,
-          qty: initialQty,
-          unitPrice: item.salePrice,
-          discountPercent: 0,
-          discountAmount: 0,
-        },
-      ];
+      const newItem = createPosCartItem(item, initialQty);
+      if (!isGstActive || company.isCompositionScheme) {
+        newItem.unitPriceInclusive = newItem.unitPrice;
+        newItem.priceMode = 'EXCLUSIVE';
+        newItem.cessRate = 0;
+      }
+      return [...prevCart, newItem];
     });
   };
 
@@ -360,11 +358,71 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     );
   };
 
-  const updateCartPrice = (itemId: string, unitPrice: number) => {
-    if (unitPrice < 0) return;
-    setCart(
-      cart.map((c) => (c.item.id === itemId ? { ...c, unitPrice } : c))
+  const updateCartExclusivePrice = (itemId: string, raw: number | string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setCart((prevCart) =>
+      prevCart.map((c) => {
+        if (c.item.id !== itemId) return c;
+        if (!isGstActive || company.isCompositionScheme) {
+          return {
+            ...c,
+            unitPrice: value,
+            unitPriceInclusive: value,
+            priceMode: 'EXCLUSIVE',
+          };
+        }
+        const gst = Number(c.item.gstRate) || 0;
+        return {
+          ...c,
+          unitPrice: value,
+          unitPriceInclusive: inclusiveFromExclusive(value, gst),
+          priceMode: 'EXCLUSIVE',
+        };
+      })
     );
+  };
+
+  const updateCartInclusivePrice = (itemId: string, raw: number | string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setCart((prevCart) =>
+      prevCart.map((c) => {
+        if (c.item.id !== itemId) return c;
+        if (!isGstActive || company.isCompositionScheme) {
+          return {
+            ...c,
+            unitPrice: value,
+            unitPriceInclusive: value,
+            priceMode: 'EXCLUSIVE',
+          };
+        }
+        const gst = Number(c.item.gstRate) || 0;
+        return {
+          ...c,
+          unitPrice: exclusiveFromInclusive(value, gst),
+          unitPriceInclusive: value,
+          priceMode: 'INCLUSIVE',
+        };
+      })
+    );
+  };
+
+  const toggleCartPriceMode = (itemId: string) => {
+    if (!isGstActive || company.isCompositionScheme) return;
+    setCart((prevCart) =>
+      prevCart.map((c) => {
+        if (c.item.id !== itemId) return c;
+        const currentMode = c.priceMode ?? 'EXCLUSIVE';
+        const nextMode: ItemPriceMode = currentMode === 'INCLUSIVE' ? 'EXCLUSIVE' : 'INCLUSIVE';
+        return {
+          ...c,
+          priceMode: nextMode,
+        };
+      })
+    );
+  };
+
+  const updateCartPrice = (itemId: string, unitPrice: number) => {
+    updateCartExclusivePrice(itemId, unitPrice);
   };
 
   const removeFromCart = (itemId: string) => {
@@ -377,14 +435,26 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   const isIntraState = supplierStateCode === recipientStateCode;
 
   const calcInputs = useMemo(() => {
-    return cart.map((c) => ({
-      quantity: c.qty,
-      unitPrice: c.unitPrice,
-      gstRate: isGstActive ? c.item.gstRate : 0,
-      discountPercent: c.discountPercent || 0,
-      discountAmount: c.discountAmount || 0,
-    }));
-  }, [cart, isGstActive]);
+    return cart.map((c) => {
+      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (c.item.gstRate || 0);
+      const excl = Number(c.unitPrice) || 0;
+      let incl = Number(c.unitPriceInclusive) || 0;
+      const mode = c.priceMode ?? 'EXCLUSIVE';
+      if (mode === 'INCLUSIVE' && incl <= 0) {
+        incl = inclusiveFromExclusive(excl, gst);
+      }
+      return {
+        quantity: c.qty,
+        unitPrice: excl,
+        unitPriceInclusive: incl,
+        priceMode: mode,
+        cessPercent: isGstActive && !company.isCompositionScheme ? (c.cessRate || c.item.cessRate || 0) : 0,
+        gstRate: gst,
+        discountPercent: c.discountPercent || 0,
+        discountAmount: c.discountAmount || 0,
+      };
+    });
+  }, [cart, isGstActive, company.isCompositionScheme]);
 
   const calcSummary = useMemo(() => {
     return calculateInvoice(supplierStateCode, recipientStateCode, calcInputs);
@@ -462,8 +532,35 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     setIsMobileCartDrawerOpen(false);
   };
 
+  const normalizeCart = (cartItems: PosCartItem[]): PosCartItem[] => {
+    return cartItems.map((c) => {
+      const item = c.item;
+      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (item.gstRate ?? 18);
+      const mode: ItemPriceMode = (!isGstActive || company.isCompositionScheme)
+        ? 'EXCLUSIVE'
+        : (c.priceMode || 'EXCLUSIVE');
+      let excl = Number(c.unitPrice ?? item.salePrice ?? 0);
+      let incl = Number(c.unitPriceInclusive);
+      if (!Number.isFinite(incl) || incl <= 0) {
+        incl = inclusiveFromExclusive(excl, gst);
+        if (mode === 'INCLUSIVE') {
+          excl = exclusiveFromInclusive(incl, gst);
+        }
+      } else if (mode === 'INCLUSIVE') {
+        excl = exclusiveFromInclusive(incl, gst);
+      }
+      return {
+        ...c,
+        unitPrice: excl,
+        unitPriceInclusive: incl,
+        priceMode: mode,
+        cessRate: c.cessRate !== undefined ? Number(c.cessRate) || 0 : (item.cessRate ?? 0),
+      };
+    });
+  };
+
   const applyResumeBill = (bill: HeldBill) => {
-    setCart(bill.cart);
+    setCart(normalizeCart(bill.cart));
     setCustomer(bill.customer);
     setCartDiscountType(bill.cartDiscount.type);
     setCartDiscountValue(bill.cartDiscount.value);
@@ -554,23 +651,32 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const invoiceItems: InvoiceItemEntry[] = cart.map((c, idx) => {
       const itemCalc = calcSummary.items[idx];
+      const excl = Number(c.unitPrice) || 0;
+      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (c.item.gstRate || 0);
+      const rawIncl = Number(c.unitPriceInclusive) || 0;
+      const incl = (!isGstActive || company.isCompositionScheme)
+        ? excl
+        : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
       return {
         itemId: c.item.id,
         name: c.item.name,
-        hsnSacCode: c.item.hsnSacCode,
+        hsnSacCode: isGstActive ? c.item.hsnSacCode : '',
         unit: c.item.unit,
         quantity: c.qty,
-        unitPrice: c.unitPrice,
+        unitPrice: excl,
+        unitPriceInclusive: incl,
+        priceMode: isGstActive && !company.isCompositionScheme ? (c.priceMode ?? 'EXCLUSIVE') : 'EXCLUSIVE',
+        cessRate: isGstActive && !company.isCompositionScheme ? (c.cessRate || 0) : 0,
         taxableAmount: itemCalc.taxableAmount,
         discountPercent: c.discountPercent,
         discountAmount: itemCalc.discountAmount,
-        gstRate: c.item.gstRate,
-        cgstAmount: itemCalc.cgstAmount,
-        sgstAmount: itemCalc.sgstAmount,
-        utgstAmount: itemCalc.utgstAmount,
-        igstAmount: itemCalc.igstAmount,
-        cessAmount: itemCalc.cessAmount,
-        totalAmount: itemCalc.totalAmount,
+        gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : c.item.gstRate,
+        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.cgstAmount,
+        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.sgstAmount,
+        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.utgstAmount,
+        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.igstAmount,
+        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.cessAmount,
+        totalAmount: (!isGstActive || company.isCompositionScheme) ? itemCalc.taxableAmount : itemCalc.totalAmount,
       };
     });
 
@@ -1188,7 +1294,16 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               </p>
             </div>
           ) : (
-            cart.map(({ item, qty, unitPrice }) => (
+            cart.map((cartItem, idx) => {
+              const { item, qty, unitPrice, unitPriceInclusive, priceMode, cessRate } = cartItem;
+              const isInclusive = priceMode === 'INCLUSIVE';
+              const activeRate = isInclusive ? (unitPriceInclusive ?? unitPrice) : unitPrice;
+              const otherRate = isInclusive ? unitPrice : (unitPriceInclusive ?? unitPrice);
+              const calcItem = calcSummary.items[idx];
+              const lineTotal = calcItem ? calcItem.totalAmount : qty * unitPrice;
+              const effectiveCess = isGstActive && !company.isCompositionScheme ? (cessRate ?? item.cessRate ?? 0) : 0;
+
+              return (
               <div
                 key={item.id}
                 className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 shadow-xs flex flex-col gap-1.5 hover:border-secondary/30 transition-all"
@@ -1200,7 +1315,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       {item.name}
                     </span>
                     <span className="text-[10px] text-outline">
-                      {item.unit}{isGstActive ? (Number(item.gstRate) > 0 ? ` • ${item.gstRate}% GST` : ' • GST Exempt (0%)') : ''}
+                      {item.unit}
+                      {isGstActive && !company.isCompositionScheme ? (
+                        <>
+                          {Number(item.gstRate) > 0 ? ` • ${item.gstRate}% GST` : ' • GST Exempt (0%)'}
+                          {effectiveCess > 0 ? ` • ${effectiveCess}% CESS` : ''}
+                        </>
+                      ) : ''}
                     </span>
                   </div>
 
@@ -1245,31 +1366,55 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     </button>
                   </div>
 
-                  {/* Inline Rate Input */}
+                  {/* Inline Rate Input & Mode Toggle */}
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-outline">₹</span>
                     <input
                       type="number"
                       step="any"
                       min="0"
-                      value={unitPrice}
+                      aria-label="Cart Unit Price"
+                      value={activeRate}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
-                        updateCartPrice(item.id, val);
+                        if (isInclusive) {
+                          updateCartInclusivePrice(item.id, val);
+                        } else {
+                          updateCartExclusivePrice(item.id, val);
+                        }
                       }}
                       className="w-16 bg-surface-container-low border border-outline-variant/25 rounded-md px-1 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
                     />
+                    {isGstActive && !company.isCompositionScheme && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleCartPriceMode(item.id)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                            isInclusive
+                              ? 'bg-secondary/15 text-secondary border border-secondary/30'
+                              : 'bg-surface-container text-on-surface-variant border border-outline-variant/30'
+                          }`}
+                          title="Toggle Exclusive / Inclusive rate mode"
+                        >
+                          {isInclusive ? 'Incl' : 'Excl'}
+                        </button>
+                        <span className="text-[10px] text-outline font-medium">
+                          {isInclusive ? `Excl. ₹${otherRate}` : `Incl. ₹${otherRate}`}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* Subtotal */}
                   <div className="text-right">
                     <div className="text-xs font-bold text-on-surface font-tabular-data">
-                      {formatINR(qty * unitPrice)}
+                      {formatINR(lineTotal)}
                     </div>
                   </div>
                 </div>
               </div>
-            ))
+            );})
           )}
         </div>
 
@@ -1543,7 +1688,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
             {/* Cart Items List (Clean, NO HSN) */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {cart.map(({ item, qty, unitPrice }) => (
+              {cart.map((cartItem, idx) => {
+                const { item, qty, unitPrice, unitPriceInclusive, cessRate } = cartItem;
+                const calcItem = calcSummary.items[idx];
+                const lineTotal = calcItem ? calcItem.totalAmount : qty * unitPrice;
+                const effectiveCess = isGstActive && !company.isCompositionScheme ? (cessRate ?? item.cessRate ?? 0) : 0;
+                const inclPrice = unitPriceInclusive ?? unitPrice;
+
+                return (
                 <div
                   key={item.id}
                   className="bg-surface-container-low/70 p-2.5 rounded-xl border border-outline-variant/20 flex items-center justify-between gap-2"
@@ -1553,7 +1705,16 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       {item.name}
                     </div>
                     <div className="text-[11px] text-outline mt-0.5">
-                      {formatINR(unitPrice)} × {formatQuantity(qty, 4)} = {formatINR(unitPrice * qty)}
+                      {isGstActive && !company.isCompositionScheme ? (
+                        <span>
+                          Excl ₹{unitPrice} · Incl ₹{inclPrice} × {formatQuantity(qty, 4)} = {formatINR(lineTotal)}
+                          {effectiveCess > 0 ? ` (CESS ${effectiveCess}%)` : ''}
+                        </span>
+                      ) : (
+                        <span>
+                          {formatINR(unitPrice)} × {formatQuantity(qty, 4)} = {formatINR(lineTotal)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1580,7 +1741,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     </button>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
 
             {/* Summary & Checkout Footer */}

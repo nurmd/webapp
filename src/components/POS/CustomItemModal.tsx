@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
+import { InventoryItem, ItemPriceMode, UnitOfMeasurement } from '../../models/item.ts';
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { db } from '../../services/db.ts';
 
 interface CustomItemModalProps {
@@ -26,6 +27,8 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
 
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [priceInclusive, setPriceInclusive] = useState('');
+  const [priceMode, setPriceMode] = useState<ItemPriceMode>('EXCLUSIVE');
   const [qty, setQty] = useState('');
   const [gstRate, setGstRate] = useState<number>(18);
   const [hsnCode, setHsnCode] = useState('998313');
@@ -33,12 +36,64 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleExclusiveChange = (val: string) => {
+    setPrice(val);
+    setPriceMode('EXCLUSIVE');
+    const num = parseFloat(val);
+    if (!val.trim() || isNaN(num) || num <= 0) {
+      setPriceInclusive('');
+    } else {
+      setPriceInclusive(String(inclusiveFromExclusive(num, gstRate)));
+    }
+  };
+
+  const handleInclusiveChange = (val: string) => {
+    setPriceInclusive(val);
+    setPriceMode('INCLUSIVE');
+    const num = parseFloat(val);
+    if (!val.trim() || isNaN(num) || num <= 0) {
+      setPrice('');
+    } else {
+      setPrice(String(exclusiveFromInclusive(num, gstRate)));
+    }
+  };
+
+  const handleGstRateChange = (nextGst: number) => {
+    setGstRate(nextGst);
+    if (priceMode === 'INCLUSIVE') {
+      const inclNum = parseFloat(priceInclusive);
+      if (!isNaN(inclNum) && inclNum > 0) {
+        setPrice(String(exclusiveFromInclusive(inclNum, nextGst)));
+      }
+    } else {
+      const exclNum = parseFloat(price);
+      if (!isNaN(exclNum) && exclNum > 0) {
+        setPriceInclusive(String(inclusiveFromExclusive(exclNum, nextGst)));
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedPrice = parseFloat(price);
+    const parsedInclusive = parseFloat(priceInclusive);
+    const activeRate = priceMode === 'INCLUSIVE' ? parsedInclusive : parsedPrice;
     const parsedQty = !qty.trim() ? 1 : roundQuantity(parseFloat(qty), 4);
-    if (!name.trim() || isNaN(parsedPrice) || parsedPrice <= 0 || isNaN(parsedQty) || parsedQty <= 0) {
+    if (!name.trim() || isNaN(activeRate) || activeRate <= 0 || isNaN(parsedQty) || parsedQty <= 0) {
       return;
+    }
+
+    let finalExcl = parsedPrice;
+    let finalIncl = parsedInclusive;
+    if (!isGstEnabled) {
+      finalExcl = isNaN(parsedPrice) ? 0 : parsedPrice;
+      finalIncl = finalExcl;
+    } else if (priceMode === 'INCLUSIVE') {
+      finalIncl = isNaN(parsedInclusive) ? 0 : parsedInclusive;
+      finalExcl = exclusiveFromInclusive(finalIncl, gstRate);
+    } else {
+      finalExcl = isNaN(parsedPrice) ? 0 : parsedPrice;
+      finalIncl = inclusiveFromExclusive(finalExcl, gstRate);
     }
 
     const newItem: InventoryItem = {
@@ -46,9 +101,12 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
       name: name.trim(),
       hsnSacCode: isGstEnabled ? (hsnCode.trim() || '9983') : '',
       unit,
-      salePrice: parsedPrice,
+      salePrice: finalExcl,
+      salePriceInclusive: finalIncl,
+      salePriceMode: !isGstEnabled ? 'EXCLUSIVE' : priceMode,
       purchasePrice: 0,
       gstRate: isGstEnabled ? gstRate : 0,
+      cessRate: 0,
       currentStock: 9999,
       minStockAlert: 0,
       category: 'Custom / Service',
@@ -100,19 +158,50 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-outline mb-1">
-                Unit Sale Price (₹) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                placeholder="0.00"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-outline">
+                  Unit Sale Price (₹) *
+                </label>
+                {isGstEnabled && (
+                  <button
+                    type="button"
+                    role="button"
+                    aria-pressed={priceMode === 'INCLUSIVE'}
+                    onClick={() => setPriceMode((prev) => (prev === 'INCLUSIVE' ? 'EXCLUSIVE' : 'INCLUSIVE'))}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors cursor-pointer ${
+                      priceMode === 'INCLUSIVE'
+                        ? 'bg-secondary text-on-secondary'
+                        : 'bg-surface-container text-on-surface-variant'
+                    }`}
+                  >
+                    {priceMode === 'INCLUSIVE' ? 'Incl GST' : 'Excl GST'}
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required={priceMode === 'EXCLUSIVE'}
+                  placeholder="0.00"
+                  value={price}
+                  onChange={(e) => handleExclusiveChange(e.target.value)}
+                  className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary"
+                />
+                {isGstEnabled && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    aria-label="Custom Item Price (Incl. GST)"
+                    placeholder="0.00 incl."
+                    value={priceInclusive}
+                    onChange={(e) => handleInclusiveChange(e.target.value)}
+                    className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-2 text-sm font-bold text-on-surface outline-none focus:border-secondary"
+                  />
+                )}
+              </div>
             </div>
 
             <div>
@@ -138,7 +227,7 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
                 <label className="block text-xs font-semibold text-outline mb-1">GST Tax Slab</label>
                 <select
                   value={gstRate}
-                  onChange={(e) => setGstRate(Number(e.target.value))}
+                  onChange={(e) => handleGstRateChange(Number(e.target.value))}
                   className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-on-surface outline-none focus:border-secondary"
                 >
                   <option value={0}>0% (Exempt / Nil)</option>

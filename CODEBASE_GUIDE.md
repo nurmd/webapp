@@ -83,6 +83,10 @@ gst-billing-app/
 ## 3. Core Business Engines (`src/core/`)
 
 ### A. GST Engine (`src/core/gst/`)
+- **`pricing.ts`**: Bidirectional synchronization between GST-exclusive rates and GST-inclusive rates (`exclusiveFromInclusive`, `inclusiveFromExclusive`).
+  - Supports `priceMode` (`'EXCLUSIVE' | 'INCLUSIVE'`).
+  - Inclusive rate covers GST only; CESS is added on top.
+  - Discount base follows the active price mode.
 - **`calculator.ts`**: Pure calculation of taxable value, CGST, SGST, IGST, Cess, and Half-Up round-off.
   - Determines **Intra-State vs Inter-State** by comparing company `stateCode` with party/POS `stateCode`.
   - Intra-State: Split equally (50/50) between CGST and SGST.

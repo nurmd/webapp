@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
-import { InventoryItem } from '../../models/item.ts';
+import { InventoryItem, ItemPriceMode } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode } from '../../models/invoice.ts';
 import { calculateInvoice, InvoiceItemCalculationInput } from '../../core/gst/calculator.ts';
+import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
@@ -57,19 +58,50 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     hsnSacCode: string;
     quantity: number;
     unitPrice: number;
+    unitPriceInclusive: number;
+    priceMode: ItemPriceMode;
+    cessRate: number;
     discountPercent: number;
     gstRate: number;
   }>>(() => {
     if (initialDraft?.rows && initialDraft.rows.length > 0) {
-      return initialDraft.rows.map((r) => ({
-        itemId: r.itemId || 'CUSTOM-' + Date.now(),
-        name: r.name,
-        hsnSacCode: r.hsnSacCode || '998313',
-        quantity: Number(r.quantity) || 1,
-        unitPrice: Number(r.unitPrice) || 0,
-        discountPercent: Number(r.discountPercent) || 0,
-        gstRate: Number(r.gstRate) || (company.isCompositionScheme ? 0 : 18),
-      }));
+      return initialDraft.rows.map((r: any) => {
+        const up = Number(r.unitPrice) || 0;
+        const gr = Number(r.gstRate) || (company.isCompositionScheme ? 0 : 18);
+        const mode: ItemPriceMode = (!isGstActive || company.isCompositionScheme)
+          ? 'EXCLUSIVE'
+          : (r.priceMode || 'EXCLUSIVE');
+        const cess = (!isGstActive || company.isCompositionScheme) ? 0 : (Number(r.cessRate) || 0);
+
+        let finalExcl = up;
+        let finalIncl = Number(r.unitPriceInclusive) || 0;
+
+        if (!isGstActive || company.isCompositionScheme) {
+          finalExcl = up;
+          finalIncl = up;
+        } else if (mode === 'INCLUSIVE') {
+          if (finalIncl <= 0 && up > 0) {
+            finalIncl = inclusiveFromExclusive(up, gr);
+          }
+          finalExcl = exclusiveFromInclusive(finalIncl, gr);
+        } else {
+          finalExcl = up;
+          finalIncl = inclusiveFromExclusive(up, gr);
+        }
+
+        return {
+          itemId: r.itemId || 'CUSTOM-' + Date.now(),
+          name: r.name,
+          hsnSacCode: isGstActive ? (r.hsnSacCode || '998313') : '',
+          quantity: Number(r.quantity) || 1,
+          unitPrice: finalExcl,
+          unitPriceInclusive: finalIncl,
+          priceMode: mode,
+          cessRate: cess,
+          discountPercent: Number(r.discountPercent) || 0,
+          gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : gr,
+        };
+      });
     }
     return [];
   });
@@ -93,11 +125,14 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       {
         itemId: 'CUSTOM-' + Date.now(),
         name: '',
-        hsnSacCode: '998313',
+        hsnSacCode: isGstActive ? '998313' : '',
         quantity: 1,
         unitPrice: 0,
+        unitPriceInclusive: 0,
+        priceMode: 'EXCLUSIVE',
+        cessRate: 0,
         discountPercent: 0,
-        gstRate: company.isCompositionScheme ? 0 : 18,
+        gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : 18,
       },
     ]);
   };
@@ -107,7 +142,55 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     setLines(lines.filter((_, idx) => idx !== index));
   };
 
+  const updateLinePrice = (index: number, field: 'exclusive' | 'inclusive', raw: number | string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setLines((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (Number(row.gstRate) || 0);
+      if (!isGstActive || company.isCompositionScheme) {
+        row.unitPrice = value;
+        row.unitPriceInclusive = value;
+        row.priceMode = 'EXCLUSIVE';
+      } else if (field === 'exclusive') {
+        row.unitPrice = value;
+        row.priceMode = 'EXCLUSIVE';
+        row.unitPriceInclusive = inclusiveFromExclusive(value, gst);
+      } else {
+        row.unitPriceInclusive = value;
+        row.priceMode = 'INCLUSIVE';
+        row.unitPrice = exclusiveFromInclusive(value, gst);
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
+
+  const updateLineGst = (index: number, nextGst: number) => {
+    const gst = company.isCompositionScheme ? 0 : (Number(nextGst) || 0);
+    setLines((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      row.gstRate = gst;
+      if (row.priceMode === 'INCLUSIVE') {
+        row.unitPrice = exclusiveFromInclusive(row.unitPriceInclusive, gst);
+      } else {
+        row.unitPriceInclusive = inclusiveFromExclusive(row.unitPrice, gst);
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
+
   const updateLine = (index: number, field: string, value: any) => {
+    if (field === 'unitPrice') {
+      updateLinePrice(index, 'exclusive', value);
+      return;
+    }
+    if (field === 'gstRate') {
+      updateLineGst(index, Number(value));
+      return;
+    }
     const updated = [...lines];
     if (field === 'quantity') {
       const parsed = parseFloat(String(value));
@@ -124,15 +207,42 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     const item = itemsCatalog.find((i) => i.id === itemId);
     if (item) {
       const updated = [...lines];
-      updated[index] = {
-        itemId: item.id,
-        name: item.name,
-        hsnSacCode: item.hsnSacCode,
-        quantity: 1,
-        unitPrice: item.salePrice,
-        discountPercent: 0,
-        gstRate: company.isCompositionScheme ? 0 : item.gstRate,
-      };
+      const itemGst = company.isCompositionScheme ? 0 : item.gstRate;
+      if (!isGstActive || company.isCompositionScheme) {
+        updated[index] = {
+          itemId: item.id,
+          name: item.name,
+          hsnSacCode: isGstActive ? item.hsnSacCode : '',
+          quantity: 1,
+          unitPrice: item.salePrice,
+          unitPriceInclusive: item.salePrice,
+          priceMode: 'EXCLUSIVE',
+          cessRate: 0,
+          discountPercent: 0,
+          gstRate: 0,
+        };
+      } else {
+        const mode: ItemPriceMode = item.salePriceMode ?? 'EXCLUSIVE';
+        let excl = item.salePrice;
+        let incl = item.salePriceInclusive ?? 0;
+        if (mode === 'INCLUSIVE' && incl > 0) {
+          excl = exclusiveFromInclusive(incl, itemGst);
+        } else {
+          incl = inclusiveFromExclusive(excl, itemGst);
+        }
+        updated[index] = {
+          itemId: item.id,
+          name: item.name,
+          hsnSacCode: item.hsnSacCode,
+          quantity: 1,
+          unitPrice: excl,
+          unitPriceInclusive: incl,
+          priceMode: mode,
+          cessRate: item.cessRate ?? 0,
+          discountPercent: 0,
+          gstRate: itemGst,
+        };
+      }
       setLines(updated);
     }
   };
@@ -141,8 +251,11 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const calcInputs: InvoiceItemCalculationInput[] = lines.map((l) => ({
     quantity: Number(l.quantity) || 1,
     unitPrice: Number(l.unitPrice) || 0,
+    unitPriceInclusive: Number(l.unitPriceInclusive) || 0,
+    priceMode: l.priceMode ?? 'EXCLUSIVE',
+    cessPercent: (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.cessRate) || 0),
     discountPercent: Number(l.discountPercent) || 0,
-    gstRate: company.isCompositionScheme ? 0 : (Number(l.gstRate) || 0),
+    gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.gstRate) || 0),
   }));
 
   const calcSummary = calculateInvoice(company.stateCode, posStateCode, calcInputs);
@@ -152,23 +265,32 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
     const invoiceItems: InvoiceItemEntry[] = lines.map((l, idx) => {
       const calcItem = calcSummary.items[idx];
+      const excl = Number(l.unitPrice) || 0;
+      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.gstRate) || 0);
+      const rawIncl = Number(l.unitPriceInclusive) || 0;
+      const incl = (!isGstActive || company.isCompositionScheme)
+        ? excl
+        : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
       return {
         itemId: l.itemId,
         name: l.name || 'Custom Item',
         hsnSacCode: isGstActive ? l.hsnSacCode : '',
         unit: 'PCS',
         quantity: l.quantity,
-        unitPrice: l.unitPrice,
+        unitPrice: excl,
+        unitPriceInclusive: incl,
+        priceMode: (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (l.priceMode ?? 'EXCLUSIVE'),
+        cessRate: (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.cessRate) || 0),
         discountPercent: l.discountPercent,
-        discountAmount: calcItem.discountAmount,
-        taxableAmount: calcItem.taxableAmount,
-        gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : l.gstRate,
-        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.cgstAmount,
-        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.sgstAmount,
-        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.utgstAmount,
-        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.igstAmount,
-        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : calcItem.cessAmount,
-        totalAmount: (!isGstActive || company.isCompositionScheme) ? calcItem.taxableAmount : calcItem.totalAmount,
+        discountAmount: calcItem?.discountAmount || 0,
+        taxableAmount: calcItem?.taxableAmount || 0,
+        gstRate: gst,
+        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.cgstAmount || 0),
+        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.sgstAmount || 0),
+        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.utgstAmount || 0),
+        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.igstAmount || 0),
+        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.cessAmount || 0),
+        totalAmount: (!isGstActive || company.isCompositionScheme) ? (calcItem?.taxableAmount || 0) : (calcItem?.totalAmount || 0),
       };
     });
 
@@ -387,11 +509,29 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                         className="bg-transparent text-[11px] text-secondary font-medium outline-none mt-0.5 cursor-pointer"
                       >
                         <option value="">Quick pick from catalog...</option>
-                        {itemsCatalog.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name} (₹{cat.salePrice})
-                          </option>
-                        ))}
+                        {itemsCatalog.map((cat) => {
+                          if (!isGstActive || company.isCompositionScheme) {
+                            return (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name} (₹{cat.salePrice})
+                              </option>
+                            );
+                          }
+                          const catGst = cat.gstRate || 0;
+                          const catMode = cat.salePriceMode ?? 'EXCLUSIVE';
+                          let excl = cat.salePrice;
+                          let incl = cat.salePriceInclusive ?? 0;
+                          if (catMode === 'INCLUSIVE' && incl > 0) {
+                            excl = exclusiveFromInclusive(incl, catGst);
+                          } else {
+                            incl = inclusiveFromExclusive(excl, catGst);
+                          }
+                          return (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name} (₹{excl} / ₹{incl})
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -421,18 +561,36 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                       />
                     </div>
 
-                    <div className="col-span-4 sm:col-span-2">
+                    <div className="col-span-4 sm:col-span-2 flex flex-col gap-1">
                       <input
                         type="number"
                         placeholder="Rate ₹"
                         min="0"
-                        value={l.unitPrice}
-                        onChange={(e) => updateLine(idx, 'unitPrice', Number(e.target.value))}
+                        step="0.01"
+                        value={l.unitPrice || ''}
+                        onChange={(e) => updateLinePrice(idx, 'exclusive', e.target.value)}
                         className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1.5 text-xs rounded-lg text-right outline-none font-semibold"
                       />
+                      {isGstActive && !company.isCompositionScheme && (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            aria-label="Line Rate (Incl. GST)"
+                            placeholder="Incl ₹"
+                            min="0"
+                            step="0.01"
+                            value={l.unitPriceInclusive || ''}
+                            onChange={(e) => updateLinePrice(idx, 'inclusive', e.target.value)}
+                            className="w-full bg-surface border border-outline-variant/40 text-on-surface px-2 py-1 text-xs rounded-lg text-right outline-none font-semibold"
+                          />
+                          <span className="text-[10px] font-bold text-secondary shrink-0" title={`Active mode: ${l.priceMode}`}>
+                            {l.priceMode === 'INCLUSIVE' ? 'Incl.' : 'Excl.'}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="col-span-5 sm:col-span-1">
+                    <div className="col-span-5 sm:col-span-1 flex flex-col gap-1">
                       {(!isGstActive || company.isCompositionScheme) ? (
                         <div
                           className="w-full bg-surface-container border border-outline-variant/30 text-on-surface-variant px-1 py-1.5 text-xs rounded-lg text-center font-bold"
@@ -441,19 +599,31 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                           0%
                         </div>
                       ) : (
-                        <select
-                          value={l.gstRate}
-                          onChange={(e) => updateLine(idx, 'gstRate', Number(e.target.value))}
-                          className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1.5 text-xs rounded-lg text-center outline-none"
-                        >
-                          <option value={0}>0%</option>
-                          <option value={0.1}>0.1%</option>
-                          <option value={0.25}>0.25%</option>
-                          <option value={3}>3%</option>
-                          <option value={5}>5%</option>
-                          <option value={12}>12%</option>
-                          <option value={18}>18%</option>
-                        </select>
+                        <>
+                          <select
+                            value={l.gstRate}
+                            onChange={(e) => updateLineGst(idx, Number(e.target.value))}
+                            className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1.5 text-xs rounded-lg text-center outline-none"
+                          >
+                            <option value={0}>0%</option>
+                            <option value={0.1}>0.1%</option>
+                            <option value={0.25}>0.25%</option>
+                            <option value={3}>3%</option>
+                            <option value={5}>5%</option>
+                            <option value={12}>12%</option>
+                            <option value={18}>18%</option>
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            aria-label="Line CESS Rate (%)"
+                            placeholder="CESS %"
+                            value={l.cessRate === 0 ? '' : l.cessRate}
+                            onChange={(e) => updateLine(idx, 'cessRate', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
+                            className="w-full bg-surface border border-outline-variant/40 text-on-surface px-1 py-1 text-xs rounded-lg text-center outline-none"
+                          />
+                        </>
                       )}
                     </div>
 
@@ -523,6 +693,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 <div className="flex justify-between text-on-surface-variant">
                   <span>GST (Composition 0%):</span>
                   <span className="font-tabular-data font-semibold text-on-surface">₹0.00</span>
+                </div>
+              )}
+
+              {!company.isCompositionScheme && calcSummary.totalCess > 0 && (
+                <div className="flex justify-between text-on-surface-variant">
+                  <span>CESS:</span>
+                  <span className="font-tabular-data font-semibold text-on-surface">{formatINR(calcSummary.totalCess)}</span>
                 </div>
               )}
 

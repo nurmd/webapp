@@ -3,15 +3,19 @@ export interface ThermalReceiptData {
   companyAddress: string;
   gstin: string;
   phone: string;
+  isGst?: boolean;
   receiptTitle?: string;
   invoiceNo: string;
   date: string;
   customerName?: string;
   customerPhone?: string;
+  totalCess?: number;
   items: Array<{
     name: string;
     qty: number;
     rate: number;
+    rateInclusive?: number;
+    cessRate?: number;
     amount: number;
   }>;
   taxableAmount: number;
@@ -107,6 +111,10 @@ export function formatThermalReceiptText(
   }
   lines.push(line);
 
+  const showGstDetails = Boolean(
+    (data.isGst ?? Boolean(data.gstin)) && !data.isCompositionScheme
+  );
+
   // Columnar Items Table
   if (width === 32) {
     // 32-column: Two-line presentation for readable item names and dedicated columns
@@ -121,6 +129,25 @@ export function formatThermalReceiptText(
       const rateStr = item.rate.toFixed(2).padStart(9);
       const amtStr = item.amount.toFixed(2).padStart(11);
       lines.push('   ' + qtyStr + ' ' + rateStr + ' ' + amtStr);
+
+      if (showGstDetails) {
+        const hasIncl = typeof item.rateInclusive === 'number' && item.rateInclusive !== item.rate;
+        const hasCess = Boolean(item.cessRate && item.cessRate > 0);
+        if (hasIncl && hasCess) {
+          const inclStr = `   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`;
+          const cessStr = `CESS: ${item.cessRate}%`;
+          if (inclStr.length + 1 + cessStr.length <= width) {
+            lines.push(`${inclStr} ${cessStr}`);
+          } else {
+            lines.push(inclStr.substring(0, width));
+            lines.push(`   ${cessStr}`.substring(0, width));
+          }
+        } else if (hasIncl) {
+          lines.push(`   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`.substring(0, width));
+        } else if (hasCess) {
+          lines.push(`   CESS: ${item.cessRate}%`.substring(0, width));
+        }
+      }
     }
   } else {
     // 48-column: Direct single-line tabular alignment
@@ -134,6 +161,25 @@ export function formatThermalReceiptText(
       const rateStr = item.rate.toFixed(2).padStart(9);
       const amtStr = item.amount.toFixed(2).padStart(10);
       lines.push(`${name} ${qtyStr} ${rateStr} ${amtStr}`);
+
+      if (showGstDetails) {
+        const hasIncl = typeof item.rateInclusive === 'number' && item.rateInclusive !== item.rate;
+        const hasCess = Boolean(item.cessRate && item.cessRate > 0);
+        if (hasIncl && hasCess) {
+          const inclStr = `   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`;
+          const cessStr = `CESS: ${item.cessRate}%`;
+          if (inclStr.length + 1 + cessStr.length <= width) {
+            lines.push(`${inclStr} ${cessStr}`);
+          } else {
+            lines.push(inclStr.substring(0, width));
+            lines.push(`   ${cessStr}`.substring(0, width));
+          }
+        } else if (hasIncl) {
+          lines.push(`   Incl: Rs. ${item.rateInclusive!.toFixed(2)}`.substring(0, width));
+        } else if (hasCess) {
+          lines.push(`   CESS: ${item.cessRate}%`.substring(0, width));
+        }
+      }
     }
   }
   lines.push(line);
@@ -147,6 +193,9 @@ export function formatThermalReceiptText(
     if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
     if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
     if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+    if (showGstDetails && data.totalCess && data.totalCess > 0) {
+      lines.push(padRow('CESS:', `Rs. ${data.totalCess.toFixed(2)}`, width));
+    }
   }
   if (data.shippingAmount && data.shippingAmount > 0) {
     lines.push(padRow('Shipping:', `+Rs. ${data.shippingAmount.toFixed(2)}`, width));

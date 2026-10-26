@@ -9,6 +9,7 @@ export interface DocumentTotalsSummaryProps {
   totalSgst: number;
   totalUtgst?: number;
   totalIgst: number;
+  totalCess?: number;
   totalTaxableAmount: number;
   isIntraState: boolean;
   isGstActive: boolean;
@@ -34,6 +35,7 @@ export const DocumentTotalsSummary: React.FC<DocumentTotalsSummaryProps> = ({
   totalSgst,
   totalUtgst,
   totalIgst,
+  totalCess,
   totalTaxableAmount,
   isIntraState,
   isGstActive,
@@ -122,6 +124,12 @@ export const DocumentTotalsSummary: React.FC<DocumentTotalsSummaryProps> = ({
                   <div className="flex items-center justify-between text-on-surface-variant">
                     <span>Integrated GST (IGST)</span>
                     <span className="font-tabular-data font-bold">{formatINR(totalIgst)}</span>
+                  </div>
+                )}
+                {totalCess !== undefined && totalCess > 0 && (
+                  <div className="flex items-center justify-between text-on-surface-variant">
+                    <span>CESS</span>
+                    <span className="font-tabular-data font-bold">{formatINR(totalCess)}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-on-surface-variant pt-1 border-t border-outline-variant/20">

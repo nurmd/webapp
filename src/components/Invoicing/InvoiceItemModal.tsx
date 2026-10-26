@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { InventoryItem, UnitOfMeasurement } from '../../models/item.ts';
+import { InventoryItem, UnitOfMeasurement, ItemPriceMode } from '../../models/item.ts';
 import { formatINR, formatQuantity, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import type { HsnItem } from '../../core/gst/hsnCatalog';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { calculateItemGst } from '../../core/gst/calculator.ts';
+import { calculateRateFromTotal, exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -15,6 +17,9 @@ export interface InvoiceItemData {
   quantity: number;
   unit: UnitOfMeasurement | string;
   unitPrice: number;
+  unitPriceInclusive?: number;
+  priceMode?: ItemPriceMode;
+  cessRate?: number;
   mrp?: number;
   discountPercent: number;
   discountAmount?: number;
@@ -84,7 +89,24 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     initialItem?.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : ''
   );
   const [unit, setUnit] = useState<string>(initialItem?.unit || 'PCS');
-  const [unitPrice, setUnitPrice] = useState<number>(initialItem?.unitPrice || 0);
+  const initialItemMode = initialItem?.priceMode ?? 'EXCLUSIVE';
+  const initialItemGst = initialItem?.gstRate ?? 18;
+  const initialRawExcl = Number(initialItem?.unitPrice) || 0;
+  let initialInitIncl = Number(initialItem?.unitPriceInclusive) || 0;
+  let initialInitExcl = initialRawExcl;
+  if (initialItemMode === 'INCLUSIVE') {
+    if (initialInitIncl <= 0) {
+      initialInitIncl = inclusiveFromExclusive(initialRawExcl, initialItemGst);
+    }
+    initialInitExcl = exclusiveFromInclusive(initialInitIncl, initialItemGst);
+  } else {
+    initialInitIncl = inclusiveFromExclusive(initialRawExcl, initialItemGst);
+  }
+
+  const [unitPrice, setUnitPrice] = useState<number>(initialInitExcl);
+  const [unitPriceInclusive, setUnitPriceInclusive] = useState<number>(initialInitIncl);
+  const [priceMode, setPriceMode] = useState<ItemPriceMode>(initialItemMode);
+  const [cessRate, setCessRate] = useState<number>(initialItem?.cessRate || 0);
   const [mrp, setMrp] = useState<number | undefined>(initialItem?.mrp);
   const [discountPercent, setDiscountPercent] = useState<number>(initialItem?.discountPercent || 0);
   const [discountPercentInput, setDiscountPercentInput] = useState<string>(
@@ -97,6 +119,29 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     initialItem?.discountAmount ? 'amount' : 'percent'
   );
   const [gstRate, setGstRate] = useState<number>(initialItem?.gstRate ?? 18);
+
+  function applyGstRate(nextRate: number) {
+    setGstRate(nextRate);
+    if (priceMode === 'INCLUSIVE') {
+      setUnitPrice(exclusiveFromInclusive(unitPriceInclusive, nextRate));
+    } else {
+      setUnitPriceInclusive(inclusiveFromExclusive(unitPrice, nextRate));
+    }
+  }
+
+  const handleExclusivePriceChange = (raw: string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setUnitPrice(value);
+    setPriceMode('EXCLUSIVE');
+    setUnitPriceInclusive(inclusiveFromExclusive(value, gstRate));
+  };
+
+  const handleInclusivePriceChange = (raw: string) => {
+    const value = Math.max(0, Number(raw) || 0);
+    setUnitPriceInclusive(value);
+    setPriceMode('INCLUSIVE');
+    setUnitPrice(exclusiveFromInclusive(value, gstRate));
+  };
 
   // Integrated Search Dropdown State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -143,17 +188,38 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setHsnSacCode(initialItem.hsnSacCode || defaultHsn);
         setQuantity(initialItem.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : '');
         setUnit(initialItem.unit || 'PCS');
-        setUnitPrice(initialItem.unitPrice || 0);
         setMrp(initialItem.mrp);
+
+        const mode = initialItem.priceMode ?? 'EXCLUSIVE';
+        const gst = initialItem.gstRate ?? 18;
+        let excl = Number(initialItem.unitPrice) || 0;
+        let incl = Number(initialItem.unitPriceInclusive) || 0;
+        if (mode === 'INCLUSIVE') {
+          if (incl <= 0) {
+            incl = inclusiveFromExclusive(excl, gst);
+          }
+          excl = exclusiveFromInclusive(incl, gst);
+        } else {
+          incl = inclusiveFromExclusive(excl, gst);
+        }
+        setUnitPrice(excl);
+        setUnitPriceInclusive(incl);
+        setPriceMode(mode);
+        setCessRate(initialItem.cessRate ?? 0);
+
         const initDiscPct = initialItem.discountPercent || 0;
         setDiscountPercent(initDiscPct);
         setDiscountPercentInput(initDiscPct > 0 ? String(initDiscPct) : '');
+
+        const activeRate = mode === 'INCLUSIVE' ? incl : excl;
+        const initQty = initialItem.quantity !== undefined && initialItem.quantity !== null ? initialItem.quantity : 1;
+        const initGross = initQty * activeRate;
+
         if (initialItem.discountAmount && initialItem.discountAmount > 0) {
           setDiscountAmountInput(String(initialItem.discountAmount));
           setLastDiscountEdited('amount');
-        } else if (initDiscPct > 0 && initialItem.quantity && initialItem.unitPrice) {
-          const initGross = initialItem.quantity * initialItem.unitPrice;
-          const initAmt = Number(((initGross * initDiscPct) / 100).toFixed(2));
+        } else if (initDiscPct > 0 && initGross > 0) {
+          const initAmt = round2((initGross * initDiscPct) / 100);
           setDiscountAmountInput(initAmt > 0 ? initAmt.toFixed(2) : '');
           setLastDiscountEdited('percent');
         } else {
@@ -181,6 +247,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setQuantity('');
     setUnit('PCS');
     setUnitPrice(0);
+    setUnitPriceInclusive(0);
+    setPriceMode('EXCLUSIVE');
+    setCessRate(0);
     setMrp(undefined);
     setDiscountPercent(0);
     setDiscountPercentInput('');
@@ -226,9 +295,43 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setName(item.name);
     setHsnSacCode(item.hsnSacCode || defaultHsn);
     setUnit(item.unit || 'PCS');
-    setUnitPrice(mode === 'purchase' ? (item.purchasePrice || item.salePrice || 0) : (item.salePrice || 0));
+
+    const gst = item.gstRate ?? 18;
+    let itemMode: ItemPriceMode = 'EXCLUSIVE';
+    let excl = 0;
+    let incl = 0;
+
+    if (mode === 'purchase') {
+      itemMode = item.purchasePriceMode ?? 'EXCLUSIVE';
+      if (itemMode === 'INCLUSIVE' && item.purchasePriceInclusive !== undefined) {
+        incl = item.purchasePriceInclusive;
+        excl = exclusiveFromInclusive(incl, gst);
+      } else {
+        excl = item.purchasePrice || item.salePrice || 0;
+        incl = inclusiveFromExclusive(excl, gst);
+      }
+    } else {
+      itemMode = item.salePriceMode ?? 'EXCLUSIVE';
+      if (itemMode === 'INCLUSIVE' && item.salePriceInclusive !== undefined) {
+        incl = item.salePriceInclusive;
+        excl = exclusiveFromInclusive(incl, gst);
+      } else {
+        excl = item.salePrice || 0;
+        incl = inclusiveFromExclusive(excl, gst);
+      }
+    }
+
+    if (!isGstActive) {
+      itemMode = 'EXCLUSIVE';
+      incl = excl;
+    }
+
+    setUnitPrice(excl);
+    setUnitPriceInclusive(incl);
+    setPriceMode(itemMode);
+    setGstRate(gst);
     setMrp(item.mrp || item.salePrice || 0);
-    setGstRate(item.gstRate ?? 18);
+    setCessRate(isGstActive ? (item.cessRate ?? 0) : 0);
     setIsDropdownOpen(false);
     setTimeout(() => {
       quantityInputRef.current?.focus();
@@ -238,8 +341,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const handleOpenCreateItem = (prefillName?: string) => {
     const initialName = (prefillName !== undefined ? prefillName : name).trim();
     setNewItemName(initialName);
-    setNewItemSalePrice(mode === 'sale' && unitPrice > 0 ? unitPrice.toString() : '');
-    setNewItemPurchasePrice(mode === 'purchase' && unitPrice > 0 ? unitPrice.toString() : '');
+    const activePrice = priceMode === 'INCLUSIVE' ? unitPriceInclusive : unitPrice;
+    setNewItemSalePrice(mode === 'sale' && activePrice > 0 ? activePrice.toString() : '');
+    setNewItemPurchasePrice(mode === 'purchase' && activePrice > 0 ? activePrice.toString() : '');
     setNewItemUnit((unit as UnitOfMeasurement) || 'PCS');
     setNewItemHsn(hsnSacCode || defaultHsn);
     setNewGstRate(gstRate ?? 18);
@@ -257,19 +361,52 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       return;
     }
 
-    const sale = parseFloat(newItemSalePrice) || 0;
-    const purchase = parseFloat(newItemPurchasePrice) || (mode === 'purchase' ? sale : 0);
+    const enteredSale = parseFloat(newItemSalePrice) || 0;
+    const enteredPurchase = parseFloat(newItemPurchasePrice) || (mode === 'purchase' ? enteredSale : 0);
+    const quickGst = isGstActive ? (Number(newItemGstRate) || 0) : 0;
+
+    let saleMode: ItemPriceMode = 'EXCLUSIVE';
+    let purchaseMode: ItemPriceMode = 'EXCLUSIVE';
+    let saleExcl = enteredSale;
+    let saleIncl = enteredSale;
+    let purchExcl = enteredPurchase;
+    let purchIncl = enteredPurchase;
+
+    if (isGstActive) {
+      saleMode = mode === 'sale' ? priceMode : 'EXCLUSIVE';
+      purchaseMode = mode === 'purchase' ? priceMode : 'EXCLUSIVE';
+
+      if (saleMode === 'INCLUSIVE') {
+        saleIncl = enteredSale;
+        saleExcl = exclusiveFromInclusive(enteredSale, quickGst);
+      } else {
+        saleExcl = enteredSale;
+        saleIncl = inclusiveFromExclusive(enteredSale, quickGst);
+      }
+
+      if (purchaseMode === 'INCLUSIVE') {
+        purchIncl = enteredPurchase;
+        purchExcl = exclusiveFromInclusive(enteredPurchase, quickGst);
+      } else {
+        purchExcl = enteredPurchase;
+        purchIncl = inclusiveFromExclusive(enteredPurchase, quickGst);
+      }
+    }
 
     const createdStock = mode === 'purchase' ? 0 : (parseFloat(newItemStock) || 0);
 
     const createdItem: InventoryItem = {
       id: 'ITM-' + Date.now(),
       name: newItemName.trim(),
-      salePrice: sale,
-      purchasePrice: purchase,
+      salePrice: saleExcl,
+      salePriceInclusive: saleIncl,
+      salePriceMode: saleMode,
+      purchasePrice: purchExcl,
+      purchasePriceInclusive: purchIncl,
+      purchasePriceMode: purchaseMode,
       unit: newItemUnit,
       hsnSacCode: isGstActive ? (newItemHsn.trim() || defaultHsn) : '',
-      gstRate: isGstActive ? (Number(newItemGstRate) || 0) : 0,
+      gstRate: quickGst,
       currentStock: createdStock,
       minStockAlert: 5,
       category: newItemCategory.trim() || 'General',
@@ -304,8 +441,11 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Live item total calculation with exact decimal discount handling
   const calculation = useMemo(() => {
     const qty = effectiveQuantity;
-    const rate = Math.max(0, Number(unitPrice) || 0);
-    const gross = Number((qty * rate).toFixed(2));
+    const exclusiveRate = Math.max(0, Number(unitPrice) || 0);
+    const inclusiveRate = Math.max(0, Number(unitPriceInclusive) || 0);
+    const gross = priceMode === 'INCLUSIVE'
+      ? round2(qty * inclusiveRate)
+      : round2(qty * exclusiveRate);
 
     let discountAmount = 0;
     let discPct = 0;
@@ -318,19 +458,24 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       }
     } else {
       discPct = Math.min(100, Math.max(0, parseFloat(discountPercentInput) || 0));
-      discountAmount = Number(((gross * discPct) / 100).toFixed(2));
+      discountAmount = round2((gross * discPct) / 100);
     }
 
-    const taxableAmount = Math.max(0, Number((gross - discountAmount).toFixed(2)));
-
     const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
-    const gstAmount = Number(((taxableAmount * taxPct) / 100).toFixed(2));
+    const cessPct = isGstActive ? Math.max(0, Number(cessRate) || 0) : 0;
 
-    const cgstAmount = isIntraState ? Number((gstAmount / 2).toFixed(2)) : 0;
-    const sgstAmount = isIntraState ? Number((gstAmount / 2).toFixed(2)) : 0;
-    const igstAmount = isIntraState ? 0 : gstAmount;
+    const calc = calculateItemGst({
+      quantity: qty,
+      unitPrice: exclusiveRate,
+      unitPriceInclusive: inclusiveRate,
+      priceMode,
+      discountPercent: discPct,
+      discountAmount,
+      gstRate: taxPct,
+      cessPercent: cessPct,
+    }, isIntraState);
 
-    let totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
+    let totalAmount = calc.totalAmount;
 
     // If user explicitly typed a total that matches within a small rounding difference (<= 0.02),
     // honor the user's exact entered total so it never falls back or gets rejected
@@ -339,18 +484,34 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       totalAmount = parsedTotal;
     }
 
+    const gstAmount = round2(calc.totalTax - calc.cessAmount);
+
     return {
       gross,
       discountAmount,
-      taxableAmount,
+      taxableAmount: calc.taxableAmount,
       gstAmount,
-      cgstAmount,
-      sgstAmount,
-      igstAmount,
+      cgstAmount: calc.cgstAmount,
+      sgstAmount: calc.sgstAmount,
+      igstAmount: calc.igstAmount,
+      cessAmount: calc.cessAmount,
       totalAmount,
       discountPercent: discPct,
     };
-  }, [effectiveQuantity, unitPrice, discountPercentInput, discountAmountInput, lastDiscountEdited, gstRate, isIntraState, isGstActive, totalInput]);
+  }, [
+    effectiveQuantity,
+    unitPrice,
+    unitPriceInclusive,
+    priceMode,
+    discountPercentInput,
+    discountAmountInput,
+    lastDiscountEdited,
+    gstRate,
+    cessRate,
+    isIntraState,
+    isGstActive,
+    totalInput,
+  ]);
 
   // Keep totalInput synchronized with calculated total unless user is actively editing it
   useEffect(() => {
@@ -367,9 +528,12 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     }
   }, [calculation.totalAmount, isEditingTotal]);
 
-  // Sync discount percent and discount amount whenever quantity or unitPrice changes
+  // Sync discount percent and discount amount whenever quantity or unit rates change
   useEffect(() => {
-    const gross = effectiveQuantity * Math.max(0, Number(unitPrice) || 0);
+    const activeRate = priceMode === 'INCLUSIVE'
+      ? Math.max(0, Number(unitPriceInclusive) || 0)
+      : Math.max(0, Number(unitPrice) || 0);
+    const gross = effectiveQuantity * activeRate;
     if (lastDiscountEdited === 'amount') {
       const amt = parseFloat(discountAmountInput);
       if (!isNaN(amt) && amt > 0 && gross > 0) {
@@ -384,13 +548,13 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     } else {
       const pct = parseFloat(discountPercentInput);
       if (!isNaN(pct) && pct > 0 && gross > 0) {
-        const amt = Number(((gross * pct) / 100).toFixed(2));
+        const amt = round2((gross * pct) / 100);
         setDiscountAmountInput(amt > 0 ? amt.toFixed(2) : '');
       } else if (!discountPercentInput.trim()) {
         setDiscountAmountInput('');
       }
     }
-  }, [effectiveQuantity, unitPrice, lastDiscountEdited]);
+  }, [effectiveQuantity, unitPrice, unitPriceInclusive, priceMode, lastDiscountEdited]);
 
   const handleDiscountPercentChange = (valStr: string) => {
     const sanitized = valStr.replace(/[^0-9.]/g, '');
@@ -409,9 +573,12 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const num = Math.min(100, Math.max(0, parseFloat(cleanVal) || 0));
     setDiscountPercent(num);
 
-    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+    const activeRate = priceMode === 'INCLUSIVE'
+      ? Math.max(0, Number(unitPriceInclusive) || 0)
+      : Math.max(0, Number(unitPrice) || 0);
+    const gross = effectiveQuantity * activeRate;
     if (gross > 0 && num > 0) {
-      const amt = Number(((gross * num) / 100).toFixed(2));
+      const amt = round2((gross * num) / 100);
       setDiscountAmountInput(amt > 0 ? amt.toFixed(2) : '');
     } else {
       setDiscountAmountInput('');
@@ -433,7 +600,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     }
 
     const amt = Math.max(0, parseFloat(cleanVal) || 0);
-    const gross = parsedQuantity * Math.max(0, Number(unitPrice) || 0);
+    const activeRate = priceMode === 'INCLUSIVE'
+      ? Math.max(0, Number(unitPriceInclusive) || 0)
+      : Math.max(0, Number(unitPrice) || 0);
+    const gross = effectiveQuantity * activeRate;
 
     if (gross > 0 && amt > 0) {
       // Better handling of decimal discount percent if discount amount is given
@@ -452,6 +622,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setTotalInput(valStr);
     if (!valStr.trim()) {
       setUnitPrice(0);
+      setUnitPriceInclusive(0);
       return;
     }
 
@@ -460,18 +631,21 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       return;
     }
 
-    const qty = parsedQuantity > 0 ? parsedQuantity : 1;
-    const discPct = Math.min(100, Math.max(0, Number(calculation.discountPercent) || 0));
-    const discMultiplier = 1 - discPct / 100;
-    const taxPct = isGstActive ? Math.max(0, Number(gstRate) || 0) : 0;
-    const taxMultiplier = 1 + taxPct / 100;
+    const rate = calculateRateFromTotal({
+      total: newTotal,
+      quantity: parsedQuantity > 0 ? parsedQuantity : 1,
+      discountPercent: calculation.discountPercent,
+      gstRate: isGstActive ? gstRate : 0,
+      cessRate: isGstActive ? cessRate : 0,
+      priceMode,
+    });
 
-    const divisor = qty * (discMultiplier > 0 ? discMultiplier : 1) * taxMultiplier;
-    if (divisor > 0) {
-      // Precision up to 4 decimal places (fractional paisa) to accurately preserve wholesale and GST rates (e.g. 21.165)
-      const rawPrice = newTotal / divisor;
-      const calculatedPrice = Math.round(rawPrice * 10000) / 10000;
-      setUnitPrice(calculatedPrice);
+    if (priceMode === 'INCLUSIVE') {
+      setUnitPriceInclusive(rate);
+      setUnitPrice(exclusiveFromInclusive(rate, gstRate));
+    } else {
+      setUnitPrice(rate);
+      setUnitPriceInclusive(inclusiveFromExclusive(rate, gstRate));
     }
   };
 
@@ -500,6 +674,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       quantity: qty,
       unit,
       unitPrice: Number(unitPrice) || 0,
+      unitPriceInclusive: isGstActive ? (Number(unitPriceInclusive) || 0) : (Number(unitPrice) || 0),
+      priceMode: isGstActive ? priceMode : 'EXCLUSIVE',
+      cessRate: isGstActive ? (Number(cessRate) || 0) : 0,
       mrp: mrp ? Number(mrp) : undefined,
       discountPercent: calculation.discountPercent,
       discountAmount: discAmt,
@@ -769,9 +946,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           </div>
 
-          {/* 3b. HSN / SAC Code & Statutory GST Rate */}
+          {/* 3b. HSN / SAC Code & Statutory GST Rate & CESS Rate */}
           {isGstActive && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
                   <span>HSN / SAC Code</span>
@@ -781,7 +958,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   onChange={(val) => setHsnSacCode(val)}
                   onSelectHsn={(item: HsnItem) => {
                     setHsnSacCode(item.code);
-                    setGstRate(item.gstRate);
+                    applyGstRate(item.gstRate);
                   }}
                   placeholder="e.g. 8471 or Laptop"
                   isGstEnabled={isGstActive}
@@ -794,8 +971,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   <span>GST Tax Rate</span>
                 </label>
                 <select
+                  aria-label="GST Tax Rate"
                   value={gstRate}
-                  onChange={(e) => setGstRate(Number(e.target.value))}
+                  onChange={(e) => applyGstRate(Number(e.target.value))}
                   className={`w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
                 >
                   <option value={0}>0% (Exempt)</option>
@@ -807,59 +985,199 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                   <option value={18}>18% (Standard)</option>
                 </select>
               </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                  <span>CESS Rate (%)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    aria-label="CESS Rate (%)"
+                    value={cessRate || ''}
+                    onChange={(e) => setCessRate(Math.max(0, Number(e.target.value)))}
+                    placeholder="0"
+                    className={`w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
+                    %
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
           {/* 4. Price & MRP */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-on-surface-variant">
-                {mode === 'purchase' ? 'Purchase Rate (₹)' : 'Sale Price (₹)'} <span className="text-error">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  required
-                  value={unitPrice || ''}
-                  onChange={(e) => setUnitPrice(Math.max(0, Number(e.target.value)))}
-                  placeholder="0.00"
-                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
-                />
+          {!isGstActive ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-on-surface-variant">
+                  {isPurchase ? 'Purchase Rate (₹)' : 'Sale Price (₹)'} <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    aria-label={isPurchase ? 'Purchase Rate (Excl. GST)' : 'Sale Price (Excl. GST)'}
+                    value={unitPrice || ''}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setUnitPrice(val);
+                      setUnitPriceInclusive(val);
+                      setPriceMode('EXCLUSIVE');
+                    }}
+                    placeholder="0.00"
+                    className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-                <span>MRP (₹)</span>
-                <span className="text-[10px] text-outline lowercase font-normal">(optional)</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={mrp !== undefined ? mrp : ''}
-                  onChange={(e) => setMrp(e.target.value === '' ? undefined : Number(e.target.value))}
-                  placeholder="0.00"
-                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
-                />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                  <span>MRP (₹)</span>
+                  <span className="text-[10px] text-outline lowercase font-normal">(optional)</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={mrp !== undefined ? mrp : ''}
+                    onChange={(e) => setMrp(e.target.value === '' ? undefined : Number(e.target.value))}
+                    placeholder="0.00"
+                    className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1 bg-surface-container-high/60 p-0.5 rounded-lg border border-outline-variant/20">
+                  <button
+                    type="button"
+                    aria-pressed={priceMode === 'EXCLUSIVE'}
+                    onClick={() => setPriceMode('EXCLUSIVE')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      priceMode === 'EXCLUSIVE'
+                        ? 'bg-surface text-on-surface shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Excl. GST
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={priceMode === 'INCLUSIVE'}
+                    onClick={() => setPriceMode('INCLUSIVE')}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      priceMode === 'INCLUSIVE'
+                        ? 'bg-surface text-on-surface shadow-xs'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Incl. GST
+                  </button>
+                </div>
+                <span className="text-[11px] text-on-surface-variant font-medium">
+                  Last edited: {priceMode === 'EXCLUSIVE' ? 'Excl. GST' : 'Incl. GST'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Exclusive Rate (first in DOM) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface-variant">
+                    {isPurchase ? 'Purchase Rate (Excl. GST)' : 'Sale Price (Excl. GST)'} <span className="text-error">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      required
+                      aria-label={isPurchase ? 'Purchase Rate (Excl. GST)' : 'Sale Price (Excl. GST)'}
+                      value={unitPrice || ''}
+                      onChange={(e) => handleExclusivePriceChange(e.target.value)}
+                      placeholder="0.00"
+                      className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border ${
+                        priceMode === 'EXCLUSIVE' ? (isPurchase ? 'border-orange-500/50' : 'border-secondary/50') : 'border-outline-variant/30'
+                      } ${simpleFocusClass} transition-all`}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Inclusive Rate */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface-variant">
+                    {isPurchase ? 'Purchase Rate (Incl. GST)' : 'Sale Price (Incl. GST)'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      aria-label={isPurchase ? 'Purchase Rate (Incl. GST)' : 'Sale Price (Incl. GST)'}
+                      value={unitPriceInclusive || ''}
+                      onChange={(e) => handleInclusivePriceChange(e.target.value)}
+                      placeholder="0.00 incl."
+                      className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-black text-on-surface border ${
+                        priceMode === 'INCLUSIVE' ? (isPurchase ? 'border-orange-500/50' : 'border-secondary/50') : 'border-outline-variant/30'
+                      } ${simpleFocusClass} transition-all`}
+                    />
+                  </div>
+                </div>
+
+                {/* 3. MRP (after the price pair) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
+                    <span>MRP (₹)</span>
+                    <span className="text-[10px] text-outline lowercase font-normal">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                      ₹
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={mrp !== undefined ? mrp : ''}
+                      onChange={(e) => setMrp(e.target.value === '' ? undefined : Number(e.target.value))}
+                      placeholder="0.00"
+                      className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-on-surface-variant/80 italic">
+                Inclusive price covers GST only. CESS is added on top.
+              </p>
+            </div>
+          )}
 
           {/* 5. Discount: Both Percentage (%) and Amount (₹) */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-                <span>Discount (%)</span>
+                <span>Discount (%) {isGstActive ? `on ${priceMode === 'INCLUSIVE' ? 'Incl.' : 'Excl.'}` : ''}</span>
               </label>
               <div className="relative">
                 <input
@@ -878,7 +1196,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-on-surface-variant flex items-center justify-between">
-                <span>Discount (₹)</span>
+                <span>Discount (₹) {isGstActive ? `on ${priceMode === 'INCLUSIVE' ? 'Incl.' : 'Excl.'}` : ''}</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline pointer-events-none">
@@ -939,23 +1257,34 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
             {/* Tax Details - only shown when GST is enabled */}
             {isGstActive && (
-              <div className="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
-                <div>
-                  <span>Taxable Value: </span>
-                  <span className="font-tabular-data font-bold text-on-surface">
-                    {formatINR(calculation.taxableAmount)}
-                  </span>
+              <div className="flex flex-col gap-1.5 pt-2 border-t border-outline-variant/20 text-[11px] text-on-surface-variant">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span>Taxable Value: </span>
+                    <span className="font-tabular-data font-bold text-on-surface">
+                      {formatINR(calculation.taxableAmount)}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span>
+                      {isIntraState
+                        ? `GST ${gstRate}% (CGST+SGST) ${priceMode === 'INCLUSIVE' ? '(included)' : '(extra)'}: `
+                        : `IGST ${gstRate}% ${priceMode === 'INCLUSIVE' ? '(included)' : '(extra)'}: `}
+                    </span>
+                    <span className={`font-tabular-data font-bold ${accentColorClass}`}>
+                      {priceMode === 'INCLUSIVE' ? '' : '+'}{formatINR(calculation.gstAmount)}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span>
-                    {isIntraState
-                      ? `GST ${gstRate}% (CGST+SGST): `
-                      : `IGST ${gstRate}%: `}
-                  </span>
-                  <span className={`font-tabular-data font-bold ${accentColorClass}`}>
-                    +{formatINR(calculation.gstAmount)}
-                  </span>
-                </div>
+
+                {calculation.cessAmount > 0 && (
+                  <div className="flex items-center justify-between pt-1 border-t border-outline-variant/10">
+                    <span>CESS ({cessRate}%):</span>
+                    <span className={`font-tabular-data font-bold ${accentColorClass}`}>
+                      +{formatINR(calculation.cessAmount)}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

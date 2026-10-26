@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
+import type { ItemPriceMode } from '../../../models/item.ts';
 
 export interface GridRow {
   itemId: string;
@@ -9,6 +10,8 @@ export interface GridRow {
   quantity: number;
   unit: string;
   unitPrice: number;
+  unitPriceInclusive?: number;
+  priceMode?: ItemPriceMode;
   mrp?: number;
   discountPercent: number;
   discountAmount?: number;
@@ -31,6 +34,27 @@ export interface InvoiceLineItemsGridProps {
   onAddItem: () => void;
   onEditItem: (index: number) => void;
   onOpenScanner: () => void;
+}
+
+function getRowTotal(row: GridRow, calcItem?: { totalAmount: number }): number {
+  if (calcItem && typeof calcItem.totalAmount === 'number') {
+    return calcItem.totalAmount;
+  }
+  const qty = Number(row.quantity) || 0;
+  const disc = Math.min(100, Math.max(0, Number(row.discountPercent) || 0));
+  const discMultiplier = 1 - disc / 100;
+  const gst = Number(row.gstRate) || 0;
+  const cess = Number(row.cessRate) || 0;
+
+  if (row.priceMode === 'INCLUSIVE' && row.unitPriceInclusive !== undefined) {
+    const incl = Number(row.unitPriceInclusive) || 0;
+    const net = qty * incl * discMultiplier;
+    const taxable = gst > 0 ? (net * 100) / (100 + gst) : net;
+    return net + (taxable * cess) / 100;
+  }
+
+  const excl = Number(row.unitPrice) || 0;
+  return qty * excl * discMultiplier * (1 + (gst + cess) / 100);
 }
 
 export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
@@ -128,6 +152,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
               <tbody className="divide-y divide-outline-variant/15 text-xs">
                 {rows.map((row, idx) => {
                   const itemCalc = calcItems[idx];
+                  const rowTotal = getRowTotal(row, itemCalc);
                   return (
                     <tr
                       key={idx}
@@ -156,7 +181,12 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                         {formatQuantity(row.quantity, 4)} <span className="text-[10px] font-normal uppercase text-on-surface-variant">{row.unit}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
-                        {formatINR(row.unitPrice)}
+                        <div>{formatINR(row.unitPrice)}</div>
+                        {isGstActive && row.unitPriceInclusive !== undefined && (
+                          <div className="text-[10px] text-on-surface-variant font-normal">
+                            Incl. {formatINR(row.unitPriceInclusive)}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data">
                         {row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0) ? (
@@ -169,11 +199,16 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                       </td>
                       {isGstActive && (
                         <td className="py-2.5 px-3 text-right font-tabular-data text-on-surface-variant font-medium">
-                          {row.gstRate}%
+                          <div>{row.gstRate}%</div>
+                          {(row.cessRate || 0) > 0 && (
+                            <div className="text-[10px] text-on-surface-variant/80 font-normal">
+                              CESS {row.cessRate}%
+                            </div>
+                          )}
                         </td>
                       )}
                       <td className="py-2.5 px-4 text-right font-tabular-data font-bold text-on-surface text-sm">
-                        {formatINR(itemCalc?.totalAmount || 0)}
+                        {formatINR(rowTotal)}
                       </td>
                     </tr>
                   );
@@ -186,6 +221,7 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
           <div className="sm:hidden divide-y divide-outline-variant/15">
             {rows.map((row, idx) => {
               const itemCalc = calcItems[idx];
+              const rowTotal = getRowTotal(row, itemCalc);
               return (
                 <div
                   key={idx}
@@ -206,11 +242,13 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-tabular-data text-sm font-black text-on-surface block">
-                        {formatINR(itemCalc?.totalAmount || 0)}
+                        {formatINR(rowTotal)}
                       </span>
                       {isGstActive && (
                         <span className="text-[10px] text-outline block">
-                          incl. {row.gstRate}% tax
+                          {(row.cessRate || 0) > 0
+                            ? `GST ${row.gstRate}% · CESS ${row.cessRate}%`
+                            : `GST ${row.gstRate}%`}
                         </span>
                       )}
                     </div>
@@ -223,9 +261,15 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                         {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
                       <span className="text-outline">×</span>
-                      <span className="font-tabular-data font-semibold text-on-surface">
-                        {formatINR(row.unitPrice)}
-                      </span>
+                      {isGstActive && row.unitPriceInclusive !== undefined ? (
+                        <span className="font-tabular-data font-semibold text-on-surface">
+                          Excl. {formatINR(row.unitPrice)} · Incl. {formatINR(row.unitPriceInclusive)}
+                        </span>
+                      ) : (
+                        <span className="font-tabular-data font-semibold text-on-surface">
+                          {formatINR(row.unitPrice)}
+                        </span>
+                      )}
                       {(row.discountPercent > 0 || (row.discountAmount && row.discountAmount > 0)) && (
                         <span className="px-1 py-0.2 rounded bg-secondary/15 text-secondary text-[10px] font-bold">
                           {row.discountPercent > 0 ? `${row.discountPercent}% off` : `₹${row.discountAmount} off`}

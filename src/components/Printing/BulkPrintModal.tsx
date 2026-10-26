@@ -3,6 +3,7 @@ import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
+import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
@@ -30,6 +31,7 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isGst = company.isGstEnabled !== false;
   const docs = invoices.length > 0 ? invoices : purchases;
   const isSales = invoices.length > 0;
   const totalAmount = docs.reduce((sum, d) => sum + (d.grandTotal || 0), 0);
@@ -216,20 +218,50 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-200">
-                      {items.map((item, itemIdx) => (
-                        <tr key={item.id || itemIdx} className="hover:bg-neutral-50">
-                          <td className="py-1 px-2 text-center text-neutral-500">{itemIdx + 1}</td>
-                          <td className="py-1 px-2 font-medium text-neutral-900">{item.itemName}</td>
-                          <td className="py-1 px-2 text-center font-mono text-neutral-600">{item.hsnCode || '-'}</td>
-                          <td className="py-1 px-2 text-right">{item.quantity} {item.unit || ''}</td>
-                          <td className="py-1 px-2 text-right tabular-nums">{formatINR(item.rate || item.unitPrice || 0)}</td>
-                          <td className="py-1 px-2 text-right tabular-nums">{item.gstRate || item.taxRate || 0}%</td>
-                          <td className="py-1 px-2 text-right tabular-nums">{formatINR(item.taxableAmount || (item.quantity * (item.rate || item.unitPrice || 0)))}</td>
-                          <td className="py-1 px-2 text-right font-semibold tabular-nums text-neutral-950">
-                            {formatINR(item.totalAmount || item.netAmount || 0)}
-                          </td>
-                        </tr>
-                      ))}
+                      {items.map((item, itemIdx) => {
+                        const rate = Number(item.rate || item.unitPrice || 0);
+                        const gstRate = Number(item.gstRate || item.taxRate || 0);
+                        const priceMode = item.priceMode ?? 'EXCLUSIVE';
+                        const storedIncl = Number(item.unitPriceInclusive);
+                        const inclusiveVal =
+                          priceMode === 'INCLUSIVE'
+                            ? (Number.isFinite(storedIncl) && storedIncl > 0
+                                ? storedIncl
+                                : inclusiveFromExclusive(rate, gstRate))
+                            : inclusiveFromExclusive(rate, gstRate);
+                        return (
+                          <tr key={item.id || itemIdx} className="hover:bg-neutral-50">
+                            <td className="py-1 px-2 text-center text-neutral-500">{itemIdx + 1}</td>
+                            <td className="py-1 px-2 font-medium text-neutral-900">{item.itemName || item.name}</td>
+                            <td className="py-1 px-2 text-center font-mono text-neutral-600">{item.hsnCode || item.hsnSacCode || '-'}</td>
+                            <td className="py-1 px-2 text-right">{item.quantity} {item.unit || ''}</td>
+                            <td className="py-1 px-2 text-right tabular-nums">
+                              <div>{formatINR(rate)}</div>
+                              {Boolean(isGst && !company.isCompositionScheme) && (
+                                <div className="text-[9.5px] text-neutral-500 font-normal">
+                                  Incl. {formatINR(inclusiveVal)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-1 px-2 text-right tabular-nums">
+                              <div>
+                                {Boolean(isGst && !company.isCompositionScheme)
+                                  ? `GST ${gstRate}%`
+                                  : `${gstRate}%`}
+                              </div>
+                              {Boolean(isGst && !company.isCompositionScheme && item.cessRate && Number(item.cessRate) > 0) && (
+                                <div className="text-[9.5px] text-neutral-500 font-normal">
+                                  CESS {item.cessRate}%
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-1 px-2 text-right tabular-nums">{formatINR(item.taxableAmount || (item.quantity * rate))}</td>
+                            <td className="py-1 px-2 text-right font-semibold tabular-nums text-neutral-950">
+                              {formatINR(item.totalAmount || item.netAmount || 0)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

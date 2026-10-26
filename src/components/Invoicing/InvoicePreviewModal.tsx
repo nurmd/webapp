@@ -26,6 +26,7 @@ import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
+import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
@@ -205,15 +206,35 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         Number(line.gstRate ?? line.taxRate ?? line.gst ?? (line.item && line.item.gstRate) ?? 0) ||
         0;
 
+      const priceMode = line.priceMode ?? 'EXCLUSIVE';
+      const storedInclusive = Number(line.unitPriceInclusive);
+      const unitPriceInclusive =
+        priceMode === 'INCLUSIVE'
+          ? (Number.isFinite(storedInclusive) && storedInclusive > 0
+              ? storedInclusive
+              : inclusiveFromExclusive(unitPrice, gstRate))
+          : inclusiveFromExclusive(unitPrice, gstRate);
+      const cessRate = Number(line.cessRate ?? 0) || 0;
+
+      const isInclusive = priceMode === 'INCLUSIVE';
+      const gross = isInclusive ? unitPriceInclusive * quantity : unitPrice * quantity;
+
       const discountAmount =
         line.discountAmount !== undefined && line.discountAmount !== null
           ? Number(line.discountAmount)
-          : (unitPrice * quantity * discountPercent) / 100;
+          : (gross * discountPercent) / 100;
 
       const taxableAmount =
         line.taxableAmount !== undefined && line.taxableAmount !== null
           ? Number(line.taxableAmount)
-          : Math.max(0, unitPrice * quantity - discountAmount);
+          : isInclusive
+          ? Math.max(0, gstRate > 0 ? (gross - discountAmount) / (1 + gstRate / 100) : gross - discountAmount)
+          : Math.max(0, gross - discountAmount);
+
+      const cessAmount =
+        line.cessAmount !== undefined && line.cessAmount !== null
+          ? Number(line.cessAmount)
+          : (taxableAmount * cessRate) / 100;
 
       const isIntra = invoice.isIntraState !== false;
       const cgstAmount =
@@ -245,7 +266,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       const totalAmount =
         line.totalAmount !== undefined && line.totalAmount !== null
           ? Number(line.totalAmount)
-          : taxableAmount + cgstAmount + sgstAmount + utgstAmount + igstAmount;
+          : taxableAmount + cgstAmount + sgstAmount + utgstAmount + igstAmount + cessAmount;
 
       return {
         id: line.id || line.itemId || `line-${idx}`,
@@ -254,6 +275,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
         quantity,
         unit,
         unitPrice,
+        priceMode,
+        unitPriceInclusive,
+        cessRate,
+        cessAmount,
         discountPercent,
         discountAmount,
         taxableAmount,
@@ -339,10 +364,18 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return isGst ? (invoice.totalIgst || itemsList.reduce((s, i) => s + i.igstAmount, 0)) : 0;
   }, [isGst, invoice.totalIgst, itemsList]);
 
+  const totalCess = useMemo(() => {
+    return isGst
+      ? (invoice.totalCess !== undefined && invoice.totalCess !== null
+          ? Number(invoice.totalCess)
+          : itemsList.reduce((s, i) => s + i.cessAmount, 0))
+      : 0;
+  }, [isGst, invoice.totalCess, itemsList]);
+
   const resolvedGrandTotal =
     invoice.grandTotal || itemsList.reduce((sum, item) => sum + item.totalAmount, 0);
   const resolvedTotalTax =
-    invoice.totalTax || totalCgst + totalSgst + totalUtgst + totalIgst;
+    invoice.totalTax || totalCgst + totalSgst + totalUtgst + totalIgst + totalCess;
 
   const wordsTotal = invoice.amountInWords || amountInWords(resolvedGrandTotal);
   const wordsTax = amountInWords(resolvedTotalTax);
@@ -650,12 +683,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                               Disc {item.discountPercent}%
                             </span>
                           )}
+                          {isGst && !company.isCompositionScheme && item.cessRate > 0 && (
+                            <span className="text-[8px] text-slate-500 block">
+                              CESS {item.cessRate}%
+                            </span>
+                          )}
                         </td>
                         <td className="py-0.5 text-center font-medium text-slate-800">
                           {formatQuantity(item.quantity, 4)}
                         </td>
                         <td className="py-0.5 text-right font-medium text-slate-800">
-                          {item.unitPrice.toFixed(0)}
+                          <div>{item.unitPrice.toFixed(0)}</div>
+                          {isGst && !company.isCompositionScheme && (
+                            <div className="text-[8px] text-slate-500">
+                              Incl. {item.unitPriceInclusive.toFixed(0)}
+                            </div>
+                          )}
                         </td>
                         <td className="py-0.5 text-right font-bold text-slate-950">
                           {item.totalAmount.toFixed(2)}
@@ -707,6 +750,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <div className="flex justify-between text-slate-600">
                           <span>IGST:</span>
                           <span>₹{totalIgst.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {totalCess > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                          <span>CESS:</span>
+                          <span>₹{totalCess.toFixed(2)}</span>
                         </div>
                       )}
                     </>
@@ -957,6 +1007,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <span className="font-semibold text-on-surface font-tabular-data">
                           ₹{item.unitPrice.toFixed(2)}
                         </span>
+                        {isGst && !company.isCompositionScheme && (
+                          <span className="text-[9.5px] text-on-surface-variant block font-normal">
+                            Incl. ₹{item.unitPriceInclusive.toFixed(2)}
+                          </span>
+                        )}
                       </div>
                       <div className="bg-surface-container/40 p-1.5 rounded">
                         <span className="text-[9px] uppercase font-bold text-on-surface-variant block">Discount</span>
@@ -969,6 +1024,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <span className="font-semibold text-on-surface font-tabular-data">
                           {item.gstRate}% (₹{(item.cgstAmount + item.sgstAmount + item.igstAmount + item.utgstAmount).toFixed(2)})
                         </span>
+                        {isGst && !company.isCompositionScheme && item.cessRate > 0 && (
+                          <span className="text-[9.5px] text-on-surface-variant block font-normal">
+                            CESS {item.cessRate}%
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1013,6 +1073,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         <div className="flex justify-between text-on-surface-variant">
                           <span>IGST</span>
                           <span className="font-semibold text-on-surface font-tabular-data">₹{totalIgst.toFixed(2)}</span>
+                        </div>
+                      )}
+
+                      {totalCess > 0 && (
+                        <div className="flex justify-between text-on-surface-variant">
+                          <span>CESS</span>
+                          <span className="font-semibold text-on-surface font-tabular-data">₹{totalCess.toFixed(2)}</span>
                         </div>
                       )}
                     </>
@@ -1538,6 +1605,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         </td>
                         <td className="py-2 px-2.5 text-right font-medium text-slate-900 border-r border-slate-300 font-tabular-data text-xs">
                           {line.unitPrice.toFixed(2)}
+                          {isGst && !company.isCompositionScheme && (
+                            <span className="text-[10px] text-slate-500 block font-normal">
+                              Incl. {line.unitPriceInclusive.toFixed(2)}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 px-2 text-right text-slate-600 border-r border-slate-300 font-tabular-data text-xs">
                           {line.discountPercent > 0 ? `${line.discountPercent}%` : '-'}
@@ -1550,6 +1622,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                         {isGst && !company.isCompositionScheme && (
                           <td className="py-2 px-2 text-center text-slate-800 border-r border-slate-300 font-tabular-data text-xs">
                             {line.gstRate}%
+                            {line.cessRate > 0 && (
+                              <span className="text-[10px] text-slate-500 block font-normal">
+                                CESS {line.cessRate}%
+                              </span>
+                            )}
                           </td>
                         )}
                         <td className="py-2 px-3 text-right font-bold text-slate-950 font-tabular-data text-xs">
@@ -1618,7 +1695,22 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                       </tr>
                     )}
 
-                    {invoice.roundOff !== 0 && (
+                    {isGst && !company.isCompositionScheme && totalCess > 0 && (
+                      <tr className="bg-slate-50/40">
+                        <td className="border-r border-slate-300"></td>
+                        <td
+                          colSpan={8}
+                          className="py-1.5 px-3 font-bold text-slate-800 border-r border-slate-300 text-right"
+                        >
+                          CESS Output
+                        </td>
+                        <td className="py-1.5 px-3 text-right font-bold text-slate-900 font-tabular-data">
+                          {totalCess.toFixed(2)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {Boolean(invoice.roundOff && invoice.roundOff !== 0) && (
                       <tr className="bg-slate-50/40">
                         <td className="border-r border-slate-300"></td>
                         <td

@@ -1,5 +1,7 @@
 export * from './category.ts';
 
+export type ItemPriceMode = 'EXCLUSIVE' | 'INCLUSIVE';
+
 export type UnitOfMeasurement =
   | 'PCS'
   | 'NOS'
@@ -24,7 +26,11 @@ export interface InventoryItem {
   category: string;
   unit: UnitOfMeasurement;
   salePrice: number;
+  salePriceInclusive?: number;
+  salePriceMode?: ItemPriceMode;
   purchasePrice: number;
+  purchasePriceInclusive?: number;
+  purchasePriceMode?: ItemPriceMode;
   wholesalePrice?: number;
   mrp?: number;
   gstRate: number; // e.g. 0, 5, 12, 18, 28

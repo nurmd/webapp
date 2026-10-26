@@ -1,4 +1,4 @@
-import type { UnitOfMeasurement } from './item.ts';
+import type { UnitOfMeasurement, ItemPriceMode } from './item.ts';
 import type { PaymentMode, PaymentStatus, PaymentSplit } from './invoice.ts';
 
 export type ItcEligibility =
@@ -21,6 +21,8 @@ export interface PurchaseItemEntry {
   unit: UnitOfMeasurement;
   quantity: number;
   unitPrice: number;
+  unitPriceInclusive?: number;
+  priceMode?: ItemPriceMode;
   pricePerUnit?: number;              // Optional alias for unitPrice
   discountPercent?: number;
   discountAmount?: number;

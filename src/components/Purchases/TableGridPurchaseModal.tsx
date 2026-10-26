@@ -6,6 +6,7 @@ import { PurchaseBill, PurchaseItemEntry, ItcEligibility } from '../../models/pu
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import { parseSplitsFromPurchase, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
+import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
@@ -235,6 +236,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       quantity: roundQuantity(itemData.quantity, 4),
       unit: itemData.unit,
       unitPrice: itemData.unitPrice,
+      unitPriceInclusive: itemData.unitPriceInclusive,
+      priceMode: itemData.priceMode,
+      cessRate: itemData.cessRate,
       mrp: itemData.mrp,
       discountPercent: itemData.discountPercent,
       discountAmount: itemData.discountAmount,
@@ -261,22 +265,51 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   // Grid rows
   const [rows, setRows] = useState<PurchaseGridRow[]>(() => {
     if (initialBill && initialBill.items.length > 0) {
-      return initialBill.items.map((it) => ({
-        itemId: it.itemId || it.id || '',
-        name: it.name,
-        description: it.description || '',
-        hsnSacCode: it.hsnSacCode,
-        quantity: it.quantity,
-        unit: it.unit,
-        unitPrice: it.unitPrice,
-        mrp: (it as any).mrp,
-        discountPercent: it.discountPercent || 0,
-        discountAmount: it.discountAmount,
-        gstRate: it.gstRate,
-      }));
+      return initialBill.items.map((it) => {
+        const mode = it.priceMode ?? 'EXCLUSIVE';
+        const gst = it.gstRate ?? 18;
+        const excl = Number(it.unitPrice) || 0;
+        const storedIncl = Number(it.unitPriceInclusive);
+        const incl =
+          mode === 'INCLUSIVE'
+            ? (Number.isFinite(storedIncl) && storedIncl > 0
+                ? storedIncl
+                : inclusiveFromExclusive(excl, gst))
+            : inclusiveFromExclusive(excl, gst);
+        return {
+          itemId: it.itemId || it.id || '',
+          name: it.name,
+          description: it.description || '',
+          hsnSacCode: it.hsnSacCode,
+          quantity: it.quantity,
+          unit: it.unit,
+          unitPrice: excl,
+          unitPriceInclusive: incl,
+          priceMode: mode,
+          cessRate: Number(it.cessRate) || 0,
+          mrp: (it as any).mrp,
+          discountPercent: it.discountPercent || 0,
+          discountAmount: it.discountAmount,
+          gstRate: it.gstRate,
+        };
+      });
     }
     if (initialDraft?.rows && initialDraft.rows.length > 0) {
-      return initialDraft.rows;
+      return initialDraft.rows.map((r: any) => {
+        const gst = Number(r.gstRate) || 0;
+        const excl = Number(r.unitPrice) || 0;
+        const incl =
+          Number(r.unitPriceInclusive) > 0
+            ? Number(r.unitPriceInclusive)
+            : inclusiveFromExclusive(excl, gst);
+        return {
+          ...r,
+          unitPrice: excl,
+          unitPriceInclusive: incl,
+          priceMode: r.priceMode ?? 'EXCLUSIVE',
+          cessRate: Number(r.cessRate) || 0,
+        };
+      });
     }
     return [];
   });
@@ -290,9 +323,12 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     return rows.map((r) => ({
       quantity: Number(r.quantity) || 0,
       unitPrice: Number(r.unitPrice) || 0,
+      unitPriceInclusive: Number(r.unitPriceInclusive) || 0,
+      priceMode: r.priceMode ?? 'EXCLUSIVE',
       discountPercent: Number(r.discountPercent) || 0,
       discountAmount: r.discountAmount,
       gstRate: isGstActive ? (Number(r.gstRate) || 0) : 0,
+      cessPercent: isGstActive ? (Number(r.cessRate) || 0) : 0,
     }));
   }, [rows, isGstActive]);
 
@@ -478,6 +514,16 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         };
         setRows(updated);
       } else {
+        const mode = found.purchasePriceMode ?? 'EXCLUSIVE';
+        const gst = found.gstRate ?? 18;
+        let excl = found.purchasePrice || found.salePrice || 100;
+        let incl = found.purchasePriceInclusive !== undefined
+          ? found.purchasePriceInclusive
+          : inclusiveFromExclusive(excl, gst);
+        if (mode === 'INCLUSIVE' && found.purchasePriceInclusive !== undefined) {
+          incl = found.purchasePriceInclusive;
+          excl = exclusiveFromInclusive(incl, gst);
+        }
         setRows([
           ...rows,
           {
@@ -487,7 +533,10 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             hsnSacCode: isGstActive ? (found.hsnSacCode || '844332') : '',
             quantity: 1,
             unit: found.unit || 'PCS',
-            unitPrice: found.purchasePrice || found.salePrice || 100,
+            unitPrice: excl,
+            unitPriceInclusive: incl,
+            priceMode: mode,
+            cessRate: isGstActive ? (found.cessRate ?? 0) : 0,
             mrp: found.mrp || found.salePrice,
             discountPercent: 0,
             gstRate: found.gstRate ?? 18,
@@ -516,6 +565,12 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
     const purchaseItems: PurchaseItemEntry[] = rows.map((r, idx) => {
       const calcItem = calcSummary.items[idx];
+      const excl = Number(r.unitPrice) || 0;
+      const gst = isGstActive ? (r.gstRate || 0) : 0;
+      const incl =
+        Number(r.unitPriceInclusive) > 0
+          ? Number(r.unitPriceInclusive)
+          : inclusiveFromExclusive(excl, gst);
       return {
         itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
         name: r.name || 'Purchased Item',
@@ -523,18 +578,21 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         hsnSacCode: isGstActive ? (r.hsnSacCode || '844332') : '',
         unit: (r.unit as any) || 'PCS',
         quantity: r.quantity,
-        unitPrice: r.unitPrice,
+        unitPrice: excl,
+        unitPriceInclusive: incl,
+        priceMode: r.priceMode ?? 'EXCLUSIVE',
         mrp: r.mrp,
         discountPercent: r.discountPercent,
         discountAmount: calcItem?.discountAmount || 0,
         taxableAmount: calcItem?.taxableAmount || 0,
-        gstRate: isGstActive ? (r.gstRate || 0) : 0,
+        gstRate: gst,
         cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
         sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
         utgstAmount: isGstActive ? (calcItem?.utgstAmount || 0) : 0,
         igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
-        cessAmount: 0,
-        totalAmount: calcItem?.totalAmount || (r.quantity * r.unitPrice * (1 - (r.discountPercent || 0) / 100)),
+        cessRate: isGstActive ? (Number(r.cessRate) || 0) : 0,
+        cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
+        totalAmount: calcItem?.totalAmount || (r.quantity * excl * (1 - (r.discountPercent || 0) / 100)),
       };
     });
 
@@ -585,7 +643,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       totalUtgst: isGstActive ? (calcSummary.totalUtgst || 0) : 0,
       isUtgst: isGstActive ? Boolean(calcSummary.isUtgst) : false,
       totalIgst: isGstActive ? calcSummary.totalIgst : 0,
-      totalCess: 0,
+      totalCess: isGstActive ? calcSummary.totalCess : 0,
       totalTax: isGstActive ? calcSummary.totalTax : 0,
       roundOff: finalRoundOff,
       shippingAmount: Number(shippingAmount) || 0,
@@ -827,7 +885,23 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     if ((draft as any).ewayBillNumber) setEwayBillNumber((draft as any).ewayBillNumber);
     if ((draft as any).receivedDate) setReceivedDate((draft as any).receivedDate);
     if (draft.rows && draft.rows.length > 0) {
-      setRows(draft.rows);
+      setRows(
+        draft.rows.map((r: any) => {
+          const gst = Number(r.gstRate) || 0;
+          const excl = Number(r.unitPrice) || 0;
+          const incl =
+            Number(r.unitPriceInclusive) > 0
+              ? Number(r.unitPriceInclusive)
+              : inclusiveFromExclusive(excl, gst);
+          return {
+            ...r,
+            unitPrice: excl,
+            unitPriceInclusive: incl,
+            priceMode: r.priceMode ?? 'EXCLUSIVE',
+            cessRate: Number(r.cessRate) || 0,
+          };
+        })
+      );
     }
     if (draft.paymentSplits && draft.paymentSplits.length > 0) {
       setPaymentSplits(draft.paymentSplits);
@@ -1002,6 +1076,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
             totalSgst={calcSummary.totalSgst}
             totalUtgst={calcSummary.totalUtgst}
             totalIgst={calcSummary.totalIgst}
+            totalCess={isGstActive ? calcSummary.totalCess : 0}
             totalTaxableAmount={calcSummary.totalTaxableAmount}
             isIntraState={calcSummary.isIntraState}
             isGstActive={isGstActive}
