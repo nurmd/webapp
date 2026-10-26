@@ -369,7 +369,7 @@ export const SelectPosPartyModal: React.FC<SelectPosPartyModalProps> = ({
                       Default B2C
                     </span>
                   </div>
-                  <div className="text-[11px] text-outline">Counter cash/UPI retail sale without ledger account</div>
+                  <div className="text-[11px] text-outline">Counter cash/UPI retail sale tracked under Walk-in Customer</div>
                 </div>
               </div>
               {(!selectedParty || isSystemParty(selectedParty)) && (

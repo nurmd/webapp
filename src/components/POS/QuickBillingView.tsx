@@ -63,6 +63,25 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     };
   });
 
+  // Default to system walk-in customer once parties catalog loads, without overriding real selections or retail phone
+  useEffect(() => {
+    if (systemParty && !customer.party && !customer.phone?.trim()) {
+      setCustomer((prev) => {
+        if (!prev.party && !prev.phone?.trim()) {
+          return {
+            ...prev,
+            party: systemParty,
+            phone: systemParty.phone || '',
+            isB2b: !!systemParty.gstin,
+            gstin: systemParty.gstin,
+            stateCode: systemParty.stateCode || company.stateCode || '27',
+          };
+        }
+        return prev;
+      });
+    }
+  }, [systemParty, customer.party, customer.phone, company.stateCode]);
+
   // Discounts and Adjustments
   const [cartDiscountType, setCartDiscountType] = useState<'PERCENT' | 'FLAT'>('FLAT');
   const [cartDiscountValue, setCartDiscountValue] = useState<number>(0);

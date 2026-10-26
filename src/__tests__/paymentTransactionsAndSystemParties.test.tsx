@@ -16,16 +16,28 @@ import type { Invoice } from '../models/invoice.ts';
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../models/bankAccount.ts';
 import type { CompanyProfile } from '../models/company.ts';
 import { computeCashBankSummary } from '../core/accounting/cashBankCalculator.ts';
+import { resetBackNavigationForTesting, triggerBack, useBackNavigation } from '../core/utils/backNavigation.ts';
+import { exportReportToCsv } from '../components/Reports/utils/reportExportUtils.ts';
+import { CashBankTransactionDetailModal } from '../components/CashBank/CashBankTransactionDetailModal.tsx';
 import { PaymentTransactionsView } from '../components/Payments/PaymentTransactionsView.tsx';
 import { CashBankManagementView } from '../components/CashBank/CashBankManagementView.tsx';
 import { BankStatementCategory } from '../components/Reports/categories/BankStatementCategory.tsx';
 import { SelectPosPartyModal } from '../components/POS/SelectPosPartyModal.tsx';
 import { SelectPartyModal } from '../components/Parties/SelectPartyModal.tsx';
+import { QuickBillingView } from '../components/POS/QuickBillingView.tsx';
 import { PartiesView } from '../components/Parties/PartiesView.tsx';
 import { PartyDetailPage } from '../components/Parties/PartyDetailPage.tsx';
 import { Drawer } from '../components/Shell/Drawer.tsx';
 import { TabletSidebar } from '../components/Shell/TabletSidebar.tsx';
 import { NavigationMenuHubView } from '../components/Navigation/NavigationMenuHubView.tsx';
+
+vi.mock('../components/Reports/utils/reportExportUtils.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/Reports/utils/reportExportUtils.ts')>();
+  return {
+    ...actual,
+    exportReportToCsv: vi.fn(),
+  };
+});
 
 describe('Payment Transactions & System Walk-in Customer Suite', () => {
   let container: HTMLDivElement;
@@ -33,12 +45,14 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetBackNavigationForTesting();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
   });
 
   afterEach(() => {
+    resetBackNavigationForTesting();
     act(() => {
       root.unmount();
     });
@@ -86,6 +100,88 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
     isDefault: false,
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
+  };
+
+  const directAddTxn: CashBankTransaction = {
+    id: 'TXN-ADD-1',
+    txnNumber: 'TXN-001',
+    date: '2026-05-10',
+    type: 'ADD_MONEY',
+    toAccountId: 'ACC_CASH',
+    amount: 10000,
+    description: 'Capital Infusion',
+    createdAt: '2026-05-10T10:00:00.000Z',
+  };
+
+  const directReduceTxn: CashBankTransaction = {
+    id: 'TXN-RED-1',
+    txnNumber: 'TXN-002',
+    date: '2026-05-11',
+    type: 'REDUCE_MONEY',
+    fromAccountId: 'ACC_BANK_1',
+    amount: 4000,
+    description: 'Owner Drawings',
+    createdAt: '2026-05-11T10:00:00.000Z',
+  };
+
+  const transferTxn: CashBankTransaction = {
+    id: 'TXN-CONTRA-1',
+    txnNumber: 'TXN-003',
+    date: '2026-05-12',
+    type: 'DEPOSIT',
+    fromAccountId: 'ACC_CASH',
+    toAccountId: 'ACC_BANK_1',
+    amount: 5000,
+    description: 'Cash deposited to bank',
+    createdAt: '2026-05-12T10:00:00.000Z',
+  };
+
+  const upfrontSale: Invoice = {
+    id: 'INV-SALE-1',
+    invoiceNumber: 'INV-001',
+    invoiceType: 'B2CS',
+    isGstInvoice: true,
+    date: '2026-05-15',
+    partyId: 'PTY-1',
+    partyName: 'Alice',
+    partyAddress: '',
+    partyStateCode: '18',
+    placeOfSupplyStateCode: '18',
+    isIntraState: true,
+    items: [],
+    totalGrossAmount: 2000,
+    totalDiscount: 0,
+    totalTaxableAmount: 2000,
+    totalCgst: 0,
+    totalSgst: 0,
+    totalIgst: 0,
+    totalCess: 0,
+    totalTax: 0,
+    roundOff: 0,
+    grandTotal: 2000,
+    amountInWords: '',
+    paymentMode: 'CASH',
+    paymentStatus: 'PAID',
+    paidAmount: 2000,
+    balanceAmount: 0,
+    createdAt: '2026-05-15T10:00:00.000Z',
+    updatedAt: '2026-05-15T10:00:00.000Z',
+  };
+
+  const upfrontPurchase = {
+    id: 'PUR-1',
+    billNumber: 'BILL-001',
+    date: '2026-05-16',
+    supplierId: 'SUP-1',
+    supplierName: 'Supplier X',
+    items: [],
+    grandTotal: 3000,
+    paidAmount: 3000,
+    balanceAmount: 0,
+    paymentMode: 'BANK' as any,
+    paymentStatus: 'PAID' as any,
+    createdAt: '2026-05-16T10:00:00.000Z',
+    updatedAt: '2026-05-16T10:00:00.000Z',
   };
 
   describe('1. Pure Domain Resolver: systemParties.ts', () => {
@@ -258,88 +354,6 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
   });
 
   describe('3. Payment In & Payment Out Calculations and Filtering', () => {
-    const directAddTxn: CashBankTransaction = {
-      id: 'TXN-ADD-1',
-      txnNumber: 'TXN-001',
-      date: '2026-05-10',
-      type: 'ADD_MONEY',
-      toAccountId: 'ACC_CASH',
-      amount: 10000,
-      description: 'Capital Infusion',
-      createdAt: '2026-05-10T10:00:00.000Z',
-    };
-
-    const directReduceTxn: CashBankTransaction = {
-      id: 'TXN-RED-1',
-      txnNumber: 'TXN-002',
-      date: '2026-05-11',
-      type: 'REDUCE_MONEY',
-      fromAccountId: 'ACC_BANK_1',
-      amount: 4000,
-      description: 'Owner Drawings',
-      createdAt: '2026-05-11T10:00:00.000Z',
-    };
-
-    const transferTxn: CashBankTransaction = {
-      id: 'TXN-CONTRA-1',
-      txnNumber: 'TXN-003',
-      date: '2026-05-12',
-      type: 'DEPOSIT',
-      fromAccountId: 'ACC_CASH',
-      toAccountId: 'ACC_BANK_1',
-      amount: 5000,
-      description: 'Cash deposited to bank',
-      createdAt: '2026-05-12T10:00:00.000Z',
-    };
-
-    const upfrontSale: Invoice = {
-      id: 'INV-SALE-1',
-      invoiceNumber: 'INV-001',
-      invoiceType: 'B2CS',
-      isGstInvoice: true,
-      date: '2026-05-15',
-      partyId: 'PTY-1',
-      partyName: 'Alice',
-      partyAddress: '',
-      partyStateCode: '18',
-      placeOfSupplyStateCode: '18',
-      isIntraState: true,
-      items: [],
-      totalGrossAmount: 2000,
-      totalDiscount: 0,
-      totalTaxableAmount: 2000,
-      totalCgst: 0,
-      totalSgst: 0,
-      totalIgst: 0,
-      totalCess: 0,
-      totalTax: 0,
-      roundOff: 0,
-      grandTotal: 2000,
-      amountInWords: '',
-      paymentMode: 'CASH',
-      paymentStatus: 'PAID',
-      paidAmount: 2000,
-      balanceAmount: 0,
-      createdAt: '2026-05-15T10:00:00.000Z',
-      updatedAt: '2026-05-15T10:00:00.000Z',
-    };
-
-    const upfrontPurchase = {
-      id: 'PUR-1',
-      billNumber: 'BILL-001',
-      date: '2026-05-16',
-      supplierId: 'SUP-1',
-      supplierName: 'Supplier X',
-      items: [],
-      grandTotal: 3000,
-      paidAmount: 3000,
-      balanceAmount: 0,
-      paymentMode: 'BANK' as any,
-      paymentStatus: 'PAID' as any,
-      createdAt: '2026-05-16T10:00:00.000Z',
-      updatedAt: '2026-05-16T10:00:00.000Z',
-    };
-
     it('computeCashBankSummary provides distinct inflows, outflows, and excludes CONTRA in PaymentViews', () => {
       const summary = computeCashBankSummary({
         accounts: [cashAccount, defaultBank, secondaryBank],
@@ -459,7 +473,106 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       expect(container.textContent).toContain('Owner Drawings');
     });
 
-    it('PaymentTransactionsView renders row-level Edit and Delete buttons and supports deletion via ConfirmDeleteModal', async () => {
+    it('PaymentTransactionsView filters rows and updates summary totals when account filter, date range, or search is applied', async () => {
+      const bankAddTxn: CashBankTransaction = {
+        id: 'TXN-ADD-BANK',
+        txnNumber: 'TXN-004',
+        date: '2026-05-20',
+        type: 'ADD_MONEY',
+        toAccountId: 'ACC_BANK_1',
+        amount: 5000,
+        description: 'Bank Inflow',
+        createdAt: '2026-05-20T10:00:00.000Z',
+      };
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank, secondaryBank]}
+            transactions={[directAddTxn, bankAddTxn, transferTxn]}
+            invoices={[upfrontSale]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      // 1. ALL Accounts (Default)
+      // Total Inflows = 10,000 (direct cash) + 5,000 (direct bank) + 2,000 (sale cash) = 17,000
+      // Cash Portion = 12,000 | Bank Portion = 5,000 | Count = 3
+      expect(container.textContent).toContain('17,000');
+      expect(container.textContent).toContain('12,000');
+      expect(container.textContent).toContain('5,000');
+      expect(container.textContent).toContain('3 transactions');
+      expect(container.textContent).toContain('Capital Infusion');
+      expect(container.textContent).toContain('Alice');
+      expect(container.textContent).toContain('Bank Inflow');
+
+      // 2. Filter by CASH
+      const cashFilterBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('Cash') && !b.textContent?.includes('All')
+      );
+      expect(cashFilterBtn).toBeDefined();
+      await act(async () => {
+        cashFilterBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('12,000');
+      expect(container.textContent).toContain('2 transactions');
+      expect(container.textContent).toContain('Capital Infusion');
+      expect(container.textContent).toContain('Alice');
+      expect(container.textContent).not.toContain('Bank Inflow');
+
+      // 3. Filter by BANK (All)
+      const bankFilterBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Bank (All)'));
+      expect(bankFilterBtn).toBeDefined();
+      await act(async () => {
+        bankFilterBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('5,000');
+      expect(container.textContent).toContain('1 transaction');
+      expect(container.textContent).toContain('Bank Inflow');
+      expect(container.textContent).not.toContain('Capital Infusion');
+      expect(container.textContent).not.toContain('Alice');
+
+      // 4. Filter by specific account: State Bank of India
+      const sbiBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('State Bank of India'));
+      expect(sbiBtn).toBeDefined();
+      await act(async () => {
+        sbiBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Bank Inflow');
+      expect(container.textContent).toContain('1 transaction');
+
+      // 5. Reset back to All Accounts
+      const allBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'All Accounts');
+      expect(allBtn).toBeDefined();
+      await act(async () => {
+        allBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('17,000');
+      expect(container.textContent).toContain('3 transactions');
+
+      // 6. Search filter
+      const searchInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+      await act(async () => {
+        const nativeInputSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+        nativeInputSetter?.call(searchInput, 'Bank Inflow');
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('5,000');
+      expect(container.textContent).toContain('1 transaction');
+      expect(container.textContent).toContain('Bank Inflow');
+      expect(container.textContent).not.toContain('Capital Infusion');
+      expect(container.textContent).not.toContain('Alice');
+    });
+
+    it('Manual native transaction row opens detail modal and supports editing and deleting', async () => {
       const onSaveTransaction = vi.fn();
       const onDeleteTransaction = vi.fn();
       const onNavigateTab = vi.fn();
@@ -482,51 +595,114 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
         );
       });
 
-      // Entry id is LEDGER-TXN-TXN-ADD-1
-      const editBtn = container.querySelector('[data-testid="edit-payment-LEDGER-TXN-TXN-ADD-1"]') as HTMLElement;
-      const deleteBtn = container.querySelector('[data-testid="delete-payment-LEDGER-TXN-TXN-ADD-1"]') as HTMLElement;
+      // No row-level edit or delete buttons exist
+      expect(container.querySelector('[data-testid^="edit-payment"]')).toBeNull();
+      expect(container.querySelector('[data-testid^="delete-payment"]')).toBeNull();
 
-      expect(editBtn).toBeDefined();
-      expect(deleteBtn).toBeDefined();
+      // Find the row with "Capital Infusion" and click it
+      const row = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Capital Infusion')
+      );
+      expect(row).toBeDefined();
 
-      // Clicking row delete button prompts confirmation modal
       await act(async () => {
-        deleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(container.textContent).toContain('Delete Transaction?');
+      // Detail modal is open
+      expect(container.textContent).toContain('Transaction Details');
+      expect(container.textContent).toContain('Editable Native Txn');
 
-      // Click Confirm Delete in modal
-      const confirmBtn = container.querySelector('[data-testid="confirm-modal-delete-button"]') as HTMLElement;
-      expect(confirmBtn).toBeDefined();
+      // Click Edit Transaction button in modal footer
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Transaction')
+      );
+      expect(editBtn).toBeDefined();
 
       await act(async () => {
-        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        editBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      // Now in edit mode
+      expect(container.textContent).toContain('Edit Transaction');
+      expect(container.textContent).toContain('Save Changes');
+
+      // Change narration / description
+      const descInput = container.querySelector('textarea') as HTMLTextAreaElement;
+      expect(descInput).toBeDefined();
+      await act(async () => {
+        const nativeInputSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+        nativeInputSetter?.call(descInput, 'Updated Infusion Narration');
+        descInput.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      // Submit the form
+      const form = container.querySelector('form') as HTMLFormElement;
+      expect(form).toBeDefined();
+
+      await act(async () => {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+
+      expect(onSaveTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'TXN-ADD-1',
+          description: 'Updated Infusion Narration',
+        })
+      );
+
+      // Now test Delete flow
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[directAddTxn]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+          />
+        );
+      });
+
+      const reRow = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Capital Infusion')
+      );
+      await act(async () => {
+        reRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Delete')
+      );
+      expect(deleteBtn).toBeDefined();
+
+      await act(async () => {
+        deleteBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(container.textContent).toContain('Confirm Transaction Deletion');
+      const confirmDeleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Yes, Delete')
+      );
+      expect(confirmDeleteBtn).toBeDefined();
+
+      await act(async () => {
+        confirmDeleteBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
       expect(onDeleteTransaction).toHaveBeenCalledWith('TXN-ADD-1');
     });
 
-    it('PaymentTransactionsView supports editing and deleting Party Vouchers', async () => {
-      const onSaveVoucher = vi.fn();
-      const onDeleteVoucher = vi.fn();
+    it('Auto-linked rows do not render row-level or modal-level edit/delete controls and allow navigation to source document', async () => {
       const onSaveTransaction = vi.fn();
       const onDeleteTransaction = vi.fn();
       const onNavigateTab = vi.fn();
-
-      const receiptVoucher = {
-        id: 'VCH-001',
-        voucherNumber: 'RCPT-101',
-        voucherType: 'RECEIPT' as const,
-        date: '2026-05-18',
-        narration: 'Payment received from Customer Bob',
-        totalAmount: 3500,
-        entries: [
-          { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 3500, credit: 0 },
-          { accountId: 'PTY-BOB', accountName: 'Bob', debit: 0, credit: 3500 },
-        ],
-        createdAt: '2026-05-18T10:00:00.000Z',
-      };
 
       await act(async () => {
         root.render(
@@ -535,41 +711,60 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
             company={mockCompany}
             accounts={[cashAccount, defaultBank]}
             transactions={[]}
-            invoices={[]}
+            invoices={[upfrontSale]}
             purchases={[]}
             expenses={[]}
-            vouchers={[receiptVoucher as any]}
+            vouchers={[]}
             onSaveTransaction={onSaveTransaction}
             onDeleteTransaction={onDeleteTransaction}
             onNavigateTab={onNavigateTab}
-            onSaveVoucher={onSaveVoucher}
-            onDeleteVoucher={onDeleteVoucher}
           />
         );
       });
 
-      expect(container.textContent).toContain('Payment received from Customer Bob');
-      expect(container.textContent).toContain('3,500');
+      // 1. Verify no row-level edit or delete controls exist
+      expect(container.querySelector('[data-testid^="edit-payment"]')).toBeNull();
+      expect(container.querySelector('[data-testid^="delete-payment"]')).toBeNull();
 
-      // Find delete button on voucher row (LEDGER-VCH-VCH-001-0)
-      const vchDeleteBtn = container.querySelector('[data-testid="delete-payment-LEDGER-VCH-VCH-001-0"]') as HTMLElement;
-      expect(vchDeleteBtn).toBeDefined();
+      const autoRow = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Alice')
+      );
+      expect(autoRow).toBeDefined();
+      expect(autoRow?.querySelector('button')).toBeNull(); // No buttons inside the row!
 
+      // 2. Click the row to open details modal
       await act(async () => {
-        vchDeleteBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        autoRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(container.textContent).toContain('Delete Accounting Voucher?');
-      expect(container.textContent).toContain('RCPT-101');
+      // 3. Verify modal opens with read-only badge and source notice
+      expect(container.textContent).toContain('Transaction Details');
+      expect(container.textContent).toContain('Auto-Linked Entry');
+      expect(container.textContent).toContain('Linked Source Document');
+      expect(container.textContent).toContain('This entry is automatically synchronized with your sale records.');
 
-      const confirmBtn = container.querySelector('[data-testid="confirm-modal-delete-button"]') as HTMLElement;
-      expect(confirmBtn).toBeDefined();
+      // 4. Modal MUST NOT render Edit or Delete buttons
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Transaction') || b.textContent?.includes('Edit Invoice')
+      );
+      expect(editBtn).toBeUndefined();
+
+      const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Delete')
+      );
+      expect(deleteBtn).toBeUndefined();
+
+      // 5. Open Source Document button exists and navigates to 'sales'
+      const openDocBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Open Source Document')
+      );
+      expect(openDocBtn).toBeDefined();
 
       await act(async () => {
-        confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        openDocBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(onDeleteVoucher).toHaveBeenCalledWith('VCH-001');
+      expect(onNavigateTab).toHaveBeenCalledWith('sales');
     });
   });
 
@@ -608,22 +803,32 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       expect(cashStatementBtn.getAttribute('title')).toBe('View Account Statement');
       expect(cashStatementBtn.getAttribute('aria-label')).toBe('View statement for Cash in Hand');
 
+      // Parent card container before click does not have active ring selection
+      const cashCard = cashStatementBtn.closest('div.rounded-2xl') as HTMLElement;
+      expect(cashCard.className).not.toContain('ring-2');
+
       await act(async () => {
         cashStatementBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
       expect(onOpenAccountStatement).toHaveBeenCalledWith('ACC_CASH');
+      // stopPropagation prevented card selection from toggling
+      expect(cashCard.className).not.toContain('ring-2');
 
       // Statement button on bank card
       const bankStatementBtn = container.querySelector('[data-testid="account-statement-ACC_BANK_1"]') as HTMLElement;
       expect(bankStatementBtn).toBeDefined();
 
+      const bankCard = bankStatementBtn.closest('div.rounded-2xl') as HTMLElement;
+      expect(bankCard.className).not.toContain('ring-2');
+
       await act(async () => {
         bankStatementBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
       expect(onOpenAccountStatement).toHaveBeenCalledWith('ACC_BANK_1');
+      expect(bankCard.className).not.toContain('ring-2');
     });
 
-    it('BankStatementCategory filters by date range and calculates period opening balance', async () => {
+    it('BankStatementCategory filters by date range, computes period opening balance, excludes pre/post range, and exports correctly', async () => {
       const txOld: CashBankTransaction = {
         id: 'TXN-OLD',
         txnNumber: '001',
@@ -657,12 +862,114 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
         createdAt: '2026-05-15T00:00:00.000Z',
       };
 
+      const txFuture: CashBankTransaction = {
+        id: 'TXN-FUTURE',
+        txnNumber: '004',
+        date: '2026-06-15',
+        type: 'ADD_MONEY',
+        toAccountId: 'ACC_BANK_1',
+        amount: 8000,
+        description: 'June Post-Period Deposit',
+        createdAt: '2026-06-15T00:00:00.000Z',
+      };
+
+      let registeredHandlers: { exportCsv?: () => void; exportPdf?: () => void } = {};
+      const onRegisterExportHandlers = vi.fn((handlers) => {
+        registeredHandlers = handlers;
+      });
+
       await act(async () => {
         root.render(
           <BankStatementCategory
             company={mockCompany}
             accounts={[defaultBank]}
-            transactions={[txOld, txPeriodIn, txPeriodOut]}
+            transactions={[txOld, txPeriodIn, txPeriodOut, txFuture]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            dateRangeLabel="May 2026"
+            dateRangeStart="2026-05-01"
+            dateRangeEnd="2026-05-31"
+            initialAccountId="ACC_BANK_1"
+            onRegisterExportHandlers={onRegisterExportHandlers}
+          />
+        );
+      });
+
+      // 1. Account opening balance is 50,000. Prior movement before 2026-05-01 is +10,000.
+      // So Period Opening Balance MUST be 60,000!
+      expect(container.textContent).toContain('60,000');
+
+      // 2. Period entries included
+      expect(container.textContent).toContain('May Deposit');
+      expect(container.textContent).toContain('May Outflow');
+
+      // 3. Pre-range and post-range entries are excluded from period rows table
+      expect(container.textContent).not.toContain('Prior Year Deposit');
+      expect(container.textContent).not.toContain('June Post-Period Deposit');
+
+      // 4. Closing balance is 63,000 (60,000 + 5,000 - 2,000)
+      expect(container.textContent).toContain('63,000');
+
+      // 5. CSV Export test: exports period opening balance and period rows
+      expect(registeredHandlers.exportCsv).toBeDefined();
+      registeredHandlers.exportCsv?.();
+      expect(exportReportToCsv).toHaveBeenCalledWith(
+        expect.stringContaining('BankStatement_State_Bank_of_India'),
+        expect.any(Array),
+        expect.arrayContaining([
+          expect.arrayContaining(['Period Opening Balance (as of 2026-05-01)', 60000]),
+          expect.arrayContaining(['May Deposit']),
+          expect.arrayContaining(['May Outflow']),
+        ]),
+        expect.anything()
+      );
+
+      // 6. Verify all-time behaviour: without date range, uses account opening balance and all entries
+      await act(async () => {
+        root.render(
+          <BankStatementCategory
+            company={mockCompany}
+            accounts={[defaultBank]}
+            transactions={[txOld, txPeriodIn, txPeriodOut, txFuture]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            dateRangeLabel="All Time"
+            dateRangeStart={undefined}
+            dateRangeEnd={undefined}
+            initialAccountId="ACC_BANK_1"
+          />
+        );
+      });
+
+      expect(container.textContent).toContain('50,000'); // Baseline account opening balance
+      expect(container.textContent).toContain('Prior Year Deposit');
+      expect(container.textContent).toContain('May Deposit');
+      expect(container.textContent).toContain('May Outflow');
+      expect(container.textContent).toContain('June Post-Period Deposit');
+    });
+
+    it('BankStatementCategory includes entry with ISO timestamp on the range end date', async () => {
+      const txOnEndDate: CashBankTransaction = {
+        id: 'TXN-END-DATE',
+        txnNumber: '005',
+        date: '2026-05-31T23:59:59.999Z', // ISO string with time on the range end date
+        type: 'ADD_MONEY',
+        toAccountId: 'ACC_BANK_1',
+        amount: 4500,
+        description: 'End of Month Wire',
+        createdAt: '2026-05-31T23:59:59.999Z',
+      };
+
+      await act(async () => {
+        root.render(
+          <BankStatementCategory
+            company={mockCompany}
+            accounts={[defaultBank]}
+            transactions={[txOnEndDate]}
             invoices={[]}
             purchases={[]}
             expenses={[]}
@@ -675,15 +982,9 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
         );
       });
 
-      // Account opening balance is 50,000. Prior movement before 2026-05-01 is +10,000.
-      // So Period Opening Balance MUST be 60,000!
-      expect(container.textContent).toContain('60,000');
-
-      // Period entries
-      expect(container.textContent).toContain('May Deposit');
-      expect(container.textContent).toContain('May Outflow');
-      // Prior transaction is not in the period rows table
-      expect(container.textContent).not.toContain('Prior Year Deposit');
+      // Due to date.slice(0, 10) normalization, this entry MUST be included in the period rows
+      expect(container.textContent).toContain('End of Month Wire');
+      expect(container.textContent).toContain('4,500');
     });
   });
 
@@ -823,6 +1124,193 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
           name: SYSTEM_WALK_IN_PARTY_NAME,
         })
       );
+    });
+
+    it('persists system party id and name on invoice saves and enforces system invariants', () => {
+      // 1. Invoices and POS creations persist SYSTEM_WALK_IN_PARTY_ID and 'Walk-in Customer'
+      const invoiceData: Partial<Invoice> = {
+        partyId: SYSTEM_WALK_IN_PARTY_ID,
+        partyName: SYSTEM_WALK_IN_PARTY_NAME,
+        grandTotal: 1500,
+      };
+      expect(invoiceData.partyId).toBe('CUSTOM_PARTY');
+      expect(invoiceData.partyName).toBe('Walk-in Customer');
+
+      // 2. Verified system party identifier cannot be mutated into a regular party
+      expect(isSystemParty(SYSTEM_WALK_IN_PARTY_ID)).toBe(true);
+      expect(isSystemParty('CUSTOM_PARTY')).toBe(true);
+      expect(isSystemParty('REGULAR_PARTY')).toBe(false);
+    });
+
+    it('QuickBillingView defaults customer.party to systemParty when parties load asynchronously', async () => {
+      const mockItem = {
+        id: 'ITEM-1',
+        name: 'Hammer',
+        sellingPrice: 250,
+        taxRate: 18,
+        stockQuantity: 10,
+        unit: 'PCS',
+        category: 'Hardware',
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      // 1. Initial render with empty parties catalog
+      await act(async () => {
+        root.render(
+          <QuickBillingView
+            company={mockCompany}
+            items={[mockItem as any]}
+            parties={[]}
+            onCompleteSale={vi.fn()}
+          />
+        );
+      });
+
+      // No walk-in badge yet since parties was empty
+      expect(container.textContent).not.toContain('Walk-in Customer');
+
+      // 2. Re-render when parties are loaded into catalog
+      const walkIn = createWalkInCustomer('18', 0);
+      await act(async () => {
+        root.render(
+          <QuickBillingView
+            company={mockCompany}
+            items={[mockItem as any]}
+            parties={[walkIn]}
+            onCompleteSale={vi.fn()}
+          />
+        );
+      });
+
+      // Customer should now automatically default to Walk-in Customer
+      expect(container.textContent).toContain('Walk-in Customer');
+    });
+  });
+
+  describe('6. Android Hardware Back Navigation Hardening', () => {
+    it('PaymentTransactionsView closes open modals on hardware back before leaving the page', async () => {
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[directAddTxn]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      // 1. Date filter modal back navigation
+      const dateFilterBtn = container.querySelector('button[title="Filter by date range"]') as HTMLElement;
+      expect(dateFilterBtn).toBeDefined();
+      await act(async () => {
+        dateFilterBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Filter by Date Range');
+
+      // Trigger Android back button
+      let backHandled = false;
+      await act(async () => {
+        backHandled = triggerBack();
+      });
+      expect(backHandled).toBe(true);
+      expect(container.textContent).not.toContain('Filter by Date Range');
+
+      // 2. Direct Cash/Bank Modal back navigation
+      const recordInBtn = container.querySelector('button[title="+ Record Payment In"]') as HTMLElement;
+      expect(recordInBtn).toBeDefined();
+      await act(async () => {
+        recordInBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Direct Money In');
+
+      await act(async () => {
+        backHandled = triggerBack();
+      });
+      expect(backHandled).toBe(true);
+      expect(container.textContent).not.toContain('Direct Money In');
+
+      // 3. Detail modal back navigation
+      const row = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Capital Infusion')
+      );
+      await act(async () => {
+        row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Transaction Details');
+
+      await act(async () => {
+        backHandled = triggerBack();
+      });
+      expect(backHandled).toBe(true);
+      expect(container.textContent).not.toContain('Transaction Details');
+    });
+
+    it('CashBankTransactionDetailModal closes confirm dialog, cancels edit mode, then closes modal on back press', async () => {
+      const onClose = vi.fn();
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={onClose}
+            rawTransaction={directAddTxn}
+            entry={null}
+            accounts={[cashAccount, defaultBank]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+          />
+        );
+      });
+
+      // Open Delete Confirmation
+      const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Delete')
+      );
+      await act(async () => {
+        deleteBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Confirm Transaction Deletion');
+
+      // Hardware back cancels delete confirmation first
+      let handled = false;
+      await act(async () => {
+        handled = triggerBack();
+      });
+      expect(handled).toBe(true);
+      expect(container.textContent).not.toContain('Confirm Transaction Deletion');
+      expect(onClose).not.toHaveBeenCalled();
+
+      // Enter edit mode
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Transaction')
+      );
+      await act(async () => {
+        editBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(container.textContent).toContain('Save Changes');
+
+      // Hardware back cancels edit mode back to view mode
+      await act(async () => {
+        handled = triggerBack();
+      });
+      expect(handled).toBe(true);
+      expect(container.textContent).not.toContain('Save Changes');
+      expect(onClose).not.toHaveBeenCalled();
+
+      // Hardware back closes modal
+      await act(async () => {
+        handled = triggerBack();
+      });
+      expect(handled).toBe(true);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

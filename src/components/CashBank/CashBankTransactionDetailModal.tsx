@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BankAccount, CashBankTransaction, CashBankTxnType, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
-import type { Voucher } from '../../core/accounting/voucherTypes.ts';
-import type { Expense } from '../../models/expense.ts';
-import type { Invoice } from '../../models/invoice.ts';
-import type { PurchaseBill } from '../../models/purchase.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
@@ -17,19 +13,6 @@ export interface CashBankTransactionDetailModalProps {
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onNavigateTab?: (tab: AppTab) => void;
-  rawVoucher?: Voucher | null;
-  onSaveVoucher?: (vch: Voucher) => void;
-  onDeleteVoucher?: (id: string) => void;
-  rawExpense?: Expense | null;
-  onSaveExpense?: (exp: Expense) => void;
-  onDeleteExpense?: (id: string) => void;
-  rawInvoice?: Invoice | null;
-  onEditInvoice?: (inv: Invoice) => void;
-  onDeleteInvoice?: (id: string) => void;
-  rawPurchase?: PurchaseBill | null;
-  onEditPurchase?: (bill: PurchaseBill) => void;
-  onDeletePurchase?: (id: string) => void;
-  initialEditing?: boolean;
 }
 
 export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailModalProps> = ({
@@ -41,19 +24,6 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
-  rawVoucher,
-  onSaveVoucher,
-  onDeleteVoucher,
-  rawExpense,
-  onSaveExpense,
-  onDeleteExpense,
-  rawInvoice,
-  onEditInvoice,
-  onDeleteInvoice,
-  rawPurchase,
-  onEditPurchase,
-  onDeletePurchase,
-  initialEditing = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -96,7 +66,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   // Synchronize edit form when modal opens or target changes
   useEffect(() => {
     if (isOpen) {
-      setIsEditing(initialEditing || false);
+      setIsEditing(false);
       setShowDeleteConfirm(false);
       setFormError(null);
 
@@ -108,24 +78,6 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
         setEditToAccountId(rawTransaction.toAccountId || (rawTransaction.type === 'WITHDRAWAL' ? 'ACC_CASH' : (defaultBank?.id || '')));
         setEditReferenceNo(rawTransaction.referenceNo || '');
         setEditDescription(rawTransaction.description || '');
-      } else if (rawVoucher) {
-        setEditType(rawVoucher.voucherType === 'RECEIPT' ? 'ADD_MONEY' : 'REDUCE_MONEY');
-        setEditDate(rawVoucher.date || new Date().toISOString().split('T')[0]);
-        setEditAmount(rawVoucher.totalAmount ? rawVoucher.totalAmount.toString() : '');
-        const targetAccId = entry?.accountId || 'ACC_CASH';
-        setEditFromAccountId(targetAccId);
-        setEditToAccountId(targetAccId);
-        setEditReferenceNo(rawVoucher.voucherNumber || '');
-        setEditDescription(rawVoucher.narration || '');
-      } else if (rawExpense) {
-        setEditType('REDUCE_MONEY');
-        setEditDate(rawExpense.date || new Date().toISOString().split('T')[0]);
-        setEditAmount(rawExpense.amount ? rawExpense.amount.toString() : '');
-        const targetAccId = rawExpense.paymentMode === 'CASH' ? 'ACC_CASH' : ((rawExpense as any).bankAccountId || defaultBank?.id || '');
-        setEditFromAccountId(targetAccId);
-        setEditToAccountId(targetAccId);
-        setEditReferenceNo(rawExpense.title || '');
-        setEditDescription(rawExpense.notes || rawExpense.title || '');
       } else if (entry) {
         setEditDate(entry.date || new Date().toISOString().split('T')[0]);
         setEditAmount(entry.amount ? entry.amount.toString() : '');
@@ -135,51 +87,46 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
         setEditDescription(entry.description || '');
       }
     }
-  }, [isOpen, initialEditing, rawTransaction, rawVoucher, rawExpense, entry, defaultBank]);
+  }, [isOpen, rawTransaction, entry, defaultBank]);
 
-  // Priority 20: Hardware back navigation (cancel edit mode first, or close modal)
+  // Hardware back navigation: tiered priorities (p30 confirm -> p25 edit -> p20 close)
   useBackNavigation(
     () => {
-      if (showDeleteConfirm) {
-        setShowDeleteConfirm(false);
-        return true;
-      }
-      if (isEditing) {
-        setIsEditing(false);
-        return true;
-      }
+      setShowDeleteConfirm(false);
+      return true;
+    },
+    isOpen && showDeleteConfirm,
+    30
+  );
+
+  useBackNavigation(
+    () => {
+      setIsEditing(false);
+      return true;
+    },
+    isOpen && !showDeleteConfirm && isEditing,
+    25
+  );
+
+  useBackNavigation(
+    () => {
       onClose();
       return true;
     },
-    isOpen,
+    isOpen && !showDeleteConfirm && !isEditing,
     20
   );
 
   if (!isOpen || (!entry && !rawTransaction)) return null;
 
   const isNativeTxn = Boolean(rawTransaction);
-  const isVoucher = Boolean(rawVoucher) || entry?.type === 'PARTY_RECEIPT' || entry?.type === 'PARTY_PAYMENT';
-  const isExpense = Boolean(rawExpense) || entry?.type === 'EXPENSE';
-  const isInvoice = Boolean(rawInvoice) || entry?.type === 'SALE';
-  const isPurchase = Boolean(rawPurchase) || entry?.type === 'PURCHASE';
-
-  const isEditable = isNativeTxn || Boolean(rawVoucher && onSaveVoucher) || Boolean(rawExpense && onSaveExpense);
-  const isDeletable =
-    (isNativeTxn && Boolean(onDeleteTransaction)) ||
-    Boolean(rawVoucher && onDeleteVoucher) ||
-    Boolean(rawExpense && onDeleteExpense) ||
-    Boolean(rawInvoice && onDeleteInvoice) ||
-    Boolean(rawPurchase && onDeletePurchase);
-
   const isTransferCategory =
     (rawTransaction && (rawTransaction.type === 'DEPOSIT' || rawTransaction.type === 'WITHDRAWAL' || rawTransaction.type === 'TRANSFER')) ||
     (entry && entry.type === 'CONTRA');
 
   const isDirectCategory =
     (rawTransaction && (rawTransaction.type === 'ADD_MONEY' || rawTransaction.type === 'REDUCE_MONEY')) ||
-    (entry && (entry.type === 'DIRECT_IN' || entry.type === 'DIRECT_OUT')) ||
-    isVoucher ||
-    isExpense;
+    (entry && (entry.type === 'DIRECT_IN' || entry.type === 'DIRECT_OUT'));
 
   const isInflow =
     rawTransaction?.type === 'ADD_MONEY' ||
@@ -191,10 +138,10 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     rawTransaction?.type === 'WITHDRAWAL' ||
     (entry?.flow === 'OUT' && entry?.type !== 'CONTRA');
 
-  const activeAmount = rawTransaction?.amount ?? (rawVoucher?.totalAmount ?? (rawExpense?.amount ?? entry?.amount ?? 0));
-  const activeDate = rawTransaction?.date || (rawVoucher?.date || (rawExpense?.date || entry?.date || ''));
-  const activeRef = rawTransaction?.referenceNo || (rawVoucher?.voucherNumber || (rawExpense?.title || entry?.referenceNo));
-  const activeDesc = rawTransaction?.description || (rawVoucher?.narration || (rawExpense?.notes || rawExpense?.title || entry?.description));
+  const activeAmount = rawTransaction?.amount ?? entry?.amount ?? 0;
+  const activeDate = rawTransaction?.date || entry?.date || '';
+  const activeRef = rawTransaction?.referenceNo || entry?.referenceNo;
+  const activeDesc = rawTransaction?.description || entry?.description;
 
   // Account name resolutions
   const fromAcc = allAccounts.find((a) => a.id === (rawTransaction?.fromAccountId || entry?.fromAccountId));
@@ -232,6 +179,8 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!rawTransaction || !onSaveTransaction) return;
+
     const numAmount = parseFloat(editAmount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setFormError('Please enter a valid amount greater than zero.');
@@ -243,149 +192,68 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
       return;
     }
 
-    // 1. Native Cash/Bank Transaction
-    if (rawTransaction && onSaveTransaction) {
-      let finalFromId: string | undefined = undefined;
-      let finalToId: string | undefined = undefined;
+    let finalFromId: string | undefined = undefined;
+    let finalToId: string | undefined = undefined;
 
-      if (editType === 'DEPOSIT') {
-        finalFromId = 'ACC_CASH';
-        finalToId = editToAccountId;
-        if (!finalToId || finalToId === 'ACC_CASH') {
-          setFormError('Please choose a valid destination bank account.');
-          return;
-        }
-      } else if (editType === 'WITHDRAWAL') {
-        finalFromId = editFromAccountId;
-        finalToId = 'ACC_CASH';
-        if (!finalFromId || finalFromId === 'ACC_CASH') {
-          setFormError('Please choose a valid source bank account.');
-          return;
-        }
-      } else if (editType === 'TRANSFER') {
-        finalFromId = editFromAccountId;
-        finalToId = editToAccountId;
-        if (!finalFromId || !finalToId) {
-          setFormError('Please select both source and destination accounts.');
-          return;
-        }
-        if (finalFromId === finalToId) {
-          setFormError('Source and destination accounts must be different.');
-          return;
-        }
-      } else if (editType === 'ADD_MONEY') {
-        finalToId = editToAccountId || editFromAccountId;
-        if (!finalToId) {
-          setFormError('Please choose the destination account.');
-          return;
-        }
-      } else if (editType === 'REDUCE_MONEY') {
-        finalFromId = editFromAccountId || editToAccountId;
-        if (!finalFromId) {
-          setFormError('Please choose the deduction account.');
-          return;
-        }
+    if (editType === 'DEPOSIT') {
+      finalFromId = 'ACC_CASH';
+      finalToId = editToAccountId;
+      if (!finalToId || finalToId === 'ACC_CASH') {
+        setFormError('Please choose a valid destination bank account.');
+        return;
       }
-
-      const updatedTxn: CashBankTransaction = {
-        ...rawTransaction,
-        type: editType,
-        date: editDate,
-        amount: numAmount,
-        fromAccountId: finalFromId,
-        toAccountId: finalToId,
-        referenceNo: editReferenceNo.trim() || undefined,
-        description: editDescription.trim(),
-      };
-
-      onSaveTransaction(updatedTxn);
-      setIsEditing(false);
-      onClose();
-      return;
+    } else if (editType === 'WITHDRAWAL') {
+      finalFromId = editFromAccountId;
+      finalToId = 'ACC_CASH';
+      if (!finalFromId || finalFromId === 'ACC_CASH') {
+        setFormError('Please choose a valid source bank account.');
+        return;
+      }
+    } else if (editType === 'TRANSFER') {
+      finalFromId = editFromAccountId;
+      finalToId = editToAccountId;
+      if (!finalFromId || !finalToId) {
+        setFormError('Please select both source and destination accounts.');
+        return;
+      }
+      if (finalFromId === finalToId) {
+        setFormError('Source and destination accounts must be different.');
+        return;
+      }
+    } else if (editType === 'ADD_MONEY') {
+      finalToId = editToAccountId || editFromAccountId;
+      if (!finalToId) {
+        setFormError('Please choose the destination account.');
+        return;
+      }
+    } else if (editType === 'REDUCE_MONEY') {
+      finalFromId = editFromAccountId || editToAccountId;
+      if (!finalFromId) {
+        setFormError('Please choose the deduction account.');
+        return;
+      }
     }
 
-    // 2. Voucher (PARTY_RECEIPT or PARTY_PAYMENT)
-    if (rawVoucher && onSaveVoucher) {
-      const chosenAccountId = (isInflow ? editToAccountId : editFromAccountId) || entry?.accountId || 'ACC_CASH';
-      const chosenAcc = allAccounts.find((a) => a.id === chosenAccountId);
-      const isCash = chosenAccountId === 'ACC_CASH' || chosenAcc?.accountType === 'CASH';
+    const updatedTxn: CashBankTransaction = {
+      ...rawTransaction,
+      type: editType,
+      date: editDate,
+      amount: numAmount,
+      fromAccountId: finalFromId,
+      toAccountId: finalToId,
+      referenceNo: editReferenceNo.trim() || undefined,
+      description: editDescription.trim(),
+    };
 
-      const updatedEntries = rawVoucher.entries.map((line) => {
-        const isLiquidSide =
-          line.accountId === 'ACC_CASH' ||
-          line.accountId?.startsWith('ACC_BANK') ||
-          line.accountId?.startsWith('BANK') ||
-          allAccounts.some((a) => a.id === line.accountId);
-
-        if (isLiquidSide) {
-          return {
-            ...line,
-            accountId: chosenAccountId,
-            accountName: chosenAcc?.accountName || (isCash ? 'Cash in Hand' : 'Bank Account'),
-            debit: isInflow ? numAmount : 0,
-            credit: isOutflow ? numAmount : 0,
-          };
-        }
-        return {
-          ...line,
-          debit: isOutflow ? numAmount : 0,
-          credit: isInflow ? numAmount : 0,
-        };
-      });
-
-      const updatedVch: Voucher = {
-        ...rawVoucher,
-        date: editDate,
-        totalAmount: numAmount,
-        narration: editDescription.trim() || rawVoucher.narration,
-        entries: updatedEntries,
-      };
-
-      onSaveVoucher(updatedVch);
-      setIsEditing(false);
-      onClose();
-      return;
-    }
-
-    // 3. Expense
-    if (rawExpense && onSaveExpense) {
-      const chosenAccountId = editFromAccountId || entry?.accountId || 'ACC_CASH';
-      const chosenAcc = allAccounts.find((a) => a.id === chosenAccountId);
-      const isCash = chosenAccountId === 'ACC_CASH' || chosenAcc?.accountType === 'CASH';
-
-      const updatedExp: Expense = {
-        ...rawExpense,
-        date: editDate,
-        amount: numAmount,
-        paymentMode: isCash ? 'CASH' : 'BANK_TRANSFER',
-        title: editReferenceNo.trim() || rawExpense.title,
-        notes: editDescription.trim() || rawExpense.notes,
-      };
-
-      onSaveExpense(updatedExp);
-      setIsEditing(false);
-      onClose();
-      return;
-    }
+    onSaveTransaction(updatedTxn);
+    setIsEditing(false);
+    onClose();
   };
 
   const handleDelete = () => {
-    if (isNativeTxn && rawTransaction && onDeleteTransaction) {
-      onDeleteTransaction(rawTransaction.id);
-      onClose();
-    } else if (rawVoucher && onDeleteVoucher) {
-      onDeleteVoucher(rawVoucher.id);
-      onClose();
-    } else if (rawExpense && onDeleteExpense) {
-      onDeleteExpense(rawExpense.id);
-      onClose();
-    } else if (rawInvoice && onDeleteInvoice) {
-      onDeleteInvoice(rawInvoice.id);
-      onClose();
-    } else if (rawPurchase && onDeletePurchase) {
-      onDeletePurchase(rawPurchase.id);
-      onClose();
-    }
+    if (!rawTransaction || !onDeleteTransaction) return;
+    onDeleteTransaction(rawTransaction.id);
+    onClose();
   };
 
   // Navigating to document source
@@ -498,14 +366,6 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
                       Editable Native Txn
                     </span>
-                  ) : isVoucher ? (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/25">
-                      Voucher Entry
-                    </span>
-                  ) : isExpense ? (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/25">
-                      Expense Entry
-                    </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
                       Auto-Linked Entry
@@ -600,7 +460,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
               </div>
 
               {/* Informational Box for Non-Direct Linked Entries */}
-              {!isEditable && entry && (
+              {!isNativeTxn && entry && (
                 <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex flex-col gap-2">
                   <div className="flex items-start gap-2">
                     <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px] shrink-0 mt-0.5">
@@ -930,10 +790,9 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
         {!isEditing && (
           <div className="px-5 py-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex items-center justify-between gap-2">
             <div>
-              {isDeletable && !showDeleteConfirm && (
+              {isNativeTxn && onDeleteTransaction && !showDeleteConfirm && (
                 <button
                   type="button"
-                  data-testid="detail-delete-transaction-button"
                   onClick={() => setShowDeleteConfirm(true)}
                   className="px-3 py-1.5 text-rose-600 hover:bg-rose-500/10 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                 >
@@ -952,43 +811,14 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                 Close
               </button>
 
-              {isEditable && !showDeleteConfirm && (
+              {isNativeTxn && onSaveTransaction && !showDeleteConfirm && (
                 <button
                   type="button"
-                  data-testid="detail-edit-transaction-button"
                   onClick={() => setIsEditing(true)}
                   className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-xs hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5"
                 >
                   <span className="material-symbols-outlined text-[16px]">edit</span>
                   <span>Edit Transaction</span>
-                </button>
-              )}
-
-              {isInvoice && rawInvoice && onEditInvoice && !showDeleteConfirm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEditInvoice(rawInvoice);
-                    onClose();
-                  }}
-                  className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-xs hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit_document</span>
-                  <span>Edit Invoice</span>
-                </button>
-              )}
-
-              {isPurchase && rawPurchase && onEditPurchase && !showDeleteConfirm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onEditPurchase(rawPurchase);
-                    onClose();
-                  }}
-                  className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-xs hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[16px]">edit_document</span>
-                  <span>Edit Bill</span>
                 </button>
               )}
             </div>

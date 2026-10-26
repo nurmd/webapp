@@ -149,13 +149,14 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
     const periodEntries: UnifiedLedgerEntry[] = [];
 
     entries.forEach((entry) => {
-      if (dateRangeStart && entry.date < dateRangeStart) {
+      const normalizedDate = (entry.date || '').slice(0, 10);
+      if (dateRangeStart && normalizedDate < dateRangeStart) {
         if (entry.flow === 'IN') {
           periodOpeningBalance += entry.amount;
         } else {
           periodOpeningBalance -= entry.amount;
         }
-      } else if (!dateRangeEnd || entry.date <= dateRangeEnd) {
+      } else if (!dateRangeEnd || normalizedDate <= dateRangeEnd) {
         periodEntries.push(entry);
       }
     });

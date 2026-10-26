@@ -396,7 +396,6 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
   - Distinct top-level `payment_in` (Sales group) and `payment_out` (Purchases group) pages with RBAC permissioning (CASHIER has access to `payment_in`; ACCOUNTANT and OWNER have access to both).
   - Uses `computeCashBankSummary` without duplicate math, excluding CONTRA transfers. Defaults to `ALL_TIME` date preset, supports live account filtering, text search, count & sum summary cards, and direct cash/bank modal creation.
   - Cash & Bank Deep-Linking: Statements icon button on cash and bank cards routes directly to Reports -> Bank Statement with `THIS_FY` preselected and period opening balance dynamically calculated.
-  - Transaction Row Editing & Deletion: Each payment card renders direct row action buttons (Edit, Delete) and detail inspection modal (`CashBankTransactionDetailModal`) supporting editing and deleting native direct transactions, accounting vouchers (`PARTY_RECEIPT`, `PARTY_PAYMENT`), expenses, and opening sales/purchase documents with declarative `ConfirmDeleteModal` prompts and automatic party balance recalculation.
 - **Dynamic Code Splitting & Performance Architecture**:
   - **Lazy Unwrapping Contract in `App.tsx`**: Secondary views and modals are dynamically imported:
     ```typescript

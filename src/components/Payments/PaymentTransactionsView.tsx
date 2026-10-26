@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { CompanyProfile } from '../../models/company.ts';
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
 import type { Invoice } from '../../models/invoice.ts';
@@ -12,7 +12,6 @@ import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DirectCashBankModal } from '../CashBank/DirectCashBankModal.tsx';
 import { CashBankTransactionDetailModal } from '../CashBank/CashBankTransactionDetailModal.tsx';
-import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface PaymentTransactionsViewProps {
@@ -27,14 +26,6 @@ export interface PaymentTransactionsViewProps {
   onSaveTransaction: (txn: CashBankTransaction) => void;
   onDeleteTransaction: (id: string) => void;
   onNavigateTab: (tab: AppTab) => void;
-  onSaveVoucher?: (vch: Voucher) => void;
-  onDeleteVoucher?: (id: string) => void;
-  onSaveExpense?: (exp: Expense) => void;
-  onDeleteExpense?: (id: string) => void;
-  onEditInvoice?: (inv: Invoice) => void;
-  onDeleteInvoice?: (id: string) => void;
-  onEditPurchase?: (bill: PurchaseBill) => void;
-  onDeletePurchase?: (id: string) => void;
 }
 
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
@@ -49,30 +40,14 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
-  onSaveVoucher,
-  onDeleteVoucher,
-  onSaveExpense,
-  onDeleteExpense,
-  onEditInvoice,
-  onDeleteInvoice,
-  onEditPurchase,
-  onDeletePurchase,
 }) => {
   const isFlowIn = flow === 'IN';
 
   // Modals
   const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [detailInitialEditing, setDetailInitialEditing] = useState(false);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<{
-    type: 'TXN' | 'VOUCHER' | 'EXPENSE' | 'INVOICE' | 'PURCHASE';
-    id: string;
-    title: string;
-    recordName?: string;
-    description: string;
-  } | null>(null);
 
   // Filters: Payment In/Out defaults to ALL_TIME as mandated by invariant #17
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');
@@ -83,10 +58,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
   // Android back-navigation priority handling
   useBackNavigation(() => {
-    if (pendingDelete) {
-      setPendingDelete(null);
-      return true;
-    }
     if (isDateModalOpen) {
       setIsDateModalOpen(false);
       return true;
@@ -98,11 +69,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     if (isDetailModalOpen) {
       setIsDetailModalOpen(false);
       setSelectedLedgerEntry(null);
-      setDetailInitialEditing(false);
       return true;
     }
     return false;
-  }, Boolean(pendingDelete) || isDateModalOpen || isDirectModalOpen || isDetailModalOpen, 20);
+  }, isDateModalOpen || isDirectModalOpen || isDetailModalOpen, 20);
 
   // Date range bounds
   const dateRange = useMemo(() => {
@@ -187,189 +157,19 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     };
   }, [filteredEntries]);
 
-  // Resolve raw entities for transactions, vouchers, expenses, invoices, and purchases
-  const getRawTxn = useCallback(
-    (entry: UnifiedLedgerEntry | null | undefined): CashBankTransaction | null => {
-      if (!entry) return null;
-      if (entry.txnId) {
-        return transactions.find((t) => t.id === entry.txnId) || null;
-      }
-      const cleanId = entry.id.replace(/^LEDGER-TXN-((OUT|IN)-)?/, '');
-      return transactions.find((t) => t.id === cleanId || t.id === entry.id) || null;
-    },
-    [transactions]
-  );
-
-  const getRawVoucher = useCallback(
-    (entry: UnifiedLedgerEntry | null | undefined): Voucher | null => {
-      if (!entry) return null;
-      if (entry.rawVoucherId) {
-        return (vouchers || []).find((v) => v.id === entry.rawVoucherId) || null;
-      }
-      const cleanId = entry.id.replace(/^LEDGER-VCH-((OUT|IN)-)?/, '').replace(/-\d+$/, '');
-      return (vouchers || []).find((v) => v.id === cleanId || v.id === entry.id) || null;
-    },
-    [vouchers]
-  );
-
-  const getRawExpense = useCallback(
-    (entry: UnifiedLedgerEntry | null | undefined): Expense | null => {
-      if (!entry) return null;
-      if (entry.rawExpenseId) {
-        return expenses.find((e) => e.id === entry.rawExpenseId) || null;
-      }
-      const cleanId = entry.id.replace(/^LEDGER-EXP-/, '');
-      return expenses.find((e) => e.id === cleanId || e.id === entry.id) || null;
-    },
-    [expenses]
-  );
-
-  const getRawInvoice = useCallback(
-    (entry: UnifiedLedgerEntry | null | undefined): Invoice | null => {
-      if (!entry) return null;
-      if (entry.rawInvoiceId) {
-        return invoices.find((inv) => inv.id === entry.rawInvoiceId) || null;
-      }
-      const cleanId = entry.id.replace(/^LEDGER-SALE-/, '').replace(/-\d+$/, '');
-      return invoices.find((inv) => inv.id === cleanId || inv.id === entry.id) || null;
-    },
-    [invoices]
-  );
-
-  const getRawPurchase = useCallback(
-    (entry: UnifiedLedgerEntry | null | undefined): PurchaseBill | null => {
-      if (!entry) return null;
-      if (entry.rawPurchaseId) {
-        return purchases.find((p) => p.id === entry.rawPurchaseId) || null;
-      }
-      const cleanId = entry.id.replace(/^LEDGER-PUR-/, '').replace(/-\d+$/, '');
-      return purchases.find((p) => p.id === cleanId || p.id === entry.id) || null;
-    },
-    [purchases]
-  );
-
-  const selectedRawTxn = useMemo(() => getRawTxn(selectedLedgerEntry), [getRawTxn, selectedLedgerEntry]);
-  const selectedRawVoucher = useMemo(() => getRawVoucher(selectedLedgerEntry), [getRawVoucher, selectedLedgerEntry]);
-  const selectedRawExpense = useMemo(() => getRawExpense(selectedLedgerEntry), [getRawExpense, selectedLedgerEntry]);
-  const selectedRawInvoice = useMemo(() => getRawInvoice(selectedLedgerEntry), [getRawInvoice, selectedLedgerEntry]);
-  const selectedRawPurchase = useMemo(() => getRawPurchase(selectedLedgerEntry), [getRawPurchase, selectedLedgerEntry]);
+  // Resolve raw transaction for native direct entries
+  const selectedRawTxn = useMemo(() => {
+    if (!selectedLedgerEntry) return null;
+    if (selectedLedgerEntry.txnId) {
+      return transactions.find((t) => t.id === selectedLedgerEntry.txnId) || null;
+    }
+    const cleanId = selectedLedgerEntry.id.replace(/^LEDGER-TXN-(OUT|IN)-/, '');
+    return transactions.find((t) => t.id === cleanId || t.id === selectedLedgerEntry.id) || null;
+  }, [selectedLedgerEntry, transactions]);
 
   const handleOpenDetailModal = (entry: UnifiedLedgerEntry) => {
     setSelectedLedgerEntry(entry);
-    setDetailInitialEditing(false);
     setIsDetailModalOpen(true);
-  };
-
-  const handleEditEntry = (entry: UnifiedLedgerEntry) => {
-    const rawTxn = getRawTxn(entry);
-    if (rawTxn) {
-      setSelectedLedgerEntry(entry);
-      setDetailInitialEditing(true);
-      setIsDetailModalOpen(true);
-      return;
-    }
-    const rawVch = getRawVoucher(entry);
-    if (rawVch) {
-      setSelectedLedgerEntry(entry);
-      setDetailInitialEditing(true);
-      setIsDetailModalOpen(true);
-      return;
-    }
-    const rawExp = getRawExpense(entry);
-    if (rawExp) {
-      setSelectedLedgerEntry(entry);
-      setDetailInitialEditing(true);
-      setIsDetailModalOpen(true);
-      return;
-    }
-    const rawInv = getRawInvoice(entry);
-    if (rawInv && onEditInvoice) {
-      onEditInvoice(rawInv);
-      return;
-    }
-    const rawPur = getRawPurchase(entry);
-    if (rawPur && onEditPurchase) {
-      onEditPurchase(rawPur);
-      return;
-    }
-    setSelectedLedgerEntry(entry);
-    setDetailInitialEditing(false);
-    setIsDetailModalOpen(true);
-  };
-
-  const handleDeleteEntry = (entry: UnifiedLedgerEntry) => {
-    const rawTxn = getRawTxn(entry);
-    if (rawTxn) {
-      setPendingDelete({
-        type: 'TXN',
-        id: rawTxn.id,
-        title: 'Delete Transaction?',
-        recordName: `${rawTxn.type}: ₹${rawTxn.amount.toFixed(2)}`,
-        description: 'Are you sure you want to delete this cash/bank transaction? This will reverse the account balance.',
-      });
-      return;
-    }
-    const rawVch = getRawVoucher(entry);
-    if (rawVch) {
-      setPendingDelete({
-        type: 'VOUCHER',
-        id: rawVch.id,
-        title: 'Delete Accounting Voucher?',
-        recordName: `${rawVch.voucherType} #${rawVch.voucherNumber}`,
-        description: 'Are you sure you want to delete this accounting voucher? This action will reverse any party ledger impacts.',
-      });
-      return;
-    }
-    const rawExp = getRawExpense(entry);
-    if (rawExp) {
-      setPendingDelete({
-        type: 'EXPENSE',
-        id: rawExp.id,
-        title: 'Delete Expense?',
-        recordName: `${rawExp.category}: ₹${rawExp.amount.toFixed(2)}`,
-        description: 'Are you sure you want to delete this expense record?',
-      });
-      return;
-    }
-    const rawInv = getRawInvoice(entry);
-    if (rawInv) {
-      setPendingDelete({
-        type: 'INVOICE',
-        id: rawInv.id,
-        title: 'Delete Invoice?',
-        recordName: `Invoice #${rawInv.invoiceNumber}`,
-        description: 'Are you sure you want to delete this invoice? This will revert inventory stock and party balance.',
-      });
-      return;
-    }
-    const rawPur = getRawPurchase(entry);
-    if (rawPur) {
-      setPendingDelete({
-        type: 'PURCHASE',
-        id: rawPur.id,
-        title: 'Delete Purchase Bill?',
-        recordName: `Bill #${rawPur.billNumber}`,
-        description: 'Are you sure you want to delete this purchase bill? This will revert inventory stock and party balance.',
-      });
-      return;
-    }
-  };
-
-  const handleConfirmDelete = () => {
-    if (!pendingDelete) return;
-    const { type, id } = pendingDelete;
-    if (type === 'TXN') {
-      onDeleteTransaction(id);
-    } else if (type === 'VOUCHER' && onDeleteVoucher) {
-      onDeleteVoucher(id);
-    } else if (type === 'EXPENSE' && onDeleteExpense) {
-      onDeleteExpense(id);
-    } else if (type === 'INVOICE' && onDeleteInvoice) {
-      onDeleteInvoice(id);
-    } else if (type === 'PURCHASE' && onDeletePurchase) {
-      onDeletePurchase(id);
-    }
-    setPendingDelete(null);
   };
 
   const pageTitle = isFlowIn ? 'Payment In' : 'Payment Out';
@@ -745,52 +545,20 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                   </div>
                 </div>
 
-                {/* Right Side: Amount & Actions */}
-                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                  <div className="flex flex-col items-end">
-                    <span
-                      className={`font-tabular-data text-xs sm:text-sm font-black ${
-                        isFlowIn
-                          ? 'text-emerald-700 dark:text-emerald-400'
-                          : 'text-rose-700 dark:text-rose-400'
-                      }`}
-                    >
-                      {isFlowIn ? `+${formatINR(entry.amount)}` : `-${formatINR(entry.amount)}`}
-                    </span>
-                    <span className="text-[10px] text-outline mt-0.5">
-                      {isNative ? 'Direct Entry' : 'Auto-linked'}
-                    </span>
-                  </div>
-
-                  {/* Row Actions: Edit & Delete */}
-                  <div className="flex items-center gap-1 border-l border-outline-variant/20 pl-2">
-                    <button
-                      type="button"
-                      data-testid={`edit-payment-${entry.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditEntry(entry);
-                      }}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
-                      title="Edit transaction"
-                      aria-label={`Edit ${entry.counterpartyOrTitle || 'transaction'}`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      data-testid={`delete-payment-${entry.id}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteEntry(entry);
-                      }}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error/10 active:scale-95 transition-all cursor-pointer"
-                      title="Delete transaction"
-                      aria-label={`Delete ${entry.counterpartyOrTitle || 'transaction'}`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">delete</span>
-                    </button>
-                  </div>
+                {/* Right Side: Amount */}
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span
+                    className={`font-tabular-data text-xs sm:text-sm font-black ${
+                      isFlowIn
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-rose-700 dark:text-rose-400'
+                    }`}
+                  >
+                    {isFlowIn ? `+${formatINR(entry.amount)}` : `-${formatINR(entry.amount)}`}
+                  </span>
+                  <span className="text-[10px] text-outline mt-0.5">
+                    {isNative ? 'Tap to edit' : 'Tap for details'}
+                  </span>
                 </div>
               </div>
             );
@@ -818,23 +586,9 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedLedgerEntry(null);
-          setDetailInitialEditing(false);
         }}
         entry={selectedLedgerEntry}
         rawTransaction={selectedRawTxn}
-        rawVoucher={selectedRawVoucher}
-        onSaveVoucher={onSaveVoucher}
-        onDeleteVoucher={onDeleteVoucher}
-        rawExpense={selectedRawExpense}
-        onSaveExpense={onSaveExpense}
-        onDeleteExpense={onDeleteExpense}
-        rawInvoice={selectedRawInvoice}
-        onEditInvoice={onEditInvoice}
-        onDeleteInvoice={onDeleteInvoice}
-        rawPurchase={selectedRawPurchase}
-        onEditPurchase={onEditPurchase}
-        onDeletePurchase={onDeletePurchase}
-        initialEditing={detailInitialEditing}
         accounts={accounts}
         onSaveTransaction={onSaveTransaction}
         onDeleteTransaction={onDeleteTransaction}
@@ -856,19 +610,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         }}
         accentColor={isFlowIn ? 'emerald-600' : 'rose-600'}
       />
-
-      {/* 8. Declarative Confirm Delete Modal for Row Actions */}
-      {pendingDelete && (
-        <ConfirmDeleteModal
-          isOpen={Boolean(pendingDelete)}
-          title={pendingDelete.title}
-          recordName={pendingDelete.recordName}
-          description={pendingDelete.description}
-          confirmText="Delete"
-          onConfirm={handleConfirmDelete}
-          onClose={() => setPendingDelete(null)}
-        />
-      )}
     </div>
   );
 };
