@@ -16,6 +16,8 @@ import {
   AuditVerificationResult,
   AuditActionType,
   GENESIS_PREVIOUS_HASH,
+  CURRENT_AUDIT_EPOCH,
+  LEGACY_AUDIT_EPOCH,
 } from '../../services/auditTrail.ts';
 
 import { FinancialBalanceAuditorPanel } from './FinancialBalanceAuditorPanel.tsx';
@@ -107,6 +109,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     return () => window.removeEventListener('switch_audit_tab', handleSwitchAuditTab);
   }, []);
 
+  // Scope filter: Current epoch (default) / Legacy / All
+  const [selectedScope, setSelectedScope] = useState<'CURRENT' | 'LEGACY' | 'ALL'>('CURRENT');
+
   // Live Verification
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<AuditVerificationResult | null>(null);
@@ -134,7 +139,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     try {
       const data = await auditTrail.getAuditTrail({ sortDirection: 'desc' });
       setRecords(data);
-      const vResult = await auditTrail.verifyChainIntegrity();
+      const vResult = await auditTrail.verifyCurrentEpoch();
       setVerificationResult(vResult);
     } catch (err) {
       console.error('Failed to load audit records:', err);
@@ -150,17 +155,21 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
   const handleVerifyChain = async () => {
     setIsVerifying(true);
     try {
-      const res = await auditTrail.verifyChainIntegrity();
+      const res = await auditTrail.verifyCurrentEpoch();
       setVerificationResult(res);
       if (res.valid) {
-        showToast(`Verification successful: All ${res.totalRecords} records cryptographically intact`);
+        showToast(
+          res.totalRecords > 0
+            ? `Current epoch verified: all ${res.totalRecords} records cryptographically intact`
+            : 'Current epoch verified: ready and cryptographically healthy'
+        );
       } else {
-        showToast(`Tampering detected at sequence #${res.brokenSequence}`);
+        showToast(`Current epoch tampering detected at sequence #${res.brokenSequence}`);
       }
     } catch (err: any) {
       setVerificationResult({
         valid: false,
-        totalRecords: records.length,
+        totalRecords: records.filter((r) => r.epoch === CURRENT_AUDIT_EPOCH).length,
         reason: err?.message || 'Verification exception encountered',
       });
     } finally {
@@ -232,9 +241,30 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     return Array.from(map.values());
   }, [records]);
 
-  // Client-side filtering
+  // Counts by epoch
+  const legacyCount = useMemo(
+    () => records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH).length,
+    [records]
+  );
+  const currentEpochCount = useMemo(
+    () => records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH).length,
+    [records]
+  );
+
+  // Active scope filtering (Current Epoch / Legacy / All)
+  const scopedRecords = useMemo(() => {
+    if (selectedScope === 'CURRENT') {
+      return records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH);
+    }
+    if (selectedScope === 'LEGACY') {
+      return records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH);
+    }
+    return records;
+  }, [records, selectedScope]);
+
+  // Client-side filtering within the active scope
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
+    return scopedRecords.filter((r) => {
       if (selectedAction !== 'ALL' && r.actionType !== selectedAction) {
         return false;
       }
@@ -261,7 +291,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       }
       return true;
     });
-  }, [records, selectedAction, selectedUser, startDate, endDate, searchTerm]);
+  }, [scopedRecords, selectedAction, selectedUser, startDate, endDate, searchTerm]);
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -344,6 +374,19 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
             <p className="text-xs text-on-surface-variant mt-0.5">
               Cryptographically chained SHA-256 event ledger. Immutable, tamper-evident record of all financial mutations.
             </p>
+            {/* Legacy Archive Notice */}
+            <div className="mt-2 text-xs flex flex-wrap items-center gap-2">
+              <span
+                data-testid="legacy-archive-badge"
+                className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20"
+              >
+                <span className="material-symbols-outlined text-[14px]">archive</span>
+                <span>Legacy archive: {legacyCount} records preserved</span>
+              </span>
+              <span className="text-[11px] text-on-surface-variant/80">
+                (Archived and not re-verified)
+              </span>
+            </div>
           </div>
         </div>
 
@@ -351,6 +394,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
         <div className="flex flex-wrap items-center gap-2.5">
           {verificationResult && (
             <div
+              data-testid="current-epoch-badge"
               className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border ${
                 verificationResult.valid
                   ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
@@ -362,8 +406,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               </span>
               <span>
                 {verificationResult.valid
-                  ? `Chain Verified (${verificationResult.totalRecords} Records)`
-                  : `Tampering Detected (#${verificationResult.brokenSequence || '?'})`}
+                  ? `Current epoch: Healthy`
+                  : `Current epoch violation (#${verificationResult.brokenSequence || '?'})`}
               </span>
             </div>
           )}
@@ -377,7 +421,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
             <span className={`material-symbols-outlined text-[16px] ${isVerifying ? 'animate-spin' : ''}`}>
               {isVerifying ? 'sync' : 'lock_reset'}
             </span>
-            <span>{isVerifying ? 'Verifying...' : 'Verify Chain Integrity'}</span>
+            <span>{isVerifying ? 'Verifying...' : 'Verify Current Epoch'}</span>
           </button>
 
           <button
@@ -402,12 +446,12 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
         </div>
       </div>
 
-      {/* Verification Warning Banner if Tampered */}
+      {/* Verification Warning Banner if Current Epoch Tampered */}
       {verificationResult && !verificationResult.valid && (
         <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-4 text-xs text-rose-500 flex items-start gap-3">
           <span className="material-symbols-outlined text-[20px] text-rose-500 shrink-0">error</span>
           <div>
-            <span className="font-bold">Cryptographic Integrity Violation Detected: </span>
+            <span className="font-bold">Current Epoch Cryptographic Integrity Violation Detected: </span>
             <span>{verificationResult.reason}</span>
             {verificationResult.corruptedRecordId && (
               <div className="mt-1 font-mono text-[11px] opacity-90">
@@ -420,6 +464,99 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
 
       {/* Filter Toolbar */}
       <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 flex flex-col gap-3">
+        {/* Scope Selector (Current Epoch / Legacy / All) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-outline-variant/15">
+          <div className="flex items-center gap-1.5 bg-surface-container-lowest p-1 rounded-xl border border-outline-variant/30">
+            <button
+              type="button"
+              data-testid="scope-current"
+              onClick={() => setSelectedScope('CURRENT')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedScope === 'CURRENT'
+                  ? 'bg-primary text-on-primary shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">verified</span>
+              <span>Current Epoch</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  selectedScope === 'CURRENT'
+                    ? 'bg-on-primary/20 text-on-primary'
+                    : 'bg-surface-container text-on-surface-variant'
+                }`}
+              >
+                {currentEpochCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="scope-legacy"
+              onClick={() => setSelectedScope('LEGACY')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedScope === 'LEGACY'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">archive</span>
+              <span>Legacy</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  selectedScope === 'LEGACY'
+                    ? 'bg-black/20 text-white'
+                    : 'bg-surface-container text-on-surface-variant'
+                }`}
+              >
+                {legacyCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              data-testid="scope-all"
+              onClick={() => setSelectedScope('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedScope === 'ALL'
+                  ? 'bg-surface-container-highest text-on-surface shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span>All</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  selectedScope === 'ALL'
+                    ? 'bg-surface-container text-on-surface'
+                    : 'bg-surface-container text-on-surface-variant'
+                }`}
+              >
+                {records.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="text-xs text-on-surface-variant">
+            {selectedScope === 'CURRENT' && (
+              <span className="text-primary font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[15px]">verified</span>
+                <span>Active epoch (clean cryptographic chain)</span>
+              </span>
+            )}
+            {selectedScope === 'LEGACY' && (
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-[15px]">archive</span>
+                <span>Immutable legacy archive preserved</span>
+              </span>
+            )}
+            {selectedScope === 'ALL' && (
+              <span className="font-medium">
+                Combined view across all audit epochs
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
           {/* Search Input */}
           <div className="relative lg:col-span-2">
@@ -498,7 +635,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
         <div className="flex items-center justify-between text-xs text-on-surface-variant pt-1 border-t border-outline-variant/15">
           <div>
             Showing <span className="font-bold text-on-surface">{filteredRecords.length}</span> of{' '}
-            <span className="font-bold text-on-surface">{records.length}</span> audit records
+            <span className="font-bold text-on-surface">{scopedRecords.length}</span> audit records
           </div>
           {(searchTerm || startDate || endDate || selectedAction !== 'ALL' || selectedUser !== 'ALL') && (
             <button
@@ -522,15 +659,21 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           </div>
         ) : filteredRecords.length === 0 ? (
           <div className="py-16 text-center text-on-surface-variant flex flex-col items-center gap-2">
-            <span className="material-symbols-outlined text-[36px] text-outline">history</span>
-            <span className="text-xs font-medium">No audit events found matching the selected filters</span>
+            <span className="material-symbols-outlined text-[36px] text-outline">
+              {selectedScope === 'CURRENT' && scopedRecords.length === 0 ? 'verified' : 'history'}
+            </span>
+            <span className="text-xs font-medium">
+              {selectedScope === 'CURRENT' && scopedRecords.length === 0
+                ? 'No current epoch audit records yet. Next event will start sequence #0001 from genesis anchor.'
+                : 'No audit events found matching the selected filters'}
+            </span>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-surface-container-low text-on-surface-variant border-b border-outline-variant/30 text-[11px] font-bold">
-                  <th className="py-3 px-4 w-20">Seq</th>
+                  <th className="py-3 px-4 w-28">Seq</th>
                   <th className="py-3 px-4 w-36">Timestamp</th>
                   <th className="py-3 px-4 w-36">User</th>
                   <th className="py-3 px-4 w-40">Action</th>
@@ -563,8 +706,27 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                       className="hover:bg-surface-container-low/60 transition-colors cursor-pointer"
                       onClick={() => setInspectRecord(r)}
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-primary">
-                        #{String(r.sequence).padStart(4, '0')}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-bold text-primary">
+                            #{String(r.sequence).padStart(4, '0')}
+                          </span>
+                          {(r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH ? (
+                            <span
+                              data-testid="badge-current"
+                              className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-primary/10 text-primary border border-primary/20"
+                            >
+                              Current
+                            </span>
+                          ) : (
+                            <span
+                              data-testid="badge-legacy"
+                              className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                            >
+                              Legacy
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-on-surface-variant whitespace-nowrap">
                         {dateStr}
@@ -648,6 +810,15 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                 <span className="px-2 py-0.5 rounded-lg bg-primary text-on-primary font-mono text-xs font-bold">
                   #{String(inspectRecord.sequence).padStart(4, '0')}
                 </span>
+                {(inspectRecord.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH ? (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
+                    Current Epoch
+                  </span>
+                ) : (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Legacy Archive
+                  </span>
+                )}
                 <div>
                   <h3 className="font-bold text-sm text-on-surface">
                     {inspectRecord.actionType} • {inspectRecord.documentId}

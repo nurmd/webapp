@@ -39,6 +39,7 @@ export type AuditDocumentType =
 export interface AuditRecord {
   id: string; // "audit_" + timestamp + "_" + randomHex
   sequence: number; // sequential increment (1, 2, 3...)
+  epoch?: number; // Audit epoch (omitted/1 = Legacy archive, 2 = Current epoch)
   timestamp: string; // ISO 8601 UTC
   userId: string;
   userName: string;
@@ -63,6 +64,8 @@ export interface AuditVerificationResult {
   reason?: string;
 }
 
+export type AuditEpochScope = 'CURRENT' | 'LEGACY' | 'ALL';
+
 export interface AuditTrailFilter {
   startDate?: string;
   endDate?: string;
@@ -72,9 +75,21 @@ export interface AuditTrailFilter {
   documentType?: AuditDocumentType;
   searchTerm?: string;
   sortDirection?: 'asc' | 'desc';
+  epochScope?: AuditEpochScope;
+  epoch?: number;
 }
 
 export const GENESIS_PREVIOUS_HASH = '0'.repeat(64);
+export const LEGACY_AUDIT_EPOCH = 1;
+export const CURRENT_AUDIT_EPOCH = 2;
+
+export function isLegacyRecord(record: AuditRecord): boolean {
+  return (record.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH;
+}
+
+export function isCurrentEpochRecord(record: AuditRecord): boolean {
+  return record.epoch === CURRENT_AUDIT_EPOCH;
+}
 const STORAGE_KEY_AUDIT_LOGS = 'gst_audit_logs';
 
 /**
@@ -197,7 +212,12 @@ export class AuditTrailService {
           try {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed) && parsed.length > 0 && this.records.length === 0) {
-              this.records = parsed.sort((a, b) => a.sequence - b.sequence);
+              this.records = parsed.sort((a, b) => {
+                const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+                const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+                if (epochA !== epochB) return epochA - epochB;
+                return a.sequence - b.sequence;
+              });
               parsed.forEach((rec) => {
                 pouch.putDoc('audit_log', rec).catch(() => {});
               });
@@ -225,12 +245,22 @@ export class AuditTrailService {
       const pouchDocs = await pouch.getAllDocs<AuditRecord>('audit_log');
       if (pouchDocs && pouchDocs.length > 0) {
         if (this.records.length === 0) {
-          this.records = pouchDocs.sort((a, b) => a.sequence - b.sequence);
+          this.records = pouchDocs.sort((a, b) => {
+            const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+            const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+            if (epochA !== epochB) return epochA - epochB;
+            return a.sequence - b.sequence;
+          });
         } else {
           const map = new Map<string, AuditRecord>();
           pouchDocs.forEach((r) => map.set(r.id, r));
           this.records.forEach((r) => map.set(r.id, r));
-          this.records = Array.from(map.values()).sort((a, b) => a.sequence - b.sequence);
+          this.records = Array.from(map.values()).sort((a, b) => {
+            const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+            const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+            if (epochA !== epochB) return epochA - epochB;
+            return a.sequence - b.sequence;
+          });
         }
       }
     } catch (e) {
@@ -267,8 +297,11 @@ export class AuditTrailService {
   private async internalAppendRecord(
     entry: AuditLogInput
   ): Promise<AuditRecord> {
-    const total = this.records.length;
-    const lastRecord = total > 0 ? this.records[total - 1] : null;
+    const currentEpochRecords = this.records.filter(
+      (r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH
+    );
+    const totalCurrent = currentEpochRecords.length;
+    const lastRecord = totalCurrent > 0 ? currentEpochRecords[totalCurrent - 1] : null;
 
     const sequence = lastRecord ? lastRecord.sequence + 1 : 1;
     const previousHash = lastRecord ? lastRecord.recordHash : GENESIS_PREVIOUS_HASH;
@@ -295,6 +328,7 @@ export class AuditTrailService {
     const record: AuditRecord = {
       id,
       sequence,
+      epoch: CURRENT_AUDIT_EPOCH,
       timestamp,
       userId: entry.userId,
       userName: entry.userName,
@@ -333,6 +367,11 @@ export class AuditTrailService {
     let result = [...this.records];
 
     if (filter) {
+      if (filter.epochScope === 'CURRENT' || filter.epoch === CURRENT_AUDIT_EPOCH) {
+        result = result.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH);
+      } else if (filter.epochScope === 'LEGACY' || filter.epoch === LEGACY_AUDIT_EPOCH) {
+        result = result.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH);
+      }
       if (filter.startDate) {
         const s = filter.startDate.trim();
         result = result.filter((r) => {
@@ -377,12 +416,27 @@ export class AuditTrailService {
         );
       }
       if (filter.sortDirection === 'desc') {
-        result.sort((a, b) => b.sequence - a.sequence);
+        result.sort((a, b) => {
+          const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+          const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+          if (epochA !== epochB) return epochB - epochA;
+          return b.sequence - a.sequence;
+        });
       } else {
-        result.sort((a, b) => a.sequence - b.sequence);
+        result.sort((a, b) => {
+          const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+          const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+          if (epochA !== epochB) return epochA - epochB;
+          return a.sequence - b.sequence;
+        });
       }
     } else {
-      result.sort((a, b) => a.sequence - b.sequence);
+      result.sort((a, b) => {
+        const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+        const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+        if (epochA !== epochB) return epochA - epochB;
+        return a.sequence - b.sequence;
+      });
     }
 
     // Return detached copies to preserve immutability
@@ -390,23 +444,28 @@ export class AuditTrailService {
   }
 
   /**
-   * Validates hash chain integrity through 3 sequential checks:
-   * 1. Monotonic sequence contiguity (1, 2, 3...)
-   * 2. Cryptographic hash linkage (previousHash matches predecessor recordHash)
-   * 3. SHA-256 canonical preimage recomputation
+   * Internal validator for a specific epoch chain.
+   * Validates:
+   * 1. Monotonic sequence contiguity (1..N) starting at sequence 1
+   * 2. First record anchored to GENESIS_PREVIOUS_HASH
+   * 3. Unbroken previousHash cryptographic chain linkage
+   * 4. SHA-256 canonical preimage recomputation
    */
-  public async verifyChainIntegrity(): Promise<AuditVerificationResult> {
+  private async verifyEpochChain(targetEpoch: number): Promise<AuditVerificationResult> {
     await this.ensureLoaded();
-    const total = this.records.length;
+    const epochRecords = this.records
+      .filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === targetEpoch)
+      .sort((a, b) => a.sequence - b.sequence);
+
+    const total = epochRecords.length;
     if (total === 0) {
       return { valid: true, totalRecords: 0 };
     }
 
-    const sorted = [...this.records].sort((a, b) => a.sequence - b.sequence);
     let expectedPrevHash = GENESIS_PREVIOUS_HASH;
 
-    for (let i = 0; i < sorted.length; i++) {
-      const rec = sorted[i];
+    for (let i = 0; i < epochRecords.length; i++) {
+      const rec = epochRecords[i];
       const expectedSequence = i + 1;
 
       // 1. Sequence contiguity
@@ -453,6 +512,43 @@ export class AuditTrailService {
     return { valid: true, totalRecords: total };
   }
 
+  /**
+   * Cryptographically verifies the current audit epoch (CURRENT_AUDIT_EPOCH = 2).
+   * Validates fresh genesis, sequence 1..N, hash chaining, and payload hashes.
+   */
+  public async verifyCurrentEpoch(): Promise<AuditVerificationResult> {
+    return this.verifyEpochChain(CURRENT_AUDIT_EPOCH);
+  }
+
+  /**
+   * Diagnostic verification for the legacy archive chain (LEGACY_AUDIT_EPOCH = 1).
+   * Evaluates historical records without modifying or repairing them.
+   */
+  public async verifyLegacyChain(): Promise<AuditVerificationResult> {
+    return this.verifyEpochChain(LEGACY_AUDIT_EPOCH);
+  }
+
+  /**
+   * Validates hash chain integrity.
+   * If epoch is specified, verifies that specific epoch.
+   * Otherwise, if only current epoch records exist, verifies current epoch;
+   * if legacy records exist, reports legacy diagnostics.
+   */
+  public async verifyChainIntegrity(epoch?: number): Promise<AuditVerificationResult> {
+    await this.ensureLoaded();
+    if (epoch !== undefined) {
+      return this.verifyEpochChain(epoch);
+    }
+    const hasCurrent = this.records.some((r) => r.epoch === CURRENT_AUDIT_EPOCH);
+    const hasLegacy = this.records.some(
+      (r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH
+    );
+    if (hasCurrent && !hasLegacy) {
+      return this.verifyEpochChain(CURRENT_AUDIT_EPOCH);
+    }
+    return this.verifyEpochChain(LEGACY_AUDIT_EPOCH);
+  }
+
   public async getAuditRecordById(id: string): Promise<AuditRecord | null> {
     await this.ensureLoaded();
     const found = this.records.find((r) => r.id === id);
@@ -471,11 +567,13 @@ export class AuditTrailService {
   }
 
   /**
-   * Exports full audit trail formatted as RFC 4180 CSV.
+   * Exports full audit trail formatted as RFC 4180 CSV, including epoch and legacy status.
    */
-  public async exportAuditTrailAsCsv(): Promise<string> {
-    const records = await this.getAuditTrail();
+  public async exportAuditTrailAsCsv(filter?: AuditTrailFilter): Promise<string> {
+    const records = await this.getAuditTrail(filter);
     const headers = [
+      'Epoch',
+      'Status',
       'Sequence',
       'Timestamp',
       'User ID',
@@ -498,29 +596,43 @@ export class AuditTrailService {
       return str;
     };
 
-    const rows = records.map((r) => [
-      r.sequence,
-      r.timestamp,
-      escapeCell(r.userId),
-      escapeCell(r.userName),
-      escapeCell(r.userRole),
-      escapeCell(r.actionType),
-      escapeCell(r.documentType),
-      escapeCell(r.documentId),
-      escapeCell(r.summary),
-      r.previousHash,
-      r.recordHash,
-    ]);
+    const rows = records.map((r) => {
+      const epoch = r.epoch ?? LEGACY_AUDIT_EPOCH;
+      const epochStatus = epoch === CURRENT_AUDIT_EPOCH ? 'Current' : 'Legacy';
+      return [
+        epoch,
+        epochStatus,
+        r.sequence,
+        r.timestamp,
+        escapeCell(r.userId),
+        escapeCell(r.userName),
+        escapeCell(r.userRole),
+        escapeCell(r.actionType),
+        escapeCell(r.documentType),
+        escapeCell(r.documentId),
+        escapeCell(r.summary),
+        r.previousHash,
+        r.recordHash,
+      ];
+    });
 
     return [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
   }
 
   /**
-   * Exports full audit trail formatted as JSON.
+   * Exports full audit trail formatted as JSON, including epoch and legacy status.
    */
-  public async exportAuditTrailAsJson(): Promise<string> {
-    const records = await this.getAuditTrail();
-    return JSON.stringify(records, null, 2);
+  public async exportAuditTrailAsJson(filter?: AuditTrailFilter): Promise<string> {
+    const records = await this.getAuditTrail(filter);
+    const exportData = records.map((r) => {
+      const epoch = r.epoch ?? LEGACY_AUDIT_EPOCH;
+      return {
+        ...r,
+        epoch,
+        epochStatus: epoch === CURRENT_AUDIT_EPOCH ? 'Current' : 'Legacy',
+      };
+    });
+    return JSON.stringify(exportData, null, 2);
   }
 
   // --- Strict Statutory Immutability Protections ---

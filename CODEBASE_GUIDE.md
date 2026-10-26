@@ -113,9 +113,15 @@ gst-billing-app/
   - POS Integration: In `SelectPosPartyModal`, selecting the default counter row selects this canonical system party; duplicate walk-in records in the registered customer list are filtered out.
 
 ### D. Audit Trail Engine (`src/services/auditTrail.ts`)
-- Implements Indian Ministry of Corporate Affairs (MCA) audit trail mandates.
+- Implements Indian Ministry of Corporate Affairs (MCA) audit trail mandates (Companies (Accounts) Rules, 2014 Rule 3(1)).
 - Every create, update, or delete operation on invoices, bills, parties, vouchers, or settings emits an immutable log record.
-- **Tamper-Evident Chaining**: Each record computes a SHA-256 hash incorporating the previous record's hash (`previousHash + timestamp + action + documentId + payload`), forming an unbroken cryptographic chain verifiable via `auditTrailService.verifyChainIntegrity()`.
+- **Tamper-Evident Chaining**: Each record computes a SHA-256 hash incorporating the previous record's hash (`previousHash + timestamp + action + documentId + payload`), forming an unbroken cryptographic chain.
+- **Audit Epoch Architecture**:
+  - **Legacy Archive (`epoch` absent or 1)**: Historical records are permanently preserved byte-for-byte without mutation, deletion, or backfilled epoch tags. Legacy chain diagnostics are isolated via `auditTrail.verifyLegacyChain()`.
+  - **Current Epoch (`epoch: 2`)**: All new mutations start cleanly in Epoch 2 at `sequence: 1` anchored to `GENESIS_PREVIOUS_HASH` (64 zeros). Sequencing and previousHash links only consider current epoch records.
+  - **Independent Verification**: `auditTrail.verifyCurrentEpoch()` cryptographically verifies Epoch 2 from genesis to sequence $N$ independently of legacy chain defects. `verifyChainIntegrity()` provides backward-compatible dispatch.
+  - **UI Scope & Notices**: `AuditLogView` defaults to the **Current Epoch** scope with an amber/neutral notice indicating the preserved legacy record count (`Legacy archive: X records preserved`), while suppressing false-positive integrity banners on legacy records. Scope selector allows toggling between Current, Legacy (with `Legacy` badges), and All.
+  - **Statutory Exports**: CSV and JSON statutory exports explicitly include `epoch` and `epochStatus` (`Current` vs `Legacy`) for complete regulatory traceability.
 
 ### E. PIN Security & RBAC (`src/services/pinSecurity.ts`, `src/core/security/rbac.ts`)
 - PBKDF2/SHA-256 salting for 4-digit staff PINs.
@@ -435,6 +441,7 @@ npm run build
 - `customerOpeningBalanceLedger.test.tsx`: Opening balance preservation across invoice lifecycles.
 - `itemEnhancements.test.tsx`: Duplicate item warning, transaction bill previews, floating search bar.
 - `auditTrail.test.ts`: MCA audit log hashing, chain verification, tamper detection.
+- `auditEpoch.test.tsx`: Audit epoch separation, legacy archive preservation, epoch-2 genesis/sequencing, reloadFromStorage persistence, broken legacy chain isolation, UI scope defaults, and statutory exports.
 - `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
 - `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
 - `conflictManifest.test.ts`: Synthetic 31-document/48-revision conflict inventory, dependency-order warnings, credential redaction, backup round-trip hashes, and tamper detection.
