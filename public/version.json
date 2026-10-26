@@ -1,15 +1,14 @@
 {
-  "version": "1.2.38",
+  "version": "1.2.39",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-26T01:33:03.375Z",
+  "buildTime": "2026-10-26T05:36:55.268Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Restore read-only auto-linked payment entries; manual cash/bank entries remain editable and deletable",
-    "Fix bank statement period opening balance and date-range filtering, including ISO timestamps",
-    "Clear account statement deep links when leaving Reports, including Android back navigation",
-    "Default POS sales to Walk-in Customer when the party catalog loads asynchronously",
-    "Fix Android back navigation through transaction detail confirm and edit states",
-    "Clarify that the system Walk-in Customer is ledger-tracked"
+    "Start a clean audit epoch: existing audit records remain preserved as a read-only Legacy archive",
+    "New audit events begin at epoch 2, sequence #0001, with a fresh cryptographic genesis chain",
+    "Security & Audit defaults to the Current Epoch, with Current, Legacy, and All scope filters and a neutral legacy notice",
+    "Audit CSV and JSON exports now include epoch and legacy status",
+    "Billing, tax, inventory, and financial calculations are unchanged"
   ]
 }
