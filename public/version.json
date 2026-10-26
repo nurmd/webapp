@@ -1,15 +1,15 @@
 {
-  "version": "1.2.37",
+  "version": "1.2.38",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-25T11:30:27.543Z",
+  "buildTime": "2026-10-26T01:33:03.375Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "add edit and delete options for payment in and out transactions",
-    "v1.2.36 payment transactions and walk-in customer",
-    "add payment in/out views, system walk-in customer, and bank statement deep linking",
-    "v1.2.35 support diagnostics and sharing",
-    "add support diagnostics and sharing fixes",
-    "v1.2.34 whatsapp validation hardening"
+    "Restore read-only auto-linked payment entries; manual cash/bank entries remain editable and deletable",
+    "Fix bank statement period opening balance and date-range filtering, including ISO timestamps",
+    "Clear account statement deep links when leaving Reports, including Android back navigation",
+    "Default POS sales to Walk-in Customer when the party catalog loads asynchronously",
+    "Fix Android back navigation through transaction detail confirm and edit states",
+    "Clarify that the system Walk-in Customer is ledger-tracked"
   ]
 }
