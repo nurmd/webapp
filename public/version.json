@@ -1,14 +1,14 @@
 {
-  "version": "1.2.40",
+  "version": "1.2.41",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-26T12:05:07.382Z",
+  "buildTime": "2026-10-27T12:18:42.875Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "GST inclusive and exclusive pricing support across catalog, sales, purchases, and POS",
-    "Bidirectional rate synchronization with active pricing mode tracking",
-    "Enhanced A4 invoice, simplified bill, and thermal receipts with dual rate and CESS display",
-    "Robust legacy draft and POS held bill normalization with backward compatibility",
-    "Statutory stock valuation and accounting integrity preserved across all transaction flows"
+    "Payment In and Payment Out now use a dedicated entry mode with optional links to outstanding invoices and bills",
+    "Manual, oldest-first, and on-account allocation keep settlements separate from invoices and bills",
+    "Invoice and bill Pay & Save behavior is unchanged, with source vouchers reconciled safely on edits",
+    "GST-exclusive and GST-inclusive rates stay synchronized across screens, A4 bills, and thermal receipts",
+    "Legacy records, tax slabs, HSN summaries, and audit hashes remain intact"
   ]
 }
