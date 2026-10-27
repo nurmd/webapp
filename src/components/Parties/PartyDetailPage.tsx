@@ -40,7 +40,7 @@ export interface PartyDetailPageProps {
     paymentSplits?: PaymentSplit[],
     discount?: number,
     bankAccountId?: string
-  ) => void;
+  ) => boolean | void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onEditPurchase?: (bill: PurchaseBill) => void;
@@ -170,9 +170,13 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   };
 
   const executeDeleteInvoiceBill = (inv: Invoice) => {
-    db.deleteInvoice(inv.id);
-    setSelectedInvoiceForView(null);
-    onRefresh?.();
+    try {
+      db.deleteInvoice(inv.id);
+      setSelectedInvoiceForView(null);
+      onRefresh?.();
+    } catch (err: any) {
+      alert(err.message || 'Cannot delete invoice.');
+    }
   };
 
   const handleDeleteInvoiceBill = (inv: Invoice, skipConfirm?: boolean) => {
@@ -184,9 +188,13 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   };
 
   const executeDeletePurchaseBill = (bill: PurchaseBill) => {
-    db.deletePurchase(bill.id);
-    setSelectedPurchaseBill(null);
-    onRefresh?.();
+    try {
+      db.deletePurchase(bill.id);
+      setSelectedPurchaseBill(null);
+      onRefresh?.();
+    } catch (err: any) {
+      alert(err.message || 'Cannot delete purchase bill.');
+    }
   };
 
   const handleDeletePurchaseBill = (bill: PurchaseBill, skipConfirm?: boolean) => {
@@ -491,6 +499,8 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               liveNetBalance={liveNetBalance}
               isCustomer={isCustomer}
               bankAccounts={bankAccounts}
+              invoices={invoices}
+              purchases={purchases}
               onRecordPayment={onRecordPayment}
               onRefresh={onRefresh}
             />

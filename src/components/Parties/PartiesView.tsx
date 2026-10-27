@@ -3,7 +3,7 @@ import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { BankAccount } from '../../models/bankAccount.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
@@ -36,8 +36,11 @@ interface PartiesViewProps {
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
     discount?: number,
-    bankAccountId?: string
-  ) => void;
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
+  ) => boolean | void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onEditPurchase?: (bill: PurchaseBill) => void;
@@ -335,19 +338,16 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
     discount?: number,
-    bankAccountId?: string
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
   ) => {
     if (onRecordPartyPayment) {
-      onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount, bankAccountId);
+      return onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount, bankAccountId, allocations, allocationMode, paymentDate);
     } else {
-      const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
-      const totalSettled = amount + (discount || 0);
-      const newBal = isPaymentIn
-        ? party.currentBalance - totalSettled
-        : party.currentBalance + totalSettled;
-      const updatedParty = { ...party, currentBalance: newBal, updatedAt: new Date().toISOString() };
-      onSaveParty(updatedParty);
-      setSelectedPartyForLedger(updatedParty);
+      console.warn('Cannot record payment: central onRecordPartyPayment handler is not available.');
+      return false;
     }
   };
 

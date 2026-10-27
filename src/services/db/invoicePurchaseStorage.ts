@@ -6,6 +6,8 @@ import { auditTrail } from '../auditTrail.ts';
 import { getFinancialYear } from '../../core/utils/dateFilters.ts';
 import { createRcmJournalVoucher, createReversalVoucher } from '../../core/accounting/ledger.ts';
 import { derivePaymentSettlement } from '../../core/accounting/paymentSplitUtils.ts';
+import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { applyAllocations, reverseAllocations, inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
 import {
   applyInvoiceStockDecrement,
   revertInvoiceStockAdjustment,
@@ -31,7 +33,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
   }
 
-  saveInvoice(invoice: Invoice): void {
+  saveInvoice(invoice: Invoice, options?: { skipSettlementDerivation?: boolean }): void {
     const list = [...this.getInvoices()];
     // Enforce unique invoice number under GST compliance
     const norm = (invoice.invoiceNumber || '').trim().toUpperCase();
@@ -47,27 +49,29 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       invoice.financialYear = getFinancialYear(invoice.date);
     }
 
-    // Centralize payment status & tender breakdown derivation (invariant enforcement)
-    const settlement = derivePaymentSettlement({
-      grandTotal: invoice.grandTotal,
-      paymentMode: invoice.paymentMode,
-      paymentStatus: invoice.paymentStatus,
-      paidAmount: invoice.paidAmount,
-      balanceAmount: invoice.balanceAmount,
-      paymentSplits: invoice.paymentSplits,
-      notes: invoice.notes,
-      bankAccountId: (invoice as any).bankAccountId,
-      bankAccountName: (invoice as any).bankAccountName,
-    });
-    invoice = {
-      ...invoice,
-      paidAmount: settlement.paidAmount,
-      balanceAmount: settlement.balanceAmount,
-      paymentStatus: settlement.paymentStatus,
-      paymentMode: settlement.paymentMode,
-      paymentSplits: settlement.paymentSplits,
-      notes: settlement.notes,
-    };
+    if (!options?.skipSettlementDerivation) {
+      // Centralize payment status & tender breakdown derivation (invariant enforcement)
+      const settlement = derivePaymentSettlement({
+        grandTotal: invoice.grandTotal,
+        paymentMode: invoice.paymentMode,
+        paymentStatus: invoice.paymentStatus,
+        paidAmount: invoice.paidAmount,
+        balanceAmount: invoice.balanceAmount,
+        paymentSplits: invoice.paymentSplits,
+        notes: invoice.notes,
+        bankAccountId: (invoice as any).bankAccountId,
+        bankAccountName: (invoice as any).bankAccountName,
+      });
+      invoice = {
+        ...invoice,
+        paidAmount: settlement.paidAmount,
+        balanceAmount: settlement.balanceAmount,
+        paymentStatus: settlement.paymentStatus,
+        paymentMode: settlement.paymentMode,
+        paymentSplits: settlement.paymentSplits,
+        notes: settlement.notes,
+      };
+    }
 
     const idx = list.findIndex((inv) => inv.id === invoice.id);
     const prevInvoice = idx >= 0 ? list[idx] : null;
@@ -161,6 +165,24 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
   deleteInvoice(id: string): void {
     const inv = this.getInvoices().find((i) => i.id === id);
+    if (inv) {
+      const activeLinkedPaymentVouchers = this.getVouchers().filter(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          (v.voucherType === 'RECEIPT' || v.voucherType === 'PAYMENT') &&
+          ((v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId === id) ||
+            v.sourceDocumentNumber === inv.invoiceNumber ||
+            v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === id))
+      );
+      if (activeLinkedPaymentVouchers.length > 0) {
+        const vNumbers = activeLinkedPaymentVouchers.map((v) => `#${v.voucherNumber}`).join(', ');
+        throw new Error(
+          `Cannot delete invoice #${inv.invoiceNumber} with active linked payment voucher(s) (${vNumbers}). Please reverse or unlink payments before deleting the invoice.`
+        );
+      }
+    }
+
     const list = this.getInvoices().filter((i) => i.id !== id);
     this.recordTombstone('invoice', id);
     this.set(STORAGE_KEYS.INVOICES, list);
@@ -244,28 +266,30 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     return this.get<PurchaseBill[]>(STORAGE_KEYS.PURCHASES, []);
   }
 
-  savePurchase(bill: PurchaseBill): void {
-    // Centralize payment status & tender breakdown derivation (invariant enforcement)
-    const settlement = derivePaymentSettlement({
-      grandTotal: bill.grandTotal,
-      paymentMode: bill.paymentMode,
-      paymentStatus: bill.paymentStatus,
-      paidAmount: bill.paidAmount,
-      balanceAmount: bill.balanceAmount,
-      paymentSplits: bill.paymentSplits,
-      notes: bill.notes,
-      bankAccountId: (bill as any).bankAccountId,
-      bankAccountName: (bill as any).bankAccountName,
-    });
-    bill = {
-      ...bill,
-      paidAmount: settlement.paidAmount,
-      balanceAmount: settlement.balanceAmount,
-      paymentStatus: settlement.paymentStatus,
-      paymentMode: settlement.paymentMode,
-      paymentSplits: settlement.paymentSplits,
-      notes: settlement.notes,
-    };
+  savePurchase(bill: PurchaseBill, options?: { skipSettlementDerivation?: boolean }): void {
+    if (!options?.skipSettlementDerivation) {
+      // Centralize payment status & tender breakdown derivation (invariant enforcement)
+      const settlement = derivePaymentSettlement({
+        grandTotal: bill.grandTotal,
+        paymentMode: bill.paymentMode,
+        paymentStatus: bill.paymentStatus,
+        paidAmount: bill.paidAmount,
+        balanceAmount: bill.balanceAmount,
+        paymentSplits: bill.paymentSplits,
+        notes: bill.notes,
+        bankAccountId: (bill as any).bankAccountId,
+        bankAccountName: (bill as any).bankAccountName,
+      });
+      bill = {
+        ...bill,
+        paidAmount: settlement.paidAmount,
+        balanceAmount: settlement.balanceAmount,
+        paymentStatus: settlement.paymentStatus,
+        paymentMode: settlement.paymentMode,
+        paymentSplits: settlement.paymentSplits,
+        notes: settlement.notes,
+      };
+    }
 
     const list = [...this.getPurchases()];
     const idx = list.findIndex((b) => b.id === bill.id);
@@ -487,6 +511,24 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
   deletePurchase(id: string): void {
     const bill = this.getPurchases().find((b) => b.id === id);
+    if (bill) {
+      const activeLinkedPaymentVouchers = this.getVouchers().filter(
+        (v) =>
+          !v.isReversed &&
+          !v.isCancelled &&
+          v.voucherType === 'PAYMENT' &&
+          ((v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId === id) ||
+            v.sourceDocumentNumber === bill.billNumber ||
+            v.paymentAllocations?.some((a) => a.documentType === 'PURCHASE' && a.documentId === id))
+      );
+      if (activeLinkedPaymentVouchers.length > 0) {
+        const vNumbers = activeLinkedPaymentVouchers.map((v) => `#${v.voucherNumber}`).join(', ');
+        throw new Error(
+          `Cannot delete purchase bill #${bill.billNumber} with active linked payment voucher(s) (${vNumbers}). Please reverse or unlink payments before deleting the bill.`
+        );
+      }
+    }
+
     const list = this.getPurchases().filter((b) => b.id !== id);
     this.recordTombstone('purchase', id);
     this.set(STORAGE_KEYS.PURCHASES, list);
@@ -633,5 +675,271 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         summary: `Stock adjustment (${adj.type}): ${adj.quantity} units for "${adj.itemName}". Reason: ${adj.reason || 'None'}`,
       })
       .catch((err) => console.error('Audit log failed for saveStockAdjustment:', err));
+  }
+
+  /**
+   * Orchestrates payment voucher persistence and two-way settlement allocations with invoices/bills.
+   * 0. Validates allocations in memory before touching records.
+   * 1. Reverses previous voucher's allocations if editing.
+   * 2. Saves voucher.
+   * 3. Applies new allocations to linked invoices/bills.
+   * 4. Recalculates party balance.
+   * 5. Notifies listeners.
+   */
+  savePaymentVoucher(voucher: Voucher, options?: { skipDocumentUpdate?: boolean }): void {
+    const list = this.getVouchers();
+    const prevVoucher = list.find((v) => v.id === voucher.id);
+
+    // 0. Pre-validate allocations before modifying state or reversing old allocations
+    if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
+      const inMemoryInvoices = prevVoucher?.paymentAllocations && !prevVoucher.isReversed && !prevVoucher.isCancelled
+        ? reverseAllocations(this.getInvoices(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE'))
+        : this.getInvoices();
+      const inMemoryPurchases = prevVoucher?.paymentAllocations && !prevVoucher.isReversed && !prevVoucher.isCancelled
+        ? reverseAllocations(this.getPurchases(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE'))
+        : this.getPurchases();
+
+      const seenDocIds = new Set<string>();
+      let sumAllocated = 0;
+
+      for (const alloc of voucher.paymentAllocations) {
+        if (seenDocIds.has(alloc.documentId)) {
+          throw new Error(`Duplicate document allocation detected for #${alloc.documentNumber || alloc.documentId}.`);
+        }
+        seenDocIds.add(alloc.documentId);
+
+        if (typeof alloc.amount !== 'number' || alloc.amount <= 0) {
+          throw new Error(`Allocation amount for #${alloc.documentNumber || alloc.documentId} must be greater than zero.`);
+        }
+        sumAllocated = Number((sumAllocated + alloc.amount).toFixed(2));
+
+        if (alloc.documentType === 'INVOICE') {
+          const inv = inMemoryInvoices.find((i) => i.id === alloc.documentId);
+          if (!inv) {
+            const inPur = inMemoryPurchases.find((p) => p.id === alloc.documentId);
+            if (inPur) {
+              throw new Error(`Document #${alloc.documentNumber || alloc.documentId} is a purchase bill, but allocated as INVOICE.`);
+            }
+            throw new Error(`Invoice #${alloc.documentNumber || alloc.documentId} not found in outstanding records.`);
+          }
+          if (inv.isCancelled) {
+            throw new Error(`Invoice #${alloc.documentNumber || inv.invoiceNumber} is cancelled and cannot be allocated.`);
+          }
+          if (
+            inv.invoiceType === 'CREDIT_NOTE' ||
+            inv.invoiceType === 'ESTIMATE' ||
+            inv.invoiceType === 'SALES_ORDER' ||
+            inv.invoiceType === 'DELIVERY_CHALLAN'
+          ) {
+            throw new Error(`Document #${alloc.documentNumber || inv.invoiceNumber} is a ${inv.invoiceType} and is not an outstanding payable invoice/bill.`);
+          }
+          const partyMatches =
+            (!voucher.partyId || !inv.partyId || inv.partyId === voucher.partyId) &&
+            (!voucher.partyName || !inv.partyName || inv.partyName.trim().toLowerCase() === voucher.partyName.trim().toLowerCase());
+          if (!partyMatches) {
+            throw new Error(`Invoice #${inv.invoiceNumber} belongs to a different party.`);
+          }
+          const bal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal - (inv.paidAmount || 0);
+          if (bal <= 0.01) {
+            throw new Error(`Invoice #${inv.invoiceNumber} has no outstanding balance.`);
+          }
+          if (alloc.amount > bal + 0.01) {
+            throw new Error(`Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${bal.toFixed(2)} on invoice #${inv.invoiceNumber}.`);
+          }
+        } else if (alloc.documentType === 'PURCHASE') {
+          const pur = inMemoryPurchases.find((p) => p.id === alloc.documentId);
+          if (!pur) {
+            const inInv = inMemoryInvoices.find((i) => i.id === alloc.documentId);
+            if (inInv) {
+              throw new Error(`Document #${alloc.documentNumber || alloc.documentId} is an invoice, but allocated as PURCHASE.`);
+            }
+            throw new Error(`Purchase bill #${alloc.documentNumber || alloc.documentId} not found in outstanding records.`);
+          }
+          if (pur.isCancelled) {
+            throw new Error(`Purchase bill #${alloc.documentNumber || pur.billNumber} is cancelled and cannot be allocated.`);
+          }
+          if (
+            pur.purchaseType === 'RETURN' ||
+            pur.purchaseType === 'PO' ||
+            pur.purchaseType === 'CHALLAN' ||
+            (pur as any).purchaseType === 'PURCHASE_ORDER' ||
+            (pur as any).purchaseType === 'PURCHASE_CHALLAN' ||
+            (pur as any).purchaseType === 'PURCHASE_RETURN'
+          ) {
+            throw new Error(`Document #${alloc.documentNumber || pur.billNumber} is a ${pur.purchaseType} and is not an outstanding payable invoice/bill.`);
+          }
+          const partyMatches =
+            (!voucher.partyId || !pur.supplierId || pur.supplierId === voucher.partyId) &&
+            (!voucher.partyName || !pur.supplierName || pur.supplierName.trim().toLowerCase() === voucher.partyName.trim().toLowerCase());
+          if (!partyMatches) {
+            throw new Error(`Purchase bill #${pur.billNumber} belongs to a different party.`);
+          }
+          const bal = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : pur.grandTotal - (pur.paidAmount || 0);
+          if (bal <= 0.01) {
+            throw new Error(`Purchase bill #${pur.billNumber} has no outstanding balance.`);
+          }
+          if (alloc.amount > bal + 0.01) {
+            throw new Error(`Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${bal.toFixed(2)} on purchase bill #${pur.billNumber}.`);
+          }
+        } else {
+          throw new Error(`Invalid document type ${(alloc as any).documentType}.`);
+        }
+      }
+
+      const maxAllowed = Number((voucher.totalAmount + 0.01).toFixed(2));
+      if (sumAllocated > maxAllowed) {
+        throw new Error(`Total allocated amount (₹${sumAllocated.toFixed(2)}) exceeds voucher total amount (₹${voucher.totalAmount.toFixed(2)}).`);
+      }
+    }
+
+    // 1. Reverse old allocations if updating an existing voucher
+    if (prevVoucher && prevVoucher.paymentAllocations && prevVoucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
+      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      if (invAllocs.length > 0) {
+        const invoices = this.getInvoices();
+        const updatedInvoices = reverseAllocations(invoices, invAllocs);
+        for (const updatedInv of updatedInvoices) {
+          if (invoices.some((orig) => orig.id === updatedInv.id && (orig.paidAmount !== updatedInv.paidAmount || orig.balanceAmount !== updatedInv.balanceAmount))) {
+            this.saveInvoice(updatedInv, { skipSettlementDerivation: true });
+          }
+        }
+      }
+
+      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      if (purAllocs.length > 0) {
+        const purchases = this.getPurchases();
+        const updatedPurchases = reverseAllocations(purchases, purAllocs);
+        for (const updatedPur of updatedPurchases) {
+          if (purchases.some((orig) => orig.id === updatedPur.id && (orig.paidAmount !== updatedPur.paidAmount || orig.balanceAmount !== updatedPur.balanceAmount))) {
+            this.savePurchase(updatedPur, { skipSettlementDerivation: true });
+          }
+        }
+      }
+    }
+
+    // 2. Save the voucher (handles journal entries, audit trail, pouch, etc.)
+    this.saveVoucher(voucher);
+
+    // 3. Apply new allocations
+    if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
+      const voucherMode = inferVoucherPaymentMode(voucher);
+      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      if (invAllocs.length > 0) {
+        const invoices = this.getInvoices();
+        const updatedInvoices = applyAllocations(invoices, invAllocs, { paymentMode: voucherMode });
+        for (const updatedInv of updatedInvoices) {
+          if (invoices.some((orig) => orig.id === updatedInv.id && (orig.paidAmount !== updatedInv.paidAmount || orig.balanceAmount !== updatedInv.balanceAmount))) {
+            this.saveInvoice(updatedInv, { skipSettlementDerivation: true });
+          }
+        }
+      }
+
+      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      if (purAllocs.length > 0) {
+        const purchases = this.getPurchases();
+        const updatedPurchases = applyAllocations(purchases, purAllocs, { paymentMode: voucherMode });
+        for (const updatedPur of updatedPurchases) {
+          if (purchases.some((orig) => orig.id === updatedPur.id && (orig.paidAmount !== updatedPur.paidAmount || orig.balanceAmount !== updatedPur.balanceAmount))) {
+            this.savePurchase(updatedPur, { skipSettlementDerivation: true });
+          }
+        }
+      }
+    }
+
+    // 4. Recalculate party balance
+    if (voucher.partyId) {
+      this.recalculatePartyBalance(voucher.partyId);
+    }
+    if (prevVoucher?.partyId && prevVoucher.partyId !== voucher.partyId) {
+      this.recalculatePartyBalance(prevVoucher.partyId);
+    }
+
+    this.notifyListeners();
+  }
+
+  /**
+   * Reverses a payment/receipt voucher:
+   * 1. Rejects if already reversed or cancelled.
+   * 2. Creates reversal voucher via createReversalVoucher.
+   * 3. Reverses original voucher's allocations, restoring linked documents' balances.
+   * 4. Marks original voucher reversed and saves both.
+   * 5. Recalculates party balance.
+   */
+  reversePaymentVoucher(voucher: Voucher, reason?: string): Voucher {
+    if (voucher.isReversed || voucher.isCancelled || voucher.voucherNumber.startsWith('VCH-REV-')) {
+      throw new Error(`Cannot reverse voucher #${voucher.voucherNumber}: voucher is already reversed or cancelled.`);
+    }
+
+    const rev = createReversalVoucher({
+      originalVoucher: voucher,
+      reason: reason || `Reversal of ${voucher.voucherType} #${voucher.voucherNumber}`,
+    });
+
+    if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0) {
+      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      if (invAllocs.length > 0) {
+        const invoices = this.getInvoices();
+        const updatedInvoices = reverseAllocations(invoices, invAllocs);
+        for (const updatedInv of updatedInvoices) {
+          if (invoices.some((orig) => orig.id === updatedInv.id && (orig.paidAmount !== updatedInv.paidAmount || orig.balanceAmount !== updatedInv.balanceAmount))) {
+            this.saveInvoice(updatedInv, { skipSettlementDerivation: true });
+          }
+        }
+      }
+
+      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      if (purAllocs.length > 0) {
+        const purchases = this.getPurchases();
+        const updatedPurchases = reverseAllocations(purchases, purAllocs);
+        for (const updatedPur of updatedPurchases) {
+          if (purchases.some((orig) => orig.id === updatedPur.id && (orig.paidAmount !== updatedPur.paidAmount || orig.balanceAmount !== updatedPur.balanceAmount))) {
+            this.savePurchase(updatedPur, { skipSettlementDerivation: true });
+          }
+        }
+      }
+    }
+
+    this.saveVoucher(rev);
+    this.saveVoucher({
+      ...voucher,
+      isReversed: true,
+      reversalVoucherId: rev.id,
+    });
+
+    if (voucher.partyId) {
+      this.recalculatePartyBalance(voucher.partyId);
+    }
+
+    this.notifyListeners();
+    return rev;
+  }
+
+  override deleteVoucher(id: string): void {
+    const prevVoucher = this.getVouchers().find((v) => v.id === id);
+    if (prevVoucher && prevVoucher.paymentAllocations && prevVoucher.paymentAllocations.length > 0 && !prevVoucher.isReversed && !prevVoucher.isCancelled) {
+      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      if (invAllocs.length > 0) {
+        const invoices = this.getInvoices();
+        const updatedInvoices = reverseAllocations(invoices, invAllocs);
+        for (const updatedInv of updatedInvoices) {
+          if (invoices.some((orig) => orig.id === updatedInv.id && (orig.paidAmount !== updatedInv.paidAmount || orig.balanceAmount !== updatedInv.balanceAmount))) {
+            this.saveInvoice(updatedInv);
+          }
+        }
+      }
+
+      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      if (purAllocs.length > 0) {
+        const purchases = this.getPurchases();
+        const updatedPurchases = reverseAllocations(purchases, purAllocs);
+        for (const updatedPur of updatedPurchases) {
+          if (purchases.some((orig) => orig.id === updatedPur.id && (orig.paidAmount !== updatedPur.paidAmount || orig.balanceAmount !== updatedPur.balanceAmount))) {
+            this.savePurchase(updatedPur);
+          }
+        }
+      }
+    }
+
+    super.deleteVoucher(id);
   }
 }

@@ -1016,14 +1016,16 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     );
   });
 
-  it('R3 Edge Case: Fallback direct settlement in DashboardRecordPaymentModal validates amount and updates paymentMode & paymentSplits', () => {
+  it('DashboardRecordPaymentModal validates amount, fails safely without handler, and invokes central onRecordPartyPayment', () => {
     const handleRefresh = vi.fn();
+    const onRecordPartyPaymentMock = vi.fn();
     const saveInvoiceSpy = vi.spyOn(db, 'saveInvoice');
 
     // Invoice for walk-in customer with no party in parties list
     const walkInInvoice: Invoice = {
       ...mockInvoices[1],
       id: 'inv_walkin_999',
+      invoiceNumber: 'INV-WALKIN-999',
       partyId: undefined,
       partyName: 'Walk-in Cash Guest',
       balanceAmount: 1500,
@@ -1031,6 +1033,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       paidAmount: 0,
     };
 
+    // First: render without onRecordPartyPayment to verify safe rejection without direct mutations
     act(() => {
       root.render(
         <DashboardView
@@ -1040,7 +1043,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
           vouchers={[]}
           expenses={[]}
           items={mockItems}
-          parties={[]} // Empty parties list forces fallback direct settlement
+          parties={[]} // Empty parties list
           onNewInvoice={vi.fn()}
           onQuickPos={vi.fn()}
           onViewInvoice={vi.fn()}
@@ -1079,7 +1082,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('Please enter a valid payment amount greater than zero.');
     expect(saveInvoiceSpy).not.toHaveBeenCalled();
 
-    // 2. Set valid amount and confirm
+    // 2. Set valid amount without handler: fails safely with validation error, no direct mutation
     act(() => {
       changeInput(amtInput, '1500');
     });
@@ -1088,16 +1091,73 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       confirmBtn?.click();
     });
 
-    expect(saveInvoiceSpy).toHaveBeenCalledWith(
+    expect(container.textContent).toContain('Payment recording handler is unavailable.');
+    expect(saveInvoiceSpy).not.toHaveBeenCalled();
+
+    // 3. Now re-render with central onRecordPartyPayment provided
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[walkInInvoice]}
+          purchases={[]}
+          vouchers={[]}
+          expenses={[]}
+          items={mockItems}
+          parties={[]}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onRefresh={handleRefresh}
+          onNavigateTab={vi.fn()}
+          onRecordPartyPayment={onRecordPartyPaymentMock}
+        />
+      );
+    });
+
+    // Click Collect again
+    const collectBtn2 = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim() === 'paymentsCollect'
+    );
+    act(() => {
+      collectBtn2?.click();
+    });
+
+    const amtInput2 = container.querySelector('input[type="number"]') as HTMLInputElement;
+    act(() => {
+      changeInput(amtInput2, '1500');
+    });
+
+    const confirmBtn2 = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Confirm Payment')
+    );
+    act(() => {
+      confirmBtn2?.click();
+    });
+
+    expect(onRecordPartyPaymentMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'inv_walkin_999',
-        paidAmount: 1500,
-        balanceAmount: 0,
-        paymentStatus: 'PAID',
-        paymentMode: expect.any(String),
-      })
+        name: 'Walk-in Cash Guest',
+      }),
+      1500,
+      expect.any(String),
+      expect.any(String),
+      'IN',
+      undefined,
+      0,
+      undefined,
+      [
+        expect.objectContaining({
+          documentType: 'INVOICE',
+          documentId: 'inv_walkin_999',
+          amount: 1500,
+        }),
+      ],
+      'MANUAL',
+      expect.any(String)
     );
     expect(handleRefresh).toHaveBeenCalled();
+    expect(saveInvoiceSpy).not.toHaveBeenCalled();
     saveInvoiceSpy.mockRestore();
   });
 

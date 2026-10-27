@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
+import { PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
-import { createPaymentReceiptVoucher, createPaymentOutVoucher } from '../../core/accounting/ledger.ts';
 
 export interface DashboardPaymentTarget {
   type: 'SALE' | 'PURCHASE';
@@ -31,8 +31,12 @@ export interface DashboardRecordPaymentModalProps {
     notes: string,
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
-    discount?: number
-  ) => void;
+    discount?: number,
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
+  ) => boolean | void;
   onRefresh?: () => void;
 }
 
@@ -137,150 +141,50 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
         ? activeParties.find((p) => p.id === target.partyId)
         : activeParties.find((p) => p.name.toLowerCase() === (target.partyName || '').toLowerCase());
 
-      if (party && onRecordPartyPayment) {
-        onRecordPartyPayment(party, payAmt, paymentMode, notes, isSale ? 'IN' : 'OUT', splits, discAmt);
-      } else {
-        // Direct Settlement fallback in local DB
-        const docId = Date.now().toString().slice(-6);
-        const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
+      const allocAmt = Number(Math.min(target.balanceAmount, totalSettled).toFixed(2));
+      const allocation: PaymentAllocation = {
+        documentType: isSale ? 'INVOICE' : 'PURCHASE',
+        documentId: target.rawId,
+        documentNumber: target.docNumber,
+        amount: allocAmt,
+        date: today,
+      };
 
-        if (isSale) {
-          const inv = target.rawInvoice || db.getInvoices().find((i) => i.id === target.rawId);
-          if (inv) {
-            const currentPaid = inv.paidAmount || 0;
-            const newPaid = Math.min(inv.grandTotal, currentPaid + totalSettled);
-            const newBal = Math.max(0, inv.grandTotal - newPaid);
-            const isFullPaid = newBal <= 0.01;
+      if (!onRecordPartyPayment) {
+        setValidationError('Payment recording handler is unavailable.');
+        setIsSubmitting(false);
+        return;
+      }
 
-            const updatedSplits: PaymentSplit[] = (inv.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
-            if (updatedSplits.length === 0 && currentPaid > 0) {
-              updatedSplits.push({
-                id: `prev-${Date.now()}`,
-                mode: (inv.paymentMode as any) || 'CASH',
-                amount: currentPaid,
-              });
-            }
-            if (splits && splits.length > 0) {
-              splits.forEach((s) => updatedSplits.push({ ...s }));
-            } else {
-              const isCash = paymentMode === 'CASH';
-              updatedSplits.push({
-                id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                mode: (paymentMode as any) || 'CASH',
-                amount: payAmt,
-                accountId: isCash ? 'ACC_CASH' : defaultBank?.id,
-                accountName: isCash ? 'Cash-in-hand' : defaultBank?.accountName,
-              });
-            }
-            if (newBal > 0) {
-              updatedSplits.push({
-                id: `split-bal-${Date.now()}`,
-                mode: 'CREDIT',
-                amount: newBal,
-              });
-            }
-            const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
-            const resolvedMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || (paymentMode as any) || 'CASH');
+      const resolvedParty: Party = party || {
+        id: target.partyId || (isSale ? 'ACC_CASH' : 'ACC_CASH'),
+        name: target.partyName || (isSale ? 'Cash Customer' : 'Cash Supplier'),
+        type: isSale ? 'CUSTOMER' : 'SUPPLIER',
+        phone: '',
+        stateCode: '00',
+        billingAddress: '',
+        currentBalance: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-            const updatedInv: Invoice = {
-              ...inv,
-              paidAmount: newPaid,
-              balanceAmount: newBal,
-              paymentStatus: isFullPaid ? 'PAID' : 'PARTIAL',
-              paymentMode: resolvedMode,
-              paymentSplits: updatedSplits,
-              updatedAt: new Date().toISOString(),
-            };
-            db.saveInvoice(updatedInv);
+      const res = onRecordPartyPayment(
+        resolvedParty,
+        payAmt,
+        paymentMode,
+        notes,
+        isSale ? 'IN' : 'OUT',
+        splits,
+        discAmt,
+        defaultBank?.id,
+        allocAmt > 0 ? [allocation] : [],
+        'MANUAL',
+        today
+      );
 
-            const voucher = createPaymentReceiptVoucher({
-              receiptNumber: `RCPT-${docId}`,
-              date: today,
-              customerName: inv.partyName || 'Cash Customer',
-              customerId: inv.partyId || 'ACC_CASH',
-              amount: payAmt,
-              discount: discAmt,
-              paymentMode,
-              bankAccountId: defaultBank?.id,
-              bankAccountName: defaultBank?.accountName,
-              paymentSplits: splits && splits.length > 0 ? splits : undefined,
-              narration: notes || `Payment received for Bill #${inv.invoiceNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
-            });
-            db.saveVoucher(voucher);
-
-            if (inv.partyId) {
-              db.recalculatePartyBalance(inv.partyId);
-            }
-          }
-        } else {
-          const pur = target.rawPurchase || db.getPurchases().find((p) => p.id === target.rawId);
-          if (pur) {
-            const currentPaid = pur.paidAmount || 0;
-            const newPaid = Math.min(pur.grandTotal, currentPaid + totalSettled);
-            const newBal = Math.max(0, pur.grandTotal - newPaid);
-            const isFullPaid = newBal <= 0.01;
-
-            const updatedSplits: PaymentSplit[] = (pur.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
-            if (updatedSplits.length === 0 && currentPaid > 0) {
-              updatedSplits.push({
-                id: `prev-${Date.now()}`,
-                mode: (pur.paymentMode as any) || 'CASH',
-                amount: currentPaid,
-              });
-            }
-            if (splits && splits.length > 0) {
-              splits.forEach((s) => updatedSplits.push({ ...s }));
-            } else {
-              const isCash = paymentMode === 'CASH';
-              updatedSplits.push({
-                id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                mode: (paymentMode as any) || 'CASH',
-                amount: payAmt,
-                accountId: isCash ? 'ACC_CASH' : defaultBank?.id,
-                accountName: isCash ? 'Cash-in-hand' : defaultBank?.accountName,
-              });
-            }
-            if (newBal > 0) {
-              updatedSplits.push({
-                id: `split-bal-${Date.now()}`,
-                mode: 'CREDIT',
-                amount: newBal,
-              });
-            }
-            const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
-            const resolvedMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || (paymentMode as any) || 'CASH');
-
-            const updatedPur: PurchaseBill = {
-              ...pur,
-              paidAmount: newPaid,
-              balanceAmount: newBal,
-              paymentStatus: isFullPaid ? 'PAID' : 'PARTIAL',
-              paymentMode: resolvedMode,
-              paymentSplits: updatedSplits,
-              updatedAt: new Date().toISOString(),
-            };
-            db.savePurchase(updatedPur);
-
-            const voucher = createPaymentOutVoucher({
-              voucherNumber: `PYMT-${docId}`,
-              date: today,
-              supplierName: pur.supplierName,
-              supplierId: pur.supplierId || 'ACC_CASH',
-              amount: payAmt,
-              discount: discAmt,
-              paymentMode,
-              bankAccountId: defaultBank?.id,
-              bankAccountName: defaultBank?.accountName,
-              paymentSplits: splits && splits.length > 0 ? splits : undefined,
-              narration: notes || `Payment made for Bill #${pur.billNumber}${discAmt > 0 ? ` (Discount: ${formatINR(discAmt)})` : ''}`,
-            });
-            db.saveVoucher(voucher);
-
-            if (pur.supplierId) {
-              db.recalculatePartyBalance(pur.supplierId);
-            }
-          }
-        }
+      if (res === false) {
+        return;
       }
 
       if (onRefresh) {

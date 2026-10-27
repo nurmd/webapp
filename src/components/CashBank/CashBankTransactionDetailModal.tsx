@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BankAccount, CashBankTransaction, CashBankTxnType, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
+import { Invoice } from '../../models/invoice.ts';
+import { PurchaseBill } from '../../models/purchase.ts';
+import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 
 export interface CashBankTransactionDetailModalProps {
@@ -10,9 +14,14 @@ export interface CashBankTransactionDetailModalProps {
   entry: UnifiedLedgerEntry | null;
   rawTransaction?: CashBankTransaction | null;
   accounts: BankAccount[];
+  vouchers?: Voucher[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onNavigateTab?: (tab: AppTab) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
 }
 
 export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailModalProps> = ({
@@ -21,12 +30,23 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   entry,
   rawTransaction,
   accounts,
+  vouchers,
+  invoices,
+  purchases,
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
+  onViewInvoice,
+  onViewPurchase,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const linkedVoucher = useMemo(() => {
+    if (!entry?.rawVoucherId) return null;
+    const all = vouchers && vouchers.length > 0 ? vouchers : db.getVouchers();
+    return all.find((v) => v.id === entry.rawVoucherId) || null;
+  }, [entry?.rawVoucherId, vouchers]);
 
   // Form State for Editing
   const [editType, setEditType] = useState<CashBankTxnType>('TRANSFER');
@@ -458,6 +478,69 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                   <span className="text-on-surface italic">{activeDesc || 'No narration provided'}</span>
                 </div>
               </div>
+
+              {/* Linked Documents for Vouchers */}
+              {linkedVoucher?.paymentAllocations && linkedVoucher.paymentAllocations.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
+                    <span>Linked Documents ({linkedVoucher.paymentAllocations.length})</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 divide-y divide-outline-variant/15 text-xs">
+                    {linkedVoucher.paymentAllocations.map((alloc) => (
+                      <div key={alloc.documentId} className="pt-1.5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              alloc.documentType === 'INVOICE'
+                                ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                                : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                            }`}
+                          >
+                            {alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
+                          </span>
+                          <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
+                          <span className="text-secondary font-bold">({formatINR(alloc.amount)})</span>
+                        </div>
+                        {alloc.documentType === 'INVOICE' && onViewInvoice && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allInvs = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+                              const inv = allInvs.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
+                              if (inv) {
+                                onClose();
+                                onViewInvoice(inv);
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">visibility</span>
+                            <span>View</span>
+                          </button>
+                        )}
+                        {alloc.documentType === 'PURCHASE' && onViewPurchase && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allPurs = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+                              const pur = allPurs.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
+                              if (pur) {
+                                onClose();
+                                onViewPurchase(pur);
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">visibility</span>
+                            <span>View</span>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Informational Box for Non-Direct Linked Entries */}
               {!isNativeTxn && entry && (

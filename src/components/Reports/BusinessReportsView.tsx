@@ -72,6 +72,8 @@ export interface BusinessReportsViewProps {
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onNavigateTab?: (tab: any) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
 }
 
 const SUB_REPORTS_MAP: Record<string, SubReportTabOption[]> = {
@@ -177,6 +179,8 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
+  onViewInvoice,
+  onViewPurchase,
 }) => {
   // Navigation State: 'hub' or a specific dedicated report category
   const [activeReportPage, setActiveReportPage] = useState<ReportCategoryKey | 'hub'>(
@@ -564,6 +568,8 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
             onSaveTransaction={onSaveTransaction || ((txn) => db.saveCashBankTransaction(txn))}
             onDeleteTransaction={onDeleteTransaction || ((id) => db.deleteCashBankTransaction(id))}
             onNavigateTab={onNavigateTab}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
           />
         )}
 

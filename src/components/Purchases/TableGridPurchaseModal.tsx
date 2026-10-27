@@ -228,6 +228,22 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   };
 
   const handleSaveItemModal = (itemData: InvoiceItemData) => {
+    const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (itemData.priceMode ?? 'EXCLUSIVE');
+    let excl = Number(itemData.unitPrice) || 0;
+    const gst = isGstActive && !company.isCompositionScheme ? (Number(itemData.gstRate) || 0) : 0;
+    let incl = itemData.unitPriceInclusive !== undefined ? Number(itemData.unitPriceInclusive) : undefined;
+
+    if (!isGstActive || company.isCompositionScheme) {
+      incl = excl;
+    } else if (mode === 'EXCLUSIVE') {
+      incl = inclusiveFromExclusive(excl, gst);
+    } else {
+      if (incl === undefined || !Number.isFinite(incl) || incl <= 0) {
+        incl = inclusiveFromExclusive(excl, gst);
+      }
+      excl = exclusiveFromInclusive(incl, gst);
+    }
+
     const purchaseRow: PurchaseGridRow = {
       itemId: itemData.itemId,
       name: itemData.name,
@@ -235,9 +251,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       hsnSacCode: itemData.hsnSacCode,
       quantity: roundQuantity(itemData.quantity, 4),
       unit: itemData.unit,
-      unitPrice: itemData.unitPrice,
-      unitPriceInclusive: itemData.unitPriceInclusive,
-      priceMode: itemData.priceMode,
+      unitPrice: excl,
+      unitPriceInclusive: incl,
+      priceMode: mode,
       cessRate: itemData.cessRate,
       mrp: itemData.mrp,
       discountPercent: itemData.discountPercent,
@@ -296,17 +312,25 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     }
     if (initialDraft?.rows && initialDraft.rows.length > 0) {
       return initialDraft.rows.map((r: any) => {
-        const gst = Number(r.gstRate) || 0;
-        const excl = Number(r.unitPrice) || 0;
-        const incl =
-          Number(r.unitPriceInclusive) > 0
-            ? Number(r.unitPriceInclusive)
-            : inclusiveFromExclusive(excl, gst);
+        const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (r.priceMode ?? 'EXCLUSIVE');
+        const gst = isGstActive && !company.isCompositionScheme ? (Number(r.gstRate) || 0) : 0;
+        let excl = Number(r.unitPrice) || 0;
+        let incl = Number(r.unitPriceInclusive);
+        if (!isGstActive || company.isCompositionScheme) {
+          incl = excl;
+        } else if (mode === 'EXCLUSIVE') {
+          incl = inclusiveFromExclusive(excl, gst);
+        } else {
+          if (!Number.isFinite(incl) || incl <= 0) {
+            incl = inclusiveFromExclusive(excl, gst);
+          }
+          excl = exclusiveFromInclusive(incl, gst);
+        }
         return {
           ...r,
           unitPrice: excl,
           unitPriceInclusive: incl,
-          priceMode: r.priceMode ?? 'EXCLUSIVE',
+          priceMode: mode,
           cessRate: Number(r.cessRate) || 0,
         };
       });
@@ -565,12 +589,20 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
     const purchaseItems: PurchaseItemEntry[] = rows.map((r, idx) => {
       const calcItem = calcSummary.items[idx];
-      const excl = Number(r.unitPrice) || 0;
-      const gst = isGstActive ? (r.gstRate || 0) : 0;
-      const incl =
-        Number(r.unitPriceInclusive) > 0
-          ? Number(r.unitPriceInclusive)
-          : inclusiveFromExclusive(excl, gst);
+      const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (r.priceMode ?? 'EXCLUSIVE');
+      const gst = isGstActive && !company.isCompositionScheme ? (r.gstRate || 0) : 0;
+      let excl = Number(r.unitPrice) || 0;
+      let incl = Number(r.unitPriceInclusive);
+      if (!isGstActive || company.isCompositionScheme) {
+        incl = excl;
+      } else if (mode === 'EXCLUSIVE') {
+        incl = inclusiveFromExclusive(excl, gst);
+      } else {
+        if (!Number.isFinite(incl) || incl <= 0) {
+          incl = inclusiveFromExclusive(excl, gst);
+        }
+        excl = exclusiveFromInclusive(incl, gst);
+      }
       return {
         itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
         name: r.name || 'Purchased Item',
@@ -580,7 +612,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         quantity: r.quantity,
         unitPrice: excl,
         unitPriceInclusive: incl,
-        priceMode: r.priceMode ?? 'EXCLUSIVE',
+        priceMode: mode,
         mrp: r.mrp,
         discountPercent: r.discountPercent,
         discountAmount: calcItem?.discountAmount || 0,
@@ -887,17 +919,25 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
     if (draft.rows && draft.rows.length > 0) {
       setRows(
         draft.rows.map((r: any) => {
-          const gst = Number(r.gstRate) || 0;
-          const excl = Number(r.unitPrice) || 0;
-          const incl =
-            Number(r.unitPriceInclusive) > 0
-              ? Number(r.unitPriceInclusive)
-              : inclusiveFromExclusive(excl, gst);
+          const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (r.priceMode ?? 'EXCLUSIVE');
+          const gst = isGstActive && !company.isCompositionScheme ? (Number(r.gstRate) || 0) : 0;
+          let excl = Number(r.unitPrice) || 0;
+          let incl = Number(r.unitPriceInclusive);
+          if (!isGstActive || company.isCompositionScheme) {
+            incl = excl;
+          } else if (mode === 'EXCLUSIVE') {
+            incl = inclusiveFromExclusive(excl, gst);
+          } else {
+            if (!Number.isFinite(incl) || incl <= 0) {
+              incl = inclusiveFromExclusive(excl, gst);
+            }
+            excl = exclusiveFromInclusive(incl, gst);
+          }
           return {
             ...r,
             unitPrice: excl,
             unitPriceInclusive: incl,
-            priceMode: r.priceMode ?? 'EXCLUSIVE',
+            priceMode: mode,
             cessRate: Number(r.cessRate) || 0,
           };
         })

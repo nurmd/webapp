@@ -6,6 +6,8 @@ import { CashBankManagementView } from '../components/CashBank/CashBankManagemen
 import { BankStatementCategory } from '../components/Reports/categories/BankStatementCategory.tsx';
 import { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../models/bankAccount.ts';
 import { CompanyProfile } from '../models/company.ts';
+import { Invoice } from '../models/invoice.ts';
+import { Voucher } from '../core/accounting/voucherTypes.ts';
 
 const mockCompany: CompanyProfile = {
   id: 'COMP-1',
@@ -445,5 +447,244 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
     // Modal opens
     expect(container.textContent).toContain('Transaction Details');
     expect(container.textContent).toContain('UTR998877');
+  });
+
+  it('receipt voucher opened from Cash & Bank page shows its linked invoice number and can open the invoice', async () => {
+    const handleViewInvoice = vi.fn();
+    const handleViewPurchase = vi.fn();
+
+    const testInvoice: Invoice = {
+      id: 'inv-cb-101',
+      invoiceNumber: 'INV-CB-2026-101',
+      invoiceType: 'B2B',
+      date: '2026-10-16',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      partyAddress: '',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      grandTotal: 3000,
+      paidAmount: 3000,
+      balanceAmount: 0,
+      items: [],
+      totalGrossAmount: 3000,
+      totalDiscount: 0,
+      totalTaxableAmount: 3000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      amountInWords: 'Three Thousand Only',
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    const testReceiptVoucher: Voucher = {
+      id: 'VCH-RCPT-CB-101',
+      voucherNumber: 'RCPT-CB-101',
+      voucherType: 'RECEIPT',
+      date: '2026-10-16',
+      referenceNo: 'INV-CB-2026-101',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      totalAmount: 3000,
+      narration: 'Payment received for INV-CB-2026-101',
+      allocationMode: 'SOURCE_DOCUMENT',
+      paymentAllocations: [
+        {
+          documentType: 'INVOICE',
+          documentId: testInvoice.id,
+          documentNumber: testInvoice.invoiceNumber,
+          amount: 3000,
+          date: '2026-10-16',
+        },
+      ],
+      entries: [
+        {
+          accountId: 'ACC_BANK_SBI',
+          accountName: 'SBI Current A/C',
+          debit: 3000,
+          credit: 0,
+          narration: 'Receipt into bank',
+        },
+        {
+          accountId: 'ACC_DEBTORS',
+          accountName: 'Sundry Debtors',
+          debit: 0,
+          credit: 3000,
+          narration: 'Payment received from Customer One',
+        },
+      ],
+      createdAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    await act(async () => {
+      root.render(
+        <CashBankManagementView
+          company={mockCompany}
+          accounts={mockAccounts}
+          transactions={[]}
+          invoices={[testInvoice]}
+          purchases={[]}
+          expenses={[]}
+          vouchers={[testReceiptVoucher]}
+          onViewInvoice={handleViewInvoice}
+          onViewPurchase={handleViewPurchase}
+          onSaveAccount={vi.fn()}
+          onDeleteAccount={vi.fn()}
+          onSaveTransaction={vi.fn()}
+          onDeleteTransaction={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    // Find the row for this receipt voucher
+    const receiptRow = Array.from(container.querySelectorAll('div[role="button"]')).find((el) =>
+      el.textContent?.includes('RCPT-CB-101')
+    );
+    expect(receiptRow).toBeDefined();
+
+    // Click on row to open CashBankTransactionDetailModal
+    await act(async () => {
+      (receiptRow as HTMLElement)?.click();
+    });
+
+    // Detail modal should display Linked Documents with the invoice number
+    expect(container.textContent).toContain('Transaction Details');
+    expect(container.textContent).toContain('#INV-CB-2026-101');
+
+    // Click on View button for the linked invoice
+    const viewBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('View')
+    );
+    expect(viewBtn).toBeDefined();
+
+    await act(async () => {
+      viewBtn?.click();
+    });
+
+    // Verifies onViewInvoice was invoked with testInvoice
+    expect(handleViewInvoice).toHaveBeenCalledWith(testInvoice);
+  });
+
+  it('receipt voucher opened from Bank Statement shows linked invoice and invokes onViewInvoice', async () => {
+    const handleViewInvoice = vi.fn();
+    const handleViewPurchase = vi.fn();
+
+    const testInvoice: Invoice = {
+      id: 'inv-bs-102',
+      invoiceNumber: 'INV-BS-2026-102',
+      invoiceType: 'B2B',
+      date: '2026-10-16',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      partyAddress: '',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      grandTotal: 5000,
+      paidAmount: 5000,
+      balanceAmount: 0,
+      items: [],
+      totalGrossAmount: 5000,
+      totalDiscount: 0,
+      totalTaxableAmount: 5000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      amountInWords: 'Five Thousand Only',
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    const testReceiptVoucher: Voucher = {
+      id: 'VCH-RCPT-BS-102',
+      voucherNumber: 'RCPT-BS-102',
+      voucherType: 'RECEIPT',
+      date: '2026-10-16',
+      referenceNo: 'INV-BS-2026-102',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      totalAmount: 5000,
+      narration: 'Bank receipt for INV-BS-2026-102',
+      allocationMode: 'SOURCE_DOCUMENT',
+      paymentAllocations: [
+        {
+          documentType: 'INVOICE',
+          documentId: testInvoice.id,
+          documentNumber: testInvoice.invoiceNumber,
+          amount: 5000,
+          date: '2026-10-16',
+        },
+      ],
+      entries: [
+        {
+          accountId: 'ACC_BANK_SBI',
+          accountName: 'SBI Current A/C',
+          debit: 5000,
+          credit: 0,
+          narration: 'Receipt into bank',
+        },
+        {
+          accountId: 'ACC_DEBTORS',
+          accountName: 'Sundry Debtors',
+          debit: 0,
+          credit: 5000,
+          narration: 'Payment received from Customer One',
+        },
+      ],
+      createdAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    await act(async () => {
+      root.render(
+        <BankStatementCategory
+          company={mockCompany}
+          accounts={mockAccounts}
+          transactions={[]}
+          invoices={[testInvoice]}
+          purchases={[]}
+          expenses={[]}
+          vouchers={[testReceiptVoucher]}
+          dateRangeLabel="This Month"
+          onViewInvoice={handleViewInvoice}
+          onViewPurchase={handleViewPurchase}
+        />
+      );
+    });
+
+    const receiptRow = Array.from(container.querySelectorAll('tbody tr')).find((tr) =>
+      tr.textContent?.includes('RCPT-BS-102')
+    );
+    expect(receiptRow).toBeDefined();
+
+    await act(async () => {
+      (receiptRow as HTMLElement)?.click();
+    });
+
+    expect(container.textContent).toContain('Transaction Details');
+    expect(container.textContent).toContain('#INV-BS-2026-102');
+
+    const viewBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('View')
+    );
+    expect(viewBtn).toBeDefined();
+
+    await act(async () => {
+      viewBtn?.click();
+    });
+
+    expect(handleViewInvoice).toHaveBeenCalledWith(testInvoice);
   });
 });

@@ -36,6 +36,16 @@ export interface JournalEntryLine {
   narration?: string;
 }
 
+export type PaymentAllocationDocumentType = 'INVOICE' | 'PURCHASE';
+
+export interface PaymentAllocation {
+  documentType: PaymentAllocationDocumentType;
+  documentId: string;
+  documentNumber: string;
+  amount: number;
+  date?: string;
+}
+
 export interface Voucher {
   id: string;
   voucherNumber: string;
@@ -50,4 +60,11 @@ export interface Voucher {
   isReversed?: boolean;
   reversalVoucherId?: string;
   reversalOfVoucherId?: string;
+  partyId?: string;
+  partyName?: string;
+  paymentAllocations?: PaymentAllocation[];
+  allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT';
+  sourceDocumentType?: PaymentAllocationDocumentType;
+  sourceDocumentId?: string;
+  sourceDocumentNumber?: string;
 }

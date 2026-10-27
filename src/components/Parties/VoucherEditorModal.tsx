@@ -172,17 +172,40 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       const disc = parseFloat(editDiscount) || 0;
       const totalSettled = Number((newAmt + disc).toFixed(2));
 
-      let adjustedBal = party.currentBalance;
-      if (v.voucherType === 'RECEIPT') {
-        adjustedBal += v.totalAmount;
-      } else {
-        adjustedBal -= v.totalAmount;
-      }
+      // Allocation validation & handling
+      const oldAllocations = v.paymentAllocations || [];
+      const allocatedSum = oldAllocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+      const isTypeChanged = (v.voucherType === 'RECEIPT' && !isReceipt) || (v.voucherType === 'PAYMENT' && isReceipt);
 
-      if (isReceipt) {
-        adjustedBal -= totalSettled;
+      let finalAllocations = oldAllocations.map((a) => ({
+        ...a,
+        date: editDate,
+      }));
+      let finalAllocationMode = v.allocationMode;
+
+      if (isTypeChanged) {
+        // Changing flow between IN and OUT clears allocations and requires re-linking
+        finalAllocations = [];
+        finalAllocationMode = 'UNALLOCATED';
+      } else if (v.allocationMode === 'SOURCE_DOCUMENT') {
+        if (Math.abs(totalSettled - v.totalAmount) > 0.01) {
+          alert(
+            'Cannot change the amount of an upfront payment voucher directly. Please edit the paid amount from the invoice or bill instead.'
+          );
+          return;
+        }
       } else {
-        adjustedBal += totalSettled;
+        if (allocatedSum > 0) {
+          if (totalSettled < allocatedSum - 0.01) {
+            alert(
+              `New total settled amount (${formatINR(totalSettled)}) cannot be less than the total allocated to linked documents (${formatINR(allocatedSum)}). Please adjust the amount or un-link documents.`
+            );
+            return;
+          }
+        }
+        if (Math.abs(totalSettled - v.totalAmount) > 0.01) {
+          finalAllocationMode = finalAllocations.length > 0 ? 'MANUAL' : 'UNALLOCATED';
+        }
       }
 
       let entries: JournalEntryLine[] = [];
@@ -225,10 +248,18 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         totalAmount: totalSettled,
         narration: editNotes || v.narration,
         entries,
+        partyId: party.id,
+        partyName: party.name,
+        paymentAllocations: finalAllocations,
+        allocationMode: finalAllocationMode,
       };
 
-      db.saveVoucher(updatedVoucher);
-      db.saveParty({ ...party, currentBalance: adjustedBal, updatedAt: new Date().toISOString() });
+      try {
+        db.savePaymentVoucher(updatedVoucher);
+      } catch (err: any) {
+        alert(err.message || 'Failed to save voucher.');
+        return;
+      }
     }
     // 2. Invoice payment edit (pay-inv)
     else if (editingLedgerEntry.id.startsWith('pay-inv-') && editingLedgerEntry.rawInvoice) {
@@ -386,45 +417,44 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   };
 
   const executeDeleteLedgerItem = (entry: PassbookEntry) => {
-    if (entry.rawVoucher) {
-      const v = entry.rawVoucher;
-      const revVoucher = createReversalVoucher({
-        originalVoucher: v,
-        reason: `Reversal of ${v.voucherType} #${v.voucherNumber} from Party Passbook`,
-      });
-      db.saveVoucher(revVoucher);
-      db.saveVoucher({ ...v, isReversed: true, reversalVoucherId: revVoucher.id });
-      db.recalculatePartyBalance(party.id);
-    } else if (entry.id.startsWith('pay-inv-') && entry.rawInvoice) {
-      const inv = entry.rawInvoice;
-      const amt = entry.credit;
-      const newPaid = Math.max(0, (inv.paidAmount || 0) - amt);
-      const newBalance = Number((inv.grandTotal - newPaid).toFixed(2));
-      const updatedInv: Invoice = {
-        ...inv,
-        paidAmount: newPaid,
-        balanceAmount: newBalance,
-        paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= inv.grandTotal ? 'PAID' : 'PARTIAL'),
-        updatedAt: new Date().toISOString(),
-      };
-      db.saveInvoice(updatedInv);
-      db.recalculatePartyBalance(party.id);
-    } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
-      const pur = entry.rawPurchase;
-      const amt = entry.debit;
-      const newPaid = Math.max(0, (pur.paidAmount || 0) - amt);
-      const newBalance = Number((pur.grandTotal - newPaid).toFixed(2));
-      const updatedPur: PurchaseBill = {
-        ...pur,
-        paidAmount: newPaid,
-        balanceAmount: newBalance,
-        paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= pur.grandTotal ? 'PAID' : 'PARTIAL'),
-        updatedAt: new Date().toISOString(),
-      };
-      db.savePurchase(updatedPur);
-      db.recalculatePartyBalance(party.id);
-    } else if (entry.isOpening) {
-      db.clearPartyOpeningBalance(party.id);
+    try {
+      if (entry.rawVoucher) {
+        const v = entry.rawVoucher;
+        db.reversePaymentVoucher(v, `Reversal of ${v.voucherType} #${v.voucherNumber} from Party Passbook`);
+      } else if (entry.id.startsWith('pay-inv-') && entry.rawInvoice) {
+        const inv = entry.rawInvoice;
+        const amt = entry.credit;
+        const newPaid = Math.max(0, (inv.paidAmount || 0) - amt);
+        const newBalance = Number((inv.grandTotal - newPaid).toFixed(2));
+        const updatedInv: Invoice = {
+          ...inv,
+          paidAmount: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= inv.grandTotal ? 'PAID' : 'PARTIAL'),
+          updatedAt: new Date().toISOString(),
+        };
+        db.saveInvoice(updatedInv);
+        db.recalculatePartyBalance(party.id);
+      } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
+        const pur = entry.rawPurchase;
+        const amt = entry.debit;
+        const newPaid = Math.max(0, (pur.paidAmount || 0) - amt);
+        const newBalance = Number((pur.grandTotal - newPaid).toFixed(2));
+        const updatedPur: PurchaseBill = {
+          ...pur,
+          paidAmount: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= pur.grandTotal ? 'PAID' : 'PARTIAL'),
+          updatedAt: new Date().toISOString(),
+        };
+        db.savePurchase(updatedPur);
+        db.recalculatePartyBalance(party.id);
+      } else if (entry.isOpening) {
+        db.clearPartyOpeningBalance(party.id);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete / reverse transaction.');
+      return;
     }
 
     onClose();
@@ -509,6 +539,68 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                     <span>Edit</span>
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Linked Documents Section for Vouchers */}
+          {editingLedgerEntry.rawVoucher?.paymentAllocations && editingLedgerEntry.rawVoucher.paymentAllocations.length > 0 && (
+            <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-1.5">
+              <span className="text-[11px] font-bold text-on-surface flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px] text-secondary">link</span>
+                <span>Linked Documents ({editingLedgerEntry.rawVoucher.paymentAllocations.length})</span>
+              </span>
+              <div className="flex flex-col gap-1 divide-y divide-outline-variant/15 text-xs">
+                {editingLedgerEntry.rawVoucher.paymentAllocations.map((alloc) => (
+                  <div key={alloc.documentId} className="pt-1 pb-1 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                          alloc.documentType === 'INVOICE'
+                            ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                            : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                        }`}
+                      >
+                        {alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
+                      </span>
+                      <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
+                      <span className="text-secondary font-bold">({formatINR(alloc.amount)})</span>
+                    </div>
+                    {alloc.documentType === 'INVOICE' && onViewInvoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const inv = db.getInvoices().find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
+                          if (inv) {
+                            onClose();
+                            onViewInvoice(inv);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[10px] flex items-center gap-0.5 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">visibility</span>
+                        <span>View</span>
+                      </button>
+                    )}
+                    {alloc.documentType === 'PURCHASE' && (onViewPurchase || onEditPurchase) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pur = db.getPurchases().find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
+                          if (pur) {
+                            onClose();
+                            if (onViewPurchase) onViewPurchase(pur);
+                            else if (onEditPurchase) onEditPurchase(pur);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">visibility</span>
+                        <span>View</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

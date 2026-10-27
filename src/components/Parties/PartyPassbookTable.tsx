@@ -182,6 +182,23 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                             ? `Paid: ${formatINR(entry.rawPurchase.paidAmount)} • Due: ${formatINR(entry.rawPurchase.balanceAmount)}`
                             : `Unpaid: ${formatINR(entry.rawPurchase.balanceAmount)}`}
                         </>
+                      ) : entry.rawVoucher && entry.rawVoucher.paymentAllocations && entry.rawVoucher.paymentAllocations.length > 0 ? (
+                        (() => {
+                          const allocatedSum = entry.rawVoucher.paymentAllocations.reduce((s, a) => s + (a.amount || 0), 0);
+                          const unalloc = Math.max(0, Math.round((entry.rawVoucher.totalAmount - allocatedSum) * 100) / 100);
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{entry.date}</span>
+                              <span>•</span>
+                              <span>{entry.description}</span>
+                              {unalloc > 0 ? (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium">
+                                  Advance: {formatINR(unalloc)}
+                                </span>
+                              ) : null}
+                            </div>
+                          );
+                        })()
                       ) : (
                         <>{entry.date} {entry.description ? `• ${entry.description}` : ''}</>
                       )}

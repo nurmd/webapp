@@ -28,6 +28,8 @@ interface CashBankManagementViewProps {
   onDeleteTransaction: (id: string) => void;
   onNavigateTab: (tab: AppTab) => void;
   onOpenAccountStatement?: (accountId: string) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
 }
 
 export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
@@ -44,6 +46,8 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onDeleteTransaction,
   onNavigateTab,
   onOpenAccountStatement,
+  onViewInvoice,
+  onViewPurchase,
 }) => {
   // Navigation / Modal States
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -863,6 +867,11 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         entry={selectedLedgerEntry}
         rawTransaction={selectedRawTxn}
         accounts={accounts}
+        vouchers={vouchers}
+        invoices={invoices}
+        purchases={purchases}
+        onViewInvoice={onViewInvoice}
+        onViewPurchase={onViewPurchase}
         onSaveTransaction={onSaveTransaction}
         onDeleteTransaction={onDeleteTransaction}
         onNavigateTab={onNavigateTab}

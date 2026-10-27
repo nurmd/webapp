@@ -440,7 +440,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       const excl = Number(c.unitPrice) || 0;
       let incl = Number(c.unitPriceInclusive) || 0;
       const mode = c.priceMode ?? 'EXCLUSIVE';
-      if (mode === 'INCLUSIVE' && incl <= 0) {
+      if (!isGstActive || company.isCompositionScheme) {
+        incl = excl;
+      } else if (mode === 'EXCLUSIVE') {
+        incl = inclusiveFromExclusive(excl, gst);
+      } else if (mode === 'INCLUSIVE' && incl <= 0) {
         incl = inclusiveFromExclusive(excl, gst);
       }
       return {
@@ -541,12 +545,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         : (c.priceMode || 'EXCLUSIVE');
       let excl = Number(c.unitPrice ?? item.salePrice ?? 0);
       let incl = Number(c.unitPriceInclusive);
-      if (!Number.isFinite(incl) || incl <= 0) {
+      if (!isGstActive || company.isCompositionScheme) {
+        incl = excl;
+      } else if (mode === 'EXCLUSIVE') {
         incl = inclusiveFromExclusive(excl, gst);
-        if (mode === 'INCLUSIVE') {
-          excl = exclusiveFromInclusive(incl, gst);
+      } else {
+        if (!Number.isFinite(incl) || incl <= 0) {
+          incl = inclusiveFromExclusive(excl, gst);
         }
-      } else if (mode === 'INCLUSIVE') {
         excl = exclusiveFromInclusive(incl, gst);
       }
       return {
@@ -654,8 +660,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       const excl = Number(c.unitPrice) || 0;
       const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (c.item.gstRate || 0);
       const rawIncl = Number(c.unitPriceInclusive) || 0;
+      const mode: ItemPriceMode = isGstActive && !company.isCompositionScheme ? (c.priceMode ?? 'EXCLUSIVE') : 'EXCLUSIVE';
       const incl = (!isGstActive || company.isCompositionScheme)
         ? excl
+        : mode === 'EXCLUSIVE'
+        ? inclusiveFromExclusive(excl, gst)
         : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
       return {
         itemId: c.item.id,
@@ -665,7 +674,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         quantity: c.qty,
         unitPrice: excl,
         unitPriceInclusive: incl,
-        priceMode: isGstActive && !company.isCompositionScheme ? (c.priceMode ?? 'EXCLUSIVE') : 'EXCLUSIVE',
+        priceMode: mode,
         cessRate: isGstActive && !company.isCompositionScheme ? (c.cessRate || 0) : 0,
         taxableAmount: itemCalc.taxableAmount,
         discountPercent: c.discountPercent,

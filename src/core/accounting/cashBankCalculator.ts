@@ -359,13 +359,14 @@ export function computeCashBankSummary(params: {
           category: isCash ? 'CASH' : 'BANK',
           accountId: targetAccId,
           accountName: targetAccName,
-          counterpartyOrTitle: v.narration || 'Party Receipt',
+          counterpartyOrTitle: v.partyName || v.narration || 'Party Receipt',
           referenceNo: v.voucherNumber,
           mode: isCash ? 'CASH' : 'BANK',
           flow: 'IN',
           amount: amt,
           description: v.narration || `Receipt Voucher #${v.voucherNumber}`,
           rawVoucherId: v.id,
+          partyId: v.partyId,
         });
       });
     } else if (v.voucherType === 'PAYMENT') {
@@ -395,13 +396,14 @@ export function computeCashBankSummary(params: {
           category: isCash ? 'CASH' : 'BANK',
           accountId: targetAccId,
           accountName: targetAccName,
-          counterpartyOrTitle: v.narration || 'Party Payment',
+          counterpartyOrTitle: v.partyName || v.narration || 'Party Payment',
           referenceNo: v.voucherNumber,
           mode: isCash ? 'CASH' : 'BANK',
           flow: 'OUT',
           amount: amt,
           description: v.narration || `Payment Voucher #${v.voucherNumber}`,
           rawVoucherId: v.id,
+          partyId: v.partyId,
         });
       });
     } else if (v.voucherType === 'CONTRA') {

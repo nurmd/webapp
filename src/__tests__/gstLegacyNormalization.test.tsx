@@ -34,6 +34,11 @@ import { TableGridInvoiceModal } from '../components/Invoicing/TableGridInvoiceM
 import { TableGridPurchaseModal } from '../components/Purchases/TableGridPurchaseModal.tsx';
 import { InvoicePreviewModal } from '../components/Invoicing/InvoicePreviewModal.tsx';
 import { SimplifiedInvoiceModal } from '../components/Invoicing/SimplifiedInvoiceModal.tsx';
+import { CreateInvoiceModal } from '../components/Invoicing/CreateInvoiceModal.tsx';
+import { InvoiceLineItemsGrid } from '../components/Invoicing/components/InvoiceLineItemsGrid.tsx';
+import { ThermalPrintModal } from '../components/Printing/ThermalPrintModal.tsx';
+import { formatThermalReceiptText } from '../core/printer/escpos.ts';
+import { buildThermalReceiptBinary } from '../core/printer/escposBinary.ts';
 import { QuickBillingView } from '../components/POS/QuickBillingView.tsx';
 import { PosCartItem, HeldBill } from '../components/POS/types.ts';
 import { applyPurchaseStockIncrement } from '../core/inventory/stockEngine.ts';
@@ -142,15 +147,14 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     const saveBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
       b.textContent?.includes('Save Invoice')
     );
-    if (saveBtn) {
-      await act(async () => {
-        saveBtn.click();
-      });
-      expect(savedInvoice).not.toBeNull();
-      expect(savedInvoice!.items[0].unitPrice).toBe(100);
-      expect(savedInvoice!.items[0].unitPriceInclusive).toBe(118);
-      expect(savedInvoice!.items[0].priceMode).toBe('EXCLUSIVE');
-    }
+    expect(saveBtn).toBeDefined();
+    await act(async () => {
+      saveBtn!.click();
+    });
+    expect(savedInvoice).not.toBeNull();
+    expect(savedInvoice!.items[0].unitPrice).toBe(100);
+    expect(savedInvoice!.items[0].unitPriceInclusive).toBe(118);
+    expect(savedInvoice!.items[0].priceMode).toBe('EXCLUSIVE');
   });
 
   it('2. Legacy purchase draft: same for purchase; inclusive 118; stock/purchase price remains 100', async () => {
@@ -189,18 +193,19 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     expect(text).toContain('Stock Item 1');
     expect(text).toContain('118.00');
 
-    const saveBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
-      b.textContent?.includes('Save Bill') || b.textContent?.includes('Record Bill')
-    );
-    if (saveBtn) {
-      await act(async () => {
-        saveBtn.click();
-      });
-      expect(savedBill).not.toBeNull();
-      expect(savedBill!.items[0].unitPrice).toBe(100);
-      expect(savedBill!.items[0].unitPriceInclusive).toBe(118);
-      expect(savedBill!.items[0].priceMode).toBe('EXCLUSIVE');
-    }
+    const saveBtn =
+      (container?.querySelector('[data-testid="purchase-save-btn"]') as HTMLButtonElement) ||
+      Array.from(container?.querySelectorAll('button') || []).find((b) =>
+        b.textContent?.includes('Save Purchase Bill')
+      );
+    expect(saveBtn).toBeDefined();
+    await act(async () => {
+      saveBtn!.click();
+    });
+    expect(savedBill).not.toBeNull();
+    expect(savedBill!.items[0].unitPrice).toBe(100);
+    expect(savedBill!.items[0].unitPriceInclusive).toBe(118);
+    expect(savedBill!.items[0].priceMode).toBe('EXCLUSIVE');
   });
 
   it('3. Zero inclusive: a row with unitPrice: 100, unitPriceInclusive: 0, priceMode: "EXCLUSIVE" displays/prints Incl. 118, not 0', async () => {
@@ -382,6 +387,14 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     }
 
     // 5b. Legacy held bill without unitPriceInclusive, priceMode, cessRate
+    await act(async () => {
+      root!.unmount();
+    });
+    container!.remove();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+
     const legacyHeldBill: any = {
       id: 'HOLD-LEGACY-01',
       heldAt: new Date().toISOString(),
@@ -415,20 +428,58 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
       totalAmount: 118,
     };
 
-    mockLocalStorage.setItem('vyapar_pos_held_bills_v1', JSON.stringify([legacyHeldBill]));
+    mockLocalStorage.setItem('vyapar_pos_held_bills', JSON.stringify([legacyHeldBill]));
 
+    let completedSale: Invoice | null = null;
     await act(async () => {
       root!.render(
         <QuickBillingView
           company={gstCompany}
           items={[catalogItem]}
-          onCompleteSale={vi.fn()}
+          onCompleteSale={(inv) => {
+            completedSale = inv;
+          }}
         />
       );
     });
 
-    const text = container?.textContent || '';
-    expect(text).toBeDefined();
+    // 1. Open HoldBillsModal
+    const heldBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
+      b.textContent?.includes('Held (')
+    );
+    expect(heldBtn).toBeDefined();
+    await act(async () => {
+      heldBtn!.click();
+    });
+
+    // 2. Click Resume inside HoldBillsModal
+    const resumeBtn2 = Array.from(container?.querySelectorAll('button') || []).find((b) =>
+      b.textContent?.includes('Resume')
+    );
+    expect(resumeBtn2).toBeDefined();
+    await act(async () => {
+      resumeBtn2!.click();
+    });
+
+    // 3. Resumed cart shows 118.00 total
+    expect(container?.textContent).toContain('118.00');
+
+    // 4. Complete checkout
+    const chargeBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
+      b.textContent?.includes('Charge')
+    );
+    expect(chargeBtn).toBeDefined();
+    await act(async () => {
+      chargeBtn!.click();
+    });
+
+    expect(completedSale).not.toBeNull();
+    expect(completedSale!.items[0].unitPrice).toBe(100);
+    expect(completedSale!.items[0].unitPriceInclusive).toBe(118);
+    expect(completedSale!.items[0].priceMode).toBe('EXCLUSIVE');
+    expect(completedSale!.items[0].cessRate).toBe(0);
+    expect(completedSale!.items[0].totalAmount).toBe(118);
+    expect(completedSale!.grandTotal).toBe(118);
   });
 
   it('6. Purchase stock regression: purchase 1 × inclusive 118 @ 18% + 12% CESS → stored exclusive rate 100, purchase total 130, stock increases by 1, stock valuation uses 100 not 118', () => {
@@ -735,5 +786,409 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     simplifiedText = container?.textContent || '';
     expect(simplifiedText).toContain('118.00');
     expect(simplifiedText).not.toContain('Incl. ₹999');
+  });
+
+  it('9. Thermal printing legacy fallback: legacy item without unitPriceInclusive derives inclusive rate and prints separate CESS', async () => {
+    const legacyItemInvoice: Invoice = {
+      id: 'INV-THERMAL-LEGACY',
+      invoiceNumber: 'INV-TH-001',
+      invoiceType: 'B2B',
+      date: '2026-10-26',
+      partyName: 'Quick Walk-in',
+      partyAddress: '123 Market Road',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      isGstInvoice: true,
+      items: [
+        {
+          itemId: 'ITM-TH-1',
+          name: 'Mineral Water Bottle',
+          hsnSacCode: '2202',
+          quantity: 1,
+          unit: 'PCS',
+          unitPrice: 100,
+          // unitPriceInclusive is deliberately undefined (legacy item)
+          priceMode: 'EXCLUSIVE',
+          gstRate: 18,
+          cessRate: 12,
+          discountPercent: 0,
+          discountAmount: 0,
+          taxableAmount: 100,
+          cgstAmount: 9,
+          sgstAmount: 9,
+          igstAmount: 0,
+          cessAmount: 12,
+          totalAmount: 130,
+        },
+      ],
+      totalGrossAmount: 100,
+      totalDiscount: 0,
+      totalTaxableAmount: 100,
+      totalCgst: 9,
+      totalSgst: 9,
+      totalIgst: 0,
+      totalCess: 12,
+      totalTax: 30,
+      roundOff: 0,
+      grandTotal: 130,
+      amountInWords: 'One Hundred Thirty Rupees Only',
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      paidAmount: 130,
+      balanceAmount: 0,
+      createdAt: '2026-10-26T10:00:00.000Z',
+      updatedAt: '2026-10-26T10:00:00.000Z',
+    };
+
+    // 9a. Render ThermalPrintModal
+    await act(async () => {
+      root!.render(
+        <ThermalPrintModal
+          invoice={legacyItemInvoice}
+          company={gstCompany}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    const thermalModalText = container?.textContent || '';
+    expect(thermalModalText).toContain('Incl: Rs. 118.00');
+    expect(thermalModalText).toContain('CESS: 12%');
+
+    // 9b. Verify 32-col formatThermalReceiptText
+    const text32 = formatThermalReceiptText(
+      {
+        companyName: gstCompany.businessName,
+        companyAddress: gstCompany.address,
+        gstin: gstCompany.gstin,
+        phone: gstCompany.phone,
+        isGst: true,
+        invoiceNo: legacyItemInvoice.invoiceNumber,
+        date: legacyItemInvoice.date,
+        items: [
+          {
+            name: 'Mineral Water Bottle',
+            qty: 1,
+            rate: 100,
+            rateInclusive: 118, // Derived by ThermalPrintModal
+            cessRate: 12,
+            amount: 130,
+          },
+        ],
+        taxableAmount: 100,
+        cgstAmount: 9,
+        sgstAmount: 9,
+        igstAmount: 0,
+        totalCess: 12,
+        grandTotal: 130,
+      },
+      32
+    );
+    expect(text32).toContain('100.00');
+    expect(text32).toContain('Incl: Rs. 118.00');
+    expect(text32).toContain('CESS: 12%');
+
+    // 9c. Verify 48-col formatThermalReceiptText
+    const text48 = formatThermalReceiptText(
+      {
+        companyName: gstCompany.businessName,
+        companyAddress: gstCompany.address,
+        gstin: gstCompany.gstin,
+        phone: gstCompany.phone,
+        isGst: true,
+        invoiceNo: legacyItemInvoice.invoiceNumber,
+        date: legacyItemInvoice.date,
+        items: [
+          {
+            name: 'Mineral Water Bottle',
+            qty: 1,
+            rate: 100,
+            rateInclusive: 118,
+            cessRate: 12,
+            amount: 130,
+          },
+        ],
+        taxableAmount: 100,
+        cgstAmount: 9,
+        sgstAmount: 9,
+        igstAmount: 0,
+        totalCess: 12,
+        grandTotal: 130,
+      },
+      48
+    );
+    expect(text48).toContain('100.00');
+    expect(text48).toContain('Incl: Rs. 118.00');
+    expect(text48).toContain('CESS: 12%');
+
+    // 9d. Verify ESC/POS binary output
+    const binary = buildThermalReceiptBinary(
+      {
+        companyName: gstCompany.businessName,
+        companyAddress: gstCompany.address,
+        gstin: gstCompany.gstin,
+        phone: gstCompany.phone,
+        isGst: true,
+        invoiceNo: legacyItemInvoice.invoiceNumber,
+        date: legacyItemInvoice.date,
+        items: [
+          {
+            name: 'Mineral Water Bottle',
+            qty: 1,
+            rate: 100,
+            rateInclusive: 118,
+            cessRate: 12,
+            amount: 130,
+          },
+        ],
+        taxableAmount: 100,
+        cgstAmount: 9,
+        sgstAmount: 9,
+        igstAmount: 0,
+        totalCess: 12,
+        grandTotal: 130,
+      },
+      { width: 32 }
+    );
+    const decodedBinary = new TextDecoder().decode(binary);
+    expect(decodedBinary).toContain('Incl: Rs. 118.00');
+    expect(decodedBinary).toContain('CESS: 12%');
+  });
+
+  it('10. Grid row save regression: EXCLUSIVE mode with unitPrice 100 and stale unitPriceInclusive 999 saves inclusive 118', async () => {
+    const staleDraft: any = {
+      invoiceNumber: 'INV-STALE-SAVE-01',
+      invoiceDate: '2026-10-26',
+      rows: [
+        {
+          name: 'Stale Item',
+          quantity: 1,
+          unitPrice: 100,
+          unitPriceInclusive: 999, // Stale!
+          priceMode: 'EXCLUSIVE',
+          gstRate: 18,
+        },
+      ],
+    };
+
+    draftService.saveInvoiceDraft(staleDraft);
+
+    let savedInvoice: Invoice | null = null;
+    await act(async () => {
+      root!.render(
+        <TableGridInvoiceModal
+          onClose={vi.fn()}
+          onSave={(inv) => {
+            savedInvoice = inv;
+          }}
+          company={gstCompany}
+          parties={[]}
+          itemsCatalog={[catalogItem]}
+        />
+      );
+    });
+
+    const saveBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
+      b.textContent?.includes('Save Invoice')
+    );
+    expect(saveBtn).toBeDefined();
+    await act(async () => {
+      saveBtn!.click();
+    });
+
+    expect(savedInvoice).not.toBeNull();
+    expect(savedInvoice!.items[0].unitPrice).toBe(100);
+    expect(savedInvoice!.items[0].unitPriceInclusive).toBe(118);
+    expect(savedInvoice!.items[0].priceMode).toBe('EXCLUSIVE');
+  });
+
+  it('11. Draft load regression: draft with EXCLUSIVE row 100 / stale inclusive 999 displays and saves 118 for purchase as well', async () => {
+    const stalePurchaseDraft: any = {
+      billNumber: 'PUR-STALE-DRAFT-01',
+      billDate: '2026-10-26',
+      rows: [
+        {
+          itemId: 'ITM-001',
+          name: 'Stock Item 1',
+          quantity: 1,
+          unitPrice: 100,
+          unitPriceInclusive: 999, // Stale!
+          priceMode: 'EXCLUSIVE',
+          gstRate: 18,
+        },
+      ],
+    };
+
+    draftService.savePurchaseDraft(stalePurchaseDraft);
+
+    let savedBill: PurchaseBill | null = null;
+    await act(async () => {
+      root!.render(
+        <TableGridPurchaseModal
+          onClose={vi.fn()}
+          onSave={(b) => {
+            savedBill = b;
+          }}
+          company={gstCompany}
+          parties={[]}
+          itemsCatalog={[catalogItem]}
+        />
+      );
+    });
+
+    const text = container?.textContent || '';
+    expect(text).toContain('118.00');
+    expect(text).not.toContain('999');
+
+    const saveBtn =
+      (container?.querySelector('[data-testid="purchase-save-btn"]') as HTMLButtonElement) ||
+      Array.from(container?.querySelectorAll('button') || []).find((b) =>
+        b.textContent?.includes('Save Purchase Bill')
+      );
+    expect(saveBtn).toBeDefined();
+    await act(async () => {
+      saveBtn!.click();
+    });
+
+    expect(savedBill).not.toBeNull();
+    expect(savedBill!.items[0].unitPrice).toBe(100);
+    expect(savedBill!.items[0].unitPriceInclusive).toBe(118);
+    expect(savedBill!.items[0].priceMode).toBe('EXCLUSIVE');
+  });
+
+  it('12. POS exclusive price edit: editing exclusive price from 100 to 200 in cart automatically updates inclusive to 236', async () => {
+    mockLocalStorage.clear();
+
+    await act(async () => {
+      root!.render(
+        <QuickBillingView
+          company={gstCompany}
+          items={[catalogItem]}
+          onCompleteSale={vi.fn()}
+        />
+      );
+    });
+
+    // Click catalog item card to add to cart
+    const itemCard =
+      (container?.querySelector(`[data-testid="pos-item-${catalogItem.id}"]`) as HTMLElement) ||
+      Array.from(container?.querySelectorAll('div') || []).find((el) =>
+        el.textContent?.includes('Stock Item 1') && el.getAttribute('data-testid')?.startsWith('pos-item-')
+      );
+    expect(itemCard).toBeDefined();
+    await act(async () => {
+      itemCard!.click();
+    });
+
+    // Cart shows Incl. ₹118
+    expect(container?.textContent).toContain('Incl. ₹118');
+
+    // Find the price input
+    const priceInput = container?.querySelector('input[type="number"][value="100"]') as HTMLInputElement;
+    expect(priceInput).toBeDefined();
+    await act(async () => {
+      // simulate changing exclusive price to 200
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(priceInput, '200');
+      priceInput.dispatchEvent(new Event('input', { bubbles: true }));
+      priceInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Cart updates to Incl. ₹236
+    expect(container?.textContent).toContain('Incl. ₹236');
+  });
+
+  it('13. Stale inclusive regression: CreateInvoiceModal and InvoiceLineItemsGrid derive inclusive 118 for EXCLUSIVE 100 with stale inclusive 999; CESS remains separate (total 130)', async () => {
+    // 13a. InvoiceLineItemsGrid display test
+    const testRows = [
+      {
+        itemId: 'ITM-001',
+        name: 'Mineral Water',
+        quantity: 1,
+        unit: 'PCS',
+        unitPrice: 100,
+        unitPriceInclusive: 999, // Stale
+        priceMode: 'EXCLUSIVE' as const,
+        gstRate: 18,
+        cessRate: 12,
+        discountPercent: 0,
+      },
+    ];
+
+    await act(async () => {
+      root!.render(
+        <InvoiceLineItemsGrid
+          rows={testRows as any}
+          calcItems={[{ totalAmount: 130 } as any]}
+          isGstActive={true}
+          onAddItem={vi.fn()}
+          onEditItem={vi.fn()}
+          onOpenScanner={vi.fn()}
+        />
+      );
+    });
+
+    const gridText = container?.textContent || '';
+    expect(gridText).toContain('Mineral Water');
+    expect(gridText).toContain('Incl. ₹ 118.00');
+    expect(gridText).not.toContain('999');
+    expect(gridText).toContain('CESS 12%');
+    expect(gridText).toContain('₹ 130.00');
+
+    // 13b. CreateInvoiceModal draft load and submit test
+    const staleDraft: any = {
+      invoiceNumber: 'INV-SIMP-STALE-01',
+      invoiceDate: '2026-10-26',
+      rows: [
+        {
+          name: 'Mineral Water',
+          quantity: 1,
+          unitPrice: 100,
+          unitPriceInclusive: 999,
+          priceMode: 'EXCLUSIVE',
+          gstRate: 18,
+          cessRate: 12,
+        },
+      ],
+    };
+    draftService.saveInvoiceDraft(staleDraft);
+
+    let savedInvoice: Invoice | null = null;
+    await act(async () => {
+      root!.render(
+        <CreateInvoiceModal
+          company={gstCompany}
+          parties={[]}
+          itemsCatalog={[catalogItem]}
+          onClose={vi.fn()}
+          onSave={(inv) => {
+            savedInvoice = inv;
+          }}
+        />
+      );
+    });
+
+    const nameInput = container?.querySelector('input[placeholder="Item name / description"]') as HTMLInputElement;
+    expect(nameInput?.value).toBe('Mineral Water');
+
+    const modalText = container?.textContent || '';
+    expect(modalText).toContain('Total Value:₹ 130.00');
+    expect(modalText).not.toContain('999');
+
+    // Submit invoice
+    const form = container?.querySelector('form');
+    expect(form).toBeDefined();
+    await act(async () => {
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(savedInvoice).not.toBeNull();
+    expect(savedInvoice!.items[0].unitPrice).toBe(100);
+    expect(savedInvoice!.items[0].unitPriceInclusive).toBe(118);
+    expect(savedInvoice!.items[0].priceMode).toBe('EXCLUSIVE');
+    expect(savedInvoice!.items[0].cessRate).toBe(12);
+    expect(savedInvoice!.items[0].totalAmount).toBe(130);
+    expect(savedInvoice!.grandTotal).toBe(130);
   });
 });

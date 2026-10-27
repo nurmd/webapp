@@ -230,7 +230,10 @@ describe('Payment In / Out: Bank Account Selection & Dropdown Redesign', () => {
       'IN',
       undefined,
       0,
-      'ACC_BANK_SBI'
+      'ACC_BANK_SBI',
+      [],
+      'UNALLOCATED',
+      expect.any(String)
     );
   });
 

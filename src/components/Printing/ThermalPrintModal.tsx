@@ -10,6 +10,7 @@ import {
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
+import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
@@ -80,14 +81,24 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     date: invoice.date,
     customerName: invoice.partyName,
     customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
-    items: invoice.items.map((i) => ({
-      name: i.name,
-      qty: i.quantity,
-      rate: i.unitPrice,
-      rateInclusive: i.unitPriceInclusive,
-      cessRate: i.cessRate,
-      amount: i.totalAmount,
-    })),
+    items: invoice.items.map((i) => {
+      const stored = Number(i.unitPriceInclusive);
+      const isGstActive = company.isGstEnabled !== false && !company.isCompositionScheme;
+      const rateInclusive =
+        Number.isFinite(stored) && stored > 0
+          ? stored
+          : isGstActive
+          ? inclusiveFromExclusive(i.unitPrice, i.gstRate || 0)
+          : undefined;
+      return {
+        name: i.name,
+        qty: i.quantity,
+        rate: i.unitPrice,
+        rateInclusive,
+        cessRate: i.cessRate,
+        amount: i.totalAmount,
+      };
+    }),
     taxableAmount: invoice.totalTaxableAmount,
     totalDiscount: thermalSettings.showItemDiscount ? invoice.totalDiscount : 0,
     cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalCgst : 0,

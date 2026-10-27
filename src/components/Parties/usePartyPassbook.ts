@@ -134,9 +134,12 @@ export function usePartyPassbook({
 
     vouchers.forEach((v) => {
       if (v.isCancelled || v.isReversed) return;
-      const isPartyVoucher = v.entries.some(
-        (e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === party.name.toLowerCase())
-      );
+      const isPartyVoucher =
+        v.partyId === party.id ||
+        (v.partyName && v.partyName.toLowerCase() === party.name.toLowerCase()) ||
+        v.entries.some(
+          (e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === party.name.toLowerCase())
+        );
 
       if (isPartyVoucher) {
         const isDupe = rawEntries.some(
@@ -154,15 +157,22 @@ export function usePartyPassbook({
             ? (v.narration?.toUpperCase().includes('BANK') ? 'BANK' : 'UPI')
             : 'UPI';
 
+          const linkedDocsText = v.paymentAllocations && v.paymentAllocations.length > 0
+            ? v.paymentAllocations.map((a) => a.documentNumber).join(', ')
+            : v.sourceDocumentNumber || '';
+
           if (v.voucherType === 'RECEIPT') {
             totalVoucherReceipts += v.totalAmount;
+            const desc = linkedDocsText
+              ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
+              : (v.narration || (isSplitVoucher ? 'Split Payment received' : 'Payment received'));
             rawEntries.push({
               id: `vchr-${v.id}`,
               rawId: v.id,
               date: v.date,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_IN',
-              description: v.narration || (isSplitVoucher ? 'Split Payment received' : 'Payment received'),
+              description: desc,
               debit: 0,
               credit: v.totalAmount,
               status: 'PAID',
@@ -171,13 +181,16 @@ export function usePartyPassbook({
             });
           } else if (v.voucherType === 'PAYMENT') {
             totalVoucherPayments += v.totalAmount;
+            const desc = linkedDocsText
+              ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
+              : (v.narration || (isSplitVoucher ? 'Split Payment disbursed' : 'Payment made'));
             rawEntries.push({
               id: `vchr-${v.id}`,
               rawId: v.id,
               date: v.date,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_OUT',
-              description: v.narration || (isSplitVoucher ? 'Split Payment disbursed' : 'Payment made'),
+              description: desc,
               debit: v.totalAmount,
               credit: 0,
               status: 'PAID',
@@ -338,7 +351,17 @@ export function usePartyPassbook({
 
       if (searchTxn.trim()) {
         const q = searchTxn.toLowerCase();
+        let matchVoucherDoc = false;
+        if (entry.rawVoucher) {
+          if (entry.rawVoucher.paymentAllocations?.some((a) => a.documentNumber.toLowerCase().includes(q))) {
+            matchVoucherDoc = true;
+          }
+          if (entry.rawVoucher.sourceDocumentNumber?.toLowerCase().includes(q)) {
+            matchVoucherDoc = true;
+          }
+        }
         const m =
+          matchVoucherDoc ||
           entry.docNumber.toLowerCase().includes(q) ||
           entry.description.toLowerCase().includes(q) ||
           (entry.paymentMode && entry.paymentMode.toLowerCase().includes(q)) ||

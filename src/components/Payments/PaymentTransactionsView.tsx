@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { CompanyProfile } from '../../models/company.ts';
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
-import type { Invoice } from '../../models/invoice.ts';
+import type { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
-import type { Voucher } from '../../core/accounting/voucherTypes.ts';
+import type { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
+import type { Party } from '../../models/party.ts';
 import type { AppTab } from '../Shell/Drawer.tsx';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
@@ -12,6 +13,7 @@ import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DirectCashBankModal } from '../CashBank/DirectCashBankModal.tsx';
 import { CashBankTransactionDetailModal } from '../CashBank/CashBankTransactionDetailModal.tsx';
+import { RecordPaymentModal } from '../Parties/RecordPaymentModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface PaymentTransactionsViewProps {
@@ -23,9 +25,25 @@ export interface PaymentTransactionsViewProps {
   purchases: PurchaseBill[];
   expenses: Expense[];
   vouchers?: Voucher[];
+  parties?: Party[];
   onSaveTransaction: (txn: CashBankTransaction) => void;
   onDeleteTransaction: (id: string) => void;
   onNavigateTab: (tab: AppTab) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
+  onRecordPartyPayment?: (
+    party: Party,
+    amount: number,
+    paymentMode: string,
+    notes: string,
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[],
+    discount?: number,
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
+  ) => boolean | void;
 }
 
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
@@ -37,13 +55,18 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   purchases,
   expenses,
   vouchers = [],
+  parties = [],
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
+  onViewInvoice,
+  onViewPurchase,
+  onRecordPartyPayment,
 }) => {
   const isFlowIn = flow === 'IN';
 
-  // Modals
+  // Modes: 'TRANSACTIONS' (default list) vs 'ENTRY' (separate new payment entry view)
+  const [viewMode, setViewMode] = useState<'TRANSACTIONS' | 'ENTRY'>('TRANSACTIONS');
   const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
@@ -62,6 +85,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       setIsDateModalOpen(false);
       return true;
     }
+    if (viewMode === 'ENTRY') {
+      setViewMode('TRANSACTIONS');
+      return true;
+    }
     if (isDirectModalOpen) {
       setIsDirectModalOpen(false);
       return true;
@@ -72,12 +99,16 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       return true;
     }
     return false;
-  }, isDateModalOpen || isDirectModalOpen || isDetailModalOpen, 20);
+  }, isDateModalOpen || viewMode === 'ENTRY' || isDirectModalOpen || isDetailModalOpen, 20);
 
   // Date range bounds
   const dateRange = useMemo(() => {
     return getDateFilterBounds(datePreset, customStart, customEnd);
   }, [datePreset, customStart, customEnd]);
+
+  const voucherMap = useMemo(() => new Map(vouchers.map((v) => [v.id, v])), [vouchers]);
+  const invoiceMap = useMemo(() => new Map(invoices.map((inv) => [inv.id, inv])), [invoices]);
+  const purchaseMap = useMemo(() => new Map(purchases.map((pur) => [pur.id, pur])), [purchases]);
 
   // Compute live ledger math via centralized engine
   const summary = useMemo(() => {
@@ -125,14 +156,27 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         const matchMode = (entry.mode || '').toLowerCase().includes(query);
         const matchAccount = (entry.accountName || '').toLowerCase().includes(query);
         const matchAmount = entry.amount.toString().includes(query);
-        if (!matchTitle && !matchRef && !matchDesc && !matchMode && !matchAccount && !matchAmount) {
+
+        let matchLinkedDocs = false;
+        if (entry.rawVoucherId) {
+          const v = voucherMap.get(entry.rawVoucherId);
+          if (v) {
+            if (v.voucherNumber?.toLowerCase().includes(query)) matchLinkedDocs = true;
+            if (v.sourceDocumentNumber?.toLowerCase().includes(query)) matchLinkedDocs = true;
+            if (v.paymentAllocations?.some((a) => a.documentNumber.toLowerCase().includes(query))) {
+              matchLinkedDocs = true;
+            }
+          }
+        }
+
+        if (!matchTitle && !matchRef && !matchDesc && !matchMode && !matchAccount && !matchAmount && !matchLinkedDocs) {
           return false;
         }
       }
 
       return true;
     });
-  }, [summary.ledgerEntries, flow, accountFilter, dateRange.start, dateRange.end, searchQuery]);
+  }, [summary.ledgerEntries, flow, accountFilter, dateRange.start, dateRange.end, searchQuery, voucherMap]);
 
   // Totals for the current filtered set (never misleading all-time totals)
   const { totalAmount, totalCount, cashPortion, bankPortion } = useMemo(() => {
@@ -187,6 +231,89 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         : accountFilter
       : undefined;
 
+  if (viewMode === 'ENTRY') {
+    return (
+      <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-4xl mx-auto animate-in fade-in">
+        {/* Entry View Top Header with Navigation back to existing transactions */}
+        <div className="flex items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode('TRANSACTIONS')}
+              className="h-9 px-2.5 rounded-xl flex items-center gap-1.5 text-on-surface-variant hover:bg-surface-container active:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0 border border-outline-variant/30"
+              title="Back to Existing Transactions"
+              aria-label="Back to Existing Transactions"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              <span className="text-xs font-semibold">Back to Existing Transactions</span>
+            </button>
+            <div className="flex flex-col">
+              <h2 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface">
+                {isFlowIn ? 'Record Payment In (Receipt)' : 'Record Payment Out'}
+              </h2>
+              <span className="text-[11px] text-on-surface-variant">
+                Link to outstanding {isFlowIn ? 'sales invoices' : 'purchase bills'} or record an advance
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setViewMode('TRANSACTIONS')}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {/* Dedicated Entry Form Panel (not an overlay dialog) */}
+        <section className="w-full">
+          <RecordPaymentModal
+            asDialog={false}
+            isOpen={true}
+            onClose={() => setViewMode('TRANSACTIONS')}
+            parties={parties}
+            invoices={invoices}
+            purchases={purchases}
+            bankAccounts={accounts}
+            initialPaymentType={isFlowIn ? 'IN' : 'OUT'}
+            onRecordPayment={(
+              party,
+              amount,
+              paymentMode,
+              notes,
+              paymentType,
+              paymentSplits,
+              discount,
+              bankAccountId,
+              allocations,
+              allocationMode,
+              paymentDate
+            ) => {
+              const res = onRecordPartyPayment?.(
+                party,
+                amount,
+                paymentMode,
+                notes,
+                paymentType,
+                paymentSplits,
+                discount,
+                bankAccountId,
+                allocations,
+                allocationMode,
+                paymentDate
+              );
+              if (res === false) {
+                return false;
+              }
+              setViewMode('TRANSACTIONS');
+              return true;
+            }}
+          />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-7xl mx-auto">
       {/* 1. Header Bar with Back Button to Dashboard */}
@@ -222,24 +349,43 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
           </div>
         </div>
 
-        {/* Primary Action Button */}
-        <button
-          type="button"
-          onClick={() => setIsDirectModalOpen(true)}
-          className={`h-9 px-3.5 sm:px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer flex-shrink-0 ${
-            isFlowIn
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-              : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
-          }`}
-          title={ctaLabel}
-          aria-label={ctaLabel}
-        >
-          <span className="material-symbols-outlined text-[17px]">
-            {isFlowIn ? 'call_received' : 'call_made'}
-          </span>
-          <span className="hidden sm:inline">{ctaLabel}</span>
-          <span className="sm:hidden">{isFlowIn ? '+ Record In' : '+ Record Out'}</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {onRecordPartyPayment && (
+            <button
+              type="button"
+              onClick={() => setViewMode('ENTRY')}
+              className={`h-9 px-3 sm:px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer ${
+                isFlowIn
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+                  : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
+              }`}
+              title={isFlowIn ? 'Record Receipt with bill links' : 'Record Payment with bill links'}
+              aria-label={isFlowIn ? 'Record Receipt' : 'Record Payment'}
+            >
+              <span className="material-symbols-outlined text-[17px]">
+                {isFlowIn ? 'receipt_long' : 'payments'}
+              </span>
+              <span className="hidden sm:inline">
+                {isFlowIn ? '+ Record Receipt' : '+ Record Payment'}
+              </span>
+              <span className="sm:hidden">{isFlowIn ? '+ Receipt' : '+ Payment'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsDirectModalOpen(true)}
+            className="h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold flex items-center gap-1 border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant transition-all cursor-pointer"
+            title={ctaLabel}
+            aria-label={ctaLabel}
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isFlowIn ? 'add_circle' : 'remove_circle'}
+            </span>
+            <span className="hidden md:inline">Direct</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. Total Summary Strip for Filtered Set */}
@@ -542,6 +688,72 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                         </>
                       )}
                     </div>
+
+                    {/* Linked Document Badges for Payment Vouchers */}
+                    {(() => {
+                      const linkedVoucher = entry.rawVoucherId ? voucherMap.get(entry.rawVoucherId) : null;
+                      if (!linkedVoucher) return null;
+
+                      if (linkedVoucher.paymentAllocations && linkedVoucher.paymentAllocations.length > 0) {
+                        const allocatedSum = linkedVoucher.paymentAllocations.reduce((s, a) => s + (a.amount || 0), 0);
+                        const unallocatedAmount = Math.max(0, Math.round((linkedVoucher.totalAmount - allocatedSum) * 100) / 100);
+                        return (
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="text-[10px] text-on-surface-variant font-medium">Linked to:</span>
+                            {linkedVoucher.paymentAllocations.map((alloc) => {
+                              const inv = alloc.documentType === 'INVOICE' ? invoiceMap.get(alloc.documentId) : null;
+                              const pur = alloc.documentType === 'PURCHASE' ? purchaseMap.get(alloc.documentId) : null;
+                              return (
+                                <button
+                                  key={alloc.documentId}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (inv && onViewInvoice) onViewInvoice(inv);
+                                    else if (pur && onViewPurchase) onViewPurchase(pur);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold font-mono transition-colors cursor-pointer"
+                                  title={`Click to view ${alloc.documentNumber}`}
+                                >
+                                  <span>{alloc.documentNumber}</span>
+                                  <span className="font-sans font-medium text-[9px] text-on-surface-variant">
+                                    ({formatINR(alloc.amount)})
+                                  </span>
+                                  <span className="material-symbols-outlined text-[11px]">open_in_new</span>
+                                </button>
+                              );
+                            })}
+                            {unallocatedAmount > 0 ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+                                Advance: {formatINR(unallocatedAmount)}
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      }
+
+                      if (linkedVoucher.allocationMode === 'UNALLOCATED' || (!linkedVoucher.paymentAllocations?.length && linkedVoucher.partyId)) {
+                        return (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+                              Unallocated Advance: {formatINR(linkedVoucher.totalAmount || entry.amount)}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      if (linkedVoucher.sourceDocumentNumber) {
+                        return (
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <span className="px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary text-[10px] font-medium font-mono">
+                              Linked to: {linkedVoucher.sourceDocumentNumber}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
                   </div>
                 </div>
 
@@ -590,6 +802,11 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         entry={selectedLedgerEntry}
         rawTransaction={selectedRawTxn}
         accounts={accounts}
+        vouchers={vouchers}
+        invoices={invoices}
+        purchases={purchases}
+        onViewInvoice={onViewInvoice}
+        onViewPurchase={onViewPurchase}
         onSaveTransaction={onSaveTransaction}
         onDeleteTransaction={onDeleteTransaction}
         onNavigateTab={onNavigateTab}

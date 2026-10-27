@@ -220,7 +220,45 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Scans and consolidates duplicate vouchers from repeat edits, reverses orphan vouchers referencing deleted documents, prunes invalid estimate vouchers, realigns stock discrepancies, and resynchronizes party balances.
   - Strictly idempotent across repeated executions.
 
-### D. Split-Bank Architecture & Tender Routing (`paymentSplitUtils.ts`, `ledger.ts`, `cashBankCalculator.ts`)
+### E. Payment Voucher & Invoice/Bill Linking Architecture (`paymentAllocation.ts`, `voucherTypes.ts`, `invoicePurchaseStorage.ts`)
+- **Standalone Payment Vouchers & Upfront Invariant**:
+  - Upfront payments made on sales invoices or purchase bills create first-class standalone `RECEIPT` or `PAYMENT` vouchers linked directly to the parent document via `paymentAllocations`, `sourceDocumentId`, and `sourceDocumentNumber`.
+  - Upfront/source vouchers are identified strictly by `allocationMode === 'SOURCE_DOCUMENT'` and `sourceDocumentId === document.id`.
+  - On editing an existing document: party payment vouchers are never touched or overwritten, no duplicate source vouchers are created, and source vouchers reconcile in-place. If active party payments already cover the paid amount, reducing below that is blocked.
+  - Safe deletion: deleting an invoice or purchase bill with active linked payment vouchers is blocked with an explicit error, preventing data corruption of multi-document vouchers.
+- **Invoice / Bill Linking (`PaymentAllocation`)**:
+  - Payment vouchers record allocated documents via `paymentAllocations: PaymentAllocation[]`, detailing `documentType` (`INVOICE` | `PURCHASE`), `documentId`, `documentNumber`, and allocated `amount`.
+  - `allocationMode` tracks whether allocations were `MANUAL`, `AUTO_FIFO`, `UNALLOCATED` (advance), or `SOURCE_DOCUMENT`.
+  - Pure allocation engine (`paymentAllocation.ts`):
+    - `getOutstandingDocuments()` resolves pending invoices/bills with remaining balances, matching party IDs and names.
+    - `allocateOldestFirst()` automatically applies funds chronologically (FIFO).
+    - `validateAllocations()` strictly checks against over-allocation, party mismatch, negative amounts, wrong document types, and duplicate document links.
+    - `applyAllocations()` and `reverseAllocations()` accurately adjust `paidAmount`, `balanceAmount`, `paymentMode`, and `paymentStatus` while preserving payment split breakdown ratios and actual payment modes (`UPI`, `BANK`, `CASH`, `SPLIT`).
+- **Persistent Transactions & Atomic Reversals (`db.savePaymentVoucher`, `db.reversePaymentVoucher`)**:
+  - `db.savePaymentVoucher` pre-validates allocations on in-memory projections before state mutations, rejecting invalid allocations without touching existing records.
+  - Editing a payment voucher seamlessly reverses previous allocations before applying new allocations, preventing double-counting.
+  - `db.reversePaymentVoucher` rejects already reversed or cancelled vouchers and restores document balances.
+  - Party ledger balances (`recalculatePartyBalance`) are automatically recomputed on every voucher write/reversal.
+- **Pre-Save Guards & Source Voucher Reconciliation (`validateInvoicePreSave`, `validatePurchasePreSave`)**:
+  - In `handleSaveInvoice` and `handleSavePurchase`, all guard checks run strictly **BEFORE** `db.saveInvoice` or `db.savePurchase` so a blocked edit cannot save an inconsistent paid amount or balance into the database.
+  - When other active payment vouchers exist:
+    - Attempting to reduce `paidAmount` below what other vouchers cover is blocked before save.
+    - Attempting to change `paidAmount` such that the source voucher amount would change while other vouchers exist is blocked before save, advising the user to edit or reverse the linked vouchers separately.
+    - The source voucher is NOT rebuilt with document `paymentSplits` (which include later payments and would overstate cash).
+  - When no other active payment vouchers exist, source voucher updates may use the document splits.
+- **Payment In/Out Page UI Separation (`PaymentTransactionsView`)**:
+  - Distinguishes two explicit modes: `TRANSACTIONS` (default summary cards, filters, search, and transactions list) and `ENTRY` (dedicated entry panel with inline `RecordPaymentModal` `asDialog={false}`).
+  - Clean separation: the transaction list is completely unmounted while in `ENTRY` mode (not rendered simultaneously).
+  - Top header bar provides a clear "Back to Existing Transactions" button and Cancel button returning to `TRANSACTIONS` mode.
+  - Android hardware back navigation (priority 20) exits `ENTRY` mode back to `TRANSACTIONS` mode before any outer navigation.
+  - Submitting payment through the central `onRecordPartyPayment` handler automatically returns the user to `TRANSACTIONS` mode.
+  - Obsolete direct-settlement fallback blocks in `PartiesView` and `DashboardRecordPaymentModal` were removed to guarantee that all payment recording strictly routes through the central accounting voucher engine.
+- **Passbook & Ledger Presentation**:
+  - Passbooks and Payment In / Payment Out views display linked document numbers and unallocated advance amounts.
+  - Automatic credit offset logic prevents double-counting between upfront vouchers and auto-generated sale ledger rows.
+  - Legacy invoices and vouchers without `paymentAllocations` continue to display and compute balances seamlessly without requiring data migrations.
+
+### F. Split-Bank Architecture & Tender Routing (`paymentSplitUtils.ts`, `ledger.ts`, `cashBankCalculator.ts`)
 - **Multi-Bank Account Allocation**:
   - `PaymentSplit` supports optional `accountId`, `accountName`, `reference`, and `referenceNo` metadata.
   - Multi-tender splits (UPI, CARD, BANK, CHEQUE, NET_BANKING) route directly to the designated bank account selected by the user, rather than defaulting globally to `ACC_BANK`.
@@ -453,6 +491,7 @@ npm run build
 - `supportDiagnosticsService.test.ts`: Defensive collector service, zero-mutation guarantee, and local download helper.
 - `supportDiagnosticsUI.test.tsx`: Support diagnostics UI card, release gate assertions, truthful sync/conflict verification, and privacy assertions.
 - `paymentTransactionsAndSystemParties.test.tsx`: Payment In/Out navigation, RBAC access, CONTRA exclusion, calculation parity, Cash/Bank statement deep linking, Walk-in Customer system invariants, delete guards, and POS customer selection.
+- `paymentVoucherInvoiceLink.test.ts`: Payment voucher and invoice/bill link spec (23 scenarios): upfront source vouchers, multi-document allocations, party payment preservation on document edits, stable voucher numbering, storage pre-validation, safe deletion guards, split payment mode consistency, and legacy compatibility.
 - `whatsAppModals.test.tsx`: WhatsApp modal phone prefill hierarchy, validation, clipboard fallback, and demo guardrails.
 - `granularStateDecoupling.test.tsx`: Fine-grained render isolation and `useSyncExternalStore` reactive stability across domain mutations.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.

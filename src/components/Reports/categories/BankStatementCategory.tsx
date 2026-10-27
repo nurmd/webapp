@@ -40,6 +40,8 @@ interface BankStatementCategoryProps {
   onSaveTransaction?: (txn: CashBankTransaction) => void;
   onDeleteTransaction?: (id: string) => void;
   onNavigateTab?: (tab: AppTab) => void;
+  onViewInvoice?: (invoice: Invoice) => void;
+  onViewPurchase?: (bill: PurchaseBill) => void;
 }
 
 export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
@@ -59,6 +61,8 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
+  onViewInvoice,
+  onViewPurchase,
 }) => {
   // Find default or first bank account
   const defaultAccount = accounts.find((a) => a.accountType === 'BANK' && a.isDefault) ||
@@ -671,6 +675,11 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         entry={selectedEntry}
         rawTransaction={selectedRawTxn}
         accounts={accounts}
+        vouchers={vouchers}
+        invoices={invoices}
+        purchases={purchases}
+        onViewInvoice={onViewInvoice}
+        onViewPurchase={onViewPurchase}
         onSaveTransaction={onSaveTransaction}
         onDeleteTransaction={onDeleteTransaction}
         onNavigateTab={onNavigateTab}

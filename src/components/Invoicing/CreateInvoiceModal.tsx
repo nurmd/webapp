@@ -268,8 +268,11 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const excl = Number(l.unitPrice) || 0;
       const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.gstRate) || 0);
       const rawIncl = Number(l.unitPriceInclusive) || 0;
+      const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (l.priceMode ?? 'EXCLUSIVE');
       const incl = (!isGstActive || company.isCompositionScheme)
         ? excl
+        : mode === 'EXCLUSIVE'
+        ? inclusiveFromExclusive(excl, gst)
         : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
       return {
         itemId: l.itemId,
@@ -279,7 +282,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         quantity: l.quantity,
         unitPrice: excl,
         unitPriceInclusive: incl,
-        priceMode: (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (l.priceMode ?? 'EXCLUSIVE'),
+        priceMode: mode,
         cessRate: (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.cessRate) || 0),
         discountPercent: l.discountPercent,
         discountAmount: calcItem?.discountAmount || 0,

@@ -7,7 +7,7 @@ import { InventoryItem, StockAdjustment } from './models/item.ts';
 import { Invoice, PaymentSplit, PaymentMode, InvoiceType } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
 import { Expense } from './models/expense.ts';
-import { Voucher } from './core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocation } from './core/accounting/voucherTypes.ts';
 import {
   createSalesInvoiceVoucher,
   createPurchaseInvoiceVoucher,
@@ -15,6 +15,13 @@ import {
   createPaymentOutVoucher,
   createReversalVoucher,
 } from './core/accounting/ledger.ts';
+import {
+  getOutstandingDocuments,
+  allocateOldestFirst,
+  validateInvoicePreSave,
+  validatePurchasePreSave,
+  resolveSourceVoucherSplits,
+} from './core/accounting/paymentAllocation.ts';
 
 import { Header } from './components/Shell/Header.tsx';
 import { AppTab } from './components/Shell/Drawer.tsx';
@@ -446,6 +453,28 @@ export const App: React.FC = () => {
       return;
     }
 
+    const validation = validateInvoicePreSave({
+      newInvoice,
+      existingInvoices: db.getInvoices(),
+      vouchers: db.getVouchers(),
+    });
+    if (!validation.valid) {
+      showToast(validation.error || 'Cannot save invoice: conflicting payment allocations.');
+      return;
+    }
+
+    const { isNew: isNewInvoice, existingSourceVoucher, otherActiveLinked, otherAllocatedTotal } = validation;
+
+    const isSpecialDocument =
+      newInvoice.invoiceType === 'CREDIT_NOTE' ||
+      newInvoice.invoiceType === 'DEBIT_NOTE';
+    const isOrderOrEstimate =
+      newInvoice.invoiceType === 'ESTIMATE' ||
+      newInvoice.invoiceType === 'SALES_ORDER' ||
+      newInvoice.invoiceType === 'DELIVERY_CHALLAN';
+    const isCredit = newInvoice.paymentMode === 'CREDIT';
+    const isUnpaidOrCancelled = isSpecialDocument || isOrderOrEstimate || newInvoice.isCancelled || (newInvoice.paidAmount || 0) <= 0 || isCredit;
+
     try {
       db.saveInvoice(newInvoice);
     } catch (err: any) {
@@ -454,11 +483,6 @@ export const App: React.FC = () => {
     }
 
     // Auto-create Double-Entry Accounting Voucher for Sales (only for taxable sales, not quotes or orders)
-    const isOrderOrEstimate =
-      newInvoice.invoiceType === 'ESTIMATE' ||
-      newInvoice.invoiceType === 'SALES_ORDER' ||
-      newInvoice.invoiceType === 'DELIVERY_CHALLAN';
-
     const existingVoucher = db.getVouchers().find(
       (v) =>
         !v.isReversed &&
@@ -498,6 +522,117 @@ export const App: React.FC = () => {
         isReversed: true,
         reversalVoucherId: rev.id,
       });
+    }
+
+    if (isNewInvoice) {
+      // On NEW document creation: create exactly one source voucher if paidAmount > 0
+      if (!isUnpaidOrCancelled) {
+        const sourceAmount = Number((newInvoice.paidAmount || 0).toFixed(2));
+        const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
+          sourceAmount,
+          newInvoice.paymentSplits,
+          newInvoice.paymentMode
+        );
+
+        const receiptVoucher = createPaymentReceiptVoucher({
+          receiptNumber: `INV-${newInvoice.invoiceNumber}`,
+          date: newInvoice.date,
+          customerName: newInvoice.partyName,
+          customerId: newInvoice.partyId || 'ACC_CASH',
+          amount: sourceAmount,
+          paymentMode: sourceMode,
+          paymentSplits: sourceSplits,
+          narration: `Upfront payment received for Invoice #${newInvoice.invoiceNumber}`,
+        });
+
+        receiptVoucher.partyId = newInvoice.partyId;
+        receiptVoucher.partyName = newInvoice.partyName;
+        receiptVoucher.sourceDocumentType = 'INVOICE';
+        receiptVoucher.sourceDocumentId = newInvoice.id;
+        receiptVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
+        receiptVoucher.allocationMode = 'SOURCE_DOCUMENT';
+        receiptVoucher.paymentAllocations = [
+          {
+            documentType: 'INVOICE',
+            documentId: newInvoice.id,
+            documentNumber: newInvoice.invoiceNumber,
+            amount: sourceAmount,
+            date: newInvoice.date,
+          },
+        ];
+
+        // Save voucher with skipDocumentUpdate since newInvoice already holds the paidAmount/balance
+        db.savePaymentVoucher(receiptVoucher, { skipDocumentUpdate: true });
+      }
+    } else {
+      // On EDITING an existing document:
+      // Never create a new source voucher. Never touch non-source party payment vouchers.
+      // Special documents (CREDIT_NOTE / DEBIT_NOTE) do not create or update source vouchers.
+      // When other active payment vouchers exist, do not rebuild source voucher with invoice paymentSplits.
+      if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length === 0) {
+        const newSourceAmount = Number(((newInvoice.paidAmount || 0) - otherAllocatedTotal).toFixed(2));
+        if (isUnpaidOrCancelled || newSourceAmount <= 0) {
+          const rev = createReversalVoucher({
+            originalVoucher: existingSourceVoucher,
+            reason: `Reversal of source receipt #${existingSourceVoucher.voucherNumber} for invoice #${newInvoice.invoiceNumber}`,
+          });
+          db.saveVoucher(rev);
+          db.saveVoucher({
+            ...existingSourceVoucher,
+            isReversed: true,
+            reversalVoucherId: rev.id,
+          });
+        } else if (newSourceAmount !== existingSourceVoucher.totalAmount || newInvoice.date !== existingSourceVoucher.date || newInvoice.partyId !== existingSourceVoucher.partyId) {
+          const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
+            newSourceAmount,
+            newInvoice.paymentSplits,
+            newInvoice.paymentMode
+          );
+
+          const updatedSourceVoucher = createPaymentReceiptVoucher({
+            voucherId: existingSourceVoucher.id,
+            receiptNumber: existingSourceVoucher.voucherNumber.replace(/^VCH-RCPT-/, ''),
+            date: newInvoice.date,
+            customerName: newInvoice.partyName,
+            customerId: newInvoice.partyId || 'ACC_CASH',
+            amount: newSourceAmount,
+            paymentMode: sourceMode,
+            paymentSplits: sourceSplits,
+            narration: `Upfront payment received for Invoice #${newInvoice.invoiceNumber}`,
+          });
+
+          updatedSourceVoucher.partyId = newInvoice.partyId;
+          updatedSourceVoucher.partyName = newInvoice.partyName;
+          updatedSourceVoucher.sourceDocumentType = 'INVOICE';
+          updatedSourceVoucher.sourceDocumentId = newInvoice.id;
+          updatedSourceVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
+          updatedSourceVoucher.allocationMode = 'SOURCE_DOCUMENT';
+          updatedSourceVoucher.paymentAllocations = [
+            {
+              documentType: 'INVOICE',
+              documentId: newInvoice.id,
+              documentNumber: newInvoice.invoiceNumber,
+              amount: newSourceAmount,
+              date: newInvoice.date,
+            },
+          ];
+
+          db.savePaymentVoucher(updatedSourceVoucher, { skipDocumentUpdate: true });
+        }
+      } else if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length > 0) {
+        // When other vouchers are also linked:
+        // Update the source voucher's date (and narration if applicable) without recreating entries or changing the allocation amount
+        if (newInvoice.date !== existingSourceVoucher.date) {
+          const updatedSourceVoucher: Voucher = {
+            ...existingSourceVoucher,
+            date: newInvoice.date,
+            paymentAllocations: (existingSourceVoucher.paymentAllocations || []).map((a) =>
+              a.documentId === newInvoice.id ? { ...a, date: newInvoice.date } : { ...a }
+            ),
+          };
+          db.savePaymentVoucher(updatedSourceVoucher, { skipDocumentUpdate: true });
+        }
+      }
     }
 
     if (newInvoice.partyId) {
@@ -595,11 +730,31 @@ export const App: React.FC = () => {
   }, []);
 
   const handleSavePurchase = useCallback((newBill: PurchaseBill) => {
+    const validation = validatePurchasePreSave({
+      newBill,
+      existingPurchases: db.getPurchases(),
+      vouchers: db.getVouchers(),
+    });
+    if (!validation.valid) {
+      const msg = validation.error || 'Cannot save purchase bill: conflicting payment allocations.';
+      showToast(msg);
+      alert(msg);
+      return;
+    }
+
+    const { isNew: isNewBill, existingSourceVoucher: existingSourcePaymentVoucher, otherActiveLinked, otherAllocatedTotal } = validation;
+
+    const isPurchaseReturn =
+      newBill.purchaseType === 'RETURN' ||
+      (newBill.purchaseType as string) === 'PURCHASE_RETURN';
+    const isPurchaseOrder = newBill.purchaseType === 'PO';
+    const isPurchaseChallan = newBill.purchaseType === 'CHALLAN';
+    const isPurCredit = newBill.paymentMode === 'CREDIT';
+    const isPurUnpaidOrCancelled = isPurchaseReturn || isPurchaseOrder || isPurchaseChallan || newBill.isCancelled || (newBill.paidAmount || 0) <= 0 || isPurCredit;
+
     db.savePurchase(newBill);
 
     // Auto-create Double-Entry Accounting Voucher for Purchase (only for inward bills, not purchase orders or challans)
-    const isPurchaseOrder = newBill.purchaseType === 'PO';
-    const isPurchaseChallan = newBill.purchaseType === 'CHALLAN';
     const existingVoucher = db.getVouchers().find(
       (v) =>
         !v.isReversed &&
@@ -642,10 +797,121 @@ export const App: React.FC = () => {
       });
     }
 
+    if (isNewBill) {
+      // On NEW bill creation: create exactly one source voucher if paidAmount > 0
+      if (!isPurUnpaidOrCancelled) {
+        const sourceAmount = Number((newBill.paidAmount || 0).toFixed(2));
+        const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
+          sourceAmount,
+          newBill.paymentSplits,
+          newBill.paymentMode
+        );
+
+        const rawReceiptNum = `PUR-${newBill.billNumber}`;
+        const paymentVoucher = createPaymentOutVoucher({
+          receiptNumber: rawReceiptNum,
+          date: newBill.date,
+          supplierName: newBill.supplierName,
+          supplierId: newBill.supplierId || 'ACC_CASH',
+          amount: sourceAmount,
+          paymentMode: sourceMode,
+          paymentSplits: sourceSplits,
+          narration: `Upfront payment made for Bill #${newBill.billNumber}`,
+        });
+
+        paymentVoucher.partyId = newBill.supplierId;
+        paymentVoucher.partyName = newBill.supplierName;
+        paymentVoucher.sourceDocumentType = 'PURCHASE';
+        paymentVoucher.sourceDocumentId = newBill.id;
+        paymentVoucher.sourceDocumentNumber = newBill.billNumber;
+        paymentVoucher.allocationMode = 'SOURCE_DOCUMENT';
+        paymentVoucher.paymentAllocations = [
+          {
+            documentType: 'PURCHASE',
+            documentId: newBill.id,
+            documentNumber: newBill.billNumber,
+            amount: sourceAmount,
+            date: newBill.date,
+          },
+        ];
+
+        db.savePaymentVoucher(paymentVoucher, { skipDocumentUpdate: true });
+      }
+    } else {
+      // On EDITING an existing bill:
+      // Purchase returns do not create or update source vouchers.
+      // When other active payment vouchers exist, do not rebuild source voucher with document paymentSplits.
+      if (!isPurchaseReturn && existingSourcePaymentVoucher && otherActiveLinked.length === 0) {
+        const newSourceAmount = Number(((newBill.paidAmount || 0) - otherAllocatedTotal).toFixed(2));
+        if (isPurUnpaidOrCancelled || newSourceAmount <= 0) {
+          const rev = createReversalVoucher({
+            originalVoucher: existingSourcePaymentVoucher,
+            reason: `Reversal of source payment #${existingSourcePaymentVoucher.voucherNumber} for bill #${newBill.billNumber}`,
+          });
+          db.saveVoucher(rev);
+          db.saveVoucher({
+            ...existingSourcePaymentVoucher,
+            isReversed: true,
+            reversalVoucherId: rev.id,
+          });
+        } else if (newSourceAmount !== existingSourcePaymentVoucher.totalAmount || newBill.date !== existingSourcePaymentVoucher.date || newBill.supplierId !== existingSourcePaymentVoucher.partyId) {
+          const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
+            newSourceAmount,
+            newBill.paymentSplits,
+            newBill.paymentMode
+          );
+
+          const rawNum = existingSourcePaymentVoucher.voucherNumber.replace(/^VCH-PYMT-/, '');
+          const updatedVoucher = createPaymentOutVoucher({
+            voucherId: existingSourcePaymentVoucher.id,
+            receiptNumber: rawNum,
+            date: newBill.date,
+            supplierName: newBill.supplierName,
+            supplierId: newBill.supplierId || 'ACC_CASH',
+            amount: newSourceAmount,
+            paymentMode: sourceMode,
+            paymentSplits: sourceSplits,
+            narration: `Upfront payment made for Bill #${newBill.billNumber}`,
+          });
+
+          updatedVoucher.partyId = newBill.supplierId;
+          updatedVoucher.partyName = newBill.supplierName;
+          updatedVoucher.sourceDocumentType = 'PURCHASE';
+          updatedVoucher.sourceDocumentId = newBill.id;
+          updatedVoucher.sourceDocumentNumber = newBill.billNumber;
+          updatedVoucher.allocationMode = 'SOURCE_DOCUMENT';
+          updatedVoucher.paymentAllocations = [
+            {
+              documentType: 'PURCHASE',
+              documentId: newBill.id,
+              documentNumber: newBill.billNumber,
+              amount: newSourceAmount,
+              date: newBill.date,
+            },
+          ];
+
+          db.savePaymentVoucher(updatedVoucher, { skipDocumentUpdate: true });
+        }
+      } else if (!isPurchaseReturn && existingSourcePaymentVoucher && otherActiveLinked.length > 0) {
+        // When other vouchers are also linked:
+        // Update the source voucher's date (and narration if applicable) without recreating entries or changing the allocation amount
+        if (newBill.date !== existingSourcePaymentVoucher.date) {
+          const updatedVoucher: Voucher = {
+            ...existingSourcePaymentVoucher,
+            date: newBill.date,
+            paymentAllocations: (existingSourcePaymentVoucher.paymentAllocations || []).map((a) =>
+              a.documentId === newBill.id ? { ...a, date: newBill.date } : { ...a }
+            ),
+          };
+          db.savePaymentVoucher(updatedVoucher, { skipDocumentUpdate: true });
+        }
+      }
+    }
+
     if (newBill.supplierId) {
       db.recalculatePartyBalance(newBill.supplierId);
     }
-  }, []);
+  }, [showToast]);
 
   const handleDeleteInvoice = useCallback((id: string) => {
     if (!rbac.canDeleteInvoice(activeUser.role)) {
@@ -661,9 +927,13 @@ export const App: React.FC = () => {
       description: 'Are you sure you want to delete this invoice? This will restore inventory stock and recalculate party balance.',
       confirmText: 'Delete Invoice',
       onConfirm: () => {
-        db.deleteInvoice(id);
-        if (inv?.partyId) {
-          db.recalculatePartyBalance(inv.partyId);
+        try {
+          db.deleteInvoice(id);
+          if (inv?.partyId) {
+            db.recalculatePartyBalance(inv.partyId);
+          }
+        } catch (err: any) {
+          alert(err.message || 'Cannot delete invoice.');
         }
       },
     });
@@ -683,9 +953,13 @@ export const App: React.FC = () => {
       description: 'Are you sure you want to delete this purchase bill? This will revert inventory stock and recalculate party balance.',
       confirmText: 'Delete Purchase',
       onConfirm: () => {
-        db.deletePurchase(id);
-        if (bill?.supplierId) {
-          db.recalculatePartyBalance(bill.supplierId);
+        try {
+          db.deletePurchase(id);
+          if (bill?.supplierId) {
+            db.recalculatePartyBalance(bill.supplierId);
+          }
+        } catch (err: any) {
+          alert(err.message || 'Cannot delete purchase bill.');
         }
       },
     });
@@ -726,192 +1000,86 @@ export const App: React.FC = () => {
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
     discount: number = 0,
-    bankAccountId?: string
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
   ) => {
     const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
     const disc = Number((discount || 0).toFixed(2));
     const totalSettled = Number((amount + disc).toFixed(2));
-    const newBal = isPaymentIn
-      ? party.currentBalance - totalSettled
-      : party.currentBalance + totalSettled;
-
-    const updatedParty: Party = {
-      ...party,
-      currentBalance: newBal,
-      updatedAt: new Date().toISOString(),
-    };
-    db.saveParty(updatedParty);
-
+    const dateStr = paymentDate || new Date().toISOString().split('T')[0];
     const docId = Date.now().toString().slice(-6);
     const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
-    if (isPaymentIn) {
-      // 1. Create Double-Entry Receipt Voucher with Split Support and Discount Allowed
-      const voucher = createPaymentReceiptVoucher({
-        receiptNumber: `RCPT-${docId}`,
-        date: new Date().toISOString().split('T')[0],
-        customerName: party.name,
-        customerId: party.id,
-        amount,
-        discount: disc,
-        paymentMode,
-        bankAccountId,
-        bankAccountName: bankAcc?.accountName,
-        paymentSplits,
-        narration: notes || `Payment received from ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+
+    let resolvedAllocations = allocations;
+    let resolvedMode = allocationMode;
+
+    if (resolvedAllocations === undefined && resolvedMode === undefined) {
+      // Legacy programmatic call without allocation params defaults to deterministic FIFO auto-allocation
+      const outstanding = getOutstandingDocuments({
+        partyId: party.id,
+        partyName: party.name,
+        documentType: isPaymentIn ? 'INVOICE' : 'PURCHASE',
+        invoices: db.getInvoices(),
+        purchases: db.getPurchases(),
       });
-      db.saveVoucher(voucher);
-
-      // 2. FIFO settlement across unpaid invoices for this customer
-      let remaining = totalSettled;
-      const unpaidInvoices = db
-        .getInvoices()
-        .filter(
-          (inv) =>
-            (inv.partyId === party.id || inv.partyName.toLowerCase() === party.name.toLowerCase()) &&
-            inv.balanceAmount > 0
-        )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      for (const inv of unpaidInvoices) {
-        if (remaining <= 0) break;
-        const settleAmt = Math.min(remaining, inv.balanceAmount);
-        const newPaid = inv.paidAmount + settleAmt;
-        const newBalInv = inv.grandTotal - newPaid;
-
-        // Maintain payment splits on settled invoice
-        const updatedSplits: PaymentSplit[] = (inv.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
-        if (paymentSplits && paymentSplits.length > 0) {
-          const ratio = amount > 0 ? settleAmt / amount : 1;
-          paymentSplits.forEach((s) => {
-            if (s.amount > 0 && s.mode !== 'CREDIT') {
-              updatedSplits.push({
-                id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                mode: s.mode,
-                amount: Number((s.amount * ratio).toFixed(2)),
-                accountId: s.accountId,
-                accountName: s.accountName,
-                reference: s.reference,
-                referenceNo: s.referenceNo,
-              });
-            }
-          });
-        } else {
-          updatedSplits.push({
-            id: `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            mode: (paymentMode as PaymentMode) || 'CASH',
-            amount: settleAmt,
-            accountId: paymentMode === 'CASH' ? 'ACC_CASH' : bankAccountId,
-            accountName: paymentMode === 'CASH' ? 'Cash-in-hand' : bankAcc?.accountName,
-          });
-        }
-        if (newBalInv > 0) {
-          updatedSplits.push({
-            id: `split-bal-${Date.now()}`,
-            mode: 'CREDIT',
-            amount: newBalInv,
-          });
-        }
-
-        const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
-        const resolvedMode: PaymentMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || 'CASH');
-
-        const updatedInv: Invoice = {
-          ...inv,
-          paidAmount: newPaid,
-          balanceAmount: Math.max(0, newBalInv),
-          paymentStatus: newBalInv <= 0.01 ? 'PAID' : 'PARTIAL',
-          paymentMode: resolvedMode,
-          paymentSplits: updatedSplits,
-          updatedAt: new Date().toISOString(),
-        };
-        db.saveInvoice(updatedInv);
-        remaining -= settleAmt;
-      }
-    } else {
-      // 1. Create Double-Entry Payment Out Voucher with Split Support and Discount Received
-      const voucher = createPaymentOutVoucher({
-        voucherNumber: `PYMT-${docId}`,
-        date: new Date().toISOString().split('T')[0],
-        supplierName: party.name,
-        supplierId: party.id,
-        amount,
-        discount: disc,
-        paymentMode,
-        bankAccountId,
-        bankAccountName: bankAcc?.accountName,
-        paymentSplits,
-        narration: notes || `Payment disbursed to ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
-      });
-      db.saveVoucher(voucher);
-
-      // 2. FIFO settlement across unpaid purchases for this supplier
-      let remaining = totalSettled;
-      const unpaidPurchases = db
-        .getPurchases()
-        .filter(
-          (pur) =>
-            (pur.supplierId === party.id || pur.supplierName.toLowerCase() === party.name.toLowerCase()) &&
-            pur.balanceAmount > 0
-        )
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-      for (const pur of unpaidPurchases) {
-        if (remaining <= 0) break;
-        const settleAmt = Math.min(remaining, pur.balanceAmount);
-        const newPaid = pur.paidAmount + settleAmt;
-        const newBalPur = pur.grandTotal - newPaid;
-
-        const updatedSplits: PaymentSplit[] = (pur.paymentSplits?.filter((s) => s.mode !== 'CREDIT') || []).map((s) => ({ ...s }));
-        if (paymentSplits && paymentSplits.length > 0) {
-          const ratio = amount > 0 ? settleAmt / amount : 1;
-          paymentSplits.forEach((s) => {
-            if (s.amount > 0 && s.mode !== 'CREDIT') {
-              updatedSplits.push({
-                id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                mode: s.mode,
-                amount: Number((s.amount * ratio).toFixed(2)),
-                accountId: s.accountId,
-                accountName: s.accountName,
-                reference: s.reference,
-                referenceNo: s.referenceNo,
-              });
-            }
-          });
-        } else {
-          updatedSplits.push({
-            id: `pymt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            mode: (paymentMode as PaymentMode) || 'CASH',
-            amount: settleAmt,
-            accountId: paymentMode === 'CASH' ? 'ACC_CASH' : bankAccountId,
-            accountName: paymentMode === 'CASH' ? 'Cash-in-hand' : bankAcc?.accountName,
-          });
-        }
-        if (newBalPur > 0) {
-          updatedSplits.push({
-            id: `split-bal-${Date.now()}`,
-            mode: 'CREDIT',
-            amount: newBalPur,
-          });
-        }
-
-        const nonCredit = updatedSplits.filter((s) => s.mode !== 'CREDIT');
-        const resolvedMode: PaymentMode = nonCredit.length > 1 ? 'SPLIT' : (nonCredit[0]?.mode || 'CASH');
-
-        const updatedPur: PurchaseBill = {
-          ...pur,
-          paidAmount: newPaid,
-          balanceAmount: Math.max(0, newBalPur),
-          paymentStatus: newBalPur <= 0.01 ? 'PAID' : 'PARTIAL',
-          paymentMode: resolvedMode,
-          paymentSplits: updatedSplits,
-          updatedAt: new Date().toISOString(),
-        };
-        db.savePurchase(updatedPur);
-        remaining -= settleAmt;
-      }
+      resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
+      resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';
+    } else if (resolvedMode === 'UNALLOCATED' || (!resolvedAllocations || resolvedAllocations.length === 0)) {
+      resolvedAllocations = [];
+      resolvedMode = 'UNALLOCATED';
     }
 
-    db.recalculatePartyBalance(party.id);
+    try {
+      if (isPaymentIn) {
+        const voucher = createPaymentReceiptVoucher({
+          receiptNumber: `RCPT-${docId}`,
+          date: dateStr,
+          customerName: party.name,
+          customerId: party.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment received from ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+
+        voucher.partyId = party.id;
+        voucher.partyName = party.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+
+        db.savePaymentVoucher(voucher);
+      } else {
+        const voucher = createPaymentOutVoucher({
+          voucherNumber: `PYMT-${docId}`,
+          date: dateStr,
+          supplierName: party.name,
+          supplierId: party.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment disbursed to ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+
+        voucher.partyId = party.id;
+        voucher.partyName = party.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+
+        db.savePaymentVoucher(voucher);
+      }
+      return true;
+    } catch (err: any) {
+      showToast(err.message || 'Cannot save payment voucher.');
+      return false;
+    }
   }, []);
 
   const handleDeleteParty = useCallback((id: string) => {
@@ -1182,6 +1350,7 @@ export const App: React.FC = () => {
           <PaymentTransactionsView
             flow="IN"
             company={company}
+            parties={parties}
             accounts={bankAccounts}
             transactions={cashBankTxns}
             invoices={invoices}
@@ -1191,6 +1360,9 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onViewInvoice={setPreviewInvoice}
+            onViewPurchase={handleEditPurchase}
+            onRecordPartyPayment={handleRecordPartyPayment}
           />
         )}
 
@@ -1257,6 +1429,7 @@ export const App: React.FC = () => {
           <PaymentTransactionsView
             flow="OUT"
             company={company}
+            parties={parties}
             accounts={bankAccounts}
             transactions={cashBankTxns}
             invoices={invoices}
@@ -1266,6 +1439,9 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onViewInvoice={setPreviewInvoice}
+            onViewPurchase={handleEditPurchase}
+            onRecordPartyPayment={handleRecordPartyPayment}
           />
         )}
 
@@ -1367,6 +1543,8 @@ export const App: React.FC = () => {
             purchases={purchases}
             expenses={expenses}
             vouchers={vouchers}
+            onViewInvoice={setPreviewInvoice}
+            onViewPurchase={handleEditPurchase}
             onSaveAccount={handleSaveBankAccount}
             onDeleteAccount={handleDeleteBankAccount}
             onSaveTransaction={handleSaveCashBankTxn}
@@ -1393,6 +1571,8 @@ export const App: React.FC = () => {
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
+            onViewInvoice={setPreviewInvoice}
+            onViewPurchase={handleEditPurchase}
           />
         )}
 

@@ -60,4 +60,5 @@ export interface UnifiedLedgerEntry {
   rawPurchaseId?: string;
   rawExpenseId?: string;
   rawVoucherId?: string;
+  partyId?: string;
 }

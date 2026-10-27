@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
 import type { ItemPriceMode } from '../../../models/item.ts';
+import { inclusiveFromExclusive } from '../../../core/gst/calculator.ts';
 
 export interface GridRow {
   itemId: string;
@@ -182,9 +183,15 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-right font-tabular-data font-semibold text-on-surface">
                         <div>{formatINR(row.unitPrice)}</div>
-                        {isGstActive && row.unitPriceInclusive !== undefined && (
+                        {isGstActive && (
                           <div className="text-[10px] text-on-surface-variant font-normal">
-                            Incl. {formatINR(row.unitPriceInclusive)}
+                            Incl. {formatINR(
+                              row.priceMode === 'EXCLUSIVE'
+                                ? inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0)
+                                : (typeof row.unitPriceInclusive === 'number' && row.unitPriceInclusive > 0
+                                    ? row.unitPriceInclusive
+                                    : inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0))
+                            )}
                           </div>
                         )}
                       </td>
@@ -261,9 +268,15 @@ export const InvoiceLineItemsGrid: React.FC<InvoiceLineItemsGridProps> = ({
                         {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
                       <span className="text-outline">×</span>
-                      {isGstActive && row.unitPriceInclusive !== undefined ? (
+                      {isGstActive ? (
                         <span className="font-tabular-data font-semibold text-on-surface">
-                          Excl. {formatINR(row.unitPrice)} · Incl. {formatINR(row.unitPriceInclusive)}
+                          Excl. {formatINR(row.unitPrice)} · Incl. {formatINR(
+                            row.priceMode === 'EXCLUSIVE'
+                              ? inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0)
+                              : (typeof row.unitPriceInclusive === 'number' && row.unitPriceInclusive > 0
+                                  ? row.unitPriceInclusive
+                                  : inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0))
+                          )}
                         </span>
                       ) : (
                         <span className="font-tabular-data font-semibold text-on-surface">
