@@ -257,6 +257,8 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Passbooks and Payment In / Payment Out views display linked document numbers and unallocated advance amounts.
   - Automatic credit offset logic prevents double-counting between upfront vouchers and auto-generated sale ledger rows.
   - Legacy invoices and vouchers without `paymentAllocations` continue to display and compute balances seamlessly without requiring data migrations.
+  - `VoucherEditorModal` opens payment vouchers (Payment In / Payment Out) in a clean read-only view by default (`isEditing: false`) displaying doc number, amount hero badge, party info, total balance due, payment mode (with bank or split breakdown), notes, and linked documents.
+  - Read-only view includes a 1-tap WhatsApp Share button (`data-testid="voucher-share-whatsapp"`) dispatching formatted payment receipts with total balance due, and an Edit button (`data-testid="voucher-edit-button"`) to toggle into editable fields with a Cancel option that reverts uncommitted inputs back to the read-only card.
 
 ### F. Split-Bank Architecture & Tender Routing (`paymentSplitUtils.ts`, `ledger.ts`, `cashBankCalculator.ts`)
 - **Multi-Bank Account Allocation**:

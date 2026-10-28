@@ -42,7 +42,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
-const inMemoryDocs = new Map<string, any>();
+const { inMemoryDocs } = vi.hoisted(() => ({
+  inMemoryDocs: new Map<string, any>(),
+}));
 vi.mock('../services/pouchdb.ts', () => ({
   pouch: {
     putDoc: vi.fn(async (type: string, doc: any) => {
@@ -68,8 +70,27 @@ vi.mock('../services/pouchdb.ts', () => ({
 
 import { db } from '../services/db.ts';
 import { Party } from '../models/party.ts';
+import { CompanyProfile } from '../models/company.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { VoucherEditorModal } from '../components/Parties/VoucherEditorModal.tsx';
+
+const sampleCompany: CompanyProfile = {
+  id: 'CMP-01',
+  businessName: 'Acme Traders PVT LTD',
+  tradeName: 'Acme Traders',
+  phone: '9876500000',
+  email: 'info@acme.com',
+  gstin: '27AAAAA0000A1Z5',
+  pan: 'AAAAA0000A',
+  stateCode: '27',
+  address: '123 Market Road, Mumbai',
+  pincode: '400001',
+  bankName: 'HDFC Bank',
+  accountNumber: '1234567890',
+  ifscCode: 'HDFC0001234',
+  branchName: 'Mumbai',
+  upiId: 'acme@okhdfcbank',
+};
 
 const sampleCustomer: Party = {
   id: 'PTY-VEM-01',
@@ -90,7 +111,8 @@ describe('VoucherEditorModal Component-Level Verification', () => {
   beforeEach(() => {
     testStorage.clear();
     inMemoryDocs.clear();
-    db.saveParty(sampleCustomer);
+    sampleCustomer.currentBalance = 5000;
+    db.saveParty({ ...sampleCustomer });
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -173,6 +195,12 @@ describe('VoucherEditorModal Component-Level Verification', () => {
           onRefresh={() => {}}
         />
       );
+    });
+
+    const editBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    expect(editBtn).not.toBeNull();
+    act(() => {
+      editBtn.click();
     });
 
     const amountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
@@ -302,6 +330,12 @@ describe('VoucherEditorModal Component-Level Verification', () => {
           onRefresh={() => {}}
         />
       );
+    });
+
+    const editBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    expect(editBtn).not.toBeNull();
+    act(() => {
+      editBtn.click();
     });
 
     // Update Date to 2026-10-15
@@ -441,6 +475,12 @@ describe('VoucherEditorModal Component-Level Verification', () => {
       );
     });
 
+    const editBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    expect(editBtn).not.toBeNull();
+    act(() => {
+      editBtn.click();
+    });
+
     const amountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
     expect(amountInput).not.toBeNull();
 
@@ -524,6 +564,12 @@ describe('VoucherEditorModal Component-Level Verification', () => {
       );
     });
 
+    const editBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    expect(editBtn).not.toBeNull();
+    act(() => {
+      editBtn.click();
+    });
+
     const amountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
     expect(amountInput).not.toBeNull();
 
@@ -548,5 +594,321 @@ describe('VoucherEditorModal Component-Level Verification', () => {
     // Mode becomes UNALLOCATED because allocations array is empty
     expect(savedVoucher.allocationMode).toBe('UNALLOCATED');
     expect(savedVoucher.paymentAllocations).toHaveLength(0);
+  });
+
+  it('5. Payment In voucher opens in read-only view by default with docNumber, amount, party name, total balance due, and Edit & WhatsApp buttons', () => {
+    const paymentVoucher: Voucher = {
+      id: 'VCH-RO-01',
+      voucherNumber: 'RCPT-RO-01',
+      voucherType: 'RECEIPT',
+      date: '2026-10-10',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      totalAmount: 2000,
+      narration: 'October partial settlement',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 2000, credit: 0 },
+        { accountId: sampleCustomer.id, accountName: sampleCustomer.name, debit: 0, credit: 2000 },
+      ],
+      createdAt: '2026-10-10T00:00:00.000Z',
+    };
+
+    const ledgerEntry = {
+      id: paymentVoucher.id,
+      date: paymentVoucher.date,
+      docNumber: paymentVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      description: paymentVoucher.narration,
+      debit: 0,
+      credit: 2000,
+      runningBalance: 3000,
+      status: 'PAID',
+      rawVoucher: paymentVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // Read-only container is present
+    const readOnlyView = container!.querySelector('[data-testid="voucher-readonly-view"]');
+    expect(readOnlyView).not.toBeNull();
+
+    // Form inputs are NOT present in read-only mode
+    expect(container!.querySelector('form')).toBeNull();
+    expect(container!.querySelector('input[type="number"]')).toBeNull();
+
+    // Displays doc number, amount, type, party name, total balance due
+    expect(container!.textContent).toContain('RCPT-RO-01');
+    expect(container!.textContent).toContain('Payment In');
+    expect(container!.textContent).toContain('2,000');
+    expect(container!.textContent).toContain('Acme Enterprises');
+    expect(container!.textContent).toContain('Total Balance Due');
+    expect(container!.textContent).toContain('5,000');
+    expect(container!.textContent).toContain('October partial settlement');
+
+    // Both Edit and WhatsApp buttons are present
+    expect(container!.querySelector('[data-testid="voucher-edit-button"]')).not.toBeNull();
+    expect(container!.querySelector('[data-testid="voucher-share-whatsapp"]')).not.toBeNull();
+  });
+
+  it('6. Clicking Edit button toggles into edit mode, and clicking Cancel reverts to read-only view', () => {
+    const paymentVoucher: Voucher = {
+      id: 'VCH-RO-02',
+      voucherNumber: 'RCPT-RO-02',
+      voucherType: 'RECEIPT',
+      date: '2026-10-12',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      totalAmount: 3000,
+      narration: 'Advance deposit',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 3000, credit: 0 },
+        { accountId: sampleCustomer.id, accountName: sampleCustomer.name, debit: 0, credit: 3000 },
+      ],
+      createdAt: '2026-10-12T00:00:00.000Z',
+    };
+
+    const ledgerEntry = {
+      id: paymentVoucher.id,
+      date: paymentVoucher.date,
+      docNumber: paymentVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      description: paymentVoucher.narration,
+      debit: 0,
+      credit: 3000,
+      runningBalance: 2000,
+      status: 'PAID',
+      rawVoucher: paymentVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // Starts in read-only
+    expect(container!.querySelector('[data-testid="voucher-readonly-view"]')).not.toBeNull();
+
+    // Click Edit button
+    const editBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    act(() => {
+      editBtn.click();
+    });
+
+    // Now in edit form mode
+    expect(container!.querySelector('[data-testid="voucher-readonly-view"]')).toBeNull();
+    const form = container!.querySelector('form');
+    expect(form).not.toBeNull();
+
+    const amountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(amountInput.value).toBe('3000');
+
+    // Type a new amount
+    act(() => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(amountInput, '9999');
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(amountInput.value).toBe('9999');
+
+    // Click Cancel button
+    const buttons = Array.from(container!.querySelectorAll('button'));
+    const cancelBtn = buttons.find((b) => b.textContent?.trim() === 'Cancel');
+    expect(cancelBtn).not.toBeUndefined();
+
+    act(() => {
+      cancelBtn!.click();
+    });
+
+    // Reverts to read-only view
+    expect(container!.querySelector('[data-testid="voucher-readonly-view"]')).not.toBeNull();
+    expect(container!.querySelector('form')).toBeNull();
+
+    // Re-entering edit mode restores original values (3000, not 9999)
+    const newEditBtn = container!.querySelector('[data-testid="voucher-edit-button"]') as HTMLButtonElement;
+    act(() => {
+      newEditBtn.click();
+    });
+    const restoredAmountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(restoredAmountInput.value).toBe('3000');
+  });
+
+  it('7. WhatsApp share button constructs message with company name, doc number, amount, payment mode, party name, and total balance due', () => {
+    const openWhatsAppUrlMock = vi.fn();
+    (window as any).AndroidBridge = {
+      openWhatsAppUrl: openWhatsAppUrlMock,
+    };
+
+    const paymentVoucher: Voucher = {
+      id: 'VCH-WA-01',
+      voucherNumber: 'RCPT-WA-777',
+      voucherType: 'RECEIPT',
+      date: '2026-10-18',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      totalAmount: 4500,
+      narration: 'Festival season advance',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 4500, credit: 0 },
+        { accountId: sampleCustomer.id, accountName: sampleCustomer.name, debit: 0, credit: 4500 },
+      ],
+      createdAt: '2026-10-18T00:00:00.000Z',
+    };
+
+    const ledgerEntry = {
+      id: paymentVoucher.id,
+      date: paymentVoucher.date,
+      docNumber: paymentVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      paymentMode: 'CASH',
+      description: paymentVoucher.narration,
+      debit: 0,
+      credit: 4500,
+      runningBalance: 500,
+      status: 'PAID',
+      rawVoucher: paymentVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    const shareBtn = container!.querySelector('[data-testid="voucher-share-whatsapp"]') as HTMLButtonElement;
+    expect(shareBtn).not.toBeNull();
+
+    act(() => {
+      shareBtn.click();
+    });
+
+    expect(openWhatsAppUrlMock).toHaveBeenCalledTimes(1);
+    const sentUrl = openWhatsAppUrlMock.mock.calls[0][0];
+    const decodedUrl = decodeURIComponent(sentUrl);
+
+    // Verify recipient phone, company name, doc number, amount, party name, mode, and total balance due
+    expect(decodedUrl).toContain('919876543210');
+    expect(decodedUrl).toContain('Acme Traders');
+    expect(decodedUrl).toContain('RCPT-WA-777');
+    expect(decodedUrl).toContain('Acme Enterprises');
+    expect(decodedUrl).toContain('4,500');
+    expect(decodedUrl).toContain('*Payment Mode:* CASH');
+    expect(decodedUrl).toContain('Total Balance Due');
+    expect(decodedUrl).toContain('5,000');
+    expect(decodedUrl).toContain('Festival season advance');
+    expect(decodedUrl).toContain('Recorded in GST Billing App');
+  });
+
+  it('8. Payment Out voucher opens in read-only view with Payment Out badge and formatting', () => {
+    const paymentOutVoucher: Voucher = {
+      id: 'VCH-PO-01',
+      voucherNumber: 'PAY-PO-888',
+      voucherType: 'PAYMENT',
+      date: '2026-10-20',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      totalAmount: 1200,
+      narration: 'Vendor refund',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: sampleCustomer.id, accountName: sampleCustomer.name, debit: 1200, credit: 0 },
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 0, credit: 1200 },
+      ],
+      createdAt: '2026-10-20T00:00:00.000Z',
+    };
+
+    const ledgerEntry = {
+      id: paymentOutVoucher.id,
+      date: paymentOutVoucher.date,
+      docNumber: paymentOutVoucher.voucherNumber,
+      type: 'PAYMENT_OUT' as const,
+      paymentMode: 'CASH',
+      description: paymentOutVoucher.narration,
+      debit: 1200,
+      credit: 0,
+      runningBalance: 6200,
+      status: 'PAID',
+      rawVoucher: paymentOutVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    expect(container!.querySelector('[data-testid="voucher-readonly-view"]')).not.toBeNull();
+    expect(container!.textContent).toContain('PAY-PO-888');
+    expect(container!.textContent).toContain('Payment Out');
+    expect(container!.textContent).toContain('1,200');
+    expect(container!.textContent).toContain('Vendor refund');
+  });
+
+  it('9. Opening balance entry defaults to edit mode directly without requiring edit button', () => {
+    const openingEntry = {
+      id: 'opening-balance-01',
+      date: '2026-10-01',
+      docNumber: 'OPENING',
+      type: 'PAYMENT_IN' as const,
+      description: 'Opening Balance (Dr)',
+      debit: 5000,
+      credit: 0,
+      runningBalance: 5000,
+      status: 'PAID',
+      isOpening: true,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={openingEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // Opening balance opens directly into editable form
+    expect(container!.querySelector('form')).not.toBeNull();
+    const amountInput = container!.querySelector('input[type="number"]') as HTMLInputElement;
+    expect(amountInput).not.toBeNull();
+    expect(amountInput.value).toBe('5000');
   });
 });

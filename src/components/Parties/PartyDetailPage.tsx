@@ -593,6 +593,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
         editingLedgerEntry={editingLedgerEntry}
         onClose={() => setEditingLedgerEntry(null)}
         party={party}
+        company={company}
         onViewInvoice={onViewInvoice}
         onEditInvoice={onEditInvoice}
         onEditPurchase={onEditPurchase}
