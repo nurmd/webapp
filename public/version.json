@@ -1,16 +1,15 @@
 {
-  "version": "1.2.44",
+  "version": "1.2.45",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-28T12:20:18.530Z",
+  "buildTime": "2026-10-28T13:10:00.697Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "redesign payment view modal and fix party passbook crash",
+    "v1.2.44",
     "make payment voucher readonly by default with edit toggle and WhatsApp share",
     "v1.2.43",
     "native A4 printing bridge, cash bank sharing, and WhatsApp total balance due",
-    "v1.2.42",
-    "split supplier ledger into transactions and orders",
-    "v1.2.41",
-    "separate payment vouchers and link outstanding documents"
+    "v1.2.42"
   ]
 }
