@@ -1,25 +1,34 @@
 import React from 'react';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../../models/company.ts';
+import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
+import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { printAccountingVoucher } from '../../core/utils/voucherDocumentPrinter.ts';
 
 export interface DashboardVoucherModalProps {
   voucher: Voucher | null;
   company: CompanyProfile;
+  parties?: Party[];
   onClose: () => void;
 }
 
 export const DashboardVoucherModal: React.FC<DashboardVoucherModalProps> = ({
   voucher,
   company,
+  parties,
   onClose,
 }) => {
   useBackNavigation(() => {
     onClose();
     return true;
   }, !!voucher, 25);
+
+  const linkedParty = React.useMemo(() => {
+    if (!voucher?.partyId || !parties || parties.length === 0) return null;
+    return parties.find((p) => p.id === voucher.partyId) || null;
+  }, [voucher?.partyId, parties]);
 
   if (!voucher) return null;
 
@@ -32,12 +41,16 @@ export const DashboardVoucherModal: React.FC<DashboardVoucherModalProps> = ({
     : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300';
 
   const handleShareWhatsApp = () => {
+    const partyDue = linkedParty ? getPartyTotalBalanceDue(linkedParty) : null;
+    const dueLine = partyDue !== null ? `*Total Balance Due:* ${formatINR(partyDue)}\n` : '';
+
     const text = `*Voucher Receipt - ${company.tradeName || company.businessName}*\n` +
       `--------------------------------\n` +
       `*Voucher No:* ${voucher.voucherNumber}\n` +
       `*Type:* ${voucher.voucherType}\n` +
       `*Date:* ${voucher.date}\n` +
       `*Amount:* ${formatINR(voucher.totalAmount)}\n` +
+      dueLine +
       (voucher.narration ? `*Narration:* ${voucher.narration}\n` : '') +
       `--------------------------------\n` +
       `Recorded in GST Billing App`;
@@ -45,9 +58,7 @@ export const DashboardVoucherModal: React.FC<DashboardVoucherModalProps> = ({
   };
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined' && window.print) {
-      window.print();
-    }
+    printAccountingVoucher(company, voucher);
   };
 
   const entries = voucher.entries || [];

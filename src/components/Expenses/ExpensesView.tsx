@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Expense, ExpenseCategory } from '../../models/expense.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
+import { printExpenseVoucher } from '../../core/utils/expenseVoucherPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
@@ -335,109 +336,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
   // Print voucher
   const handlePrint = (exp: Expense) => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      if (typeof window !== 'undefined' && window.print) {
-        window.print();
-      }
-      return;
-    }
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Expense Voucher #${exp.voucherNumber || exp.id}</title>
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 24px; color: #1e293b; max-width: 600px; margin: 0 auto; }
-          .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
-          .company-name { font-size: 20px; font-weight: 800; color: #0f172a; }
-          .voucher-title { font-size: 14px; font-weight: 700; text-transform: uppercase; color: #64748b; margin-top: 4px; }
-          .hero { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-          .amount { font-size: 24px; font-weight: 800; color: #e11d48; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; font-size: 13px; }
-          .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; }
-          .label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 4px; }
-          .val { font-weight: 600; color: #0f172a; }
-          .notes { font-size: 12px; color: #475569; font-style: italic; margin-top: 12px; }
-          .footer { border-top: 1px dashed #cbd5e1; margin-top: 24px; padding-top: 12px; font-size: 11px; text-align: center; color: #94a3b8; }
-          @media print { body { padding: 0; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="company-name">${company.tradeName || company.businessName}</div>
-          <div class="voucher-title">Payment / Expense Voucher</div>
-          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
-            ${company.address ? `${company.address} • ` : ''}${company.phone ? `Ph: ${company.phone}` : ''}
-          </div>
-        </div>
-
-        <div class="hero">
-          <div>
-            <div class="label">Expense Purpose</div>
-            <div style="font-size: 16px; font-weight: 700;">${exp.title}</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Category: ${exp.category}</div>
-          </div>
-          <div style="text-align: right;">
-            <div class="label">Total Paid</div>
-            <div class="amount">${formatINR(exp.amount)}</div>
-          </div>
-        </div>
-
-        <div class="grid">
-          <div class="box">
-            <div class="label">Voucher Number</div>
-            <div class="val">${exp.voucherNumber || exp.id}</div>
-          </div>
-          <div class="box">
-            <div class="label">Date of Payment</div>
-            <div class="val">${formatDate(exp.date)}</div>
-          </div>
-          <div class="box">
-            <div class="label">Payment Mode</div>
-            <div class="val">${exp.paymentMode}</div>
-          </div>
-          <div class="box">
-            <div class="label">Vendor / Payee</div>
-            <div class="val">${exp.vendorName || 'Not specified'}</div>
-          </div>
-        </div>
-
-        ${
-          exp.taxAmount > 0
-            ? `
-          <div class="box" style="margin-bottom: 16px;">
-            <div class="label">GST Tax Breakdown (${exp.gstRate}% GST)</div>
-            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px;">
-              <span>Taxable Value: <strong>${formatINR(exp.taxableAmount)}</strong></span>
-              <span>Total Tax: <strong>${formatINR(exp.taxAmount)}</strong></span>
-              <span>ITC Claimable: <strong>${exp.itcEligible ? 'YES' : 'NO'}</strong></span>
-            </div>
-          </div>
-        `
-            : ''
-        }
-
-        ${exp.notes ? `<div class="notes"><strong>Remarks:</strong> ${exp.notes}</div>` : ''}
-
-        <div style="display: flex; justify-content: space-between; margin-top: 40px; font-size: 12px;">
-          <div>Receiver's Signature</div>
-          <div>Authorized Signatory</div>
-        </div>
-
-        <div class="footer">
-          Recorded in Vyapar GST Billing • Computer Generated Voucher
-        </div>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(html);
-    printWindow.document.close();
+    printExpenseVoucher(company, exp);
   };
 
   // Export CSV

@@ -6,6 +6,7 @@ import {
   exportReportToCsv,
   generateReportHtml,
   printReportDocument,
+  printReportDocumentDirect,
   ReportPdfConfig,
 } from '../components/Reports/utils/reportExportUtils.ts';
 import { CompanyProfile } from '../models/company.ts';
@@ -256,6 +257,59 @@ describe('Report Export Utilities (reportExportUtils.ts)', () => {
       expect(appendChildSpy).toHaveBeenCalled();
       const iframe = appendChildSpy.mock.calls.find((call) => call[0] instanceof HTMLIFrameElement)?.[0] as HTMLIFrameElement;
       expect(iframe).toBeDefined();
+    });
+
+    it('selects A4-landscape paper size in printReportDocumentDirect when headers length > 7', () => {
+      const mockPrintHtmlWithPaper = vi.fn();
+      const mockPrintHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        printHtmlWithPaper: mockPrintHtmlWithPaper,
+        printHtml: mockPrintHtml,
+      };
+
+      const wideConfig: ReportPdfConfig = {
+        title: 'Wide Multi-Column Sales Register',
+        company: mockCompany,
+        dateRangeLabel: 'FY 2026-27',
+        headers: ['Date', 'Invoice #', 'Party', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'],
+        rows: [['2026-10-15', 'INV-01', 'Acme Corp', '27AABCU9603R1ZM', '1000', '90', '90', '0', '1180']],
+      };
+
+      printReportDocumentDirect(wideConfig);
+
+      expect(mockPrintHtmlWithPaper).toHaveBeenCalledTimes(1);
+      expect(mockPrintHtmlWithPaper).toHaveBeenCalledWith(
+        expect.stringContaining('Wide Multi-Column Sales Register'),
+        'Wide Multi-Column Sales Register',
+        'A4-landscape'
+      );
+      expect(mockPrintHtml).not.toHaveBeenCalled();
+    });
+
+    it('selects standard A4 paper size in printReportDocumentDirect when headers length <= 7', () => {
+      const mockPrintHtmlWithPaper = vi.fn();
+      const mockPrintHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        printHtmlWithPaper: mockPrintHtmlWithPaper,
+        printHtml: mockPrintHtml,
+      };
+
+      const standardConfig: ReportPdfConfig = {
+        title: 'Summary Report',
+        company: mockCompany,
+        dateRangeLabel: 'Today',
+        headers: ['Date', 'Doc #', 'Party', 'Amount'],
+        rows: [['2026-10-15', 'INV-01', 'Acme Corp', '1180']],
+      };
+
+      printReportDocumentDirect(standardConfig);
+
+      expect(mockPrintHtml).toHaveBeenCalledTimes(1);
+      expect(mockPrintHtml).toHaveBeenCalledWith(
+        expect.stringContaining('Summary Report'),
+        'Summary Report'
+      );
+      expect(mockPrintHtmlWithPaper).not.toHaveBeenCalled();
     });
   });
 });

@@ -46,6 +46,7 @@ export function formatWhatsAppMessage(
     language?: TemplateLanguage;
     purpose?: MessagePurpose;
     overrideTemplate?: string;
+    totalBalanceDue?: number;
   } = {}
 ): string {
   const language = options.language || 'en';
@@ -61,13 +62,21 @@ export function formatWhatsAppMessage(
   const formattedAmount = formatINR(invoice.grandTotal);
   const formattedDate = formatDate(invoice.date);
 
-  return raw
+  let message = raw
     .replace(/{customer_name}/g, invoice.partyName || 'Valued Customer')
     .replace(/{store_name}/g, company.tradeName || company.businessName)
     .replace(/{invoice_no}/g, invoice.invoiceNumber)
     .replace(/{amount}/g, formattedAmount)
     .replace(/{date}/g, formattedDate)
     .replace(/{upi_link}/g, upiLink);
+
+  const dueValue = Math.max(0, options.totalBalanceDue ?? invoice.balanceAmount ?? 0);
+  const dueLabel = language === 'hi' ? '📊 *कुल बकाया राशि:*' : '📊 *Total Balance Due:*';
+  if (!message.includes('Total Balance Due') && !message.includes('कुल बकाया राशि')) {
+    message += `\n\n${dueLabel} ${formatINR(dueValue)}`;
+  }
+
+  return message;
 }
 
 export function openWhatsAppShare(
@@ -78,6 +87,7 @@ export function openWhatsAppShare(
     language?: TemplateLanguage;
     purpose?: MessagePurpose;
     overrideTemplate?: string;
+    totalBalanceDue?: number;
   } = {}
 ): void {
   const message = formatWhatsAppMessage(company, invoice, options);

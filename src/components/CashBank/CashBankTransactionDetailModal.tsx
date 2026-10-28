@@ -3,8 +3,11 @@ import { BankAccount, CashBankTransaction, CashBankTxnType, UnifiedLedgerEntry }
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { CompanyProfile } from '../../models/company.ts';
+import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 
@@ -14,6 +17,8 @@ export interface CashBankTransactionDetailModalProps {
   entry: UnifiedLedgerEntry | null;
   rawTransaction?: CashBankTransaction | null;
   accounts: BankAccount[];
+  company?: CompanyProfile;
+  parties?: Party[];
   vouchers?: Voucher[];
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
@@ -30,6 +35,8 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   entry,
   rawTransaction,
   accounts,
+  company,
+  parties,
   vouchers,
   invoices,
   purchases,
@@ -47,6 +54,58 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     const all = vouchers && vouchers.length > 0 ? vouchers : db.getVouchers();
     return all.find((v) => v.id === entry.rawVoucherId) || null;
   }, [entry?.rawVoucherId, vouchers]);
+
+  const linkedParty = useMemo(() => {
+    if (!entry || !parties || parties.length === 0) return null;
+
+    // 1. entry.partyId
+    if (entry.partyId) {
+      const match = parties.find((p) => p.id === entry.partyId);
+      if (match) return match;
+    }
+
+    // 2. entry.rawVoucherId -> linked voucher .partyId
+    if (linkedVoucher?.partyId) {
+      const match = parties.find((p) => p.id === linkedVoucher.partyId);
+      if (match) return match;
+    }
+
+    // 3. entry.rawInvoiceId -> invoice .partyId, then normalized .partyName
+    if (entry.rawInvoiceId) {
+      const allInvoices = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+      const invoice = allInvoices.find((i) => i.id === entry.rawInvoiceId);
+      if (invoice) {
+        if (invoice.partyId) {
+          const match = parties.find((p) => p.id === invoice.partyId);
+          if (match) return match;
+        }
+        if (invoice.partyName) {
+          const normInvName = invoice.partyName.trim().toLowerCase();
+          const match = parties.find((p) => p.name.trim().toLowerCase() === normInvName);
+          if (match) return match;
+        }
+      }
+    }
+
+    // 4. entry.rawPurchaseId -> purchase .supplierId, then normalized .supplierName
+    if (entry.rawPurchaseId) {
+      const allPurchases = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+      const purchase = allPurchases.find((p) => p.id === entry.rawPurchaseId);
+      if (purchase) {
+        if (purchase.supplierId) {
+          const match = parties.find((p) => p.id === purchase.supplierId);
+          if (match) return match;
+        }
+        if (purchase.supplierName) {
+          const normSuppName = purchase.supplierName.trim().toLowerCase();
+          const match = parties.find((p) => p.name.trim().toLowerCase() === normSuppName);
+          if (match) return match;
+        }
+      }
+    }
+
+    return null;
+  }, [entry, parties, linkedVoucher, invoices, purchases]);
 
   // Form State for Editing
   const [editType, setEditType] = useState<CashBankTxnType>('TRANSFER');
@@ -176,6 +235,75 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     toAcc?.accountName ||
     entry?.toAccountName ||
     (entry?.flow === 'IN' ? entry.accountName : (defaultBank?.accountName || 'Bank Account'));
+
+  const handleShareWhatsApp = () => {
+    const heading = isTransferCategory
+      ? 'Cash / Bank Transfer'
+      : isInflow
+      ? 'Payment Received'
+      : 'Payment Made';
+    const companyName =
+      company?.tradeName?.trim() || company?.businessName?.trim() || 'GST Billing App';
+
+    const lines: string[] = [
+      `*${heading} - ${companyName}*`,
+      '--------------------------------',
+    ];
+
+    if (rawTransaction?.txnNumber) {
+      lines.push(`*Txn No:* ${rawTransaction.txnNumber}`);
+    }
+    if (activeDate) {
+      lines.push(`*Date:* ${formatDate(activeDate)}`);
+    }
+    lines.push(`*Amount:* ${formatINR(activeAmount)}`);
+
+    if (!isTransferCategory && linkedParty) {
+      const partyDue = getPartyTotalBalanceDue(linkedParty);
+      if (partyDue !== null) {
+        lines.push(`*Total Balance Due:* ${formatINR(partyDue)}`);
+      }
+    }
+
+    const typeLabel = rawTransaction?.type || entry?.type;
+    if (typeLabel) {
+      lines.push(`*Type:* ${typeLabel}`);
+    }
+
+    if (isTransferCategory) {
+      lines.push(`*From:* ${resolvedFromName}`);
+      lines.push(`*To:* ${resolvedToName}`);
+    } else {
+      const accountName =
+        entry?.accountName ||
+        (rawTransaction?.type === 'ADD_MONEY' ? toAcc?.accountName : fromAcc?.accountName);
+      if (accountName) {
+        lines.push(`*Account:* ${accountName}`);
+      }
+    }
+
+    if (entry?.mode) {
+      lines.push(`*Mode:* ${entry.mode}`);
+    }
+
+    if (activeRef) {
+      lines.push(`*Reference:* ${activeRef}`);
+    }
+
+    if (entry?.counterpartyOrTitle) {
+      lines.push(`*Party / Purpose:* ${entry.counterpartyOrTitle}`);
+    }
+
+    if (activeDesc) {
+      lines.push(`*Notes:* ${activeDesc}`);
+    }
+
+    lines.push('--------------------------------');
+    lines.push('Recorded in GST Billing App');
+
+    const text = lines.join('\n');
+    safeOpenExternalUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
+  };
 
   const handleTransferTypeSwitch = (newType: CashBankTxnType) => {
     setEditType(newType);
@@ -893,6 +1021,20 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
               >
                 Close
               </button>
+
+              {!showDeleteConfirm && (
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  data-testid="cash-bank-share-whatsapp"
+                  aria-label="Share transaction on WhatsApp"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">share</span>
+                  <span className="hidden sm:inline">WhatsApp</span>
+                  <span className="sm:hidden">Share</span>
+                </button>
+              )}
 
               {isNativeTxn && onSaveTransaction && !showDeleteConfirm && (
                 <button

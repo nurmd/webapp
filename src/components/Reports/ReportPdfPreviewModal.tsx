@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Printer, X, LayoutGrid, FileText, ZoomIn, ZoomOut } from 'lucide-react';
-import { ReportPdfConfig, printReportDocumentDirect } from './utils/reportExportUtils.ts';
+import {
+  ReportPdfConfig,
+  printReportDocumentDirect,
+  generateReportHtml,
+  printReportHtmlNative,
+} from './utils/reportExportUtils.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface ReportPdfPreviewModalProps {
@@ -48,6 +53,11 @@ export const ReportPdfPreviewModal: React.FC<ReportPdfPreviewModalProps> = ({
 
   const handlePrint = useCallback(() => {
     if (!config) return;
+    const isLand = config.orientation === 'landscape' || (config.headers && config.headers.length > 7);
+    const html = generateReportHtml(config);
+    if (printReportHtmlNative(html, config.title, isLand ? 'A4-landscape' : 'A4')) {
+      return;
+    }
     // Trigger native print dialog cleanly
     if (typeof window !== 'undefined' && window.print) {
       window.print();

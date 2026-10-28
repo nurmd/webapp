@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { ReportPdfPreviewModal } from '../components/Reports/ReportPdfPreviewModal.tsx';
-import { ReportPdfConfig, printReportDocument, registerReportPreviewHandler } from '../components/Reports/utils/reportExportUtils.ts';
+import {
+  ReportPdfConfig,
+  printReportDocument,
+  registerReportPreviewHandler,
+  printReportHtmlNative,
+} from '../components/Reports/utils/reportExportUtils.ts';
 import { InvoiceHeaderMeta } from '../components/Invoicing/components/InvoiceHeaderMeta.tsx';
 import { PurchaseHeaderMeta } from '../components/Purchases/components/PurchaseHeaderMeta.tsx';
 import { triggerBack, resetBackNavigationForTesting } from '../core/utils/backNavigation.ts';
@@ -59,6 +64,7 @@ describe('Reports PDF Preview & Draft Top Bar Suite', () => {
     container.remove();
     resetBackNavigationForTesting();
     registerReportPreviewHandler(null);
+    delete (window as any).AndroidBridge;
     vi.restoreAllMocks();
   });
 
@@ -144,7 +150,7 @@ describe('Reports PDF Preview & Draft Top Bar Suite', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     });
 
-    it('invokes window.print when Print / Save PDF button is clicked', () => {
+    it('invokes window.print when Print / Save PDF button is clicked without Android bridge', () => {
       const printSpy = vi.fn();
       window.print = printSpy;
 
@@ -166,6 +172,149 @@ describe('Reports PDF Preview & Draft Top Bar Suite', () => {
       });
 
       expect(printSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('invokes AndroidBridge.printHtml and avoids window.print when AndroidBridge is available', () => {
+      const printHtmlSpy = vi.fn();
+      (window as any).AndroidBridge = {
+        printHtml: printHtmlSpy,
+      };
+      const printSpy = vi.fn();
+      window.print = printSpy;
+      const handleClose = vi.fn();
+
+      act(() => {
+        root.render(
+          <ReportPdfPreviewModal
+            isOpen={true}
+            config={mockPdfConfig}
+            onClose={handleClose}
+          />
+        );
+      });
+
+      const printBtn = container.querySelector('[data-testid="report-preview-print-button"]') as HTMLButtonElement;
+      expect(printBtn).not.toBeNull();
+
+      act(() => {
+        printBtn.click();
+      });
+
+      // 1. AndroidBridge.printHtml called exactly once
+      expect(printHtmlSpy).toHaveBeenCalledTimes(1);
+
+      // 2. The HTML argument contains report title and printable table markup
+      const [calledHtml, calledJobName] = printHtmlSpy.mock.calls[0];
+      expect(calledJobName).toBe(mockPdfConfig.title);
+      expect(calledHtml).toContain(mockPdfConfig.title);
+      expect(calledHtml).toContain('<table');
+      expect(calledHtml).toContain('Invoice #');
+      expect(calledHtml).toContain('INV-001');
+      expect(calledHtml).toContain('Customer A');
+      expect(calledHtml).toContain('₹ 30,000');
+
+      // 3. window.print is NOT called
+      expect(printSpy).not.toHaveBeenCalled();
+
+      // 4. Modal remains open after printing (does not auto-close)
+      expect(handleClose).not.toHaveBeenCalled();
+      expect(container.querySelector('[data-testid="report-pdf-preview-modal"]')).not.toBeNull();
+
+      // 5. Modal remains closable afterwards via Back button
+      const backBtn = container.querySelector('[data-testid="report-preview-back-button"]') as HTMLButtonElement;
+      act(() => {
+        backBtn.click();
+      });
+      expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('printReportHtmlNative returns true when bridge exists and false otherwise', () => {
+      const printHtmlMock = vi.fn();
+      (window as any).AndroidBridge = { printHtml: printHtmlMock };
+
+      const resultWithBridge = printReportHtmlNative('<html><body>Test</body></html>', 'Test Report');
+      expect(resultWithBridge).toBe(true);
+      expect(printHtmlMock).toHaveBeenCalledTimes(1);
+      expect(printHtmlMock).toHaveBeenCalledWith('<html><body>Test</body></html>', 'Test Report');
+
+      delete (window as any).AndroidBridge;
+      const resultWithoutBridge = printReportHtmlNative('<html><body>Test</body></html>', 'Test Report');
+      expect(resultWithoutBridge).toBe(false);
+
+      (window as any).AndroidBridge = {};
+      const resultWithEmptyBridge = printReportHtmlNative('<html><body>Test</body></html>', 'Test Report');
+      expect(resultWithEmptyBridge).toBe(false);
+
+      // Bridge throws exception: catches and returns false
+      (window as any).AndroidBridge = {
+        printHtml: () => {
+          throw new Error('Native IPC failure');
+        },
+      };
+      const resultWithThrowingBridge = printReportHtmlNative('<html><body>Test</body></html>', 'Test Report');
+      expect(resultWithThrowingBridge).toBe(false);
+    });
+
+    it('falls back to window.print if AndroidBridge.printHtml throws an exception', () => {
+      (window as any).AndroidBridge = {
+        printHtml: () => {
+          throw new Error('Native crash');
+        },
+      };
+      const printSpy = vi.fn();
+      window.print = printSpy;
+
+      act(() => {
+        root.render(
+          <ReportPdfPreviewModal
+            isOpen={true}
+            config={mockPdfConfig}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const printBtn = container.querySelector('[data-testid="report-preview-print-button"]') as HTMLButtonElement;
+      expect(printBtn).not.toBeNull();
+
+      act(() => {
+        printBtn.click();
+      });
+
+      expect(printSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('hardware back evaluation handles preview modal without triggering double-back exit', () => {
+      const handleClose = vi.fn();
+      act(() => {
+        root.render(
+          <ReportPdfPreviewModal
+            isOpen={true}
+            config={mockPdfConfig}
+            onClose={handleClose}
+          />
+        );
+      });
+
+      // Rapid back press simulated: first press should be consumed by modal (priority 30)
+      const handledFirst = (window as any).__handleAndroidBack ? (window as any).__handleAndroidBack() : triggerBack();
+      expect(handledFirst).toBe(true);
+      expect(handleClose).toHaveBeenCalledTimes(1);
+
+      // Now modal is closed: rerender with isOpen=false
+      act(() => {
+        root.render(
+          <ReportPdfPreviewModal
+            isOpen={false}
+            config={null}
+            onClose={handleClose}
+          />
+        );
+      });
+
+      // Next back press at root is not handled by the modal
+      const handledSecond = (window as any).__handleAndroidBack ? (window as any).__handleAndroidBack() : triggerBack();
+      expect(handledSecond).toBe(false);
     });
 
     it('delegates printReportDocument to custom preview handler when registered', () => {

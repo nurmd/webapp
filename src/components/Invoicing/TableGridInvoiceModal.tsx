@@ -9,6 +9,7 @@ import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { roundQuantity } from '../../core/utils/formatters.ts';
+import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
@@ -1082,6 +1083,16 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isAnySubModalOpen, handleOpenAddItem, handleSaveInvoiceDirect, handleOpenPaymentModal]);
 
+  const whatsAppPartyTotalDue = useMemo(() => {
+    if (!whatsAppInvoiceData) return undefined;
+    const found = parties.find(
+      (p) =>
+        (whatsAppInvoiceData.partyId && p.id === whatsAppInvoiceData.partyId) ||
+        (p.name && p.name.trim().toLowerCase() === (whatsAppInvoiceData.partyName || '').trim().toLowerCase())
+    );
+    return getPartyTotalBalanceDue(found) ?? whatsAppInvoiceData.balanceAmount;
+  }, [whatsAppInvoiceData, parties]);
+
   return (
     <div className="fixed inset-0 z-50 bg-surface flex flex-col min-h-screen overflow-x-hidden antialiased">
       {/* Main Full-Width Scrollable Workstation */}
@@ -1278,6 +1289,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             setWhatsAppInvoiceData(null);
             onClose();
           }}
+          totalBalanceDue={whatsAppPartyTotalDue}
         />
       )}
 

@@ -6,6 +6,7 @@ import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { printCurrentPage } from '../../core/utils/printBridge.ts';
 
 export type LabelLayout = 'THERMAL_50x25' | 'THERMAL_38x25' | 'A4_24UP' | 'A4_30UP';
 
@@ -75,11 +76,8 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined' && window.print) {
-      window.print();
-    } else {
-      showAppToast('Print is not supported in this environment.');
-    }
+    const isA4 = layout === 'A4_24UP' || layout === 'A4_30UP';
+    printCurrentPage('Barcode-Labels', isA4 ? 'A4' : 'default');
   };
 
   const businessName = company.tradeName || company.businessName || 'Store';
@@ -94,10 +92,14 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
   const labelArray = Array.from({ length: labelCount });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-2 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-2 sm:p-4 animate-fade-in print-modal-overlay">
       {/* Scoped CSS for Thermal and Sticker Sheet Printing */}
       <style>{`
         @media print {
+          @page {
+            size: ${layout === 'A4_24UP' || layout === 'A4_30UP' ? 'A4 portrait' : 'auto'};
+            margin: ${layout === 'A4_24UP' || layout === 'A4_30UP' ? '8mm 6mm' : '0'};
+          }
           body * {
             visibility: hidden !important;
           }
@@ -109,6 +111,9 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
             margin: 0 !important;
             padding: 0 !important;
             background: #fff !important;
@@ -154,7 +159,7 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
       `}</style>
 
       {/* Main Modal Shell */}
-      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl border border-outline-variant/30 overflow-hidden">
+      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl border border-outline-variant/30 overflow-hidden print-modal-container">
         {/* Sticky Header */}
         <div className="p-3 sm:p-4 border-b border-outline-variant/20 bg-surface-container-low flex items-center justify-between gap-2 shrink-0 no-print">
           <div className="flex items-center gap-2 min-w-0">

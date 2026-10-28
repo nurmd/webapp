@@ -32,12 +32,15 @@ import { printSettingsService, resolveReceiptTitle } from '../../services/printS
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
+import { printCurrentPage } from '../../core/utils/printBridge.ts';
+import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 
-interface InvoicePreviewModalProps {
+export interface InvoicePreviewModalProps {
   invoice: Invoice;
   company: CompanyProfile;
   onClose: () => void;
   onEditInvoice?: (invoice: Invoice) => void;
+  initialViewMode?: InvoiceViewMode;
 }
 
 export type InvoiceViewMode = 'MOBILE' | 'A4' | 'THERMAL';
@@ -48,14 +51,17 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   company,
   onClose,
   onEditInvoice,
+  initialViewMode,
 }) => {
   const [showEwayThresholdWarning, setShowEwayThresholdWarning] = useState(false);
   const [viewMode, setViewMode] = useState<InvoiceViewMode>(() => {
+    if (initialViewMode) return initialViewMode;
     const defaultPrint = localStorage.getItem('defaultPrintOption');
     if (defaultPrint === 'Thermal-58mm' || defaultPrint === 'Thermal-80mm') return 'THERMAL';
     if (typeof window !== 'undefined' && window.innerWidth < 640) return 'MOBILE';
     return 'A4';
   });
+  const [pendingA4Print, setPendingA4Print] = useState(false);
   const [a4FitZoom, setA4FitZoom] = useState(true);
   const [copiedInvoiceNo, setCopiedInvoiceNo] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
@@ -124,10 +130,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   const isGst = company.isGstEnabled !== false && (propInvoice as any)?.isGstInvoice !== false;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   // If the invoice has no items, fall back to sample items from DEFAULT_INVOICES so preview is never empty
   const rawItems = (propInvoice as any)?.items || (propInvoice as any)?.lines || (propInvoice as any)?.invoiceItems || [];
   const hasItems = Array.isArray(rawItems) && rawItems.length > 0;
@@ -151,6 +153,23 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     return propInvoice;
   }, [propInvoice, hasItems]);
 
+  // If a print was triggered from Thermal view, switch to A4 and dispatch once mounted
+  useEffect(() => {
+    if (pendingA4Print && viewMode === 'A4') {
+      setPendingA4Print(false);
+      printCurrentPage(`Invoice-${invoice.invoiceNumber || 'Document'}`, 'A4');
+    }
+  }, [pendingA4Print, viewMode, invoice.invoiceNumber]);
+
+  const handlePrint = () => {
+    if (viewMode === 'THERMAL') {
+      setViewMode('A4');
+      setPendingA4Print(true);
+      return;
+    }
+    printCurrentPage(`Invoice-${invoice.invoiceNumber || 'Document'}`, 'A4');
+  };
+
   const sellerStateObj = getStateByCode(company.stateCode || '');
   const buyerStateObj = getStateByCode(invoice.partyStateCode || '');
   const posStateCode = invoice.placeOfSupplyStateCode || company.stateCode || '';
@@ -169,6 +188,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       ) || null
     );
   }, [invoice.partyId, invoice.partyName]);
+
+  const totalBalanceDue = useMemo(() => {
+    return getPartyTotalBalanceDue(party) ?? invoice.balanceAmount;
+  }, [party, invoice.balanceAmount]);
 
   // Normalize every line item to ensure all tax and numeric columns display accurately
   const itemsList = useMemo(() => {
@@ -450,6 +473,44 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-2 print-modal-overlay animate-fade-in">
+      {/* Scoped CSS for A4 Invoice Laser Printing */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #invoice-a4-print-root, #invoice-a4-print-root * {
+            visibility: visible !important;
+          }
+          #invoice-a4-print-root {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            justify-content: center !important;
+            background: #ffffff !important;
+          }
+          #invoice-a4-print-root .printable-invoice {
+            transform: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 8mm 10mm;
+          }
+        }
+      `}</style>
       <div className="bg-surface-container-lowest text-on-surface rounded-none sm:rounded-2xl border-0 sm:border sm:border-outline-variant/30 w-full max-w-5xl h-full sm:h-auto sm:max-h-[96vh] flex flex-col shadow-2xl overflow-hidden print-modal-container">
         {/* Modal Controls Toolbar (Compact & Minimal Padding) */}
         <div className="no-print px-2 sm:px-3 py-1 sm:py-1.5 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/95 gap-1 shrink-0">
@@ -1191,6 +1252,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           {/* Official A4 Laser GST Tax Invoice (Shown on screen for A4, or used as print source for Mobile) */}
           {(viewMode === 'A4' || viewMode === 'MOBILE') && (
             <div
+              id="invoice-a4-print-root"
               className={`w-full ${
                 viewMode === 'MOBILE'
                   ? 'hidden print:flex justify-center'
@@ -2204,6 +2266,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           company={company}
           onClose={() => setIsWhatsAppModalOpen(false)}
           initialPhone={party?.phone}
+          totalBalanceDue={totalBalanceDue}
         />
       )}
 

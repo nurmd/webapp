@@ -318,6 +318,39 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Included in PouchDB sync reconciliation, real-time incoming changes (`applyIncomingChange`), and cross-tab BroadcastChannel mutations (`applyLocalEntityMutation`).
   - Centralized dangling reference pruning (`pruneDanglingPartyReferences`) cleans unassigned references during local deletion, incoming changes, and full sync reconciliation.
   - Full round-trip backup/restore with backward compatibility for legacy backups omitting group/category collections.
+
+### I. Unified Native Print Bridge & A4 Document Architecture (`src/core/utils/printBridge.ts`, `MainActivity.kt`)
+- **Shared Print Bridge (`printBridge.ts`)**:
+  - All printing paths route through a unified abstraction: `printHtmlNative`, `printCurrentPageNative`, `printHtmlDocument`, `printCurrentPage`, and `escapeHtml`.
+  - Android Native Bridge (`MainActivity.kt`): When running inside Android, calls `@JavascriptInterface` methods:
+    - `printHtml(html, jobName)`: ISO A4 portrait printing via offscreen WebView.
+    - `printHtmlWithPaper(html, jobName, paperSize)`: Supports `"A4"`, `"A4-landscape"`, and `"default"` using explicit `PrintAttributes` (`MediaSize.ISO_A4`, `MediaSize.ISO_A4.asLandscape()`, `COLOR_MODE_COLOR`, `Margins.NO_MARGINS`).
+    - `printCurrentPage(jobName)` and `printCurrentPageWithPaper(jobName, paperSize)`: Dispatches `createPrintDocumentAdapter` on the main UI thread.
+    - Guarded with `hasStartedPrint` to prevent double-invocations on page finish, and wrapped in try-catch with UI toast feedback.
+  - Browser Fallback: Standalone HTML uses hidden iframe or pop-up window printing; current page printing falls back to `window.print()`.
+- **Standalone A4 Document Generators**:
+  - Expense vouchers: `expenseVoucherPrinter.ts` (`generateExpenseVoucherHtml`, `printExpenseVoucher`) with `.no-print` desktop toolbar (`window.print()`, `window.close()`).
+  - Accounting vouchers: `voucherDocumentPrinter.ts` (`generateAccountingVoucherHtml`, `printAccountingVoucher`) including entries, debits/credits, narration, signature block, and desktop toolbar.
+  - Purchase bills/challans: `purchaseDocumentPrinter.ts` (`generatePurchaseBillHtml`, `printPurchaseBill`) with line items, HSN, taxes, signature block, and desktop toolbar.
+  - E-Way bill slips: `eWayBillSlipPrinter.ts` (`generateEWayBillSlipHtml`, `printEWayBillSlip`).
+  - Party ledger statements: `ledgerStatementPrinter.ts` (`generatePartyLedgerStatementHtml`, `printPartyLedgerStatement`).
+  - Report previews: `reportExportUtils.ts` (`printReportHtmlNative`, `printReportDocumentDirect` choosing `A4-landscape` whenever `config.orientation === 'landscape' || config.headers.length > 7`).
+- **Modal Integrations & A4/PDF UX**:
+  - `InvoicePreviewModal`: Uses `initialViewMode?: 'MOBILE' | 'A4' | 'THERMAL'`, scoped print CSS targeting `#invoice-a4-print-root` (`height: auto !important; max-height: none !important; overflow: visible !important; min-width: 0 !important;`), and native current-page print.
+  - `BulkPrintModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#bulk-print-container` height/overflow resets for multi-page document batches.
+  - `BarcodeLabelModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#barcode-print-canvas` resets and conditional `@page` size (`A4 portrait` vs `auto`).
+  - Global `.print-modal-container` reset in `src/index.css` (`height: auto !important; max-height: none !important; min-height: 0 !important; overflow: visible !important;`).
+  - `ThermalPrintModal`: Dedicated `A4 / PDF` action invoking `onPrintA4(invoice)` or falling back to current-page print.
+  - `SimplifiedInvoiceModal`: Direct `A4 / PDF` action invoking `onOpenFullA4Preview(invoice)`.
+  - `App.tsx`: Full A4 `InvoicePreviewModal` rendering state wired to `onOpenFullA4Preview` and `ThermalPrintModal.onPrintA4`.
+- **Cash & Bank Transaction Sharing & Mobile Simplification**:
+  - `CashBankTransactionDetailModal.tsx`: Adds WhatsApp sharing (`data-testid="cash-bank-share-whatsapp"`) formatting structured WhatsApp messages with company branding, txn number, amount, date, account/contra route, reference, and narration via `safeOpenExternalUrl`. Includes party `*Total Balance Due:*` for non-transfer records when linked to a customer/supplier. Resolves `linkedParty` via priority fallback (1. `entry.partyId`, 2. `entry.rawVoucherId` → linked voucher `partyId`, 3. `entry.rawInvoiceId` → invoice `partyId` / `partyName`, 4. `entry.rawPurchaseId` → purchase `supplierId` / `supplierName`) so passbook `SALE` and `PURCHASE` ledger entries correctly include the party's total balance due.
+  - `DashboardVoucherModal.tsx`: Includes optional `parties?: Party[]` prop; adds `*Total Balance Due:*` after voucher amount when linked to a customer or supplier with outstanding balance.
+  - WhatsApp Total Balance Due helper (`getPartyTotalBalanceDue` in `src/core/utils/upiAndShare.ts`): Resolves signed overall party balances (`Math.max(0, currentBalance)` for customers, `Math.max(0, -currentBalance)` for suppliers, or fallback to document balance). Integrated across `buildWhatsAppMessage`, `InvoicePreviewModal`, `TableGridInvoiceModal`, `DashboardView`, `DashboardVoucherModal`, and `CashBankTransactionDetailModal`.
+  - In `src/services/whatsappService.ts`: Appends vernacular `📊 *कुल बकाया राशि:*` for Hindi language shares, with duplicate inclusion guards.
+  - Horizontally scrollable account card strip on mobile (`w-[175px] shrink-0 sm:w-auto`).
+  - Compact 2-line passbook ledger rows with inline direction icon, title, reference, amount, and concise contra route cues (`Cash in Hand → HDFC Current A/C`), with reference and contra badges hidden on smallest screens (`hidden sm:inline-flex`) to prevent 360px viewport overflow.
+  - Preserved testids (`cash-bank-reconcile-button`, `account-statement-ACC_CASH`, `account-statement-${acc.id}`), filter pills, and detail modal triggers.
   - Full backups include an optional `syncRemoteUrl` so a restore after reinstall restores the cloud link. Backups containing this field must be stored securely because it may include CouchDB credentials.
 - **Reactive State & UI Integration (`src/core/store/useDataStore.ts`, `src/components/Parties/`)**:
   - `usePartyGroups()` and `usePartyCategories()` hooks provide selective reactive updates via `useSyncExternalStore`.

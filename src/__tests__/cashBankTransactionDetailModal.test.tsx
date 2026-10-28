@@ -9,6 +9,8 @@ import { CompanyProfile } from '../models/company.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 const mockCompany: CompanyProfile = {
   id: 'COMP-1',
   businessName: 'Bharat Traders',
@@ -686,5 +688,245 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
     });
 
     expect(handleViewInvoice).toHaveBeenCalledWith(testInvoice);
+  });
+
+  describe('WhatsApp Sharing on Cash / Bank Transactions', () => {
+    it('shares native direct transaction on WhatsApp with company, amount, date, txnNumber, narration', async () => {
+      const mockOpenWhatsApp = vi.fn();
+      (window as any).AndroidBridge = {
+        openWhatsAppUrl: mockOpenWhatsApp,
+      };
+
+      const directEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-TXN-IN-TXN-002',
+        date: '2026-10-16',
+        type: 'DIRECT_IN',
+        category: 'BANK',
+        accountId: 'ACC_BANK_SBI',
+        accountName: 'SBI Current A/C',
+        counterpartyOrTitle: 'Capital Investment from Owner',
+        flow: 'IN',
+        amount: 20000,
+        mode: 'BANK_TRANSFER',
+        referenceNo: 'UTR998877',
+        description: 'Capital Investment from Owner',
+        txnId: 'TXN-002',
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={directEntry}
+            rawTransaction={mockTransactions[1]}
+            accounts={mockAccounts}
+            company={mockCompany}
+          />
+        );
+      });
+
+      const shareBtn = container.querySelector('[data-testid="cash-bank-share-whatsapp"]') as HTMLButtonElement;
+      expect(shareBtn).toBeDefined();
+
+      await act(async () => {
+        shareBtn.click();
+      });
+
+      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
+      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
+      expect(url.startsWith('https://wa.me/?text=')).toBe(true);
+
+      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
+      expect(decoded).toContain('Payment Received - Bharat Traders');
+      expect(decoded).toContain('*Txn No:* IN-2026-0002');
+      expect(decoded).toContain('16/10/2026');
+      expect(decoded).toContain('20,000');
+      expect(decoded).toContain('*Account:* SBI Current A/C');
+      expect(decoded).toContain('*Reference:* UTR998877');
+      expect(decoded).toContain('*Notes:* Capital Investment from Owner');
+      expect(decoded).toContain('Recorded in GST Billing App');
+    });
+
+    it('shares contra transfer message containing both account names and transfer heading', async () => {
+      const mockOpenWhatsApp = vi.fn();
+      (window as any).AndroidBridge = {
+        openWhatsAppUrl: mockOpenWhatsApp,
+      };
+
+      const contraEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-TXN-OUT-TXN-001',
+        date: '2026-10-15',
+        type: 'CONTRA',
+        category: 'CASH',
+        accountId: 'ACC_CASH',
+        accountName: 'Cash in Hand',
+        counterpartyOrTitle: 'Transfer to SBI Current A/C',
+        flow: 'OUT',
+        amount: 5000,
+        mode: 'CONTRA',
+        referenceNo: 'CHQ-100201',
+        description: 'Cash deposited to SBI branch',
+        fromAccountId: 'ACC_CASH',
+        fromAccountName: 'Cash in Hand',
+        toAccountId: 'ACC_BANK_SBI',
+        toAccountName: 'SBI Current A/C',
+        contraType: 'DEPOSIT',
+        txnId: 'TXN-001',
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={contraEntry}
+            rawTransaction={mockTransactions[0]}
+            accounts={mockAccounts}
+            company={mockCompany}
+          />
+        );
+      });
+
+      const shareBtn = container.querySelector('[data-testid="cash-bank-share-whatsapp"]') as HTMLButtonElement;
+      expect(shareBtn).toBeDefined();
+
+      await act(async () => {
+        shareBtn.click();
+      });
+
+      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
+      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
+      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
+      expect(decoded).toContain('Cash / Bank Transfer - Bharat Traders');
+      expect(decoded).toContain('*From:* Cash in Hand');
+      expect(decoded).toContain('*To:* SBI Current A/C');
+      expect(decoded).toContain('5,000');
+      expect(decoded).toContain('*Txn No:* TRF-2026-0001');
+    });
+
+    it('does not render share button while editing or during delete confirmation', async () => {
+      const contraEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-TXN-OUT-TXN-001',
+        date: '2026-10-15',
+        type: 'CONTRA',
+        category: 'CASH',
+        accountId: 'ACC_CASH',
+        accountName: 'Cash in Hand',
+        counterpartyOrTitle: 'Transfer to SBI Current A/C',
+        flow: 'OUT',
+        amount: 5000,
+        mode: 'CONTRA',
+        referenceNo: 'CHQ-100201',
+        description: 'Cash deposited to SBI branch',
+        fromAccountId: 'ACC_CASH',
+        fromAccountName: 'Cash in Hand',
+        toAccountId: 'ACC_BANK_SBI',
+        toAccountName: 'SBI Current A/C',
+        contraType: 'DEPOSIT',
+        txnId: 'TXN-001',
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={contraEntry}
+            rawTransaction={mockTransactions[0]}
+            accounts={mockAccounts}
+            company={mockCompany}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+          />
+        );
+      });
+
+      // View mode: button visible
+      expect(container.querySelector('[data-testid="cash-bank-share-whatsapp"]')).not.toBeNull();
+
+      // Enter edit mode
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Transaction')
+      );
+      expect(editBtn).toBeDefined();
+
+      await act(async () => {
+        editBtn?.click();
+      });
+
+      // While editing: share button must be hidden
+      expect(container.querySelector('[data-testid="cash-bank-share-whatsapp"]')).toBeNull();
+
+      // Cancel editing
+      const cancelBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Cancel')
+      );
+      await act(async () => {
+        cancelBtn?.click();
+      });
+
+      // View mode again: button visible
+      expect(container.querySelector('[data-testid="cash-bank-share-whatsapp"]')).not.toBeNull();
+
+      // Open delete confirmation
+      const deleteBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Delete')
+      );
+      await act(async () => {
+        deleteBtn?.click();
+      });
+
+      // While delete confirmation is open: share button must be hidden
+      expect(container.querySelector('[data-testid="cash-bank-share-whatsapp"]')).toBeNull();
+    });
+
+    it('falls back gracefully to "GST Billing App" when company prop is omitted', async () => {
+      const mockOpenWhatsApp = vi.fn();
+      (window as any).AndroidBridge = {
+        openWhatsAppUrl: mockOpenWhatsApp,
+      };
+
+      const directEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-TXN-IN-TXN-002',
+        date: '2026-10-16',
+        type: 'DIRECT_IN',
+        category: 'BANK',
+        accountId: 'ACC_BANK_SBI',
+        accountName: 'SBI Current A/C',
+        counterpartyOrTitle: 'Capital Investment from Owner',
+        flow: 'IN',
+        amount: 20000,
+        mode: 'BANK_TRANSFER',
+        referenceNo: 'UTR998877',
+        description: 'Capital Investment from Owner',
+        txnId: 'TXN-002',
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={directEntry}
+            rawTransaction={mockTransactions[1]}
+            accounts={mockAccounts}
+            // company omitted intentionally
+          />
+        );
+      });
+
+      const shareBtn = container.querySelector('[data-testid="cash-bank-share-whatsapp"]') as HTMLButtonElement;
+      expect(shareBtn).toBeDefined();
+
+      await act(async () => {
+        shareBtn.click();
+      });
+
+      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
+      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
+      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
+      expect(decoded).toContain('Payment Received - GST Billing App');
+    });
   });
 });

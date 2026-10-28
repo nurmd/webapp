@@ -1,6 +1,7 @@
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from './formatters.ts';
+import { printHtmlDocument } from './printBridge.ts';
 
 export interface PrintableLedgerEntry {
   date: string;
@@ -272,10 +273,5 @@ export function printPartyLedgerStatement(
     </html>
   `;
 
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-  }
+  printHtmlDocument(html, `Ledger Statement - ${party.name}`, 'A4');
 }

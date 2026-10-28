@@ -131,6 +131,9 @@ const RoleSwitchModal = React.lazy(() =>
 const CreateInvoiceModal = React.lazy(() =>
   import('./components/Invoicing/CreateInvoiceModal.tsx').then((m) => ({ default: m.CreateInvoiceModal }))
 );
+const InvoicePreviewModal = React.lazy(() =>
+  import('./components/Invoicing/InvoicePreviewModal.tsx').then((m) => ({ default: m.InvoicePreviewModal }))
+);
 const SimplifiedInvoiceModal = React.lazy(() =>
   import('./components/Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
 );
@@ -214,6 +217,7 @@ export const App: React.FC = () => {
   const [selectedPartyForInvoice, setSelectedPartyForInvoice] = useState<Party | null>(null);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [printInvoice, setPrintInvoice] = useState<Invoice | null>(null);
+  const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
   const [isTableGridPurchaseOpen, setIsTableGridPurchaseOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<PurchaseBill | null>(null);
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Party | null>(null);
@@ -310,6 +314,11 @@ export const App: React.FC = () => {
     setPrintInvoice(null);
     return true;
   }, !!printInvoice, 25);
+
+  useBackNavigation(() => {
+    setFullA4Invoice(null);
+    return true;
+  }, !!fullA4Invoice, 25);
 
   useBackNavigation(() => {
     setIsRoleSwitchOpen(false);
@@ -1543,6 +1552,7 @@ export const App: React.FC = () => {
             purchases={purchases}
             expenses={expenses}
             vouchers={vouchers}
+            parties={parties}
             onViewInvoice={setPreviewInvoice}
             onViewPurchase={handleEditPurchase}
             onSaveAccount={handleSaveBankAccount}
@@ -1705,7 +1715,7 @@ export const App: React.FC = () => {
               setPrintInvoice(inv);
             }}
             onOpenFullA4Preview={(inv) => {
-              setPrintInvoice(inv);
+              setFullA4Invoice(inv);
             }}
           />
         </React.Suspense>
@@ -1718,6 +1728,21 @@ export const App: React.FC = () => {
             invoice={printInvoice}
             company={company}
             onClose={() => setPrintInvoice(null)}
+            onPrintA4={(inv) => {
+              setFullA4Invoice(inv);
+            }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Full A4 / PDF Laser Invoice Preview Modal */}
+      {fullA4Invoice && (
+        <React.Suspense fallback={<ModalLoadingFallback title="Loading A4 Invoice Preview..." />}>
+          <InvoicePreviewModal
+            invoice={fullA4Invoice}
+            company={company}
+            onClose={() => setFullA4Invoice(null)}
+            initialViewMode="A4"
           />
         </React.Suspense>
       )}

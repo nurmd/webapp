@@ -48,7 +48,7 @@ export interface PaymentTransactionsViewProps {
 
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
   flow,
-  company: _company,
+  company,
   accounts,
   transactions,
   invoices,
@@ -802,6 +802,8 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         entry={selectedLedgerEntry}
         rawTransaction={selectedRawTxn}
         accounts={accounts}
+        company={company}
+        parties={parties}
         vouchers={vouchers}
         invoices={invoices}
         purchases={purchases}

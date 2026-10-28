@@ -1,4 +1,5 @@
 import { CompanyProfile } from '../../../models/company.ts';
+import { printHtmlNative, printHtmlDocument, PrintPaperSize } from '../../../core/utils/printBridge.ts';
 
 /**
  * Report Export Utilities: RFC 4180 CSV with UTF-8 BOM and CWE-1236 Formula Sanitization,
@@ -491,68 +492,26 @@ export function registerReportPreviewHandler(
 }
 
 /**
- * Direct printable PDF Generator with fallback to hidden <iframe> if window.open is blocked.
+ * Native Android Print Bridge helper:
+ * Dispatches HTML content directly to the Android PrintManager via shared printBridge.
+ * Returns true if the native bridge handled the print job, or false if running in standard desktop/browser environments.
+ */
+export function printReportHtmlNative(
+  html: string,
+  jobName: string,
+  paperSize: PrintPaperSize = 'A4'
+): boolean {
+  return printHtmlNative(html, jobName, paperSize);
+}
+
+/**
+ * Direct printable PDF Generator with native Android PrintManager support and browser fallbacks.
  */
 export function printReportDocumentDirect(config: ReportPdfConfig): void {
   const htmlContent = generateReportHtml(config);
-
-  try {
-    // Attempt opening a print window
-    const printWindow = window.open('', '_blank');
-
-    if (printWindow && !printWindow.closed) {
-      printWindow.document.open();
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      return;
-    }
-  } catch (err) {
-    console.warn('Popup blocked or window.open failed, falling back to hidden iframe:', err);
-  }
-
-  // Fallback to hidden iframe
-  try {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document || iframe.contentDocument;
-    if (doc) {
-      doc.open();
-      doc.write(htmlContent);
-      doc.close();
-
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          if (typeof iframe.contentWindow?.print === 'function') {
-            iframe.contentWindow.print();
-          } else if (typeof window !== 'undefined' && typeof window.print === 'function') {
-            window.print();
-          }
-        } catch (printErr) {
-          console.warn('Iframe print call warning:', printErr);
-        } finally {
-          setTimeout(() => {
-            if (iframe.parentNode) {
-              iframe.parentNode.removeChild(iframe);
-            }
-          }, 3000);
-        }
-      }, 300);
-    }
-  } catch (fallbackErr) {
-    console.error('Print iframe fallback failed:', fallbackErr);
-    // Last resort: window.print directly
-    if (typeof window !== 'undefined' && window.print) {
-      window.print();
-    }
-  }
+  const landscape = config.orientation === 'landscape' || config.headers.length > 7;
+  const paperSize: PrintPaperSize = landscape ? 'A4-landscape' : 'A4';
+  printHtmlDocument(htmlContent, config.title, paperSize);
 }
 
 /**

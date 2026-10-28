@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.print.PrintAttributes
+import android.print.PrintManager
 import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -339,6 +341,7 @@ class MainActivity : Activity() {
     }
 
     private var lastBackPressTime: Long = 0
+    private var backEvaluationInFlight: Boolean = false
 
     override fun onBackPressed() {
         if (!::webView.isInitialized) {
@@ -346,35 +349,55 @@ class MainActivity : Activity() {
             return
         }
 
-        webView.evaluateJavascript(
-            "(function() { " +
-            "  try { " +
-            "    if (typeof window.__handleAndroidBack === 'function') { " +
-            "      return window.__handleAndroidBack() === true; " +
-            "    } " +
-            "  } catch (e) {} " +
-            "  return false; " +
-            "})()"
-        ) { result ->
-            val handled = result?.trim()?.replace("\"", "")?.equals("true", ignoreCase = true) == true
-            if (!handled) {
-                val now = System.currentTimeMillis()
-                if (now - lastBackPressTime < 2000) {
-                    finish()
+        if (backEvaluationInFlight) {
+            return
+        }
+
+        backEvaluationInFlight = true
+
+        try {
+            webView.evaluateJavascript(
+                "(function() { " +
+                "  try { " +
+                "    if (typeof window.__handleAndroidBack === 'function') { " +
+                "      return window.__handleAndroidBack() === true; " +
+                "    } " +
+                "  } catch (e) {} " +
+                "  return false; " +
+                "})()"
+            ) { result ->
+                backEvaluationInFlight = false
+                val handled = result?.trim()?.replace("\"", "")?.equals("true", ignoreCase = true) == true
+                if (handled) {
+                    lastBackPressTime = 0L
                 } else {
-                    lastBackPressTime = now
-                    vibrator?.let { v ->
-                        try {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                v.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
-                            } else {
-                                @Suppress("DEPRECATION")
-                                v.vibrate(40)
-                            }
-                        } catch (_: Exception) {}
+                    val now = System.currentTimeMillis()
+                    if (now - lastBackPressTime < 2000) {
+                        finish()
+                    } else {
+                        lastBackPressTime = now
+                        vibrator?.let { v ->
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    v.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    v.vibrate(40)
+                                }
+                            } catch (_: Exception) {}
+                        }
+                        Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
                     }
-                    Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
                 }
+            }
+        } catch (e: Exception) {
+            backEvaluationInFlight = false
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressTime < 2000) {
+                finish()
+            } else {
+                lastBackPressTime = now
+                Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -430,6 +453,100 @@ class AndroidBridge(
 ) {
     private var downloadThread: Thread? = null
     @Volatile private var isDownloading = false
+    private var pendingPrintWebView: WebView? = null
+
+    private fun buildPrintAttributes(paperSize: String): PrintAttributes? {
+        return try {
+            when (paperSize.trim().lowercase()) {
+                "a4-landscape" -> {
+                    PrintAttributes.Builder()
+                        .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
+                        .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                        .build()
+                }
+                "a4" -> {
+                    PrintAttributes.Builder()
+                        .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                        .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                        .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                        .build()
+                }
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    @JavascriptInterface
+    fun printHtml(html: String, jobName: String) {
+        printHtmlWithPaper(html, jobName, "A4")
+    }
+
+    @JavascriptInterface
+    fun printHtmlWithPaper(html: String, jobName: String, paperSize: String) {
+        if (html.isBlank()) {
+            return
+        }
+        (context as? Activity)?.runOnUiThread {
+            try {
+                val safeJobName = jobName.trim().ifBlank { "Report" }.take(60)
+                val printWebView = WebView(context)
+                pendingPrintWebView = printWebView
+                val settings = printWebView.settings
+                settings.javaScriptEnabled = false
+                var hasStartedPrint = false
+                printWebView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        if (hasStartedPrint) {
+                            return
+                        }
+                        hasStartedPrint = true
+                        try {
+                            val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                            if (printManager == null) {
+                                Toast.makeText(context, "Print service unavailable", Toast.LENGTH_SHORT).show()
+                                return
+                            }
+                            val adapter = printWebView.createPrintDocumentAdapter(safeJobName)
+                            val attributes = buildPrintAttributes(paperSize)
+                            printManager.print(safeJobName, adapter, attributes)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Failed to start print: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to start print: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun printCurrentPage(jobName: String) {
+        printCurrentPageWithPaper(jobName, "A4")
+    }
+
+    @JavascriptInterface
+    fun printCurrentPageWithPaper(jobName: String, paperSize: String) {
+        (context as? Activity)?.runOnUiThread {
+            try {
+                val safeJobName = jobName.trim().ifBlank { "Document" }.take(60)
+                val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
+                if (printManager == null) {
+                    Toast.makeText(context, "Print service unavailable", Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                val adapter = webView.createPrintDocumentAdapter(safeJobName)
+                val attributes = buildPrintAttributes(paperSize)
+                printManager.print(safeJobName, adapter, attributes)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Print error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     @JavascriptInterface
     fun openWhatsAppUrl(url: String) {

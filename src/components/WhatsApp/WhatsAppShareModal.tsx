@@ -20,6 +20,7 @@ interface WhatsAppShareModalProps {
   company: CompanyProfile;
   onClose: () => void;
   initialPhone?: string;
+  totalBalanceDue?: number;
 }
 
 export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
@@ -27,6 +28,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   company,
   onClose,
   initialPhone,
+  totalBalanceDue,
 }) => {
   useBackNavigation(() => {
     onClose();
@@ -46,6 +48,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const messagePreview = formatWhatsAppMessage(company, invoice, {
     language,
     purpose,
+    totalBalanceDue,
   });
 
   const handleCopy = () => {
@@ -75,6 +78,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       phoneNumber: trimmedPhone || undefined,
       language,
       purpose,
+      totalBalanceDue,
     });
     onClose();
   };

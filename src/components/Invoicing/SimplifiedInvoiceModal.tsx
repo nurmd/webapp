@@ -307,19 +307,29 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
         {/* Bottom Actions Bar (Sticky Action Dock) */}
         <div className="flex flex-wrap items-center gap-2 p-3 sm:p-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0">
-          {/* Print Button */}
-          {(onPrintInvoice || onOpenFullA4Preview) && (
+          {/* Print Button (Thermal) */}
+          {onPrintInvoice && (
             <button
               type="button"
-              onClick={() => {
-                if (onPrintInvoice) onPrintInvoice(invoice);
-                else if (onOpenFullA4Preview) onOpenFullA4Preview(invoice);
-              }}
-              className="flex-1 min-w-[110px] py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-secondary/90 transition-all"
+              onClick={() => onPrintInvoice(invoice)}
+              className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-secondary/90 transition-all"
               title="Print Thermal POS Receipt"
             >
               <span className="material-symbols-outlined text-[16px]">print</span>
               <span>Print</span>
+            </button>
+          )}
+
+          {/* A4 / PDF Button */}
+          {onOpenFullA4Preview && (
+            <button
+              type="button"
+              onClick={() => onOpenFullA4Preview(invoice)}
+              className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-all"
+              title="View full A4 / PDF layout & print"
+            >
+              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+              <span>A4 / PDF</span>
             </button>
           )}
 

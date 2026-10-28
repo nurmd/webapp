@@ -5,6 +5,7 @@ import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { printPurchaseBill } from '../../core/utils/purchaseDocumentPrinter.ts';
 
 export interface SimplifiedPurchaseModalProps {
   bill: PurchaseBill | null;
@@ -313,11 +314,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
           {/* Print Button */}
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined' && window.print) {
-                window.print();
-              }
-            }}
+            onClick={() => printPurchaseBill(company, bill)}
             className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
             title={isChallan ? 'Print Purchase Challan' : 'Print Purchase Bill'}
           >

@@ -13,17 +13,20 @@ import { printSettingsService } from '../../services/printSettingsService.ts';
 import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { printCurrentPage } from '../../core/utils/printBridge.ts';
 
-interface ThermalPrintModalProps {
+export interface ThermalPrintModalProps {
   invoice: Invoice;
   company: CompanyProfile;
   onClose: () => void;
+  onPrintA4?: (invoice: Invoice) => void;
 }
 
 export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   invoice,
   company,
   onClose,
+  onPrintA4,
 }) => {
   useBackNavigation(() => {
     onClose();
@@ -233,8 +236,13 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       return;
     }
 
-    // Default fallback: window.print()
-    window.print();
+    // Fallback: A4 callback if provided, otherwise native current page print
+    if (onPrintA4) {
+      onClose();
+      onPrintA4(invoice);
+      return;
+    }
+    printCurrentPage(`Invoice-${invoice.invoiceNumber || 'Thermal'}`, 'default');
   };
 
   return (
@@ -361,7 +369,21 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3 sm:p-4 border-t border-outline-variant/20 bg-surface-container-low/50 flex items-center justify-end gap-2">
+        <div className="p-3 sm:p-4 border-t border-outline-variant/20 bg-surface-container-low/50 flex items-center justify-end gap-2 flex-wrap">
+          {onPrintA4 && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onPrintA4(invoice);
+              }}
+              className="px-3 py-2 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 text-xs font-bold hover:bg-surface-container-high active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              title="Print or save as full A4 / PDF"
+            >
+              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+              <span>A4 / PDF</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

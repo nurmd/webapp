@@ -4,6 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { printExpenseVoucher } from '../../core/utils/expenseVoucherPrinter.ts';
 
 export interface DashboardExpenseModalProps {
   expense: Expense | null;
@@ -39,9 +40,7 @@ export const DashboardExpenseModal: React.FC<DashboardExpenseModalProps> = ({
   };
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined' && window.print) {
-      window.print();
-    }
+    printExpenseVoucher(company, expense);
   };
 
   return (

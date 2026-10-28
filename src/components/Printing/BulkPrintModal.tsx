@@ -6,6 +6,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { printCurrentPage } from '../../core/utils/printBridge.ts';
 
 export interface BulkPrintModalProps {
   isOpen: boolean;
@@ -37,16 +38,18 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
   const totalAmount = docs.reduce((sum, d) => sum + (d.grandTotal || 0), 0);
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined' && window.print) {
-      window.print();
-    }
+    printCurrentPage('Bulk-Documents', 'A4');
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-2 sm:p-4 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-2 sm:p-4 animate-fade-in print-modal-overlay">
       {/* Dynamic print-specific styles */}
       <style>{`
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm 6mm;
+          }
           body * {
             visibility: hidden !important;
           }
@@ -58,6 +61,9 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
             margin: 0 !important;
             padding: 0 !important;
             background: #fff !important;
@@ -79,7 +85,7 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
       `}</style>
 
       {/* Main Container */}
-      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl border border-outline-variant/30 overflow-hidden">
+      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl border border-outline-variant/30 overflow-hidden print-modal-container">
         {/* Sticky Toolbar */}
         <div className="p-3 sm:p-4 border-b border-outline-variant/20 bg-surface-container-low flex items-center justify-between gap-2 shrink-0 no-print">
           <div className="flex items-center gap-2 min-w-0">

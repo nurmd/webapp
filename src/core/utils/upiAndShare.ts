@@ -28,6 +28,21 @@ export function cleanIndianPhoneNumber(rawPhone?: string): string {
   return normalized.valid ? normalized.e164 : '';
 }
 
+/**
+ * Calculates the party's overall total balance due amount.
+ * - Customer party: Math.max(0, party.currentBalance) (positive balance = receivable)
+ * - Supplier party: Math.max(0, -party.currentBalance) (negative balance = payable)
+ * - Returns null if party is omitted or currentBalance is non-finite.
+ */
+export function getPartyTotalBalanceDue(party?: Party | null): number | null {
+  if (!party || typeof party.currentBalance !== 'number' || !Number.isFinite(party.currentBalance)) {
+    return null;
+  }
+  const isSupplier = party.type === 'SUPPLIER';
+  const due = isSupplier ? -party.currentBalance : party.currentBalance;
+  return Math.max(0, due);
+}
+
 export function getUpiPaymentUrl(company: CompanyProfile, invoiceOrAmount: Invoice | number, notePrefix: string = 'Bill'): string {
   const upiId = company.upiId || 'merchant@upi';
   const name = encodeURIComponent(company.tradeName || company.businessName);
@@ -53,6 +68,7 @@ export function buildWhatsAppMessage(
     balanceAmount?: number;
     partyName?: string;
     partyPhone?: string;
+    totalBalanceDue?: number;
   },
   options: WhatsAppMessageOptions = {}
 ): { text: string; cleanPhone: string; whatsappUrl: string } {
@@ -66,6 +82,18 @@ export function buildWhatsAppMessage(
     ? data.balanceAmount
     : data.invoice?.balanceAmount ?? data.party?.currentBalance ?? 0;
   const grandTotal = data.invoice?.grandTotal ?? balance;
+
+  const resolvedTotalDue =
+    typeof data.totalBalanceDue === 'number' && Number.isFinite(data.totalBalanceDue)
+      ? Math.max(0, data.totalBalanceDue)
+      : (() => {
+          const partyDue = getPartyTotalBalanceDue(data.party);
+          if (partyDue !== null) return partyDue;
+          if (data.invoice && typeof data.invoice.balanceAmount === 'number' && Number.isFinite(data.invoice.balanceAmount)) {
+            return Math.max(0, data.invoice.balanceAmount);
+          }
+          return null;
+        })();
 
   const upiDetails = company.upiId
     ? lang === 'HI'
@@ -99,6 +127,7 @@ export function buildWhatsAppMessage(
         `📅 *दिनांक:* ${inv.date}\n` +
         `💰 *कुल राशि:* ₹${inv.grandTotal.toLocaleString('en-IN')}\n` +
         `⚠️ *बकाया राशि:* ₹${inv.balanceAmount.toLocaleString('en-IN')}\n` +
+        (resolvedTotalDue !== null ? `📊 *कुल बकाया राशि:* ₹${resolvedTotalDue.toLocaleString('en-IN')}\n` : '') +
         `📌 *स्थिति:* ${inv.paymentStatus === 'PAID' ? 'पूर्ण भुगतान' : inv.paymentStatus === 'PARTIAL' ? 'आंशिक भुगतान' : 'लंबित'}\n` +
         `------------------------------` +
         `${inv.balanceAmount > 0 ? upiDetails + bankDetails : ''}\n\n` +
@@ -110,6 +139,7 @@ export function buildWhatsAppMessage(
         `📅 *Date:* ${inv.date}\n` +
         `💰 *Grand Total:* ₹${inv.grandTotal.toLocaleString('en-IN')}\n` +
         `⚠️ *Balance Due:* ₹${inv.balanceAmount.toLocaleString('en-IN')}\n` +
+        (resolvedTotalDue !== null ? `📊 *Total Balance Due:* ₹${resolvedTotalDue.toLocaleString('en-IN')}\n` : '') +
         `📌 *Payment Status:* ${inv.paymentStatus}\n` +
         `------------------------------` +
         `${inv.balanceAmount > 0 ? upiDetails + bankDetails : ''}\n\n` +
@@ -189,8 +219,17 @@ export function buildWhatsAppMessage(
 /**
  * Backwards compatible helper for single invoice WhatsApp sharing
  */
-export function getWhatsAppShareUrl(invoice: Invoice, company: CompanyProfile, partyPhone?: string): string {
-  const result = buildWhatsAppMessage(company, { invoice, partyPhone }, { template: 'INVOICE_DELIVERY' });
+export function getWhatsAppShareUrl(
+  invoice: Invoice,
+  company: CompanyProfile,
+  partyPhone?: string,
+  party?: Party
+): string {
+  const result = buildWhatsAppMessage(
+    company,
+    { invoice, partyPhone, party },
+    { template: 'INVOICE_DELIVERY' }
+  );
   return result.whatsappUrl;
 }
 

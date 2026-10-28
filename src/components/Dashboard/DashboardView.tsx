@@ -7,7 +7,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { getWhatsAppShareUrl, safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
+import { getWhatsAppShareUrl, safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 
 const SimplifiedPurchaseModal = React.lazy(() =>
@@ -641,13 +641,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     e.stopPropagation();
     if (item.type === 'SALE' && item.rawInvoice) {
       const party = item.partyId ? activeParties.find((p) => p.id === item.partyId) : undefined;
-      const url = getWhatsAppShareUrl(item.rawInvoice, company, party?.phone);
+      const url = getWhatsAppShareUrl(item.rawInvoice, company, party?.phone, party);
       safeOpenExternalUrl(url);
     } else if (item.type === 'PURCHASE' && item.rawPurchase) {
       const pur = item.rawPurchase;
       const supplier = item.partyId ? activeParties.find((p) => p.id === item.partyId) : undefined;
       const cleanPhone = (supplier?.phone || '').replace(/\D/g, '');
       const phoneParam = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      const totalDue = getPartyTotalBalanceDue(supplier) ?? pur.balanceAmount;
       const text = `*Purchase Bill Summary - ${company.tradeName || company.businessName}*\n` +
         `--------------------------------\n` +
         `*Bill No:* ${pur.billNumber}\n` +
@@ -655,17 +656,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         `*Date:* ${pur.date}\n` +
         `*Amount:* ${formatINR(pur.grandTotal)}\n` +
         `*Balance Due:* ${formatINR(pur.balanceAmount)}\n` +
+        `*Total Balance Due:* ${formatINR(totalDue)}\n` +
         `*Status:* ${pur.paymentStatus}`;
       const url = `https://wa.me/${phoneParam}?text=${encodeURIComponent(text)}`;
       safeOpenExternalUrl(url);
     } else if (item.type === 'VOUCHER' && item.rawVoucher) {
       const v = item.rawVoucher;
+      const vParty = v.partyId ? activeParties.find((p) => p.id === v.partyId) : undefined;
+      const vDue = getPartyTotalBalanceDue(vParty);
       const text = `*Voucher Summary - ${company.tradeName || company.businessName}*\n` +
         `--------------------------------\n` +
         `*Voucher No:* ${v.voucherNumber}\n` +
         `*Type:* ${v.voucherType}\n` +
         `*Date:* ${v.date}\n` +
         `*Amount:* ${formatINR(v.totalAmount)}\n` +
+        (vDue !== null ? `*Total Balance Due:* ${formatINR(vDue)}\n` : '') +
         (v.narration ? `*Narration:* ${v.narration}\n` : '') +
         `--------------------------------\n` +
         `Recorded in GST Billing App`;
@@ -1528,6 +1533,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <DashboardVoucherModal
           voucher={selectedVoucherForModal}
           company={company}
+          parties={activeParties}
           onClose={() => setSelectedVoucherForModal(null)}
         />
       )}
