@@ -1,14 +1,14 @@
 {
-  "version": "1.2.42",
+  "version": "1.2.43",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-28T05:33:33.184Z",
+  "buildTime": "2026-10-28T10:58:14.081Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Supplier details now separate Transactions from Purchase Orders and GRNs",
-    "Purchase order and GRN totals no longer affect supplier payable balances",
-    "Orders tab tracks PO/GRN status, converted bills, cancelled documents, and unbilled totals",
-    "Unbilled order value is shown under You Will Pay on supplier details",
-    "Purchase returns are clearly labelled with their return reason in the supplier ledger"
+    "Native ISO A4 printing bridge with paper size selection and print dialog guards",
+    "Cash & Bank passbook WhatsApp sharing with structured breakdown and total due",
+    "Customer and supplier WhatsApp total balance due across invoices, purchases, vouchers, and folder modal",
+    "Vernacular Hindi Total Balance Due label with duplicate prevention",
+    "Passbook sale and purchase ledger entries resolve linked party balance due"
   ]
 }
