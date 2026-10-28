@@ -1,14 +1,14 @@
 {
-  "version": "1.2.41",
+  "version": "1.2.42",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-27T12:18:42.875Z",
+  "buildTime": "2026-10-28T05:33:33.184Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Payment In and Payment Out now use a dedicated entry mode with optional links to outstanding invoices and bills",
-    "Manual, oldest-first, and on-account allocation keep settlements separate from invoices and bills",
-    "Invoice and bill Pay & Save behavior is unchanged, with source vouchers reconciled safely on edits",
-    "GST-exclusive and GST-inclusive rates stay synchronized across screens, A4 bills, and thermal receipts",
-    "Legacy records, tax slabs, HSN summaries, and audit hashes remain intact"
+    "Supplier details now separate Transactions from Purchase Orders and GRNs",
+    "Purchase order and GRN totals no longer affect supplier payable balances",
+    "Orders tab tracks PO/GRN status, converted bills, cancelled documents, and unbilled totals",
+    "Unbilled order value is shown under You Will Pay on supplier details",
+    "Purchase returns are clearly labelled with their return reason in the supplier ledger"
   ]
 }
