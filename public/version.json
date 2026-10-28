@@ -1,14 +1,16 @@
 {
-  "version": "1.2.43",
+  "version": "1.2.44",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-28T10:58:14.081Z",
+  "buildTime": "2026-10-28T12:20:18.530Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Native ISO A4 printing bridge with paper size selection and print dialog guards",
-    "Cash & Bank passbook WhatsApp sharing with structured breakdown and total due",
-    "Customer and supplier WhatsApp total balance due across invoices, purchases, vouchers, and folder modal",
-    "Vernacular Hindi Total Balance Due label with duplicate prevention",
-    "Passbook sale and purchase ledger entries resolve linked party balance due"
+    "make payment voucher readonly by default with edit toggle and WhatsApp share",
+    "v1.2.43",
+    "native A4 printing bridge, cash bank sharing, and WhatsApp total balance due",
+    "v1.2.42",
+    "split supplier ledger into transactions and orders",
+    "v1.2.41",
+    "separate payment vouchers and link outstanding documents"
   ]
 }
