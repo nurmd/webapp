@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
@@ -8,7 +8,6 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
-import { createReversalVoucher } from '../../core/accounting/ledger.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -88,7 +87,16 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     return def?.id || 'ACC_BANK';
   });
 
-  const populateForm = () => {
+  const selectedBankName = useMemo(() => {
+    const found = availableBankAccounts.find((a) => a.id === editBankAccountId);
+    return found?.accountName || 'Bank Account';
+  }, [availableBankAccounts, editBankAccountId]);
+
+  const partyTotalDue = useMemo(() => {
+    return party ? getPartyTotalBalanceDue(party) : null;
+  }, [party]);
+
+  const populateForm = useCallback(() => {
     if (!editingLedgerEntry) return;
 
     setEditDate(editingLedgerEntry.date);
@@ -155,11 +163,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     } else {
       setEditOpeningType(editingLedgerEntry.debit > 0 ? 'RECEIVABLE' : 'PAYABLE');
     }
-  };
+  }, [editingLedgerEntry, party, availableBankAccounts]);
 
   useEffect(() => {
     populateForm();
-  }, [editingLedgerEntry, party]);
+  }, [populateForm]);
 
   useEffect(() => {
     if (typeof initialEditing === 'boolean') {
@@ -179,7 +187,20 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     return true;
   }, !!editingLedgerEntry, 20);
 
+  // Guard after ALL hooks have been registered
   if (!editingLedgerEntry) return null;
+
+  const isReceipt =
+    editingLedgerEntry.type === 'PAYMENT_IN' ||
+    editType === 'IN' ||
+    (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0);
+
+  const currentAmount =
+    parseFloat(editAmount) ||
+    (editingLedgerEntry.credit > 0 ? editingLedgerEntry.credit : editingLedgerEntry.debit) ||
+    0;
+
+  const currentDiscount = parseFloat(editDiscount) || 0;
 
   const handleSaveLedgerItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,16 +227,14 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     // 1. Voucher edit
     if (editingLedgerEntry.rawVoucher) {
       const v = editingLedgerEntry.rawVoucher;
-      const isReceipt = editType === 'IN';
-      const newVoucherType = isReceipt ? 'RECEIPT' : 'PAYMENT';
-
+      const newVoucherType = editType === 'IN' ? 'RECEIPT' : 'PAYMENT';
       const disc = parseFloat(editDiscount) || 0;
       const totalSettled = Number((newAmt + disc).toFixed(2));
 
       // Allocation validation & handling
       const oldAllocations = v.paymentAllocations || [];
       const allocatedSum = oldAllocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-      const isTypeChanged = (v.voucherType === 'RECEIPT' && !isReceipt) || (v.voucherType === 'PAYMENT' && isReceipt);
+      const isTypeChanged = (v.voucherType === 'RECEIPT' && editType !== 'IN') || (v.voucherType === 'PAYMENT' && editType === 'IN');
 
       let finalAllocations = oldAllocations.map((a) => ({
         ...a,
@@ -224,7 +243,6 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       let finalAllocationMode = v.allocationMode;
 
       if (isTypeChanged) {
-        // Changing flow between IN and OUT clears allocations and requires re-linking
         finalAllocations = [];
         finalAllocationMode = 'UNALLOCATED';
       } else if (v.allocationMode === 'SOURCE_DOCUMENT') {
@@ -255,7 +273,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         const b = parseFloat(editSplitBank) || 0;
         const bankSum = Number((u + b).toFixed(2));
 
-        if (isReceipt) {
+        if (editType === 'IN') {
           if (c > 0) entries.push({ accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: c, credit: 0, narration: 'Payment received via CASH' });
           if (bankSum > 0) entries.push({ accountId: 'ACC_BANK', accountName: 'Bank Account', debit: bankSum, credit: 0, narration: 'Payment received via BANK/UPI' });
           if (disc > 0) entries.push({ accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: disc, credit: 0, narration: 'Cash discount allowed' });
@@ -270,7 +288,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId) || availableBankAccounts[0];
         const accId = editMode === 'CASH' ? 'ACC_CASH' : (selectedBank?.id || 'ACC_BANK');
         const accName = editMode === 'CASH' ? 'Cash-in-hand' : (selectedBank?.accountName || 'Bank Account');
-        if (isReceipt) {
+        if (editType === 'IN') {
           entries.push({ accountId: accId, accountName: accName, debit: newAmt, credit: 0, narration: `Payment received via ${editMode}${selectedBank && editMode === 'BANK' ? ` (${selectedBank.accountName})` : ''}` });
           if (disc > 0) entries.push({ accountId: 'ACC_EXPENSE_DISCOUNT', accountName: 'Discount Allowed', debit: disc, credit: 0, narration: 'Cash discount allowed' });
           entries.push({ accountId: party.id, accountName: party.name, debit: 0, credit: totalSettled, narration: editNotes || v.narration });
@@ -505,15 +523,6 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     setIsDeleteConfirmOpen(true);
   };
 
-  const selectedBankName = useMemo(() => {
-    const found = availableBankAccounts.find((a) => a.id === editBankAccountId);
-    return found?.accountName || 'Bank Account';
-  }, [availableBankAccounts, editBankAccountId]);
-
-  const partyTotalDue = useMemo(() => {
-    return getPartyTotalBalanceDue(party);
-  }, [party]);
-
   const handleShareWhatsApp = () => {
     if (!editingLedgerEntry) return;
 
@@ -524,16 +533,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       db.getCompany()?.businessName ||
       'Vyapar Books';
 
-    const isReceipt =
-      editingLedgerEntry.type === 'PAYMENT_IN' ||
-      editType === 'IN' ||
-      (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0);
     const voucherTitle = isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher';
-    const numAmt =
-      parseFloat(editAmount) ||
-      (editingLedgerEntry.credit > 0 ? editingLedgerEntry.credit : editingLedgerEntry.debit);
-    const discAmt = parseFloat(editDiscount) || 0;
-    const totalDue = getPartyTotalBalanceDue(party);
+    const numAmt = currentAmount;
+    const discAmt = currentDiscount;
+    const totalDue = partyTotalDue;
 
     const lines: string[] = [
       `*${voucherTitle} - ${companyName}*`,
@@ -589,9 +592,15 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     <>
       {/* View/Edit Invoice buttons if linked to a full sales invoice */}
       {editingLedgerEntry.rawInvoice && (
-        <div className="flex items-center justify-between p-2 rounded-xl bg-primary/10 border border-primary/20 text-xs">
-          <span className="text-primary font-bold">Invoice #{editingLedgerEntry.rawInvoice.invoiceNumber}</span>
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-primary/10 border border-primary/20 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-primary text-[18px]">receipt_long</span>
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold text-primary/80 block">Linked Sales Invoice</span>
+              <span className="text-primary font-bold truncate">#{editingLedgerEntry.rawInvoice.invoiceNumber}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {onViewInvoice && (
               <button
                 type="button"
@@ -600,7 +609,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   onClose();
                   onViewInvoice(inv);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-primary text-on-primary font-bold text-[11px] shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
                 <span>View</span>
@@ -614,7 +623,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   onClose();
                   onEditInvoice(inv);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-[11px] cursor-pointer flex items-center gap-1 active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high"
               >
                 <span className="material-symbols-outlined text-[14px]">edit</span>
                 <span>Edit</span>
@@ -626,26 +635,26 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
       {/* Linked Documents Section for Vouchers */}
       {editingLedgerEntry.rawVoucher?.paymentAllocations && editingLedgerEntry.rawVoucher.paymentAllocations.length > 0 && (
-        <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-1.5">
-          <span className="text-[11px] font-bold text-on-surface flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px] text-secondary">link</span>
+        <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
+          <span className="text-[11px] font-bold text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
             <span>Linked Documents ({editingLedgerEntry.rawVoucher.paymentAllocations.length})</span>
           </span>
-          <div className="flex flex-col gap-1 divide-y divide-outline-variant/15 text-xs">
+          <div className="flex flex-col gap-1.5 divide-y divide-outline-variant/15 text-xs">
             {editingLedgerEntry.rawVoucher.paymentAllocations.map((alloc) => (
-              <div key={alloc.documentId} className="pt-1 pb-1 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
+              <div key={alloc.documentId} className="pt-1.5 pb-0.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                       alloc.documentType === 'INVOICE'
-                        ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
-                        : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                        ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                        : 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
                     }`}
                   >
                     {alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
                   </span>
                   <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
-                  <span className="text-secondary font-bold">({formatINR(alloc.amount)})</span>
+                  <span className="text-secondary font-bold font-tabular-data">({formatINR(alloc.amount)})</span>
                 </div>
                 {alloc.documentType === 'INVOICE' && onViewInvoice && (
                   <button
@@ -657,9 +666,9 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                         onViewInvoice(inv);
                       }
                     }}
-                    className="px-2 py-0.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[10px] flex items-center gap-0.5 cursor-pointer active:scale-95"
+                    className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[12px]">visibility</span>
+                    <span className="material-symbols-outlined text-[13px]">visibility</span>
                     <span>View</span>
                   </button>
                 )}
@@ -674,9 +683,9 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                         else if (onEditPurchase) onEditPurchase(pur);
                       }
                     }}
-                    className="px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer active:scale-95"
+                    className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[12px]">visibility</span>
+                    <span className="material-symbols-outlined text-[13px]">visibility</span>
                     <span>View</span>
                   </button>
                 )}
@@ -688,9 +697,15 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
       {/* View/Edit Purchase buttons if linked to a purchase bill */}
       {editingLedgerEntry.rawPurchase && (
-        <div className="flex items-center justify-between p-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs">
-          <span className="text-orange-600 dark:text-orange-400 font-bold">Purchase Bill #{editingLedgerEntry.rawPurchase.billNumber}</span>
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="material-symbols-outlined text-orange-600 dark:text-orange-400 text-[18px]">shopping_bag</span>
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold text-orange-700 dark:text-orange-300 block">Linked Purchase Bill</span>
+              <span className="text-orange-600 dark:text-orange-400 font-bold truncate">#{editingLedgerEntry.rawPurchase.billNumber}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {onViewPurchase && (
               <button
                 type="button"
@@ -699,7 +714,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   onClose();
                   onViewPurchase(bill);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-orange-600 text-white font-bold text-[11px] shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-orange-600 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
               >
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
                 <span>View</span>
@@ -713,7 +728,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   onClose();
                   onEditPurchase(bill);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface font-bold text-[11px] cursor-pointer flex items-center gap-1 active:scale-95"
+                className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high"
               >
                 <span className="material-symbols-outlined text-[14px]">edit</span>
                 <span>Edit</span>
@@ -726,159 +741,246 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-2xl p-4 w-full max-w-sm sm:max-w-md shadow-2xl border border-outline-variant/30 flex flex-col gap-3">
-        <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
-          <h3 className="font-bold text-sm text-on-surface flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[18px] text-secondary">
-              {editingLedgerEntry.type === 'SALE'
-                ? 'receipt_long'
-                : editingLedgerEntry.type === 'PURCHASE'
-                ? 'shopping_bag'
-                : 'payments'}
-            </span>
-            <span>
-              {isEditing
-                ? editingLedgerEntry.type === 'SALE'
-                  ? 'Edit Sales Invoice'
-                  : editingLedgerEntry.type === 'PURCHASE'
-                  ? 'Edit Purchase Bill'
-                  : editingLedgerEntry.type === 'PAYMENT_IN' || editType === 'IN'
-                  ? 'Edit Payment In'
-                  : editingLedgerEntry.type === 'PAYMENT_OUT' || editType === 'OUT'
-                  ? 'Edit Payment Out'
-                  : editingLedgerEntry.isOpening
-                  ? 'Edit Opening Balance'
-                  : 'Edit Transaction'
-                : editingLedgerEntry.type === 'PAYMENT_IN' || editType === 'IN' || (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0)
-                ? 'Payment In Details'
-                : editingLedgerEntry.type === 'PAYMENT_OUT' || editType === 'OUT'
-                ? 'Payment Out Details'
-                : editingLedgerEntry.type === 'SALE'
-                ? 'Sales Invoice Details'
-                : editingLedgerEntry.type === 'PURCHASE'
-                ? 'Purchase Bill Details'
-                : 'Transaction Details'}
-            </span>
-          </h3>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+      <div className="bg-surface-container-lowest rounded-3xl w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col max-h-[92vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-outline-variant/20 px-4 py-3.5 flex-shrink-0 bg-surface">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                isReceipt
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {isReceipt ? 'south_west' : 'north_east'}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
+                  {isEditing
+                    ? editingLedgerEntry.type === 'SALE'
+                      ? 'Edit Sales Invoice'
+                      : editingLedgerEntry.type === 'PURCHASE'
+                      ? 'Edit Purchase Bill'
+                      : isReceipt
+                      ? 'Edit Payment In'
+                      : 'Edit Payment Out'
+                    : isReceipt
+                    ? 'Payment In Details'
+                    : editingLedgerEntry.type === 'SALE'
+                    ? 'Sales Invoice Details'
+                    : editingLedgerEntry.type === 'PURCHASE'
+                    ? 'Purchase Bill Details'
+                    : 'Payment Out Details'}
+                </h3>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isReceipt
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+                  }`}
+                >
+                  {isReceipt ? 'Payment In' : 'Payment Out'}
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant font-medium">
+                Doc #{editingLedgerEntry.docNumber} • {formatDate(editDate || editingLedgerEntry.date)}
+              </p>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface p-0.5 cursor-pointer"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
             title="Close"
             aria-label="Close transaction details"
           >
-            <span className="material-symbols-outlined text-[16px]">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         {!isEditing ? (
-          <div data-testid="voucher-readonly-view" className="flex flex-col gap-3 text-xs">
-            {/* Amount Hero Card */}
-            <div
-              className={`p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 ${
-                editingLedgerEntry.type === 'PAYMENT_IN' || editType === 'IN' || (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0)
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-950 dark:text-emerald-100'
-                  : 'bg-rose-500/10 border-rose-500/20 text-rose-950 dark:text-rose-100'
-              }`}
-            >
-              <div className="flex items-center justify-between w-full text-[11px] font-semibold text-on-surface-variant">
-                <span className="font-bold text-on-surface">Doc: #{editingLedgerEntry.docNumber}</span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    editingLedgerEntry.type === 'PAYMENT_IN' || editType === 'IN' || (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0)
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-rose-500/20 text-rose-700 dark:text-rose-300'
+          <>
+            {/* Scrollable Content Area */}
+            <div data-testid="voucher-readonly-view" className="flex-1 overflow-y-auto p-4 space-y-3.5 overscroll-contain text-xs">
+              {/* Amount Hero Card */}
+              <div
+                className={`p-4 rounded-2xl border flex flex-col items-center justify-center relative overflow-hidden ${
+                  isReceipt
+                    ? 'bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-500/25'
+                    : 'bg-gradient-to-b from-rose-500/10 via-rose-500/5 to-transparent border-rose-500/25'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider ${
+                      isReceipt ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                    }`}
+                  >
+                    {isReceipt ? 'Amount Received' : 'Amount Paid'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-container-high/80 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[13px] text-emerald-600 dark:text-emerald-400">
+                      check_circle
+                    </span>
+                    <span>Recorded</span>
+                  </span>
+                </div>
+
+                <div
+                  className={`font-tabular-data text-3xl sm:text-4xl font-black my-1 tracking-tight ${
+                    isReceipt
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-rose-600 dark:text-rose-400'
                   }`}
                 >
-                  {editingLedgerEntry.type === 'PAYMENT_IN' || editType === 'IN' || (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0)
-                    ? 'Payment In'
-                    : 'Payment Out'}
-                </span>
-              </div>
-
-              <div className="text-2xl font-black my-1 text-on-surface">
-                {formatINR(parseFloat(editAmount) || (editingLedgerEntry.credit > 0 ? editingLedgerEntry.credit : editingLedgerEntry.debit))}
-              </div>
-
-              <div className="text-[11px] text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">calendar_today</span>
-                <span>{formatDate(editDate || editingLedgerEntry.date)}</span>
-              </div>
-
-              {parseFloat(editDiscount) > 0 && (
-                <div className="mt-1 pt-1 border-t border-outline-variant/20 w-full flex items-center justify-between text-[11px] font-medium text-on-surface-variant">
-                  <span>Discount {editType === 'IN' ? 'Allowed' : 'Received'}:</span>
-                  <span className="font-bold text-secondary">{formatINR(parseFloat(editDiscount))}</span>
+                  {formatINR(currentAmount)}
                 </div>
-              )}
-            </div>
 
-            {/* Party & Total Due Info */}
-            <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Party</span>
-                {party.phone && (
-                  <span className="text-[10px] text-on-surface-variant flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[12px]">call</span>
-                    <span>{party.phone}</span>
+                <div className="flex items-center gap-2 mt-1 flex-wrap justify-center text-xs">
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">calendar_today</span>
+                    <span>{formatDate(editDate || editingLedgerEntry.date)}</span>
                   </span>
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-sm text-on-surface truncate">{party.name}</span>
-                {partyTotalDue !== null && !isNaN(partyTotalDue) && (
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-[9px] text-on-surface-variant font-bold uppercase">Total Balance Due</div>
-                    <div className={`font-bold text-xs ${partyTotalDue > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {formatINR(partyTotalDue)}
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[13px]">
+                      {editMode === 'CASH' ? 'payments' : editMode === 'BANK' ? 'account_balance' : editMode === 'SPLIT' ? 'call_split' : 'qr_code_2'}
+                    </span>
+                    <span>{editMode === 'BANK' ? `Bank (${selectedBankName})` : editMode}</span>
+                  </span>
+                </div>
+
+                {currentDiscount > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-outline-variant/20 w-full flex items-center justify-between text-xs">
+                    <span className="text-on-surface-variant font-medium">
+                      Discount {isReceipt ? 'Allowed' : 'Received'}:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-secondary font-tabular-data">{formatINR(currentDiscount)}</span>
+                      <span className="text-on-surface-variant text-[11px]">
+                        (Settled: <strong className="font-tabular-data">{formatINR(currentAmount + currentDiscount)}</strong>)
+                      </span>
                     </div>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Payment Mode & Notes */}
-            <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-1.5 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-on-surface-variant font-bold">Payment Mode:</span>
-                <span className="font-bold text-on-surface px-1.5 py-0.5 rounded bg-surface border border-outline-variant/20">
-                  {editMode === 'BANK' ? `Bank (${selectedBankName})` : editMode}
-                </span>
-              </div>
-              {editMode === 'SPLIT' && (
-                <div className="mt-1 pt-1 border-t border-outline-variant/15 flex flex-col gap-0.5 text-[10px]">
-                  <span className="font-bold text-on-surface-variant">Split Tender Breakdown:</span>
-                  <div className="flex items-center gap-2 text-on-surface flex-wrap">
-                    {parseFloat(editSplitCash) > 0 && <span>Cash: <strong>{formatINR(parseFloat(editSplitCash))}</strong></span>}
-                    {parseFloat(editSplitUPI) > 0 && <span>UPI: <strong>{formatINR(parseFloat(editSplitUPI))}</strong></span>}
-                    {parseFloat(editSplitBank) > 0 && <span>Bank: <strong>{formatINR(parseFloat(editSplitBank))}</strong></span>}
+              {/* Party & Balance Card */}
+              <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Party Details
+                  </span>
+                  {party.phone && (
+                    <a
+                      href={`tel:${party.phone}`}
+                      className="text-[11px] font-bold text-secondary flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">call</span>
+                      <span>{party.phone}</span>
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-secondary/15 text-secondary flex items-center justify-center font-black text-xs flex-shrink-0">
+                      {party.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="font-bold text-sm text-on-surface block truncate">
+                        {party.name}
+                      </span>
+                      <span className="text-[10px] font-medium text-on-surface-variant">
+                        {party.type === 'CUSTOMER' ? 'Customer' : 'Supplier'}
+                      </span>
+                    </div>
                   </div>
+                  {partyTotalDue !== null && !isNaN(partyTotalDue) && (
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                        Total Balance Due
+                      </div>
+                      <div
+                        className={`font-black text-sm font-tabular-data ${
+                          partyTotalDue > 0
+                            ? 'text-rose-600 dark:text-rose-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
+                        }`}
+                      >
+                        {formatINR(partyTotalDue)}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {(editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration) && (
-                <div className="mt-1 pt-1 border-t border-outline-variant/15 text-on-surface-variant">
-                  <span className="font-bold text-[10px] block">Notes / Remarks:</span>
-                  <p className="italic text-on-surface text-xs mt-0.5">
-                    {editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration}
-                  </p>
+              </div>
+
+              {/* Payment Details & Notes Card */}
+              <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Payment Method
+                  </span>
+                  <span className="font-bold text-on-surface">
+                    {editMode === 'BANK' ? `Bank (${selectedBankName})` : editMode}
+                  </span>
                 </div>
-              )}
+
+                {editMode === 'SPLIT' && (
+                  <div className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/20 flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[13px] text-secondary">call_split</span>
+                      <span>Split Tender Breakdown</span>
+                    </span>
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                      {parseFloat(editSplitCash) > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                          Cash: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitCash))}</span>
+                        </span>
+                      )}
+                      {parseFloat(editSplitUPI) > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                          UPI: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitUPI))}</span>
+                        </span>
+                      )}
+                      {parseFloat(editSplitBank) > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                          Bank: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitBank))}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {(editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration) && (
+                  <div className="pt-2 border-t border-outline-variant/15 flex flex-col gap-0.5">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                      Notes / Remarks
+                    </span>
+                    <p className="text-xs text-on-surface italic bg-surface-container/50 p-2.5 rounded-xl border border-outline-variant/15 leading-relaxed">
+                      "{editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration}"
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Linked Documents (Invoice / Purchase / Allocations) */}
+              {renderLinkedDocs()}
             </div>
 
-            {/* Linked Documents (Invoice / Purchase / Allocations) */}
-            {renderLinkedDocs()}
-
-            {/* Read-Only Actions */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/20">
+            {/* Read-Only Actions Footer */}
+            <div className="flex items-center justify-between gap-2 p-3.5 border-t border-outline-variant/20 bg-surface-container-lowest/90 backdrop-blur-xs flex-shrink-0">
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
                 <button
                   type="button"
                   onClick={handleDeleteLedgerItem}
-                  className="px-2.5 py-1.5 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
+                  className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                   title="Delete transaction"
                 >
-                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
                   <span>Delete</span>
                 </button>
               ) : <div />}
@@ -888,10 +990,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   type="button"
                   data-testid="voucher-share-whatsapp"
                   onClick={handleShareWhatsApp}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
                   title="Share on WhatsApp"
                 >
-                  <span className="material-symbols-outlined text-[15px]">share</span>
+                  <span className="material-symbols-outlined text-[16px]">share</span>
                   <span>WhatsApp</span>
                 </button>
 
@@ -899,107 +1001,107 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   type="button"
                   data-testid="voucher-edit-button"
                   onClick={() => setIsEditing(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer transition-all"
+                  className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-xs shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                   title="Edit transaction"
                 >
-                  <span className="material-symbols-outlined text-[15px]">edit</span>
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
                   <span>Edit</span>
                 </button>
               </div>
             </div>
-          </div>
+          </>
         ) : (
-          <form onSubmit={handleSaveLedgerItem} className="flex flex-col gap-2.5 text-xs">
-            <div className="p-2 rounded-xl bg-surface-container-low text-[11px] text-on-surface-variant flex items-center justify-between">
-              <span>Doc: <strong>{editingLedgerEntry.docNumber}</strong></span>
-              <span className="font-semibold">{editingLedgerEntry.type.replace('_', ' ')}</span>
-            </div>
-
-            {/* Linked Documents in Edit Mode */}
-            {renderLinkedDocs()}
-
-            {/* Payment Type switch if payment */}
-            {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
-              <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
-                <button
-                  type="button"
-                  onClick={() => setEditType('IN')}
-                  className={`py-1 rounded-lg font-bold cursor-pointer ${
-                    editType === 'IN' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
-                  }`}
-                >
-                  Payment In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditType('OUT')}
-                  className={`py-1 rounded-lg font-bold cursor-pointer ${
-                    editType === 'OUT' ? 'bg-amber-600 text-white shadow-xs' : 'text-on-surface-variant'
-                  }`}
-                >
-                  Payment Out
-                </button>
+          <form onSubmit={handleSaveLedgerItem} className="flex-1 flex flex-col min-h-0 overflow-hidden text-xs">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 overscroll-contain">
+              <div className="p-2.5 rounded-xl bg-surface-container-low text-[11px] text-on-surface-variant flex items-center justify-between">
+                <span>Doc: <strong>#{editingLedgerEntry.docNumber}</strong></span>
+                <span className="font-semibold">{editingLedgerEntry.type.replace('_', ' ')}</span>
               </div>
-            )}
 
-            {/* Date, Amount & Discount */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div>
-                <label className="block font-bold text-on-surface-variant mb-0.5">Date</label>
-                <input
-                  type="date"
-                  required
-                  value={editDate}
-                  onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-on-surface-variant mb-0.5">Amount (₹)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={editAmount}
-                  onChange={(e) => setEditAmount(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-on-surface-variant mb-0.5">
-                  {editType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={editDiscount}
-                  onChange={(e) => setEditDiscount(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[36px]"
-                />
-              </div>
-            </div>
+              {/* Linked Documents in Edit Mode */}
+              {renderLinkedDocs()}
 
-            {parseFloat(editDiscount) > 0 && (
-              <div className="flex items-center justify-between px-2.5 py-1 bg-secondary/10 rounded-xl text-[11px] font-bold text-secondary">
-                <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">discount</span>
-                  <span>Total Settled against Balance:</span>
-                </span>
-                <span>{formatINR((parseFloat(editAmount) || 0) + (parseFloat(editDiscount) || 0))}</span>
-              </div>
-            )}
+              {/* Payment Type switch if payment */}
+              {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
+                <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
+                  <button
+                    type="button"
+                    onClick={() => setEditType('IN')}
+                    className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${
+                      editType === 'IN' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
+                    }`}
+                  >
+                    Payment In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditType('OUT')}
+                    className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${
+                      editType === 'OUT' ? 'bg-amber-600 text-white shadow-xs' : 'text-on-surface-variant'
+                    }`}
+                  >
+                    Payment Out
+                  </button>
+                </div>
+              )}
 
-            {/* Payment Mode & Bank Account (Side-by-Side Dropdowns) */}
-            {(editingLedgerEntry.rawVoucher || editingLedgerEntry.paymentMode) && (
-              <div className="flex flex-col gap-2">
-                <div className={`grid gap-2 ${editMode === 'BANK' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor="voucher-edit-mode-select" className="text-[10px] font-bold text-on-surface-variant">
-                      Payment Mode
-                    </label>
-                    <div className="relative flex items-center">
+              {/* Date, Amount & Discount */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">
+                    {editType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={editDiscount}
+                    onChange={(e) => setEditDiscount(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
+                  />
+                </div>
+              </div>
+
+              {parseFloat(editDiscount) > 0 && (
+                <div className="flex items-center justify-between px-3 py-1.5 bg-secondary/10 rounded-xl text-xs font-bold text-secondary">
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[15px]">discount</span>
+                    <span>Total Settled against Balance:</span>
+                  </span>
+                  <span>{formatINR((parseFloat(editAmount) || 0) + (parseFloat(editDiscount) || 0))}</span>
+                </div>
+              )}
+
+              {/* Payment Mode & Bank Account */}
+              {(editingLedgerEntry.rawVoucher || editingLedgerEntry.paymentMode) && (
+                <div className="flex flex-col gap-2.5">
+                  <div className={`grid gap-2.5 ${editMode === 'BANK' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="voucher-edit-mode-select" className="text-[11px] font-bold text-on-surface-variant">
+                        Payment Mode
+                      </label>
                       <select
                         id="voucher-edit-mode-select"
                         value={editMode}
@@ -1015,7 +1117,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                             }
                           }
                         }}
-                        className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[38px] cursor-pointer"
                       >
                         <option value="UPI">UPI</option>
                         <option value="CASH">Cash</option>
@@ -1023,19 +1125,17 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                         <option value="SPLIT">Split Tender</option>
                       </select>
                     </div>
-                  </div>
 
-                  {editMode === 'BANK' && (
-                    <div className="flex flex-col gap-1 animate-in fade-in">
-                      <label htmlFor="voucher-bank-select" className="text-[10px] font-bold text-on-surface-variant truncate">
-                        {editType === 'IN' ? 'Deposit to Bank' : 'Pay from Bank'}
-                      </label>
-                      <div className="relative flex items-center">
+                    {editMode === 'BANK' && (
+                      <div className="flex flex-col gap-1 animate-in fade-in">
+                        <label htmlFor="voucher-bank-select" className="text-[11px] font-bold text-on-surface-variant truncate">
+                          {editType === 'IN' ? 'Deposit to Bank' : 'Pay from Bank'}
+                        </label>
                         <select
                           id="voucher-bank-select"
                           value={editBankAccountId}
                           onChange={(e) => setEditBankAccountId(e.target.value)}
-                          className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
+                          className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[38px] cursor-pointer"
                         >
                           {availableBankAccounts.map((acc) => (
                             <option key={acc.id} value={acc.id}>
@@ -1044,177 +1144,177 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                           ))}
                         </select>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {editMode === 'SPLIT' && (() => {
+                    const target = parseFloat(editAmount) || 0;
+                    const c = parseFloat(editSplitCash) || 0;
+                    const u = parseFloat(editSplitUPI) || 0;
+                    const b = parseFloat(editSplitBank) || 0;
+                    const allocated = Number((c + u + b).toFixed(2));
+                    const remaining = target > 0 ? Number(Math.max(0, target - allocated).toFixed(2)) : 0;
+
+                    return (
+                      <div className="p-3 bg-surface rounded-2xl border border-secondary/25 flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-on-surface flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-secondary">call_split</span>
+                            <span>Split Breakdown</span>
+                          </span>
+                          <span className={`font-bold ${
+                            target > 0 && allocated === target
+                              ? 'text-secondary'
+                              : target > 0 && allocated > target
+                              ? 'text-error'
+                              : 'text-amber-600'
+                          }`}>
+                            Allocated: {formatINR(allocated)} {target > 0 ? `/ ${formatINR(target)}` : ''}
+                            {remaining > 0 && ` (${formatINR(remaining)} left)`}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="flex flex-col gap-1 p-2 rounded-xl bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-on-surface">Cash</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (c + remaining).toFixed(2);
+                                    setEditSplitCash(parseFloat(next).toString());
+                                  }}
+                                  className="text-[10px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitCash}
+                              onChange={(e) => setEditSplitCash(e.target.value)}
+                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1 p-2 rounded-xl bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-on-surface">UPI</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (u + remaining).toFixed(2);
+                                    setEditSplitUPI(parseFloat(next).toString());
+                                  }}
+                                  className="text-[10px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitUPI}
+                              onChange={(e) => setEditSplitUPI(e.target.value)}
+                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1 p-2 rounded-xl bg-surface-container-low border border-outline-variant/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-on-surface">Bank</span>
+                              {remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = (b + remaining).toFixed(2);
+                                    setEditSplitBank(parseFloat(next).toString());
+                                  }}
+                                  className="text-[10px] font-bold text-secondary cursor-pointer"
+                                >
+                                  +Fill
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={editSplitBank}
+                              onChange={(e) => setEditSplitBank(e.target.value)}
+                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
+              )}
 
-                {editMode === 'SPLIT' && (() => {
-                  const target = parseFloat(editAmount) || 0;
-                  const c = parseFloat(editSplitCash) || 0;
-                  const u = parseFloat(editSplitUPI) || 0;
-                  const b = parseFloat(editSplitBank) || 0;
-                  const allocated = Number((c + u + b).toFixed(2));
-                  const remaining = target > 0 ? Number(Math.max(0, target - allocated).toFixed(2)) : 0;
-
-                  return (
-                    <div className="p-2 bg-surface rounded-xl border border-secondary/20 flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-bold text-on-surface flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[13px] text-secondary">call_split</span>
-                          <span>Split Breakdown</span>
-                        </span>
-                        <span className={`font-bold ${
-                          target > 0 && allocated === target
-                            ? 'text-secondary'
-                            : target > 0 && allocated > target
-                            ? 'text-error'
-                            : 'text-amber-600'
-                        }`}>
-                          Allocated: {formatINR(allocated)} {target > 0 ? `/ ${formatINR(target)}` : ''}
-                          {remaining > 0 && ` (${formatINR(remaining)} left)`}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-on-surface">Cash</span>
-                            {remaining > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = (c + remaining).toFixed(2);
-                                  setEditSplitCash(parseFloat(next).toString());
-                                }}
-                                className="text-[9px] font-bold text-secondary cursor-pointer"
-                              >
-                                +Fill
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={editSplitCash}
-                            onChange={(e) => setEditSplitCash(e.target.value)}
-                            className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-on-surface">UPI</span>
-                            {remaining > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = (u + remaining).toFixed(2);
-                                  setEditSplitUPI(parseFloat(next).toString());
-                                }}
-                                className="text-[9px] font-bold text-secondary cursor-pointer"
-                              >
-                                +Fill
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={editSplitUPI}
-                            onChange={(e) => setEditSplitUPI(e.target.value)}
-                            className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-0.5 p-1.5 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-on-surface">Bank</span>
-                            {remaining > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const next = (b + remaining).toFixed(2);
-                                  setEditSplitBank(parseFloat(next).toString());
-                                }}
-                                className="text-[9px] font-bold text-secondary cursor-pointer"
-                              >
-                                +Fill
-                              </button>
-                            )}
-                          </div>
-                          <input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            value={editSplitBank}
-                            onChange={(e) => setEditSplitBank(e.target.value)}
-                            className="w-full px-1.5 py-0.5 bg-surface rounded text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
+              {/* Notes */}
+              <div>
+                <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Notes / Remarks</label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Remarks..."
+                  className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
+                />
               </div>
-            )}
 
-            {/* Notes */}
-            <div>
-              <label className="block font-bold text-on-surface-variant mb-0.5">Notes / Remarks</label>
-              <input
-                type="text"
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Remarks..."
-                className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary"
-              />
+              {/* Opening Balance Type Switcher */}
+              {editingLedgerEntry.isOpening && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold text-on-surface-variant">Opening Balance Type</label>
+                  <div className="grid grid-cols-2 gap-2 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
+                    <button
+                      type="button"
+                      onClick={() => setEditOpeningType('RECEIVABLE')}
+                      className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                        editOpeningType === 'RECEIVABLE' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">call_received</span>
+                      <span>To Receive (Dr)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditOpeningType('PAYABLE')}
+                      className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                        editOpeningType === 'PAYABLE' ? 'bg-error text-on-error shadow-xs' : 'text-on-surface-variant'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">call_made</span>
+                      <span>To Pay (Cr)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Opening Balance Type Switcher */}
-            {editingLedgerEntry.isOpening && (
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-on-surface-variant">Opening Balance Type</label>
-                <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
-                  <button
-                    type="button"
-                    onClick={() => setEditOpeningType('RECEIVABLE')}
-                    className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                      editOpeningType === 'RECEIVABLE' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[14px]">call_received</span>
-                    <span>To Receive (Dr)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditOpeningType('PAYABLE')}
-                    className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1 ${
-                      editOpeningType === 'PAYABLE' ? 'bg-error text-on-error shadow-xs' : 'text-on-surface-variant'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[14px]">call_made</span>
-                    <span>To Pay (Cr)</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/20">
+            {/* Edit Mode Actions Footer */}
+            <div className="flex items-center justify-between gap-2 p-3.5 border-t border-outline-variant/20 bg-surface-container-lowest/90 backdrop-blur-xs flex-shrink-0">
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
                 <button
                   type="button"
-                  onClick={() => handleDeleteLedgerItem()}
-                  className="px-2.5 py-1.5 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1"
+                  onClick={handleDeleteLedgerItem}
+                  className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
                 >
-                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
                   <span>{editingLedgerEntry.isOpening ? 'Clear' : 'Delete'}</span>
                 </button>
               ) : <div />}
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -1225,13 +1325,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                       onClose();
                     }
                   }}
-                  className="px-3 py-1.5 rounded-xl text-on-surface-variant font-bold text-xs cursor-pointer hover:text-on-surface"
+                  className="px-3.5 py-2 rounded-xl text-on-surface-variant font-bold text-xs cursor-pointer hover:bg-surface-container-high transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer hover:bg-secondary/90"
                 >
                   Save
                 </button>

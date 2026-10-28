@@ -589,17 +589,19 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
       </main>
 
       {/* Edit Ledger Item Modal */}
-      <VoucherEditorModal
-        editingLedgerEntry={editingLedgerEntry}
-        onClose={() => setEditingLedgerEntry(null)}
-        party={party}
-        company={company}
-        onViewInvoice={onViewInvoice}
-        onEditInvoice={onEditInvoice}
-        onEditPurchase={onEditPurchase}
-        onViewPurchase={(bill) => setSelectedPurchaseBill(bill)}
-        onRefresh={onRefresh}
-      />
+      {editingLedgerEntry && (
+        <VoucherEditorModal
+          editingLedgerEntry={editingLedgerEntry}
+          onClose={() => setEditingLedgerEntry(null)}
+          party={party}
+          company={company}
+          onViewInvoice={onViewInvoice}
+          onEditInvoice={onEditInvoice}
+          onEditPurchase={onEditPurchase}
+          onViewPurchase={(bill) => setSelectedPurchaseBill(bill)}
+          onRefresh={onRefresh}
+        />
+      )}
 
       {/* Simplified Purchase View Modal */}
       {selectedPurchaseBill && (

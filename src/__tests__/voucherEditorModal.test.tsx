@@ -911,4 +911,85 @@ describe('VoucherEditorModal Component-Level Verification', () => {
     expect(amountInput).not.toBeNull();
     expect(amountInput.value).toBe('5000');
   });
+
+  it('10. Transitioning editingLedgerEntry from null to payment in entry and back to null does not violate React rules of hooks', () => {
+    const paymentVoucher: Voucher = {
+      id: 'VCH-CRASH-TEST-01',
+      voucherNumber: 'RCPT-CRASH-01',
+      voucherType: 'RECEIPT',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      totalAmount: 1500,
+      narration: 'No crash test',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 1500, credit: 0 },
+        { accountId: sampleCustomer.id, accountName: sampleCustomer.name, debit: 0, credit: 1500 },
+      ],
+      createdAt: '2026-10-25T00:00:00.000Z',
+    };
+
+    const ledgerEntry = {
+      id: paymentVoucher.id,
+      date: paymentVoucher.date,
+      docNumber: paymentVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      paymentMode: 'UPI',
+      description: paymentVoucher.narration,
+      debit: 0,
+      credit: 1500,
+      runningBalance: 3500,
+      status: 'PAID',
+      rawVoucher: paymentVoucher,
+    };
+
+    // 1. Initial render with null (same as PartyDetailPage initial mount)
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={null}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+    expect(container!.innerHTML).toBe('');
+
+    // 2. User clicks payment in transaction row -> editingLedgerEntry becomes active
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    const readOnlyView = container!.querySelector('[data-testid="voucher-readonly-view"]');
+    expect(readOnlyView).not.toBeNull();
+    expect(container!.textContent).toContain('RCPT-CRASH-01');
+    expect(container!.textContent).toContain('Payment In');
+    expect(container!.textContent).toContain('1,500');
+
+    // 3. User closes modal -> editingLedgerEntry returns to null
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={sampleCustomer}
+          company={sampleCompany}
+          editingLedgerEntry={null}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+    expect(container!.innerHTML).toBe('');
+  });
 });
