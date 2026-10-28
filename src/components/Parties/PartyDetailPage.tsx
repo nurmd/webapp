@@ -15,6 +15,7 @@ import { PartyInfoCard } from './PartyInfoCard.tsx';
 import { RecordPaymentModal } from './RecordPaymentModal.tsx';
 import { VoucherEditorModal } from './VoucherEditorModal.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
+import { PartyOrdersTable } from './PartyOrdersTable.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
@@ -69,6 +70,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 }) => {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [showPartyDetails, setShowPartyDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState<'TRANSACTIONS' | 'ORDERS'>('TRANSACTIONS');
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<PassbookEntry | null>(null);
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
@@ -116,10 +118,15 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
     }
     window.scrollTo(0, 0);
     setIsScrolled(false);
+    setActiveTab('TRANSACTIONS');
   }, [party.id]);
 
   const {
     isCustomer,
+    partyOrders,
+    purchaseOrderTotal,
+    grnTotal,
+    unbilledOrdersTotal,
     totalBilled,
     totalPaid,
     liveNetBalance,
@@ -370,17 +377,24 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
               >
                 {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
               </span>
-              <span
-                className={`font-currency-display-mobile text-xs font-black ${
-                  isReceivable
-                    ? 'text-emerald-700 dark:text-emerald-400'
-                    : isPayable
-                    ? 'text-rose-700 dark:text-rose-400'
-                    : 'text-secondary'
-                }`}
-              >
-                {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
-              </span>
+              <div className="flex flex-col items-end">
+                <span
+                  className={`font-currency-display-mobile text-xs font-black ${
+                    isReceivable
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : isPayable
+                      ? 'text-rose-700 dark:text-rose-400'
+                      : 'text-secondary'
+                  }`}
+                >
+                  {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
+                </span>
+                {!isCustomer && unbilledOrdersTotal > 0 && (
+                  <span className="text-[9px] text-on-surface-variant/80 font-medium leading-none">
+                    (Unbilled {formatINR(unbilledOrdersTotal)})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </aside>
@@ -398,6 +412,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
             isPayable={isPayable}
             totalBilled={totalBilled}
             totalPaid={totalPaid}
+            unbilledTotal={unbilledOrdersTotal}
             showPartyDetails={showPartyDetails}
             setShowPartyDetails={setShowPartyDetails}
             onEditParty={onEditParty}
@@ -418,6 +433,7 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
                 isPayable={isPayable}
                 totalBilled={totalBilled}
                 totalPaid={totalPaid}
+                unbilledTotal={unbilledOrdersTotal}
                 showPartyDetails={showPartyDetails}
                 setShowPartyDetails={setShowPartyDetails}
                 onEditParty={onEditParty}
@@ -508,16 +524,66 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
           {/* Right Column: Transaction Ledger */}
           <div className="w-full flex-1 min-w-0 mt-1 md:mt-0 flex flex-col gap-2.5 sm:gap-3.5">
-            <PartyPassbookTable
-              filteredPassbook={filteredPassbook}
-              txnFilter={txnFilter}
-              setTxnFilter={setTxnFilter}
-              txnSortOrder={txnSortOrder}
-              setTxnSortOrder={setTxnSortOrder}
-              searchTxn={searchTxn}
-              setSearchTxn={setSearchTxn}
-              onTransactionClick={handleTransactionClick}
-            />
+            {!isCustomer && (
+              <div className="flex items-center gap-1.5 p-1 bg-surface-container rounded-2xl border border-outline-variant/20">
+                <button
+                  type="button"
+                  data-testid="party-tab-transactions"
+                  onClick={() => setActiveTab('TRANSACTIONS')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'TRANSACTIONS'
+                      ? 'bg-surface-container-lowest text-on-surface shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                  <span>Transactions</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="party-tab-orders"
+                  onClick={() => setActiveTab('ORDERS')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'ORDERS'
+                      ? 'bg-surface-container-lowest text-on-surface shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">shopping_cart</span>
+                  <span>Orders</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container-high font-bold text-on-surface-variant">
+                    {partyOrders.length}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            {activeTab === 'TRANSACTIONS' || isCustomer ? (
+              <PartyPassbookTable
+                filteredPassbook={filteredPassbook}
+                txnFilter={txnFilter}
+                setTxnFilter={setTxnFilter}
+                txnSortOrder={txnSortOrder}
+                setTxnSortOrder={setTxnSortOrder}
+                searchTxn={searchTxn}
+                setSearchTxn={setSearchTxn}
+                onTransactionClick={handleTransactionClick}
+              />
+            ) : (
+              <PartyOrdersTable
+                orders={partyOrders}
+                purchaseOrderTotal={purchaseOrderTotal}
+                grnTotal={grnTotal}
+                unbilledOrdersTotal={unbilledOrdersTotal}
+                onOrderClick={(order) => {
+                  if (onEditPurchase) {
+                    onEditPurchase(order);
+                  } else {
+                    setSelectedPurchaseBill(order);
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       </main>

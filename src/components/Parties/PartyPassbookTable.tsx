@@ -143,7 +143,9 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                         {entry.type === 'SALE'
                           ? `Sale #${entry.docNumber}`
                           : entry.type === 'PURCHASE'
-                          ? `Bill #${entry.docNumber}`
+                          ? entry.rawPurchase?.purchaseType === 'RETURN'
+                            ? `Return #${entry.docNumber}`
+                            : `Bill #${entry.docNumber}`
                           : entry.type === 'PAYMENT_IN'
                           ? `Payment In (${entry.paymentMode || 'UPI'})`
                           : entry.type === 'PAYMENT_OUT'
@@ -175,13 +177,19 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                             : `Unpaid: ${formatINR(entry.rawInvoice.balanceAmount)}`}
                         </>
                       ) : entry.type === 'PURCHASE' && entry.rawPurchase ? (
-                        <>
-                          {entry.date} • {entry.rawPurchase.paymentStatus === 'PAID'
-                            ? `Fully Paid (${entry.rawPurchase.paymentMode || 'Cash'})`
-                            : entry.rawPurchase.paidAmount > 0
-                            ? `Paid: ${formatINR(entry.rawPurchase.paidAmount)} • Due: ${formatINR(entry.rawPurchase.balanceAmount)}`
-                            : `Unpaid: ${formatINR(entry.rawPurchase.balanceAmount)}`}
-                        </>
+                        entry.rawPurchase.purchaseType === 'RETURN' ? (
+                          <>
+                            {entry.date} • {entry.rawPurchase.returnReason || 'Purchase Return'}
+                          </>
+                        ) : (
+                          <>
+                            {entry.date} • {entry.rawPurchase.paymentStatus === 'PAID'
+                              ? `Fully Paid (${entry.rawPurchase.paymentMode || 'Cash'})`
+                              : entry.rawPurchase.paidAmount > 0
+                              ? `Paid: ${formatINR(entry.rawPurchase.paidAmount)} • Due: ${formatINR(entry.rawPurchase.balanceAmount)}`
+                              : `Unpaid: ${formatINR(entry.rawPurchase.balanceAmount)}`}
+                          </>
+                        )
                       ) : entry.rawVoucher && entry.rawVoucher.paymentAllocations && entry.rawVoucher.paymentAllocations.length > 0 ? (
                         (() => {
                           const allocatedSum = entry.rawVoucher.paymentAllocations.reduce((s, a) => s + (a.amount || 0), 0);

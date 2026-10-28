@@ -13,6 +13,7 @@ export interface PartyInfoCardProps {
   isPayable: boolean;
   totalBilled: number;
   totalPaid: number;
+  unbilledTotal?: number;
   showPartyDetails: boolean;
   setShowPartyDetails: React.Dispatch<React.SetStateAction<boolean>>;
   onEditParty: (party: Party) => void;
@@ -26,6 +27,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
   isPayable,
   totalBilled,
   totalPaid,
+  unbilledTotal,
   showPartyDetails,
   setShowPartyDetails,
   onEditParty,
@@ -51,6 +53,11 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
           >
             {liveNetBalance === 0 ? '₹0 (Settled)' : formatINR(Math.abs(liveNetBalance))}
           </span>
+          {party.type !== 'CUSTOMER' && typeof unbilledTotal === 'number' && unbilledTotal > 0 && (
+            <span className="text-[11px] font-medium text-on-surface-variant/80 mt-0.5">
+              (Unbilled {formatINR(unbilledTotal)})
+            </span>
+          )}
         </div>
 
         <div className="flex flex-col items-end gap-1">

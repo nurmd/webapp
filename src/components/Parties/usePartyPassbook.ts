@@ -53,6 +53,14 @@ export function usePartyPassbook({
 
   const isCustomer = party.type === 'CUSTOMER';
 
+  const isOrderCancelled = (order: PurchaseBill): boolean => {
+    return (
+      order.isCancelled === true ||
+      order.orderStatus === 'CANCELLED' ||
+      order.challanStatus === 'CANCELLED'
+    );
+  };
+
   // Filter party's sales and purchases (exclude non-sale quotations, delivery challans, sales orders, and cancelled docs)
   const partyInvoices = useMemo(() => {
     return invoices.filter(
@@ -67,15 +75,58 @@ export function usePartyPassbook({
 
   const partyPurchases = useMemo(() => {
     return purchases.filter(
-      (pur) => pur.supplierId === party.id || pur.supplierName.toLowerCase() === party.name.toLowerCase()
+      (pur) =>
+        !pur.isCancelled &&
+        (pur.purchaseType === undefined || pur.purchaseType === 'BILL' || pur.purchaseType === 'RETURN') &&
+        (pur.supplierId === party.id || (pur.supplierName && pur.supplierName.toLowerCase() === party.name.toLowerCase()))
     );
   }, [purchases, party]);
+
+  const partyOrders = useMemo(() => {
+    return purchases
+      .filter(
+        (pur) =>
+          (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN') &&
+          (pur.supplierId === party.id ||
+            (pur.supplierName && pur.supplierName.toLowerCase() === party.name.toLowerCase()))
+      )
+      .sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        if (dateB !== dateA) return dateB - dateA;
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return createdB - createdA;
+      });
+  }, [purchases, party]);
+
+  const purchaseOrderTotal = useMemo(() => {
+    return partyOrders
+      .filter((pur) => pur.purchaseType === 'PO' && !isOrderCancelled(pur))
+      .reduce((sum, pur) => sum + (pur.grandTotal || 0), 0);
+  }, [partyOrders]);
+
+  const grnTotal = useMemo(() => {
+    return partyOrders
+      .filter((pur) => pur.purchaseType === 'CHALLAN' && !isOrderCancelled(pur))
+      .reduce((sum, pur) => sum + (pur.grandTotal || 0), 0);
+  }, [partyOrders]);
+
+  const ordersTotal = useMemo(() => {
+    return purchaseOrderTotal + grnTotal;
+  }, [purchaseOrderTotal, grnTotal]);
+
+  const unbilledOrdersTotal = useMemo(() => {
+    return partyOrders
+      .filter((pur) => !isOrderCancelled(pur) && !pur.isConverted)
+      .reduce((sum, pur) => sum + (pur.grandTotal || 0), 0);
+  }, [partyOrders]);
 
   // Aggregate totals
   const totalBilled = useMemo(() => {
     return isCustomer
       ? partyInvoices.reduce((s, inv) => s + inv.grandTotal, 0)
-      : partyPurchases.reduce((s, pur) => s + pur.grandTotal, 0);
+      : partyPurchases.reduce((s, pur) => s + (pur.purchaseType === 'RETURN' ? -pur.grandTotal : pur.grandTotal), 0);
   }, [isCustomer, partyInvoices, partyPurchases]);
 
   const totalPaid = useMemo(() => {
@@ -108,19 +159,22 @@ export function usePartyPassbook({
       });
     });
 
-    // Purchase Bills (Credit the full billed amount)
+    // Purchase Bills (Credit the full billed amount for BILL, debit for RETURN)
     partyPurchases.forEach((pur) => {
+      const isReturn = pur.purchaseType === 'RETURN';
       rawEntries.push({
         id: `pur-${pur.id}`,
         rawId: pur.id,
         date: pur.date,
         docNumber: pur.billNumber,
         type: 'PURCHASE',
-        description: pur.items && pur.items.length > 0
+        description: isReturn
+          ? (pur.returnReason ? `Purchase Return (${pur.returnReason})` : `Purchase Return #${pur.billNumber}`)
+          : pur.items && pur.items.length > 0
           ? `${pur.items.length} items (${pur.items.map((i) => i.name).slice(0, 2).join(', ')})`
           : `Purchase Bill #${pur.billNumber}`,
-        debit: 0,
-        credit: pur.grandTotal,
+        debit: isReturn ? pur.grandTotal : 0,
+        credit: isReturn ? 0 : pur.grandTotal,
         billAmount: pur.grandTotal,
         status: pur.paymentStatus,
         paymentMode: pur.paymentMode,
@@ -236,12 +290,14 @@ export function usePartyPassbook({
         }
       }
     } else {
-      const totalPaidOnPurchases = partyPurchases.reduce((s, pur) => s + (pur.paidAmount || 0), 0);
+      const totalPaidOnPurchases = partyPurchases
+        .filter((pur) => pur.purchaseType !== 'RETURN')
+        .reduce((s, pur) => s + (pur.paidAmount || 0), 0);
       let unvoucheredPaid = Math.max(0, totalPaidOnPurchases - totalVoucherPayments);
 
       if (unvoucheredPaid > 0) {
         const sortedPurs = [...partyPurchases]
-          .filter((pur) => (pur.paidAmount || 0) > 0)
+          .filter((pur) => pur.purchaseType !== 'RETURN' && (pur.paidAmount || 0) > 0)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         for (const pur of sortedPurs) {
@@ -427,6 +483,11 @@ export function usePartyPassbook({
     isCustomer,
     partyInvoices,
     partyPurchases,
+    partyOrders,
+    purchaseOrderTotal,
+    grnTotal,
+    ordersTotal,
+    unbilledOrdersTotal,
     totalBilled,
     totalPaid,
     passbook,
