@@ -243,6 +243,16 @@ describe('entity resolution', () => {
     expect(tokenScore('Fortune Mustard Oil 1L Pouch', 'Fortune Mustard Oil')).toBeGreaterThan(0.9);
     expect(tokenScore('Fortune Mustard Oil', 'Tata Salt')).toBe(0);
   });
+
+  it('does not arbitrarily pick the first candidate on ambiguous HSN with low description similarity', () => {
+    const items = [
+      item({ id: 'i1', name: 'Almond Oil 500ml', hsnSacCode: '15121000' }),
+      item({ id: 'i2', name: 'Sunflower Oil 500ml', hsnSacCode: '15121000' }),
+    ];
+    const match = matchItem(items, { description: 'Completely Unrelated Item', hsnSacCode: '1512' });
+    expect(match.method).toBe('NONE');
+    expect(match.item).toBeUndefined();
+  });
 });
 
 /* ------------------------------------------------------------------ bill shape */

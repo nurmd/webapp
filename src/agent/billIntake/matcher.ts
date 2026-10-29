@@ -114,9 +114,15 @@ export function matchItem(
   const exact = active.find((i) => normalizeName(i.name) === normalizeName(description));
   if (description && exact) return { item: exact, method: 'NAME', score: 0.95 };
 
-  // 3. HSN/SAC prefix match, then break ties by description similarity.
+  // 3. HSN/SAC prefix match (4 or 6 digits), then break ties by description similarity.
   if (hsn && hsn.length >= 4) {
-    const byHsn = active.filter((i) => String(i.hsnSacCode || '').replace(/\s/g, '').startsWith(hsn.slice(0, 6)));
+    const cleanHsn = hsn.replace(/\s/g, '');
+    const prefixLen = cleanHsn.length >= 6 ? 6 : 4;
+    const prefix = cleanHsn.slice(0, prefixLen);
+    const byHsn = active.filter((i) => {
+      const itemHsn = String(i.hsnSacCode || '').replace(/\s/g, '');
+      return itemHsn.length >= prefixLen && itemHsn.slice(0, prefixLen) === prefix;
+    });
     if (byHsn.length === 1) {
       return { item: byHsn[0], method: 'HSN', score: 0.85 };
     }
@@ -129,7 +135,7 @@ export function matchItem(
       if (best && best.score >= 0.4) {
         return { item: best.item, method: 'HSN', score: Number((0.6 + best.score * 0.3).toFixed(2)) };
       }
-      return { item: byHsn[0], method: 'HSN', score: 0.55 };
+      // If ambiguous with no description match (score < 0.4), do not arbitrarily pick byHsn[0].
     }
   }
 

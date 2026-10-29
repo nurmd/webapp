@@ -518,6 +518,9 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
     - `DocumentLineItemsGrid.tsx`: consolidated line-item grid supporting interactive workstation mode and compact mobile preview mode with complete GST pricing mode compliance.
     - `DocumentTaxSummary.tsx`: unified tax breakdown supporting `variant="full"` (collapsible tax base breakdown) and `variant="compact"` (streamlined invoice/bill values).
     - `DocumentViewModal.tsx`: shared preview dialog shell with backdrop blur, accessible close button, Android hardware back navigation (`useBackNavigation`), responsive viewport, and sticky action docks.
+  - **Direct PDF Generation & Printing Bridge (`src/core/utils/directPdf.ts`, `src/services/printBridge.ts`)**:
+    - Direct PDF export generates print-ready documents without requiring print dialog interception.
+    - Android native WebView printing bridge (`AndroidBridge.printPdfDirect`, `PdfPrint.kt`) delivers 1-tap PDF generation, file saving, and sharing across sales invoices, delivery challans, purchase bills, and financial reports.
   - **Entry Chunk Ceiling**: Main bundle (`index.js`) must strictly remain under **450 kB** uncompressed. Zero-CLS Suspense fallback skeletons are rendered during chunk loads.
 
 ---

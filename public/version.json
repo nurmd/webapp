@@ -1,15 +1,15 @@
 {
-  "version": "1.2.46",
+  "version": "1.2.47",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-29T15.17.28.289Z",
+  "buildTime": "2026-10-29T16:16:29.176Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "redesign payment view modal and fix party passbook crash",
-    "v1.2.44",
-    "make payment voucher readonly by default with edit toggle and WhatsApp share",
-    "v1.2.43",
-    "native A4 printing bridge, cash bank sharing, and WhatsApp total balance due",
-    "v1.2.42"
+    "Complete modal unification across invoicing, reports, challans, parties, and purchases",
+    "Direct PDF generation and unified native printing bridge for fast, 1-tap document exports",
+    "AI Bill Intake: Automated purchase bill extraction from PDF/images and GSTR-2B imports",
+    "Smart HSN and entity matching with non-destructive multi-item resolution",
+    "Background modal preloading and offline service worker chunk caching",
+    "Performance optimizations: reduced initial bundle size and zero-CLS lazy fallbacks"
   ]
 }
