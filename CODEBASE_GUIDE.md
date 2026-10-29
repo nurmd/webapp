@@ -530,6 +530,51 @@ npm run build
 - `whatsAppModals.test.tsx`: WhatsApp modal phone prefill hierarchy, validation, clipboard fallback, and demo guardrails.
 - `granularStateDecoupling.test.tsx`: Fine-grained render isolation and `useSyncExternalStore` reactive stability across domain mutations.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.
+- `billIntake.test.ts`: GSTR-2B/2A parsing, printed-vs-computed reconciliation, supplier/item/duplicate matching, model-output coercion, and the auto-post confidence gate.
+
+---
+
+## 7A. AI Bill Intake (`src/agent/billIntake/`)
+
+Full design and rollout notes: [docs/AI_BILL_INTAKE.md](./docs/AI_BILL_INTAKE.md).
+
+### Trust boundary
+A vision model is used **only to transcribe** a supplier invoice. It never produces a
+number that reaches the ledger: every taxable value and tax head is recomputed by
+`src/core/gst/calculator.ts` and diffed against the printed totals. A mismatch is a
+`BLOCKER`, never a silent correction.
+
+### Pipeline
+```
+File (PDF/image)  -> server/bill-intake proxy -> RawBillExtraction
+GSTR-2B/2A JSON   -> gstr2b.ts (no model)    -> RawBillExtraction
+RawBillExtraction -> schema.ts (coerce)      -> matchSupplier / matchItem
+                  -> calculateInvoice + reconcile -> scoreDraft -> IntakeDraft
+IntakeDraft       -> buildPurchaseBill       -> db.savePurchase (stock + ledger + audit)
+```
+
+### Modules
+| File | Responsibility |
+|---|---|
+| `types.ts` | `RawBillExtraction`, `IntakeDraft`, settings contracts |
+| `schema.ts` | Defensive coercion of model output (`₹1,180.00`, `03/04/2025`, unit aliases) |
+| `matcher.ts` | Supplier (GSTIN → name → tokens), item (SKU → name → HSN → tokens), duplicate detection |
+| `reconcile.ts` | Recompute via GST engine; 1-rupee / 0.1% tolerance per head |
+| `confidence.ts` | Deterministic 0–1 score + `canAutoPost` gate |
+| `toPurchaseBill.ts` | Assembles the exact `PurchaseBill` shape the manual modal produces |
+| `gstr2b.ts` | Deterministic GSTR-2B/2A parser (B2B + CDNR; IMPG skipped with warning) |
+| `queue.ts` | Review queue in `localStorage` (`gst_bill_intake_queue_v1`), open drafts pinned |
+| `settings.ts` | `localStorage` config (`gst_bill_intake_settings_v1`) |
+| `visionClient.ts` | Authenticated client for the extraction proxy |
+| `agent.ts` | Orchestrator: `ingestFiles`, `ingestGstr2bFile`, `postDraft`, `runAutoPost` |
+
+### Invariants
+- **No provider keys in the client.** Extraction goes through `server/bill-intake` (zero-dependency Node proxy, shared-token auth, no document retention).
+- **Auto-post requires**: zero `BLOCKER` issues, score ≥ `autoPostThreshold` (default 0.92), a known supplier, and catalog-matched items (both toggleable).
+- **Never auto-post a duplicate**; duplicates are detected on supplier GSTIN + normalised document number, independent of date.
+- **2B imports have no quantity** — lines are grouped per (HSN, rate) and flagged `QTY_NOT_REPORTED`.
+- **Provenance** (source, file, confidence) is written to the bill `notes`; the audit record comes from `db.savePurchase` as usual.
+- **UI entry point**: Purchases Hub → `AI Intake` → `BillIntakeView.tsx`, which reuses `TableGridPurchaseModal` for human review.
 
 ---
 

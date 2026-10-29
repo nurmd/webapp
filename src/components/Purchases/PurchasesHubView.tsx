@@ -6,6 +6,7 @@ import { InventoryItem } from '../../models/item.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { TableGridPurchaseModal } from './TableGridPurchaseModal.tsx';
 import { SimplifiedPurchaseModal } from './SimplifiedPurchaseModal.tsx';
+import { BillIntakeView } from './BillIntakeView.tsx';
 import {
   DatePreset,
   getDateFilterBounds,
@@ -45,6 +46,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNPAID' | 'DUE' | 'PAID'>('ALL');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<PurchaseBill | null>(null);
   const [selectedBillForPreview, setSelectedBillForPreview] = useState<PurchaseBill | null>(null);
 
@@ -570,8 +572,17 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         )}
       </section>
 
-      {/* Floating Action Button for New Purchase */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      {/* Floating Action Buttons: AI intake + New Purchase */}
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2">
+        <button
+          onClick={() => setIsIntakeOpen(true)}
+          className="h-10 px-3.5 rounded-full bg-primary text-on-primary font-bold text-[11px] shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"
+          type="button"
+          title="Scan invoices or import GSTR-2B"
+        >
+          <span className="material-symbols-outlined text-[17px]">document_scanner</span>
+          <span>AI Intake</span>
+        </button>
         <button
           onClick={() => {
             setEditingBill(null);
@@ -585,6 +596,16 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
           <span>+ Purchase</span>
         </button>
       </div>
+
+      {/* AI Bill Intake */}
+      {isIntakeOpen && (
+        <BillIntakeView
+          company={company}
+          parties={parties}
+          itemsCatalog={itemsCatalog}
+          onClose={() => setIsIntakeOpen(false)}
+        />
+      )}
 
       {/* Table Grid Purchase Workstation Modal */}
       {(isModalOpen || editingBill) && (
