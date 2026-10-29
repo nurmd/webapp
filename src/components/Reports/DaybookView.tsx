@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { BookOpen, CheckCircle } from 'lucide-react';
+import { BookOpen, CheckCircle, Printer } from 'lucide-react';
+import { ReportPdfConfig } from './utils/reportExportUtils.ts';
+import { ReportPreviewModal } from './ReportPreviewModal.tsx';
+import { db } from '../../services/db.ts';
+import { preloadReportPdfPreviewModal } from '../../core/utils/modalPreload.ts';
 
 interface DaybookViewProps {
   vouchers: Voucher[];
+  company?: CompanyProfile;
 }
 
-export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
+export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers, company }) => {
   const [filterType, setFilterType] = useState('ALL');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const activeCompany = useMemo(() => company || db.getCompany(), [company]);
 
   const filtered = vouchers.filter((v) => filterType === 'ALL' || v.voucherType === filterType);
 
@@ -20,6 +29,41 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
     (sum, v) => sum + v.entries.reduce((s, e) => s + e.credit, 0),
     0
   );
+
+  const daybookRows = useMemo(() => {
+    const rows: (string | number)[][] = [];
+    filtered.forEach((v) => {
+      v.entries.forEach((e) => {
+        rows.push([
+          formatDate(v.date),
+          v.voucherNumber,
+          v.voucherType,
+          e.accountName,
+          e.debit > 0 ? formatINR(e.debit) : '-',
+          e.credit > 0 ? formatINR(e.credit) : '-',
+          v.narration || '-',
+        ]);
+      });
+    });
+    return rows;
+  }, [filtered]);
+
+  const reportConfig: ReportPdfConfig = useMemo(() => {
+    return {
+      title: 'Accounting Daybook & General Ledger',
+      subtitle: `Journal Vouchers (${filterType === 'ALL' ? 'All Types' : filterType})`,
+      company: activeCompany,
+      dateRangeLabel: 'All Records',
+      headers: ['Date', 'Voucher #', 'Type', 'Ledger Account', 'Debit (Dr)', 'Credit (Cr)', 'Narration'],
+      rows: daybookRows,
+      summaryRow: ['Totals', '', '', '', formatINR(totalDebits), formatINR(totalCredits), 'Balanced'],
+      kpis: [
+        { label: 'Total Debits', value: formatINR(totalDebits) },
+        { label: 'Total Credits', value: formatINR(totalCredits) },
+        { label: 'Total Vouchers', value: String(filtered.length) },
+      ],
+    };
+  }, [activeCompany, daybookRows, filterType, filtered.length, totalCredits, totalDebits]);
 
   return (
     <div className="p-4 sm:p-6 flex flex-col gap-5">
@@ -34,18 +78,32 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-xl border border-outline-variant/30 text-xs text-on-surface-variant flex-wrap">
-          <div>
-            Total Debits: <strong className="text-blue-600 dark:text-blue-400 font-bold">{formatINR(totalDebits)}</strong>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-xl border border-outline-variant/30 text-xs text-on-surface-variant flex-wrap">
+            <div>
+              Total Debits: <strong className="text-blue-600 dark:text-blue-400 font-bold">{formatINR(totalDebits)}</strong>
+            </div>
+            <span>•</span>
+            <div>
+              Total Credits: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatINR(totalCredits)}</strong>
+            </div>
+            <span>•</span>
+            <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
+              <CheckCircle size={13} /> Balanced
+            </div>
           </div>
-          <span>•</span>
-          <div>
-            Total Credits: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatINR(totalCredits)}</strong>
-          </div>
-          <span>•</span>
-          <div className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
-            <CheckCircle size={13} /> Balanced
-          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsPreviewOpen(true)}
+            onMouseEnter={() => preloadReportPdfPreviewModal()}
+            onFocus={() => preloadReportPdfPreviewModal()}
+            title="Print or export Daybook report"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary/90 active:scale-95 transition-all shadow-xs cursor-pointer"
+          >
+            <Printer size={14} />
+            <span>Print / Preview</span>
+          </button>
         </div>
       </div>
 
@@ -133,6 +191,14 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers }) => {
           ))
         )}
       </div>
+      {/* Daybook Report Preview Modal */}
+      {isPreviewOpen && (
+        <ReportPreviewModal
+          isOpen={isPreviewOpen}
+          config={reportConfig}
+          onClose={() => setIsPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 };

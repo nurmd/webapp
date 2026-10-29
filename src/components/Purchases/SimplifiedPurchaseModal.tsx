@@ -4,6 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { printPurchaseBill } from '../../core/utils/purchaseDocumentPrinter.ts';
+import { generatePdfNative } from '../../core/utils/printBridge.ts';
 import { PurchaseDocumentModal } from './PurchaseDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
 import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
@@ -88,12 +89,20 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
     </div>
   );
 
+  const handlePrint = () => {
+    const jobName = `Purchase-${bill.billNumber || bill.id}`;
+    if (generatePdfNative(jobName)) {
+      return;
+    }
+    printPurchaseBill(company, bill);
+  };
+
   const footerNode = (
     <div className="flex items-center justify-end gap-2">
       {/* Print Button */}
       <button
         type="button"
-        onClick={() => printPurchaseBill(company, bill)}
+        onClick={handlePrint}
         className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
         title={isChallan ? 'Print Purchase Challan' : 'Print Purchase Bill'}
       >

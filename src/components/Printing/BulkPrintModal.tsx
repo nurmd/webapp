@@ -43,46 +43,6 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-2 sm:p-4 animate-fade-in print-modal-overlay">
-      {/* Dynamic print-specific styles */}
-      <style>{`
-        @media print {
-          @page {
-            size: A4 portrait;
-            margin: 8mm 6mm;
-          }
-          body * {
-            visibility: hidden !important;
-          }
-          #bulk-print-container, #bulk-print-container * {
-            visibility: visible !important;
-          }
-          #bulk-print-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            background: #fff !important;
-            color: #000 !important;
-          }
-          .bulk-print-page {
-            page-break-after: always !important;
-            break-after: page !important;
-            min-height: 96vh !important;
-            box-sizing: border-box !important;
-            padding: 8mm 6mm !important;
-            margin-bottom: 0 !important;
-            border: 1px solid #ddd !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
 
       {/* Main Container */}
       <div className="bg-surface-container-lowest rounded-2xl w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl border border-outline-variant/30 overflow-hidden print-modal-container">

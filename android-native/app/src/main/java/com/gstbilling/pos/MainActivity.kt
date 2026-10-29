@@ -557,8 +557,9 @@ class AndroidBridge(
     fun generatePdfFromCurrentPage(jobName: String) {
         (context as? Activity)?.runOnUiThread {
             try {
-                val safeJobName = jobName.trim().ifBlank { "Invoice" }.take(60)
-                val cleanFileName = "invoice_${safeJobName.replace(Regex("[^a-zA-Z0-9._-]"), "_")}.pdf"
+                val safeJobName = jobName.trim().ifBlank { "Document" }.take(60)
+                val prefix = if (safeJobName.startsWith("Invoice", ignoreCase = true)) "invoice" else "doc"
+                val cleanFileName = "${prefix}_${safeJobName.replace(Regex("[^a-zA-Z0-9._-]"), "_")}.pdf"
                 val pdfFile = File(context.cacheDir, cleanFileName)
                 if (pdfFile.exists()) {
                     pdfFile.delete()
@@ -600,6 +601,80 @@ class AndroidBridge(
             } catch (e: Exception) {
                 Toast.makeText(context, "PDF generation error: ${e.message}", Toast.LENGTH_SHORT).show()
                 printCurrentPage(jobName)
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun generatePdfFromHtml(html: String, jobName: String) {
+        generatePdfFromHtml(html, jobName, "A4")
+    }
+
+    @JavascriptInterface
+    fun generatePdfFromHtml(html: String, jobName: String, paperSize: String) {
+        (context as? Activity)?.runOnUiThread {
+            try {
+                val safeJobName = jobName.trim().ifBlank { "Document" }.take(60)
+                val prefix = if (safeJobName.startsWith("Invoice", ignoreCase = true)) "invoice" else "doc"
+                val cleanFileName = "${prefix}_${safeJobName.replace(Regex("[^a-zA-Z0-9._-]"), "_")}.pdf"
+                val pdfFile = File(context.cacheDir, cleanFileName)
+                if (pdfFile.exists()) {
+                    pdfFile.delete()
+                }
+
+                val printWebView = WebView(context)
+                pendingPrintWebView = printWebView
+                val settings = printWebView.settings
+                settings.javaScriptEnabled = false
+                var hasStarted = false
+                printWebView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        if (hasStarted) return
+                        hasStarted = true
+                        try {
+                            val adapter = printWebView.createPrintDocumentAdapter(safeJobName)
+                            val attributes = buildPrintAttributes(paperSize) ?: PrintAttributes.Builder()
+                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                                .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                                .build()
+
+                            val pdfPrint = android.print.PdfPrint(attributes)
+                            pdfPrint.print(adapter, pdfFile, object : android.print.PdfPrint.Callback {
+                                override fun onSuccess() {
+                                    (context as? Activity)?.runOnUiThread {
+                                        try {
+                                            val contentUri = Uri.parse("content://com.gstbilling.pos.fileprovider/$cleanFileName")
+                                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                setDataAndType(contentUri, "application/pdf")
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Could not open PDF viewer: ${e.message}", Toast.LENGTH_SHORT).show()
+                                            printHtmlWithPaper(html, jobName, paperSize)
+                                        }
+                                    }
+                                }
+
+                                override fun onFailure(error: String) {
+                                    (context as? Activity)?.runOnUiThread {
+                                        Toast.makeText(context, "PDF generation failed: $error", Toast.LENGTH_SHORT).show()
+                                        printHtmlWithPaper(html, jobName, paperSize)
+                                    }
+                                }
+                            })
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "PDF generation error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            printHtmlWithPaper(html, jobName, paperSize)
+                        }
+                    }
+                }
+                printWebView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            } catch (e: Exception) {
+                Toast.makeText(context, "PDF error: ${e.message}", Toast.LENGTH_SHORT).show()
+                printHtmlWithPaper(html, jobName, paperSize)
             }
         }
     }

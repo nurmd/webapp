@@ -122,6 +122,22 @@ export function preloadPurchaseDocumentModal() {
   return purchaseDocumentPromise;
 }
 
+let partyDetailPromise: Promise<any> | null = null;
+export function preloadPartyDetailModal() {
+  if (!partyDetailPromise) {
+    partyDetailPromise = import('../../components/Parties/PartyDetailModal.tsx');
+  }
+  return partyDetailPromise;
+}
+
+let reportPreviewPromise: Promise<any> | null = null;
+export function preloadReportPreviewModal() {
+  if (!reportPreviewPromise) {
+    reportPreviewPromise = import('../../components/Reports/ReportPreviewModal.tsx');
+  }
+  return reportPreviewPromise;
+}
+
 /**
  * Preloads all heavy modal chunks in the background during idle periods.
  * This primes the ServiceWorker cache and browser module cache without blocking main thread.
@@ -133,6 +149,8 @@ export function preloadAllModalsOnIdle(): void {
     preloadInvoicePreviewModal,
     preloadInvoiceDocumentModal,
     preloadPurchaseDocumentModal,
+    preloadPartyDetailModal,
+    preloadReportPreviewModal,
     preloadTableGridInvoiceModal,
     preloadTableGridPurchaseModal,
     preloadCashBankTransactionDetailModal,

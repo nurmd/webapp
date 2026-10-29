@@ -125,14 +125,47 @@ export function generatePdfNative(jobName: string): boolean {
 }
 
 /**
+ * Dispatches direct PDF generation of an HTML document via AndroidBridge.
+ * Renders the HTML in a background WebView to an ISO A4 PDF file in native cache and opens it with ACTION_VIEW.
+ * Returns true if handled by the native bridge without error, or false if bridge is unavailable or throws.
+ */
+export function generatePdfFromHtmlNative(
+  html: string,
+  jobName: string,
+  paperSize: PrintPaperSize = 'A4'
+): boolean {
+  if (typeof window === 'undefined') return false;
+  const bridge = (window as any).AndroidBridge;
+  if (!bridge) return false;
+
+  try {
+    if (typeof bridge.generatePdfFromHtml === 'function') {
+      bridge.generatePdfFromHtml(html, jobName, paperSize);
+      return true;
+    }
+  } catch (err) {
+    console.warn('AndroidBridge HTML direct PDF generation failed, falling back:', err);
+    return false;
+  }
+  return false;
+}
+
+/**
  * Unified printable HTML generator runner:
- * Tries Android native print first, then falls back to window.open, hidden iframe, and window.print().
+ * Tries direct native PDF generation first, then Android native print,
+ * and falls back to window.open, hidden iframe, and window.print().
  */
 export function printHtmlDocument(
   html: string,
   jobName: string,
   paperSize: PrintPaperSize = 'A4'
 ): void {
+  // 1. Try direct native PDF generation via AndroidBridge
+  if (generatePdfFromHtmlNative(html, jobName, paperSize)) {
+    return;
+  }
+
+  // 2. Try native Android PrintManager dialog
   if (printHtmlNative(html, jobName, paperSize)) {
     return;
   }

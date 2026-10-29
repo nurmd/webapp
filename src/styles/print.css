@@ -94,4 +94,128 @@
   body:has(#invoice-a4-print-root) #invoice-a4-print-root * {
     visibility: visible;
   }
+
+  /* Scoped Report PDF Print Root */
+  #report-pdf-print-root {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 8mm 10mm !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .no-print-preview-bar {
+    display: none !important;
+  }
+
+  body:has(#report-pdf-print-root) * {
+    visibility: hidden;
+  }
+
+  body:has(#report-pdf-print-root) #report-pdf-print-root,
+  body:has(#report-pdf-print-root) #report-pdf-print-root * {
+    visibility: visible;
+  }
+
+  /* Bulk Documents Print Container */
+  #bulk-print-container {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .bulk-print-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    min-height: 96vh !important;
+  }
+
+  body:has(#bulk-print-container) * {
+    visibility: hidden;
+  }
+
+  body:has(#bulk-print-container) #bulk-print-container,
+  body:has(#bulk-print-container) #bulk-print-container * {
+    visibility: visible;
+  }
+
+  /* Barcode / Label Sticker Sheet Canvas */
+  #barcode-print-canvas {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .barcode-label-card {
+    border: 1px dashed #bbb !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    box-sizing: border-box !important;
+  }
+
+  .layout-thermal-50x25 {
+    width: 50mm !important;
+    height: 25mm !important;
+    padding: 1.5mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .layout-thermal-38x25 {
+    width: 38mm !important;
+    height: 25mm !important;
+    padding: 1mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .layout-a4-24up {
+    width: 70mm !important;
+    height: 37mm !important;
+    padding: 2mm !important;
+    margin: 0 !important;
+  }
+
+  .layout-a4-30up {
+    width: 70mm !important;
+    height: 29.7mm !important;
+    padding: 1.5mm !important;
+    margin: 0 !important;
+  }
+
+  body:has(#barcode-print-canvas) * {
+    visibility: hidden;
+  }
+
+  body:has(#barcode-print-canvas) #barcode-print-canvas,
+  body:has(#barcode-print-canvas) #barcode-print-canvas * {
+    visibility: visible;
+  }
 }

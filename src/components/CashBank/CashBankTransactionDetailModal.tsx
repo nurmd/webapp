@@ -11,6 +11,7 @@ import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/u
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 
 export interface CashBankTransactionDetailModalProps {
   isOpen: boolean;
@@ -659,34 +660,18 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                 </div>
               )}
 
-              {/* Delete Confirmation Alert */}
+              {/* Delete Confirmation Modal */}
               {showDeleteConfirm && (
-                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col gap-2.5 animate-fade-in">
-                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300">
-                    <span className="material-symbols-outlined text-[20px]">warning</span>
-                    <span className="font-bold text-xs">Confirm Transaction Deletion</span>
-                  </div>
-                  <p className="text-xs text-rose-800 dark:text-rose-200">
-                    Are you sure you want to delete this transaction? This will reverse the account balance adjustment.
-                  </p>
-                  <div className="flex items-center gap-2 justify-end mt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">delete</span>
-                      <span>Yes, Delete</span>
-                    </button>
-                  </div>
-                </div>
+                <ConfirmDeleteModal
+                  isOpen={showDeleteConfirm}
+                  title="Confirm Transaction Deletion"
+                  recordName={rawTransaction ? `${rawTransaction.type}: ₹${rawTransaction.amount.toFixed(2)}` : undefined}
+                  description="Are you sure you want to delete this transaction? This will reverse the account balance adjustment."
+                  confirmText="Yes, Delete"
+                  cancelText="Cancel"
+                  onConfirm={handleDelete}
+                  onClose={() => setShowDeleteConfirm(false)}
+                />
               )}
             </div>
           )}

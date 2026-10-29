@@ -5,6 +5,7 @@ import {
   printHtmlNative,
   printCurrentPageNative,
   generatePdfNative,
+  generatePdfFromHtmlNative,
   printHtmlDocument,
   printCurrentPage,
   printDocument,
@@ -400,6 +401,45 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
 
       const res = generatePdfNative('Invoice-101');
       expect(res).toBe(false);
+    });
+
+    it('returns false when AndroidBridge is absent in generatePdfFromHtmlNative', () => {
+      expect(generatePdfFromHtmlNative('<html></html>', 'Doc-101')).toBe(false);
+    });
+
+    it('calls AndroidBridge.generatePdfFromHtml(html, jobName, paperSize) in generatePdfFromHtmlNative', () => {
+      const mockGeneratePdfFromHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfFromHtml: mockGeneratePdfFromHtml,
+      };
+
+      const res = generatePdfFromHtmlNative('<html><body>Test</body></html>', 'Purchase-101', 'A4');
+      expect(res).toBe(true);
+      expect(mockGeneratePdfFromHtml).toHaveBeenCalledWith('<html><body>Test</body></html>', 'Purchase-101', 'A4');
+    });
+
+    it('catches AndroidBridge exceptions in generatePdfFromHtmlNative and returns false', () => {
+      (window as any).AndroidBridge = {
+        generatePdfFromHtml: vi.fn(() => {
+          throw new Error('Bridge IPC failed');
+        }),
+      };
+
+      const res = generatePdfFromHtmlNative('<html></html>', 'Doc-101');
+      expect(res).toBe(false);
+    });
+
+    it('printHtmlDocument invokes direct native PDF first when generatePdfFromHtml is supported', () => {
+      const mockGeneratePdfFromHtml = vi.fn();
+      const mockPrintHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfFromHtml: mockGeneratePdfFromHtml,
+        printHtml: mockPrintHtml,
+      };
+
+      printHtmlDocument('<html>Doc</html>', 'Voucher-V1', 'A4');
+      expect(mockGeneratePdfFromHtml).toHaveBeenCalledWith('<html>Doc</html>', 'Voucher-V1', 'A4');
+      expect(mockPrintHtml).not.toHaveBeenCalled();
     });
 
     it('printCurrentPage falls back to window.print when bridge is absent', () => {

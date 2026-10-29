@@ -14,6 +14,8 @@ import {
   preloadCashBankTransactionDetailModal,
   preloadVoucherEditorModal,
   preloadReportPdfPreviewModal,
+  preloadPartyDetailModal,
+  preloadReportPreviewModal,
   preloadThermalPrintModal,
   preloadBulkPrintModal,
 } from '../core/utils/modalPreload.ts';
@@ -48,6 +50,8 @@ describe('modalPreload utility suite', () => {
       preloadCashBankTransactionDetailModal,
       preloadVoucherEditorModal,
       preloadReportPdfPreviewModal,
+      preloadPartyDetailModal,
+      preloadReportPreviewModal,
       preloadThermalPrintModal,
       preloadBulkPrintModal,
     ];
