@@ -13,6 +13,10 @@ import { DirectCashBankModal } from './DirectCashBankModal.tsx';
 import { AddEditBankAccountModal } from './AddEditBankAccountModal.tsx';
 import { CashBankReconciliationPanel } from './CashBankReconciliationPanel.tsx';
 import { AppTab } from '../Shell/Drawer.tsx';
+import {
+  useModalPreloadOnMount,
+  preloadCashBankTransactionDetailModal,
+} from '../../core/utils/modalPreload.ts';
 
 const CashBankTransactionDetailModal = React.lazy(() =>
   import('./CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
@@ -55,6 +59,8 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onViewInvoice,
   onViewPurchase,
 }) => {
+  useModalPreloadOnMount([preloadCashBankTransactionDetailModal]);
+
   // Navigation / Modal States
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [transferInitialType, setTransferInitialType] = useState<'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER'>('DEPOSIT');

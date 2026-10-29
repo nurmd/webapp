@@ -37,6 +37,7 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
 import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
+import { useModalPreloadOnMount, preloadThermalPrintModal } from '../../core/utils/modalPreload.ts';
 
 export interface InvoicePreviewModalProps {
   invoice: Invoice;
@@ -56,6 +57,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   onEditInvoice,
   initialViewMode,
 }) => {
+  useModalPreloadOnMount([preloadThermalPrintModal]);
+
   const [showEwayThresholdWarning, setShowEwayThresholdWarning] = useState(false);
   const [viewMode, setViewMode] = useState<InvoiceViewMode>(() => {
     if (initialViewMode) return initialViewMode;

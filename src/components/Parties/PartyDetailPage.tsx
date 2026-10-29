@@ -16,6 +16,12 @@ import { PartyOrdersTable } from './PartyOrdersTable.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
+import {
+  useModalPreloadOnMount,
+  preloadVoucherEditorModal,
+  preloadSimplifiedInvoiceModal,
+  preloadSimplifiedPurchaseModal,
+} from '../../core/utils/modalPreload.ts';
 
 const SimplifiedPurchaseModal = React.lazy(() =>
   import('../Purchases/SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
@@ -75,6 +81,12 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
   onCreatePurchase,
   onRefresh,
 }) => {
+  useModalPreloadOnMount([
+    preloadVoucherEditorModal,
+    preloadSimplifiedInvoiceModal,
+    preloadSimplifiedPurchaseModal,
+  ]);
+
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [showPartyDetails, setShowPartyDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'TRANSACTIONS' | 'ORDERS'>('TRANSACTIONS');

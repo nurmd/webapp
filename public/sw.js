@@ -154,9 +154,28 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Immediate activation message listener
+// Immediate activation and dynamic caching message listener
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CACHE_URLS' && Array.isArray(event.data.urls)) {
+    event.waitUntil(
+      caches.open(CACHE_VERSION).then((cache) => {
+        return Promise.all(
+          event.data.urls.map((url) =>
+            fetch(url)
+              .then((res) => {
+                if (isCacheableResponse({ headers: new Headers() }, res)) {
+                  return cache.put(url, res);
+                }
+              })
+              .catch((err) => {
+                console.warn('[SW] Precache URL warning:', url, err);
+              })
+          )
+        );
+      })
+    );
   }
 });

@@ -17,6 +17,12 @@ import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import {
+  useModalPreloadOnMount,
+  preloadSimplifiedPurchaseModal,
+  preloadTableGridPurchaseModal,
+  preloadBulkPrintModal,
+} from '../../core/utils/modalPreload.ts';
 
 const TableGridPurchaseModal = React.lazy(() =>
   import('./TableGridPurchaseModal.tsx').then((m) => ({ default: m.TableGridPurchaseModal }))
@@ -49,6 +55,12 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
   onEditPurchase,
   onAddNewParty,
 }) => {
+  useModalPreloadOnMount([
+    preloadSimplifiedPurchaseModal,
+    preloadTableGridPurchaseModal,
+    preloadBulkPrintModal,
+  ]);
+
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'UNPAID' | 'DUE' | 'PAID'>('ALL');
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);

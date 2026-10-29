@@ -9,9 +9,11 @@ const swSource = fs.readFileSync(
 );
 
 type FetchHandler = (event: any) => void;
+type MessageHandler = (event: any) => void;
 
 function loadServiceWorker() {
   let fetchHandler: FetchHandler | undefined;
+  let messageHandler: MessageHandler | undefined;
   const putSpy = vi.fn(async () => {});
   const fetchSpy = vi.fn(async () => ({
     status: 200,
@@ -20,8 +22,9 @@ function loadServiceWorker() {
 
   const self = {
     location: { origin: 'https://app.example.com' },
-    addEventListener: (type: string, handler: FetchHandler) => {
+    addEventListener: (type: string, handler: any) => {
       if (type === 'fetch') fetchHandler = handler;
+      if (type === 'message') messageHandler = handler;
     },
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn() },
@@ -43,7 +46,7 @@ function loadServiceWorker() {
 
   vm.runInContext(swSource, context);
 
-  return { fetchHandler, fetchSpy, putSpy };
+  return { fetchHandler, messageHandler, fetchSpy, putSpy, self };
 }
 
 function makeRequest(url: string, headers?: Headers) {
@@ -115,5 +118,31 @@ describe('service worker sync cache bypass', () => {
 
     await respondWith.mock.calls[0][0];
     expect(putSpy).not.toHaveBeenCalled();
+  });
+
+  it('handles SKIP_WAITING message', () => {
+    const loaded = loadServiceWorker();
+    expect(loaded.messageHandler).toBeTypeOf('function');
+    loaded.messageHandler!({ data: { type: 'SKIP_WAITING' } });
+    expect(loaded.self.skipWaiting).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles CACHE_URLS message to precache lazy modal chunk URLs', async () => {
+    const loaded = loadServiceWorker();
+    expect(loaded.messageHandler).toBeTypeOf('function');
+
+    const waitUntilPromise = vi.fn();
+    loaded.messageHandler!({
+      data: {
+        type: 'CACHE_URLS',
+        urls: ['/assets/InvoicePreviewModal-abc.js', '/assets/TableGridInvoiceModal-def.js'],
+      },
+      waitUntil: waitUntilPromise,
+    });
+
+    expect(waitUntilPromise).toHaveBeenCalledTimes(1);
+    await waitUntilPromise.mock.calls[0][0];
+    expect(loaded.fetchSpy).toHaveBeenCalledTimes(2);
+    expect(loaded.putSpy).toHaveBeenCalledTimes(2);
   });
 });

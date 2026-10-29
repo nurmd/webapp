@@ -1,11 +1,12 @@
 import React from 'react';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
-import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
-import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { formatINR } from '../../core/utils/formatters.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { printPurchaseBill } from '../../core/utils/purchaseDocumentPrinter.ts';
+import { DocumentViewModal } from '../Common/DocumentViewModal.tsx';
+import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
+import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
 
 export interface SimplifiedPurchaseModalProps {
   bill: PurchaseBill | null;
@@ -23,12 +24,6 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
   onDeletePurchase,
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
-
-  // System hardware back navigation (priority 25: closes preview before underlying screens)
-  useBackNavigation(() => {
-    onClose();
-    return true;
-  }, !!bill, 25);
 
   if (!bill) return null;
 
@@ -68,58 +63,90 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
     ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
     : 'bg-orange-500/15 text-orange-600 dark:text-orange-400';
 
+  const titleNode = (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <h3 className="font-bold text-sm text-on-surface truncate">
+        {headerTitle}
+      </h3>
+      {isChallan ? (
+        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300">
+          {bill.isConverted ? 'CONVERTED' : (bill.challanStatus || 'RECEIVED')}
+        </span>
+      ) : (
+        <span
+          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+            isPaid
+              ? 'bg-secondary/15 text-secondary'
+              : isPartial
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : 'bg-error/15 text-error'
+          }`}
+        >
+          {bill.paymentStatus}
+        </span>
+      )}
+    </div>
+  );
+
+  const footerNode = (
+    <div className="flex items-center justify-end gap-2">
+      {/* Print Button */}
+      <button
+        type="button"
+        onClick={() => printPurchaseBill(company, bill)}
+        className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+        title={isChallan ? 'Print Purchase Challan' : 'Print Purchase Bill'}
+      >
+        <span className="material-symbols-outlined text-[16px]">print</span>
+        <span>Print</span>
+      </button>
+
+      {/* Delete Button */}
+      {onDeletePurchase && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          className="min-h-[44px] py-2 px-3.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors active:scale-95"
+          title={isChallan ? 'Delete Purchase Challan' : 'Delete Purchase Bill'}
+        >
+          <span className="material-symbols-outlined text-[16px]">delete</span>
+          <span>Delete</span>
+        </button>
+      )}
+
+      {/* Edit Button */}
+      {onEditPurchase && (!bill.isConverted || isPo) && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onEditPurchase(bill);
+          }}
+          className="min-h-[44px] py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
+          title={isChallan ? 'Edit Purchase Challan' : 'Edit Purchase Bill'}
+        >
+          <span className="material-symbols-outlined text-[16px]">edit</span>
+          <span>{isChallan ? 'Edit Challan' : isPo ? 'Edit PO' : 'Edit Bill'}</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Sticky Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant/20 p-3 sm:p-4 flex-shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`w-8 h-8 rounded-xl ${headerIconBg} flex items-center justify-center flex-shrink-0`}>
-              <span className="material-symbols-outlined text-[18px]">{headerIcon}</span>
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-sm text-on-surface truncate">
-                  {headerTitle}
-                </h3>
-                {isChallan ? (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300">
-                    {bill.isConverted ? 'CONVERTED' : (bill.challanStatus || 'RECEIVED')}
-                  </span>
-                ) : (
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isPaid
-                        ? 'bg-secondary/15 text-secondary'
-                        : isPartial
-                        ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                        : 'bg-error/15 text-error'
-                    }`}
-                  >
-                    {bill.paymentStatus}
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px] text-on-surface-variant truncate block">
-                {bill.supplierName} • {bill.date}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
-            title="Close"
-            aria-label="Close purchase details"
-          >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-
-        {/* Scrollable Content Body */}
-        <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-2.5">
-          {/* Compact Supplier Details */}
+    <>
+      <DocumentViewModal
+        isOpen={!!bill}
+        onClose={onClose}
+        title={titleNode}
+        subtitle={`${bill.supplierName} • ${bill.date}`}
+        headerIcon={headerIcon}
+        headerIconClass={headerIconBg}
+        closeAriaLabel="Close purchase details"
+        maxWidth="md"
+        footer={footerNode}
+        backNavPriority={25}
+      >
+        {/* Compact Supplier Details */}
         {isGstActive && (
           <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
             <span>
@@ -132,119 +159,26 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         )}
 
         {/* Purchased Items Table View */}
-        <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-          <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-            <table className="w-full text-left text-[11px] border-collapse table-fixed">
-              <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
-                <tr>
-                  <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
-                  <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
-                  <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
-                    <span className="block text-right">Total</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/15 text-on-surface">
-                {bill.items && bill.items.length > 0 ? (
-                  bill.items.map((item, idx) => {
-                    const isGst = isGstActive && !company.isCompositionScheme;
-                    const priceMode = item.priceMode ?? 'EXCLUSIVE';
-                    const storedInclusive = Number(item.unitPriceInclusive);
-                    const inclusiveRate =
-                      priceMode === 'INCLUSIVE'
-                        ? (Number.isFinite(storedInclusive) && storedInclusive > 0
-                            ? storedInclusive
-                            : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0))
-                        : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0);
-                    const cess = Number(item.cessRate) || 0;
-                    return (
-                      <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0 text-left">
-                          <div className="truncate font-bold text-on-surface" title={item.name}>
-                            {item.name}
-                          </div>
-                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                            {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                            {isGstActive && item.hsnSacCode && <span>•</span>}
-                            {isGst && (
-                              <span className="text-orange-600 dark:text-orange-400 font-semibold">
-                                GST {item.gstRate || 0}%
-                              </span>
-                            )}
-                            {isGst && cess > 0 && <span>• CESS {cess}%</span>}
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2 text-center min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate text-center">
-                            {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
-                          </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
-                            @ {formatINR(item.unitPrice)}
-                          </div>
-                          {isGst && (
-                            <div className="text-[9px] text-on-surface-variant font-mono truncate text-center">
-                              Incl. {formatINR(inclusiveRate)}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
-                          <div className="w-full text-right flex justify-end">
-                            <span>{formatINR(item.totalAmount)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-center text-on-surface-variant text-xs">
-                      No items recorded in this bill
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DocumentLineItemsGrid
+          mode="compact"
+          kind="purchase"
+          rows={bill.items}
+          isGstActive={isGstActive}
+          isCompositionScheme={company.isCompositionScheme}
+        />
 
         {/* Financial Breakdown */}
-        {(() => {
-          const isGst = isGstActive && !company.isCompositionScheme;
-          const totalCess = isGst ? (Number(bill.totalCess) || 0) : 0;
-          const gstOnly = Math.max(0, (Number(bill.totalTax) || 0) - totalCess);
-          return (
-            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-              {isGst && (
-                <>
-                  <div className="flex justify-between text-on-surface-variant text-[11px]">
-                    <span>Taxable Amount</span>
-                    <span className="font-bold text-on-surface">{formatINR(bill.totalTaxableAmount)}</span>
-                  </div>
-                  <div className="flex justify-between text-on-surface-variant text-[11px]">
-                    <span>{totalCess > 0 ? 'GST / ITC' : 'Total Tax (GST / ITC)'}</span>
-                    <span className="font-bold text-orange-600 dark:text-orange-400">
-                      {formatINR(totalCess > 0 ? gstOnly : bill.totalTax)}
-                    </span>
-                  </div>
-                  {totalCess > 0 && (
-                    <div className="flex justify-between text-on-surface-variant text-[11px]">
-                      <span>CESS</span>
-                      <span className="font-bold text-orange-600 dark:text-orange-400">
-                        {formatINR(totalCess)}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
-                <span>Total Bill Value</span>
-                <span className="font-black text-on-surface font-currency-display-mobile">
-                  {formatINR(bill.grandTotal)}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
+        <DocumentTaxSummary
+          variant="compact"
+          title="Total Bill Value"
+          totalTaxableAmount={bill.totalTaxableAmount}
+          totalTax={bill.totalTax}
+          totalCess={bill.totalCess}
+          finalGrandTotal={bill.grandTotal}
+          isGstActive={isGstActive}
+          isCompositionScheme={company.isCompositionScheme}
+          accentColor="orange"
+        />
 
         {/* Compact Status / Payment Bar */}
         {isChallan ? (
@@ -307,51 +241,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
             )}
           </div>
         )}
-        </div>
-
-        {/* Bottom Actions Bar (Sticky Action Dock) */}
-        <div className="flex items-center justify-end gap-2 p-3 sm:p-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0">
-          {/* Print Button */}
-          <button
-            type="button"
-            onClick={() => printPurchaseBill(company, bill)}
-            className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
-            title={isChallan ? 'Print Purchase Challan' : 'Print Purchase Bill'}
-          >
-            <span className="material-symbols-outlined text-[16px]">print</span>
-            <span>Print</span>
-          </button>
-
-          {/* Delete Button */}
-          {onDeletePurchase && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="min-h-[44px] py-2 px-3.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors active:scale-95"
-              title={isChallan ? 'Delete Purchase Challan' : 'Delete Purchase Bill'}
-            >
-              <span className="material-symbols-outlined text-[16px]">delete</span>
-              <span>Delete</span>
-            </button>
-          )}
-
-          {/* Edit Button */}
-          {onEditPurchase && (!bill.isConverted || isPo) && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onEditPurchase(bill);
-              }}
-              className="min-h-[44px] py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
-              title={isChallan ? 'Edit Purchase Challan' : 'Edit Purchase Bill'}
-            >
-              <span className="material-symbols-outlined text-[16px]">edit</span>
-              <span>{isChallan ? 'Edit Challan' : isPo ? 'Edit PO' : 'Edit Bill'}</span>
-            </button>
-          )}
-        </div>
-      </div>
+      </DocumentViewModal>
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
@@ -368,6 +258,6 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
           onClose={() => setIsDeleteModalOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 };

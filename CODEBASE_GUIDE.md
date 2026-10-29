@@ -492,6 +492,15 @@ To prevent sticky headers and modal backdrops from scrolling behind the topbar:
       import('./components/Invoicing/TableGridInvoiceModal.tsx').then((m) => ({ default: m.TableGridInvoiceModal }))
     );
     ```
+  - **Modal Preload & Offline Cache Engine (`src/core/utils/modalPreload.ts`)**:
+    - `lazyWithPreload`: wraps `React.lazy` with an explicit `.preload()` hook caching the dynamic import promise.
+    - `useModalPreloadOnMount`: preloads view-specific modals asynchronously on view entrance without blocking initial render.
+    - `preloadAllModalsOnIdle`: schedules non-blocking idle chunk preloads (`requestIdleCallback`) to pre-warm the browser module cache.
+    - `public/sw.js` precache handler listens for `CACHE_URLS` messages to store modal chunks in CacheStorage for full offline access.
+  - **Unified Document Components (`src/components/Common/Billing/`)**:
+    - `DocumentLineItemsGrid.tsx`: consolidated line-item grid supporting interactive workstation mode and compact mobile preview mode with complete GST pricing mode compliance.
+    - `DocumentTaxSummary.tsx`: unified tax breakdown supporting `variant="full"` (collapsible tax base breakdown) and `variant="compact"` (streamlined invoice/bill values).
+    - `DocumentViewModal.tsx`: shared preview dialog shell with backdrop blur, accessible close button, Android hardware back navigation (`useBackNavigation`), responsive viewport, and sticky action docks.
   - **Entry Chunk Ceiling**: Main bundle (`index.js`) must strictly remain under **450 kB** uncompressed. Zero-CLS Suspense fallback skeletons are rendered during chunk loads.
 
 ---

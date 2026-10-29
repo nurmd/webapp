@@ -23,6 +23,12 @@ import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/uti
 import { showAppToast } from '../../services/toast.ts';
 import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
 import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
+import {
+  useModalPreloadOnMount,
+  preloadSimplifiedInvoiceModal,
+  preloadInvoicePreviewModal,
+  preloadTableGridInvoiceModal,
+} from '../../core/utils/modalPreload.ts';
 
 const BulkPrintModal = React.lazy(() =>
   import('../Printing/BulkPrintModal.tsx').then((m) => ({ default: m.BulkPrintModal }))
@@ -51,6 +57,12 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   onQuickPos,
   onRefresh,
 }) => {
+  useModalPreloadOnMount([
+    preloadSimplifiedInvoiceModal,
+    preloadInvoicePreviewModal,
+    preloadTableGridInvoiceModal,
+  ]);
+
   const [activeTab, setActiveTab] = useState<'ALL' | 'UNPAID' | 'PAID' | 'ESTIMATES' | 'CHALLANS'>('ALL');
   const [search, setSearch] = useState('');
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<Invoice | null>(null);

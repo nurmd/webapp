@@ -1,15 +1,15 @@
 import React from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
-import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
-import { useBackNavigation } from '../../core/utils/backNavigation.ts';
-import { getWhatsAppShareUrl } from '../../core/utils/upiAndShare.ts';
+import { formatINR } from '../../core/utils/formatters.ts';
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { db } from '../../services/db.ts';
+import { DocumentViewModal } from '../Common/DocumentViewModal.tsx';
+import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
+import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -33,12 +33,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [showEwayThresholdWarning, setShowEwayThresholdWarning] = React.useState(false);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = React.useState(false);
-
-  // System back navigation (priority 25: closes preview before underlying screens)
-  useBackNavigation(() => {
-    onClose();
-    return true;
-  }, !!invoice, 25);
 
   const party = React.useMemo(() => {
     if (!invoice || (!invoice.partyName && !invoice.partyId)) return null;
@@ -71,69 +65,149 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
     setIsDeleteModalOpen(true);
   };
 
+  const titleNode = (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <h3 className="font-bold text-sm text-on-surface truncate">
+        {company.isCompositionScheme ? `Bill of Supply #${invoice.invoiceNumber}` : `Invoice #${invoice.invoiceNumber}`}
+      </h3>
+      {company.isCompositionScheme && (
+        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+          Composition
+        </span>
+      )}
+      <span
+        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+          isPaid
+            ? 'bg-secondary/15 text-secondary'
+            : isPartial
+            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+            : 'bg-error/15 text-error'
+        }`}
+      >
+        {invoice.paymentStatus}
+      </span>
+    </div>
+  );
+
+  const leadingAction = onDeleteInvoice ? (
+    <button
+      type="button"
+      onClick={handleDelete}
+      className="w-8 h-8 rounded-xl bg-error/15 text-error hover:bg-error/25 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+      title="Delete Invoice"
+      aria-label="Delete invoice"
+    >
+      <span className="material-symbols-outlined text-[18px]">delete</span>
+    </button>
+  ) : (
+    <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+      <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+    </div>
+  );
+
+  const footerNode = (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Print Button (Thermal) */}
+      {onPrintInvoice && (
+        <button
+          type="button"
+          onClick={() => onPrintInvoice(invoice)}
+          className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-secondary/90 transition-all"
+          title="Print Thermal POS Receipt"
+        >
+          <span className="material-symbols-outlined text-[16px]">print</span>
+          <span>Print</span>
+        </button>
+      )}
+
+      {/* A4 / PDF Button */}
+      {onOpenFullA4Preview && (
+        <button
+          type="button"
+          onClick={() => onOpenFullA4Preview(invoice)}
+          className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-all"
+          title="View full A4 / PDF layout & print"
+        >
+          <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+          <span>A4 / PDF</span>
+        </button>
+      )}
+
+      {/* WhatsApp Share Button */}
+      <button
+        type="button"
+        onClick={handleWhatsApp}
+        className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+        title="Share via WhatsApp"
+      >
+        <span className="material-symbols-outlined text-[16px]">send</span>
+        <span>WhatsApp</span>
+      </button>
+
+      {/* Edit Invoice Button */}
+      {onEditInvoice && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onEditInvoice(invoice);
+          }}
+          className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          title="Edit Invoice"
+        >
+          <span className="material-symbols-outlined text-[16px]">edit</span>
+          <span>Edit</span>
+        </button>
+      )}
+
+      {/* E-Way JSON export */}
+      {isGstActive && (
+        <button
+          type="button"
+          onClick={() => {
+            if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
+              setShowEwayThresholdWarning(true);
+              return;
+            }
+            downloadEWayBillJson(company, invoice);
+          }}
+          className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          title="Download E-Way Bill JSON"
+        >
+          <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+          <span>E-Way</span>
+        </button>
+      )}
+
+      {/* E-Invoice JSON export */}
+      {isGstActive && (
+        <button
+          type="button"
+          onClick={() => downloadEInvoiceJson(company, invoice)}
+          className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          title="Download E-Invoice JSON"
+        >
+          <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+          <span>E-Inv</span>
+        </button>
+      )}
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 animate-fade-in">
-      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-md shadow-2xl border border-outline-variant/30 flex flex-col max-h-[90vh] overflow-hidden">
-        {/* Sticky Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant/20 p-3 sm:p-4 flex-shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {onDeleteInvoice ? (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="w-8 h-8 rounded-xl bg-error/15 text-error hover:bg-error/25 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                title="Delete Invoice"
-                aria-label="Delete invoice"
-              >
-                <span className="material-symbols-outlined text-[18px]">delete</span>
-              </button>
-            ) : (
-              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-              </div>
-            )}
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-sm text-on-surface truncate">
-                  {company.isCompositionScheme ? `Bill of Supply #${invoice.invoiceNumber}` : `Invoice #${invoice.invoiceNumber}`}
-                </h3>
-                {company.isCompositionScheme && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
-                    Composition
-                  </span>
-                )}
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
-                    isPaid
-                      ? 'bg-secondary/15 text-secondary'
-                      : isPartial
-                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                      : 'bg-error/15 text-error'
-                  }`}
-                >
-                  {invoice.paymentStatus}
-                </span>
-              </div>
-              <span className="text-[11px] text-on-surface-variant truncate block">
-                {invoice.partyName || 'Cash Customer'} • {invoice.date}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:text-on-surface hover:bg-surface-container cursor-pointer transition-colors"
-            title="Close"
-            aria-label="Close invoice details"
-          >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-
-        {/* Scrollable Content Body */}
-        <div className="p-3.5 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-2.5">
-          {/* Compact Customer Details */}
+    <>
+      <DocumentViewModal
+        isOpen={!!invoice}
+        onClose={onClose}
+        title={titleNode}
+        subtitle={`${invoice.partyName || 'Cash Customer'} • ${invoice.date}`}
+        leadingAction={leadingAction}
+        closeAriaLabel="Close invoice details"
+        maxWidth="md"
+        footer={footerNode}
+        backNavPriority={25}
+      >
+        {/* Compact Customer Details */}
         {isGstActive && (
           <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
             <span>
@@ -158,111 +232,26 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         )}
 
         {/* Purchased Items Table View */}
-        <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-          <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-            <table className="w-full text-left text-[11px] border-collapse table-fixed">
-              <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
-                <tr>
-                  <th className="py-1.5 px-2.5 font-semibold w-[46%] text-left">Item</th>
-                  <th className="py-1.5 px-2 text-center font-semibold w-[26%]">Qty × Rate</th>
-                  <th className="py-1.5 px-2.5 text-right font-semibold w-[28%]">
-                    <span className="block text-right">Total</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/15 text-on-surface">
-                {invoice.items && invoice.items.length > 0 ? (
-                  invoice.items.map((item, idx) => {
-                    const isGst = isGstActive && !company.isCompositionScheme;
-                    const priceMode = item.priceMode ?? 'EXCLUSIVE';
-                    const storedInclusive = Number(item.unitPriceInclusive);
-                    const inclusiveRate =
-                      priceMode === 'INCLUSIVE'
-                        ? (Number.isFinite(storedInclusive) && storedInclusive > 0
-                            ? storedInclusive
-                            : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0))
-                        : inclusiveFromExclusive(item.unitPrice, item.gstRate || 0);
-                    const cess = Number(item.cessRate) || 0;
-                    return (
-                      <tr key={idx} className="hover:bg-surface-container-low/40">
-                        <td className="py-1.5 px-2.5 min-w-0 text-left">
-                          <div className="truncate font-bold text-on-surface" title={item.name}>
-                            {item.name}
-                          </div>
-                          <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
-                            {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                            {isGstActive && item.hsnSacCode && <span>•</span>}
-                            {isGstActive && !company.isCompositionScheme && <span className="text-secondary font-semibold">GST {item.gstRate || 0}%</span>}
-                            {isGst && cess > 0 && <span>• CESS {cess}%</span>}
-                          </div>
-                        </td>
-                        <td className="py-1.5 px-2 text-center min-w-0">
-                          <div className="font-mono font-medium text-on-surface truncate text-center">
-                            {formatQuantity(item.quantity, 4)} <span className="text-[9px] text-on-surface-variant">{item.unit || 'PCS'}</span>
-                          </div>
-                          <div className="text-[10px] text-on-surface-variant font-mono truncate text-center">
-                            @ {formatINR(item.unitPrice)}
-                          </div>
-                          {isGst && (
-                            <div className="text-[9px] text-on-surface-variant font-mono truncate text-center">
-                              Incl. {formatINR(inclusiveRate)}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-1.5 px-2.5 text-right font-mono font-bold text-on-surface whitespace-nowrap tabular-nums">
-                          <div className="w-full text-right flex justify-end">
-                            <span>{formatINR(item.totalAmount)}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-center text-on-surface-variant text-xs">
-                      No items in this invoice
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DocumentLineItemsGrid
+          mode="compact"
+          kind="invoice"
+          rows={invoice.items}
+          isGstActive={isGstActive}
+          isCompositionScheme={company.isCompositionScheme}
+        />
 
         {/* Financial Breakdown */}
-        {(() => {
-          const isGst = isGstActive && !company.isCompositionScheme;
-          const totalCess = isGst ? (Number(invoice.totalCess) || 0) : 0;
-          const gstOnly = Math.max(0, (Number(invoice.totalTax) || 0) - totalCess);
-          return (
-            <div className="p-2.5 rounded-xl bg-surface-container-low space-y-1 text-xs">
-              {isGst && (
-                <>
-                  <div className="flex justify-between text-on-surface-variant text-[11px]">
-                    <span>Taxable Amount</span>
-                    <span className="font-bold text-on-surface">{formatINR(invoice.totalTaxableAmount)}</span>
-                  </div>
-                  <div className="flex justify-between text-on-surface-variant text-[11px]">
-                    <span>{totalCess > 0 ? 'GST' : 'Total Tax (GST)'}</span>
-                    <span className="font-bold text-secondary">{formatINR(totalCess > 0 ? gstOnly : invoice.totalTax)}</span>
-                  </div>
-                  {totalCess > 0 && (
-                    <div className="flex justify-between text-on-surface-variant text-[11px]">
-                      <span>CESS</span>
-                      <span className="font-bold text-secondary">{formatINR(totalCess)}</span>
-                    </div>
-                  )}
-                </>
-              )}
-              <div className="flex justify-between pt-1 border-t border-outline-variant/20 font-bold text-sm text-on-surface">
-                <span>Total Invoice Value</span>
-                <span className="font-black text-on-surface font-currency-display-mobile">
-                  {formatINR(invoice.grandTotal)}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
+        <DocumentTaxSummary
+          variant="compact"
+          title="Total Invoice Value"
+          totalTaxableAmount={invoice.totalTaxableAmount}
+          totalTax={invoice.totalTax}
+          totalCess={invoice.totalCess}
+          finalGrandTotal={invoice.grandTotal}
+          isGstActive={isGstActive}
+          isCompositionScheme={company.isCompositionScheme}
+          accentColor="secondary"
+        />
 
         {/* Compact Payment Status Bar */}
         <div className="flex flex-col gap-1 px-3 py-1.5 rounded-xl bg-surface-container text-xs">
@@ -303,96 +292,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             </div>
           )}
         </div>
-        </div>
-
-        {/* Bottom Actions Bar (Sticky Action Dock) */}
-        <div className="flex flex-wrap items-center gap-2 p-3 sm:p-3.5 border-t border-outline-variant/20 bg-surface-container-low/40 flex-shrink-0">
-          {/* Print Button (Thermal) */}
-          {onPrintInvoice && (
-            <button
-              type="button"
-              onClick={() => onPrintInvoice(invoice)}
-              className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-secondary/90 transition-all"
-              title="Print Thermal POS Receipt"
-            >
-              <span className="material-symbols-outlined text-[16px]">print</span>
-              <span>Print</span>
-            </button>
-          )}
-
-          {/* A4 / PDF Button */}
-          {onOpenFullA4Preview && (
-            <button
-              type="button"
-              onClick={() => onOpenFullA4Preview(invoice)}
-              className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-all"
-              title="View full A4 / PDF layout & print"
-            >
-              <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-              <span>A4 / PDF</span>
-            </button>
-          )}
-
-          {/* WhatsApp Share Button */}
-          <button
-            type="button"
-            onClick={handleWhatsApp}
-            className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-            title="Share via WhatsApp"
-          >
-            <span className="material-symbols-outlined text-[16px]">send</span>
-            <span>WhatsApp</span>
-          </button>
-
-          {/* Edit Invoice Button */}
-          {onEditInvoice && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onEditInvoice(invoice);
-              }}
-              className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-              title="Edit Invoice"
-            >
-              <span className="material-symbols-outlined text-[16px]">edit</span>
-              <span>Edit</span>
-            </button>
-          )}
-
-          {/* E-Way JSON export */}
-          {isGstActive && (
-            <button
-              type="button"
-              onClick={() => {
-                if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
-                  setShowEwayThresholdWarning(true);
-                  return;
-                }
-                downloadEWayBillJson(company, invoice);
-              }}
-              className="py-2 px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-              title="Download E-Way Bill JSON"
-            >
-              <span className="material-symbols-outlined text-[16px]">local_shipping</span>
-              <span>E-Way</span>
-            </button>
-          )}
-
-          {/* E-Invoice JSON export */}
-          {isGstActive && (
-            <button
-              type="button"
-              onClick={() => downloadEInvoiceJson(company, invoice)}
-              className="py-2 px-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-              title="Download E-Invoice JSON"
-            >
-              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-              <span>E-Inv</span>
-            </button>
-          )}
-        </div>
-      </div>
+      </DocumentViewModal>
 
       {/* Delete Invoice Confirmation Modal */}
       {isDeleteModalOpen && (
@@ -438,6 +338,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           initialTemplate="INVOICE_DELIVERY"
         />
       )}
-    </div>
+    </>
   );
 };

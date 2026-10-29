@@ -51,6 +51,7 @@ import { withWalkInCustomer, isSystemParty } from './core/utils/systemParties.ts
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
+import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
 
 
 // Secondary Views (Dynamic Code-Splitting with named-export unwrapping)
@@ -278,6 +279,7 @@ export const App: React.FC = () => {
         console.warn('Failed to sync party balances on startup:', err);
       }
     }
+    preloadAllModalsOnIdle();
     initBackNavigation(() => {
       if (activeTabRef.current !== 'dashboard') {
         setActiveTab('dashboard');

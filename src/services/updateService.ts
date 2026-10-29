@@ -696,4 +696,14 @@ class UpdateService {
   }
 }
 
+export function cacheUrlsInServiceWorker(urls: string[]): void {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'CACHE_URLS',
+      urls,
+    });
+  }
+}
+
 export const updateService = new UpdateService();
