@@ -1,6 +1,6 @@
 {
   "name": "gst-billing-app",
-  "version": "1.2.45",
+  "version": "1.2.46",
   "private": true,
   "description": "Cross-platform GST Billing & Accounting Application (Web, Android, iOS, Windows, Linux)",
   "type": "module",
@@ -17,6 +17,7 @@
     "test:gst": "node --experimental-strip-types scripts/test-gst-engine.ts",
     "test:gstr": "node --experimental-strip-types scripts/test-gstr-engine.ts",
     "conflict:manifest": "node --experimental-strip-types scripts/conflict-manifest.ts",
+    "intake:server": "node --env-file=server/bill-intake/.env server/bill-intake/server.mjs",
     "cap:sync": "cap sync",
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",

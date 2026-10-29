@@ -1,0 +1,14 @@
+{
+  "name": "bill-intake-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Extraction proxy for Vyapar Books AI Bill Intake (vision model -> JSON)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --env-file=.env server.mjs",
+    "start:plain": "node server.mjs"
+  }
+}
