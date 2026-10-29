@@ -11,10 +11,15 @@ import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
 import { ItemFormModal } from './ItemFormModal.tsx';
 import { ItemDetailSheet, ItemTransactionRecord, ItemTransactionType } from './ItemDetailSheet.tsx';
-import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
-import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { BarcodeLabelModal } from './BarcodeLabelModal.tsx';
+
+const SimplifiedInvoiceModal = React.lazy(() =>
+  import('../Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
+);
+const SimplifiedPurchaseModal = React.lazy(() =>
+  import('../Purchases/SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
+);
 
 export type { ItemTransactionType, ItemTransactionRecord };
 
@@ -841,20 +846,24 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
       {/* 5. Simplified Invoice Preview Modal */}
       {previewInvoice && (
-        <SimplifiedInvoiceModal
-          invoice={previewInvoice}
-          company={company}
-          onClose={() => setPreviewInvoice(null)}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedInvoiceModal
+            invoice={previewInvoice}
+            company={company}
+            onClose={() => setPreviewInvoice(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* 6. Simplified Purchase Bill Preview Modal */}
       {previewPurchase && (
-        <SimplifiedPurchaseModal
-          bill={previewPurchase}
-          company={company}
-          onClose={() => setPreviewPurchase(null)}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedPurchaseModal
+            bill={previewPurchase}
+            company={company}
+            onClose={() => setPreviewPurchase(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* 7. Reconcile Stock Discrepancy Confirmation Modal */}

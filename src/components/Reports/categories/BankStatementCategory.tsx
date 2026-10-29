@@ -20,8 +20,11 @@ import type { Voucher } from '../../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { computeCashBankSummary } from '../../../core/accounting/cashBankCalculator.ts';
 import { exportReportToCsv, printReportDocument } from '../utils/reportExportUtils.ts';
-import { CashBankTransactionDetailModal } from '../../CashBank/CashBankTransactionDetailModal.tsx';
 import type { AppTab } from '../../Shell/Drawer.tsx';
+
+const CashBankTransactionDetailModal = React.lazy(() =>
+  import('../../CashBank/CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
+);
 
 interface BankStatementCategoryProps {
   company: CompanyProfile;
@@ -666,24 +669,28 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         </div>
       </div>
 
-      <CashBankTransactionDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedEntry(null);
-        }}
-        entry={selectedEntry}
-        rawTransaction={selectedRawTxn}
-        accounts={accounts}
-        vouchers={vouchers}
-        invoices={invoices}
-        purchases={purchases}
-        onViewInvoice={onViewInvoice}
-        onViewPurchase={onViewPurchase}
-        onSaveTransaction={onSaveTransaction}
-        onDeleteTransaction={onDeleteTransaction}
-        onNavigateTab={onNavigateTab}
-      />
+      {isDetailModalOpen && (
+        <React.Suspense fallback={null}>
+          <CashBankTransactionDetailModal
+            isOpen={isDetailModalOpen}
+            onClose={() => {
+              setIsDetailModalOpen(false);
+              setSelectedEntry(null);
+            }}
+            entry={selectedEntry}
+            rawTransaction={selectedRawTxn}
+            accounts={accounts}
+            vouchers={vouchers}
+            invoices={invoices}
+            purchases={purchases}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 };

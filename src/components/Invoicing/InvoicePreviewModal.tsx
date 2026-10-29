@@ -22,8 +22,11 @@ import {
   Building2,
   User,
 } from 'lucide-react';
-import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
+
+const ThermalPrintModal = React.lazy(() =>
+  import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
+);
 import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
@@ -473,44 +476,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-0 sm:p-2 print-modal-overlay animate-fade-in">
-      {/* Scoped CSS for A4 Invoice Laser Printing */}
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          #invoice-a4-print-root, #invoice-a4-print-root * {
-            visibility: visible !important;
-          }
-          #invoice-a4-print-root {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            max-height: none !important;
-            overflow: visible !important;
-            min-width: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            display: flex !important;
-            justify-content: center !important;
-            background: #ffffff !important;
-          }
-          #invoice-a4-print-root .printable-invoice {
-            transform: none !important;
-            width: 100% !important;
-            max-width: 100% !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          @page {
-            size: A4 portrait;
-            margin: 8mm 10mm;
-          }
-        }
-      `}</style>
       <div className="bg-surface-container-lowest text-on-surface rounded-none sm:rounded-2xl border-0 sm:border sm:border-outline-variant/30 w-full max-w-5xl h-full sm:h-auto sm:max-h-[96vh] flex flex-col shadow-2xl overflow-hidden print-modal-container">
         {/* Modal Controls Toolbar (Compact & Minimal Padding) */}
         <div className="no-print px-2 sm:px-3 py-1 sm:py-1.5 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/95 gap-1 shrink-0">
@@ -640,7 +605,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
         {/* Document Preview Viewport Container */}
         <div
-          className={`overflow-auto py-1 sm:py-2 px-1 flex ${
+          className={`print-preview-viewport overflow-auto py-1 sm:py-2 px-1 flex ${
             viewMode === 'THERMAL' || viewMode === 'MOBILE'
               ? 'justify-center'
               : 'justify-start sm:justify-center'
@@ -2253,11 +2218,13 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       </div>
 
       {isThermalModalOpen && (
-        <ThermalPrintModal
-          invoice={invoice}
-          company={company}
-          onClose={() => setIsThermalModalOpen(false)}
-        />
+        <React.Suspense fallback={null}>
+          <ThermalPrintModal
+            invoice={invoice}
+            company={company}
+            onClose={() => setIsThermalModalOpen(false)}
+          />
+        </React.Suspense>
       )}
 
       {isWhatsAppModalOpen && (

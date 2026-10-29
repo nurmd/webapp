@@ -11,8 +11,11 @@ import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
-import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { db } from '../../services/db.ts';
+
+const ThermalPrintModal = React.lazy(() =>
+  import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
+);
 import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
@@ -1920,11 +1923,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
       {/* Thermal Receipt Print Modal */}
       {thermalPrintInvoice && (
-        <ThermalPrintModal
-          invoice={thermalPrintInvoice}
-          company={company}
-          onClose={() => setThermalPrintInvoice(null)}
-        />
+        <React.Suspense fallback={null}>
+          <ThermalPrintModal
+            invoice={thermalPrintInvoice}
+            company={company}
+            onClose={() => setThermalPrintInvoice(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* Camera Barcode Scanner Modal */}

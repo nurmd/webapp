@@ -6,6 +6,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { Voucher, JournalEntryLine } from '../../core/accounting/voucherTypes.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
+import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
@@ -526,64 +527,23 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const handleShareWhatsApp = () => {
     if (!editingLedgerEntry) return;
 
-    const companyName =
-      company?.tradeName ||
-      company?.businessName ||
-      db.getCompany()?.tradeName ||
-      db.getCompany()?.businessName ||
-      'Vyapar Books';
+    const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
+    const text = buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company, partyTotalDue, {
+      heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
+      docNumber: editingLedgerEntry.docNumber,
+      date: formatDate(editDate || editingLedgerEntry.date),
+      amount: currentAmount,
+      discount: currentDiscount,
+      paymentMode: editMode,
+      bankAccountName: selectedBank?.accountName,
+      splits: editMode === 'SPLIT' ? {
+        cash: parseFloat(editSplitCash) || 0,
+        upi: parseFloat(editSplitUPI) || 0,
+        bank: parseFloat(editSplitBank) || 0,
+      } : undefined,
+      notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
+    });
 
-    const voucherTitle = isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher';
-    const numAmt = currentAmount;
-    const discAmt = currentDiscount;
-    const totalDue = partyTotalDue;
-
-    const lines: string[] = [
-      `*${voucherTitle} - ${companyName}*`,
-      '--------------------------------',
-      `*Receipt No:* ${editingLedgerEntry.docNumber}`,
-      `*Type:* ${isReceipt ? 'Payment In' : 'Payment Out'}`,
-      `*Date:* ${formatDate(editDate || editingLedgerEntry.date)}`,
-      `*Party:* ${party.name}`,
-      `*Amount:* ${formatINR(numAmt)}`,
-    ];
-
-    if (discAmt > 0) {
-      lines.push(`*Discount:* ${formatINR(discAmt)}`);
-      lines.push(`*Total Settled:* ${formatINR(numAmt + discAmt)}`);
-    }
-
-    if (editMode) {
-      if (editMode === 'BANK') {
-        const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
-        lines.push(`*Payment Mode:* Bank${selectedBank ? ` (${selectedBank.accountName})` : ''}`);
-      } else if (editMode === 'SPLIT') {
-        const c = parseFloat(editSplitCash) || 0;
-        const u = parseFloat(editSplitUPI) || 0;
-        const b = parseFloat(editSplitBank) || 0;
-        const parts: string[] = [];
-        if (c > 0) parts.push(`Cash: ${formatINR(c)}`);
-        if (u > 0) parts.push(`UPI: ${formatINR(u)}`);
-        if (b > 0) parts.push(`Bank: ${formatINR(b)}`);
-        lines.push(`*Payment Mode:* Split (${parts.join(', ')})`);
-      } else {
-        lines.push(`*Payment Mode:* ${editMode}`);
-      }
-    }
-
-    if (totalDue !== null && !isNaN(totalDue)) {
-      lines.push(`*Total Balance Due:* ${formatINR(totalDue)}`);
-    }
-
-    const narration = editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration;
-    if (narration) {
-      lines.push(`*Notes:* ${narration}`);
-    }
-
-    lines.push('--------------------------------');
-    lines.push('Recorded in GST Billing App');
-
-    const text = lines.join('\n');
     const { url } = buildWhatsAppSendUrl({ phone: party.phone, text });
     safeOpenExternalUrl(url);
   };

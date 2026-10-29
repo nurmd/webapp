@@ -12,9 +12,12 @@ import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DirectCashBankModal } from '../CashBank/DirectCashBankModal.tsx';
-import { CashBankTransactionDetailModal } from '../CashBank/CashBankTransactionDetailModal.tsx';
 import { RecordPaymentModal } from '../Parties/RecordPaymentModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+
+const CashBankTransactionDetailModal = React.lazy(() =>
+  import('../CashBank/CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
+);
 
 export interface PaymentTransactionsViewProps {
   flow: 'IN' | 'OUT';
@@ -793,26 +796,30 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       />
 
       {/* 6. Detail / Edit / Delete Modal */}
-      <CashBankTransactionDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedLedgerEntry(null);
-        }}
-        entry={selectedLedgerEntry}
-        rawTransaction={selectedRawTxn}
-        accounts={accounts}
-        company={company}
-        parties={parties}
-        vouchers={vouchers}
-        invoices={invoices}
-        purchases={purchases}
-        onViewInvoice={onViewInvoice}
-        onViewPurchase={onViewPurchase}
-        onSaveTransaction={onSaveTransaction}
-        onDeleteTransaction={onDeleteTransaction}
-        onNavigateTab={onNavigateTab}
-      />
+      {isDetailModalOpen && (
+        <React.Suspense fallback={null}>
+          <CashBankTransactionDetailModal
+            isOpen={isDetailModalOpen}
+            onClose={() => {
+              setIsDetailModalOpen(false);
+              setSelectedLedgerEntry(null);
+            }}
+            entry={selectedLedgerEntry}
+            rawTransaction={selectedRawTxn}
+            accounts={accounts}
+            company={company}
+            parties={parties}
+            vouchers={vouchers}
+            invoices={invoices}
+            purchases={purchases}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+          />
+        </React.Suspense>
+      )}
 
       {/* 7. Date Filter Modal */}
       <DateFilterModal

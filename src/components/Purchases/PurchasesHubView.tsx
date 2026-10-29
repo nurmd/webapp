@@ -4,8 +4,6 @@ import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { TableGridPurchaseModal } from './TableGridPurchaseModal.tsx';
-import { SimplifiedPurchaseModal } from './SimplifiedPurchaseModal.tsx';
 import {
   DatePreset,
   getDateFilterBounds,
@@ -16,10 +14,19 @@ import {
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
 import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
-import { BulkPrintModal } from '../Printing/BulkPrintModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+
+const TableGridPurchaseModal = React.lazy(() =>
+  import('./TableGridPurchaseModal.tsx').then((m) => ({ default: m.TableGridPurchaseModal }))
+);
+const SimplifiedPurchaseModal = React.lazy(() =>
+  import('./SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
+);
+const BulkPrintModal = React.lazy(() =>
+  import('../Printing/BulkPrintModal.tsx').then((m) => ({ default: m.BulkPrintModal }))
+);
 
 interface PurchasesHubViewProps {
   purchases: PurchaseBill[];
@@ -588,45 +595,49 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
       {/* Table Grid Purchase Workstation Modal */}
       {(isModalOpen || editingBill) && (
-        <TableGridPurchaseModal
-          company={company}
-          parties={parties}
-          itemsCatalog={itemsCatalog}
-          initialBill={editingBill}
-          onClose={() => {
-            setIsModalOpen(false);
-            setEditingBill(null);
-          }}
-          onSave={(newBill) => {
-            onSavePurchase(newBill);
-            setIsModalOpen(false);
-            setEditingBill(null);
-          }}
-          onAddNewParty={() => {
-            if (onAddNewParty) onAddNewParty();
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <TableGridPurchaseModal
+            company={company}
+            parties={parties}
+            itemsCatalog={itemsCatalog}
+            initialBill={editingBill}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingBill(null);
+            }}
+            onSave={(newBill) => {
+              onSavePurchase(newBill);
+              setIsModalOpen(false);
+              setEditingBill(null);
+            }}
+            onAddNewParty={() => {
+              if (onAddNewParty) onAddNewParty();
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* Simplified Mobile Purchase Bill Preview Modal */}
       {selectedBillForPreview && (
-        <SimplifiedPurchaseModal
-          bill={selectedBillForPreview}
-          company={company}
-          onClose={() => setSelectedBillForPreview(null)}
-          onEditPurchase={(bill) => {
-            setSelectedBillForPreview(null);
-            if (onEditPurchase) {
-              onEditPurchase(bill);
-            } else {
-              setEditingBill(bill);
-            }
-          }}
-          onDeletePurchase={(id) => {
-            setSelectedBillForPreview(null);
-            onDeletePurchase(id);
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedPurchaseModal
+            bill={selectedBillForPreview}
+            company={company}
+            onClose={() => setSelectedBillForPreview(null)}
+            onEditPurchase={(bill) => {
+              setSelectedBillForPreview(null);
+              if (onEditPurchase) {
+                onEditPurchase(bill);
+              } else {
+                setEditingBill(bill);
+              }
+            }}
+            onDeletePurchase={(id) => {
+              setSelectedBillForPreview(null);
+              onDeletePurchase(id);
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* Date Filter Modal */}
@@ -657,13 +668,15 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
       {/* Bulk Print Preview Modal */}
       {isBulkPrintOpen && (
-        <BulkPrintModal
-          isOpen={isBulkPrintOpen}
-          onClose={() => setIsBulkPrintOpen(false)}
-          company={company}
-          purchases={selectedPurchases}
-          title="Bulk Purchase Bills Printing"
-        />
+        <React.Suspense fallback={null}>
+          <BulkPrintModal
+            isOpen={isBulkPrintOpen}
+            onClose={() => setIsBulkPrintOpen(false)}
+            company={company}
+            purchases={selectedPurchases}
+            title="Bulk Purchase Bills Printing"
+          />
+        </React.Suspense>
       )}
 
       {/* Bulk Delete Confirmation Modal */}

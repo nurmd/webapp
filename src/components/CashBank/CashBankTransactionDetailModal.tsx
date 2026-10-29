@@ -8,6 +8,7 @@ import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
+import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 
@@ -242,66 +243,25 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
       : isInflow
       ? 'Payment Received'
       : 'Payment Made';
-    const companyName =
-      company?.tradeName?.trim() || company?.businessName?.trim() || 'GST Billing App';
 
-    const lines: string[] = [
-      `*${heading} - ${companyName}*`,
-      '--------------------------------',
-    ];
-
-    if (rawTransaction?.txnNumber) {
-      lines.push(`*Txn No:* ${rawTransaction.txnNumber}`);
-    }
-    if (activeDate) {
-      lines.push(`*Date:* ${formatDate(activeDate)}`);
-    }
-    lines.push(`*Amount:* ${formatINR(activeAmount)}`);
-
-    if (!isTransferCategory && linkedParty) {
-      const partyDue = getPartyTotalBalanceDue(linkedParty);
-      if (partyDue !== null) {
-        lines.push(`*Total Balance Due:* ${formatINR(partyDue)}`);
-      }
-    }
-
-    const typeLabel = rawTransaction?.type || entry?.type;
-    if (typeLabel) {
-      lines.push(`*Type:* ${typeLabel}`);
-    }
-
-    if (isTransferCategory) {
-      lines.push(`*From:* ${resolvedFromName}`);
-      lines.push(`*To:* ${resolvedToName}`);
-    } else {
-      const accountName =
+    const text = buildPaymentVoucherWhatsAppMessage(rawTransaction || entry, linkedParty, company, undefined, {
+      heading,
+      docNumber: rawTransaction?.txnNumber,
+      date: activeDate ? formatDate(activeDate) : undefined,
+      amount: activeAmount,
+      type: rawTransaction?.type || entry?.type,
+      isContra: Boolean(isTransferCategory),
+      fromAccountName: resolvedFromName,
+      toAccountName: resolvedToName,
+      accountName:
         entry?.accountName ||
-        (rawTransaction?.type === 'ADD_MONEY' ? toAcc?.accountName : fromAcc?.accountName);
-      if (accountName) {
-        lines.push(`*Account:* ${accountName}`);
-      }
-    }
+        (rawTransaction?.type === 'ADD_MONEY' ? toAcc?.accountName : fromAcc?.accountName),
+      paymentMode: entry?.mode,
+      reference: activeRef,
+      counterpartyOrTitle: entry?.counterpartyOrTitle,
+      notes: activeDesc,
+    });
 
-    if (entry?.mode) {
-      lines.push(`*Mode:* ${entry.mode}`);
-    }
-
-    if (activeRef) {
-      lines.push(`*Reference:* ${activeRef}`);
-    }
-
-    if (entry?.counterpartyOrTitle) {
-      lines.push(`*Party / Purpose:* ${entry.counterpartyOrTitle}`);
-    }
-
-    if (activeDesc) {
-      lines.push(`*Notes:* ${activeDesc}`);
-    }
-
-    lines.push('--------------------------------');
-    lines.push('Recorded in GST Billing App');
-
-    const text = lines.join('\n');
     safeOpenExternalUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
   };
 

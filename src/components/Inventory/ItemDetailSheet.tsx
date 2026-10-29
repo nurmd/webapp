@@ -2,12 +2,17 @@ import React, { useState, useMemo } from 'react';
 import { InventoryItem, StockAdjustment, isItemDisabled } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
-import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
-import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
 import { db } from '../../services/db.ts';
+
+const SimplifiedInvoiceModal = React.lazy(() =>
+  import('../Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
+);
+const SimplifiedPurchaseModal = React.lazy(() =>
+  import('../Purchases/SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
+);
 
 export type ItemTransactionType = 'SALE' | 'PURCHASE' | 'STOCK_IN' | 'STOCK_OUT' | 'WASTAGE' | 'CORRECTION';
 
@@ -630,20 +635,24 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
 
       {/* Sales Invoice Preview Modal */}
       {selectedInvoiceForPreview && (
-        <SimplifiedInvoiceModal
-          invoice={selectedInvoiceForPreview}
-          company={company}
-          onClose={() => setSelectedInvoiceForPreview(null)}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedInvoiceModal
+            invoice={selectedInvoiceForPreview}
+            company={company}
+            onClose={() => setSelectedInvoiceForPreview(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* Purchase Bill Preview Modal */}
       {selectedPurchaseForPreview && (
-        <SimplifiedPurchaseModal
-          bill={selectedPurchaseForPreview}
-          company={company}
-          onClose={() => setSelectedPurchaseForPreview(null)}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedPurchaseModal
+            bill={selectedPurchaseForPreview}
+            company={company}
+            onClose={() => setSelectedPurchaseForPreview(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* Disable Item Instead Modal */}

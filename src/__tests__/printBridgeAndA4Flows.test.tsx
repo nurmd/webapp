@@ -6,6 +6,7 @@ import {
   printCurrentPageNative,
   printHtmlDocument,
   printCurrentPage,
+  printDocument,
   escapeHtml,
 } from '../core/utils/printBridge.ts';
 import {
@@ -389,6 +390,35 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       printCurrentPage('Native-Print', 'A4');
       expect(mockNativePrint).toHaveBeenCalledWith('Native-Print');
       expect(mockWindowPrint).not.toHaveBeenCalled();
+    });
+
+    it('printDocument routes documentType invoice-current-page to printCurrentPage', () => {
+      const mockNativePrint = vi.fn();
+      (window as any).AndroidBridge = {
+        printCurrentPage: mockNativePrint,
+      };
+
+      printDocument({
+        documentType: 'invoice-current-page',
+        jobName: 'Inv-Doc-Test',
+        paperSize: 'A4',
+      });
+      expect(mockNativePrint).toHaveBeenCalledWith('Inv-Doc-Test');
+    });
+
+    it('printDocument routes documentType standalone-html to printHtmlDocument', () => {
+      const mockPrintHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        printHtml: mockPrintHtml,
+      };
+
+      printDocument({
+        documentType: 'standalone-html',
+        jobName: 'Report-Doc-Test',
+        paperSize: 'A4',
+        html: '<html><body>Test Report</body></html>',
+      });
+      expect(mockPrintHtml).toHaveBeenCalledWith('<html><body>Test Report</body></html>', 'Report-Doc-Test');
     });
   });
 

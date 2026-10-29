@@ -6,6 +6,7 @@ import { PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
+import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface DashboardPaymentTarget {
   type: 'SALE' | 'PURCHASE';
@@ -264,247 +265,55 @@ export const DashboardRecordPaymentModal: React.FC<DashboardRecordPaymentModalPr
             </div>
           </div>
 
-          {/* Amount Input */}
-          <div>
-            <label className="block text-xs font-bold text-on-surface mb-1">
-              Payment Amount (₹) <span className="text-error">*</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-on-surface-variant">
-                ₹
-              </span>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface font-tabular-data font-bold text-lg focus:outline-hidden focus:border-secondary transition-all"
-              />
-            </div>
-            {target.balanceAmount > 0 && parseFloat(amount) !== target.balanceAmount && (
-              <button
-                type="button"
-                onClick={() => setAmount(target.balanceAmount.toString())}
-                className="mt-1 min-h-[36px] py-1 text-[11px] font-bold text-secondary hover:underline cursor-pointer inline-flex items-center"
-              >
-                Set to full balance ({formatINR(target.balanceAmount)})
-              </button>
-            )}
-
-            {validationError && (
-              <div className="mt-2 p-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px]">error</span>
-                <span>{validationError}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Discount Input */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-on-surface">
-                {isSale ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
-              </label>
-              {parseFloat(discount) > 0 && (
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                  Total Settled: {formatINR((parseFloat(amount) || 0) + (parseFloat(discount) || 0))}
-                </span>
-              )}
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-on-surface-variant">
-                ₹
-              </span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-                placeholder="0.00"
-                className="w-full pl-8 pr-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface font-tabular-data font-bold text-sm focus:outline-hidden focus:border-secondary transition-all min-h-[36px]"
-              />
-            </div>
-          </div>
-
-          {/* Payment Mode Selection */}
-          <div>
-            <label className="block text-xs font-bold text-on-surface mb-1.5">
-              Payment Mode
-            </label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-              {PAYMENT_MODES.map((mode) => (
-                <button
-                  key={mode.value}
-                  type="button"
-                  onClick={() => {
-                    setPaymentMode(mode.value);
-                    if (mode.value === 'SPLIT') {
-                      const total = parseFloat(amount) || 0;
-                      if (total > 0 && !splitCash && !splitUPI && !splitBank) {
-                        if (paymentMode === 'CASH') setSplitCash(total.toString());
-                        else if (paymentMode === 'BANK_TRANSFER') setSplitBank(total.toString());
-                        else setSplitUPI(total.toString());
-                      }
-                    }
-                  }}
-                  className={`min-h-[48px] flex flex-col items-center justify-center p-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer active:scale-95 ${
-                    paymentMode === mode.value
-                      ? 'border-secondary bg-secondary/10 text-secondary shadow-xs scale-102'
-                      : 'border-outline-variant/30 bg-surface-container-lowest text-on-surface-variant hover:border-outline'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[18px] mb-0.5">{mode.icon}</span>
-                  <span className="truncate w-full text-center">{mode.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Split Tender Allocation Box when SPLIT is selected */}
-          {paymentMode === 'SPLIT' && (() => {
-            const targetAmt = parseFloat(amount) || 0;
-            const c = parseFloat(splitCash) || 0;
-            const u = parseFloat(splitUPI) || 0;
-            const b = parseFloat(splitBank) || 0;
-            const allocated = Number((c + u + b).toFixed(2));
-            const remaining = targetAmt > 0 ? Number(Math.max(0, targetAmt - allocated).toFixed(2)) : 0;
-
-            return (
-              <div className="p-3 bg-surface-container-low/60 rounded-xl border border-secondary/30 flex flex-col gap-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-on-surface flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px] text-secondary">call_split</span>
-                    <span>Split Breakdown</span>
-                  </span>
-                  <span
-                    className={`font-bold ${
-                      targetAmt > 0 && allocated === targetAmt
-                        ? 'text-secondary'
-                        : targetAmt > 0 && allocated > targetAmt
-                        ? 'text-error'
-                        : 'text-amber-600'
-                    }`}
+          {/* Shared Payment Entry Form */}
+          <PaymentEntryForm
+            layout="stacked"
+            showDate={false}
+            amount={amount}
+            onChangeAmount={setAmount}
+            paymentType={isSale ? 'IN' : 'OUT'}
+            discount={discount}
+            onChangeDiscount={setDiscount}
+            mode={paymentMode}
+            onChangeMode={setPaymentMode}
+            modeStyle="chips"
+            modeOptions={PAYMENT_MODES}
+            splitCash={splitCash}
+            onChangeSplitCash={setSplitCash}
+            splitUPI={splitUPI}
+            onChangeSplitUPI={setSplitUPI}
+            splitBank={splitBank}
+            onChangeSplitBank={setSplitBank}
+            notes={notes}
+            onChangeNotes={setNotes}
+            notesLabel="Notes / Reference (Optional)"
+            notesPlaceholder="e.g. UTR number, UPI transaction ID, Cheque number"
+            amountLabel={
+              <>
+                Payment Amount (₹) <span className="text-error">*</span>
+              </>
+            }
+            amountSlotBottom={
+              <>
+                {target.balanceAmount > 0 && parseFloat(amount) !== target.balanceAmount && (
+                  <button
+                    type="button"
+                    onClick={() => setAmount(target.balanceAmount.toString())}
+                    className="mt-1 min-h-[36px] py-1 text-[11px] font-bold text-secondary hover:underline cursor-pointer inline-flex items-center"
                   >
-                    Allocated: {formatINR(allocated)} {targetAmt > 0 ? `/ ${formatINR(targetAmt)}` : ''}
-                    {remaining > 0 && ` (${formatINR(remaining)} left)`}
-                  </span>
-                </div>
+                    Set to full balance ({formatINR(target.balanceAmount)})
+                  </button>
+                )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {/* Cash */}
-                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[13px] text-emerald-600">payments</span>
-                        Cash
-                      </span>
-                      {remaining > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = (c + remaining).toFixed(2);
-                            setSplitCash(parseFloat(next).toString());
-                          }}
-                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
-                        >
-                          + Fill
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={splitCash}
-                      onChange={(e) => setSplitCash(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
-                    />
+                {validationError && (
+                  <div className="mt-2 p-2 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">error</span>
+                    <span>{validationError}</span>
                   </div>
-
-                  {/* UPI */}
-                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[13px] text-sky-600">qr_code_scanner</span>
-                        UPI
-                      </span>
-                      {remaining > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = (u + remaining).toFixed(2);
-                            setSplitUPI(parseFloat(next).toString());
-                          }}
-                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
-                        >
-                          + Fill
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={splitUPI}
-                      onChange={(e) => setSplitUPI(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
-                    />
-                  </div>
-
-                  {/* Bank */}
-                  <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container border border-outline-variant/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                        <span className="material-symbols-outlined text-[13px] text-indigo-600">account_balance</span>
-                        Bank
-                      </span>
-                      {remaining > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = (b + remaining).toFixed(2);
-                            setSplitBank(parseFloat(next).toString());
-                          }}
-                          className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
-                        >
-                          + Fill
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={splitBank}
-                      onChange={(e) => setSplitBank(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 bg-surface-container-lowest rounded-md text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Payment Notes */}
-          <div>
-            <label className="block text-xs font-bold text-on-surface mb-1">
-              Notes / Reference (Optional)
-            </label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. UTR number, UPI transaction ID, Cheque number"
-              className="w-full px-3 py-2 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-xs text-on-surface focus:outline-hidden focus:border-secondary transition-all"
-            />
-          </div>
+                )}
+              </>
+            }
+          />
 
           {/* Submit Actions */}
           <div className="pt-2 flex items-center justify-end gap-2 border-t border-outline-variant/20">

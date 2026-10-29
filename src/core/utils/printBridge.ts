@@ -186,3 +186,29 @@ export function printCurrentPage(
     window.print();
   }
 }
+
+export type PrintDocumentType = 'invoice-current-page' | 'standalone-html';
+
+export interface PrintDocumentOptions {
+  documentType: PrintDocumentType;
+  jobName: string;
+  paperSize?: PrintPaperSize;
+  html?: string;
+}
+
+/**
+ * Consolidated print document runner:
+ * Chooses between current-page DOM printing (for modal previews like Invoice A4)
+ * and standalone HTML document printing (for reports, vouchers, bills, slips).
+ */
+export function printDocument(options: PrintDocumentOptions): void {
+  if (options.documentType === 'standalone-html') {
+    if (!options.html) {
+      console.warn('printDocument: HTML string required for standalone-html documentType');
+      return;
+    }
+    printHtmlDocument(options.html, options.jobName, options.paperSize || 'A4');
+  } else {
+    printCurrentPage(options.jobName, options.paperSize || 'A4');
+  }
+}

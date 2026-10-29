@@ -23,7 +23,10 @@ import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/uti
 import { showAppToast } from '../../services/toast.ts';
 import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
 import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
-import { BulkPrintModal } from '../Printing/BulkPrintModal.tsx';
+
+const BulkPrintModal = React.lazy(() =>
+  import('../Printing/BulkPrintModal.tsx').then((m) => ({ default: m.BulkPrintModal }))
+);
 
 interface SalesHubViewProps {
   company: CompanyProfile;
@@ -1207,13 +1210,15 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
       {/* Bulk Print Preview Modal */}
       {isBulkPrintOpen && (
-        <BulkPrintModal
-          isOpen={isBulkPrintOpen}
-          onClose={() => setIsBulkPrintOpen(false)}
-          company={company}
-          invoices={selectedInvoices}
-          title="Bulk Sales Invoice Printing"
-        />
+        <React.Suspense fallback={null}>
+          <BulkPrintModal
+            isOpen={isBulkPrintOpen}
+            onClose={() => setIsBulkPrintOpen(false)}
+            company={company}
+            invoices={selectedInvoices}
+            title="Bulk Sales Invoice Printing"
+          />
+        </React.Suspense>
       )}
 
       {/* Bulk Delete Confirmation Modal */}

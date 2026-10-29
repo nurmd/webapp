@@ -13,6 +13,7 @@ import {
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
+import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -457,267 +458,28 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         </div>
       )}
 
-      {/* Date, Amount & Discount Inputs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-on-surface-variant">Date</label>
-          <input
-            type="date"
-            required
-            value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px]"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-on-surface-variant">Amount (₹) *</label>
-          <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
-            <input
-              type="number"
-              step="0.01"
-              required
-              placeholder="0.00"
-              value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
-              className="w-full pl-6 pr-2 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px]"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold text-on-surface-variant">
-            {paymentType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
-          </label>
-          <div className="relative flex items-center">
-            <span className="absolute left-2.5 text-xs font-bold text-on-surface-variant">₹</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={discountAmount}
-              onChange={(e) => setDiscountAmount(e.target.value)}
-              className="w-full pl-6 pr-2 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px]"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Settlement summary banner */}
-      {totalSettled > 0 && (
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-          <span className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[15px]">account_balance_wallet</span>
-            <span>Total Settled:</span>
-          </span>
-          <span>
-            {formatINR(totalSettled)}
-            {numDiscount > 0 ? ` (₹${numPayAmount.toFixed(2)} + ₹${numDiscount.toFixed(2)} discount)` : ''}
-          </span>
-        </div>
-      )}
-
-      {/* Payment Mode & Bank Account */}
-      <div className={`grid gap-2 ${paymentMode === 'BANK' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="payment-mode-select" className="text-[10px] font-bold text-on-surface-variant">
-            Payment Mode
-          </label>
-          <div className="relative flex items-center">
-            <select
-              id="payment-mode-select"
-              value={paymentMode}
-              onChange={(e) => {
-                const m = e.target.value;
-                setPaymentMode(m);
-                if (m === 'SPLIT') {
-                  const total = parseFloat(paymentAmount) || 0;
-                  if (total > 0 && !splitCash && !splitUPI && !splitBank) {
-                    if (paymentMode === 'CASH') setSplitCash(total.toString());
-                    else if (paymentMode === 'BANK') setSplitBank(total.toString());
-                    else setSplitUPI(total.toString());
-                  }
-                }
-              }}
-              className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
-            >
-              <option value="UPI">UPI</option>
-              <option value="CASH">Cash</option>
-              <option value="BANK">Bank</option>
-              <option value="SPLIT">Split Tender</option>
-            </select>
-          </div>
-        </div>
-
-        {paymentMode === 'BANK' && (
-          <div className="flex flex-col gap-1 animate-in fade-in">
-            <label htmlFor="bank-account-select" className="text-[10px] font-bold text-on-surface-variant truncate">
-              {paymentType === 'IN' ? 'Deposit to Bank' : 'Pay from Bank'}
-            </label>
-            <div className="relative flex items-center">
-              <select
-                id="bank-account-select"
-                value={selectedBankAccountId}
-                onChange={(e) => setSelectedBankAccountId(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-surface rounded-xl text-xs font-bold text-on-surface border border-outline-variant/30 focus:border-secondary focus:outline-none min-h-[36px] cursor-pointer"
-              >
-                {availableBankAccounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.accountName} {acc.accountNumber ? `(•••${acc.accountNumber.slice(-4)})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Split Tender Allocation Box when SPLIT is selected */}
-      {paymentMode === 'SPLIT' && (() => {
-        const target = parseFloat(paymentAmount) || 0;
-        const c = parseFloat(splitCash) || 0;
-        const u = parseFloat(splitUPI) || 0;
-        const b = parseFloat(splitBank) || 0;
-        const allocated = Number((c + u + b).toFixed(2));
-        const remaining = target > 0 ? Number(Math.max(0, target - allocated).toFixed(2)) : 0;
-
-        return (
-          <div className="p-2.5 bg-surface rounded-xl border border-secondary/20 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-bold text-on-surface flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px] text-secondary">call_split</span>
-                <span>Split Breakdown</span>
-              </span>
-              <span className={`font-bold ${
-                target > 0 && allocated === target
-                  ? 'text-secondary'
-                  : target > 0 && allocated > target
-                  ? 'text-error'
-                  : 'text-amber-600'
-              }`}>
-                Allocated: {formatINR(allocated)} {target > 0 ? `/ ${formatINR(target)}` : ''}
-                {remaining > 0 && ` (${formatINR(remaining)} left)`}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {/* Cash */}
-              <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[12px] text-emerald-600">payments</span>
-                    Cash
-                  </span>
-                  {remaining > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (c + remaining).toFixed(2);
-                        setSplitCash(parseFloat(next).toString());
-                      }}
-                      className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
-                    >
-                      + Fill
-                    </button>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={splitCash}
-                    onChange={(e) => setSplitCash(e.target.value)}
-                    className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                  />
-                </div>
-              </div>
-
-              {/* UPI */}
-              <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[12px] text-blue-600">qr_code_2</span>
-                    UPI
-                  </span>
-                  {remaining > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (u + remaining).toFixed(2);
-                        setSplitUPI(parseFloat(next).toString());
-                      }}
-                      className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
-                    >
-                      + Fill
-                    </button>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={splitUPI}
-                    onChange={(e) => setSplitUPI(e.target.value)}
-                    className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                  />
-                </div>
-              </div>
-
-              {/* Bank */}
-              <div className="flex flex-col gap-1 p-2 rounded-lg bg-surface-container-low border border-outline-variant/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-on-surface flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[12px] text-purple-600">account_balance</span>
-                    Bank / Cheque
-                  </span>
-                  {remaining > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = (b + remaining).toFixed(2);
-                        setSplitBank(parseFloat(next).toString());
-                      }}
-                      className="text-[9px] font-bold text-secondary hover:underline cursor-pointer"
-                    >
-                      + Fill
-                    </button>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={splitBank}
-                    onChange={(e) => setSplitBank(e.target.value)}
-                    className="w-full pl-4 pr-1 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                  />
-                </div>
-                {availableBankAccounts.length > 1 && (
-                  <select
-                    value={selectedBankAccountId}
-                    onChange={(e) => setSelectedBankAccountId(e.target.value)}
-                    className="mt-1 w-full px-1.5 py-0.5 bg-surface rounded text-[10px] font-medium text-on-surface border border-outline-variant/20 focus:outline-none cursor-pointer"
-                  >
-                    {availableBankAccounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.accountName}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Payment Entry Form (Date, Amount, Discount, Mode, Bank, Split Tender) */}
+      <PaymentEntryForm
+        date={paymentDate}
+        onChangeDate={setPaymentDate}
+        amount={paymentAmount}
+        onChangeAmount={setPaymentAmount}
+        paymentType={paymentType}
+        discount={discountAmount}
+        onChangeDiscount={setDiscountAmount}
+        mode={paymentMode}
+        onChangeMode={setPaymentMode}
+        bankAccountId={selectedBankAccountId}
+        onChangeBankAccountId={setSelectedBankAccountId}
+        bankAccounts={availableBankAccounts}
+        splitCash={splitCash}
+        onChangeSplitCash={setSplitCash}
+        splitUPI={splitUPI}
+        onChangeSplitUPI={setSplitUPI}
+        splitBank={splitBank}
+        onChangeSplitBank={setSplitBank}
+        showNotes={false}
+      />
 
       {/* ── INVOICE / BILL LINK SECTION ── */}
       {activeParty && (

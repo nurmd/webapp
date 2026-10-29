@@ -321,15 +321,21 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Centralized dangling reference pruning (`pruneDanglingPartyReferences`) cleans unassigned references during local deletion, incoming changes, and full sync reconciliation.
   - Full round-trip backup/restore with backward compatibility for legacy backups omitting group/category collections.
 
-### I. Unified Native Print Bridge & A4 Document Architecture (`src/core/utils/printBridge.ts`, `MainActivity.kt`)
+### I. Unified Native Print Bridge, Shared CSS & Modal Unification Phase 1 (`src/core/utils/printBridge.ts`, `src/styles/print.css`, `src/core/utils/whatsAppMessageBuilders.ts`, `src/components/Common/PaymentEntryForm.tsx`)
 - **Shared Print Bridge (`printBridge.ts`)**:
-  - All printing paths route through a unified abstraction: `printHtmlNative`, `printCurrentPageNative`, `printHtmlDocument`, `printCurrentPage`, and `escapeHtml`.
+  - All printing paths route through a unified abstraction: `printDocument` with `documentType` (`'invoice-current-page' | 'standalone-html'`), `printHtmlNative`, `printCurrentPageNative`, `printHtmlDocument`, `printCurrentPage`, and `escapeHtml`.
   - Android Native Bridge (`MainActivity.kt`): When running inside Android, calls `@JavascriptInterface` methods:
     - `printHtml(html, jobName)`: ISO A4 portrait printing via offscreen WebView.
     - `printHtmlWithPaper(html, jobName, paperSize)`: Supports `"A4"`, `"A4-landscape"`, and `"default"` using explicit `PrintAttributes` (`MediaSize.ISO_A4`, `MediaSize.ISO_A4.asLandscape()`, `COLOR_MODE_COLOR`, `Margins.NO_MARGINS`).
     - `printCurrentPage(jobName)` and `printCurrentPageWithPaper(jobName, paperSize)`: Dispatches `createPrintDocumentAdapter` on the main UI thread.
     - Guarded with `hasStartedPrint` to prevent double-invocations on page finish, and wrapped in try-catch with UI toast feedback.
   - Browser Fallback: Standalone HTML uses hidden iframe or pop-up window printing; current page printing falls back to `window.print()`.
+- **Shared Print Stylesheet (`src/styles/print.css`)**:
+  - Consolidated `@media print` rules imported at top of `src/index.css`. Includes `@page` geometry, `.no-print`, `.print-modal-overlay`, `.print-modal-container`, `.print-preview-viewport` (ensuring non-clipped print viewports), `.printable-invoice`, and `#invoice-a4-print-root` isolation (`body:has(#invoice-a4-print-root) * { visibility: hidden; }` and `#invoice-a4-print-root * { visibility: visible; }`).
+- **Modal Unification & Lazy-Loading Architecture (Phase 1)**:
+  - **Shared WhatsApp Message Builders (`src/core/utils/whatsAppMessageBuilders.ts`)**: Pure typed message builders `buildInvoiceWhatsAppMessage`, `buildPurchaseWhatsAppMessage`, and `buildPaymentVoucherWhatsAppMessage` consolidating message construction across `InvoicePreviewModal`, `TableGridInvoiceModal`, `CashBankTransactionDetailModal`, `DashboardVoucherModal`, `VoucherEditorModal`, and `DashboardView`.
+  - **Lazy-Loaded Modals**: 11 heavy modal dialogs loaded on demand via `React.lazy` and wrapped in `<React.Suspense fallback={null}>` where conditionally rendered: `InvoicePreviewModal`, `TableGridInvoiceModal`, `SimplifiedInvoiceModal`, `SimplifiedPurchaseModal`, `TableGridPurchaseModal`, `CashBankTransactionDetailModal`, `VoucherEditorModal`, `DashboardVoucherModal`, `ReportPdfPreviewModal`, `ThermalPrintModal`, and `BulkPrintModal`.
+  - **Shared Payment Entry Form (`src/components/Common/PaymentEntryForm.tsx`)**: Reusable component encapsulating common payment fields (amount, date, discount, mode selector or chip buttons, bank account selection, split tender breakdown with `+Fill` allocation and secondary bank selector, notes) utilized across `RecordPaymentModal`, `DashboardRecordPaymentModal`, and `DirectCashBankModal` while leaving allocation calculations in their respective consumers.
 - **Standalone A4 Document Generators**:
   - Expense vouchers: `expenseVoucherPrinter.ts` (`generateExpenseVoucherHtml`, `printExpenseVoucher`) with `.no-print` desktop toolbar (`window.print()`, `window.close()`).
   - Accounting vouchers: `voucherDocumentPrinter.ts` (`generateAccountingVoucherHtml`, `printAccountingVoucher`) including entries, debits/credits, narration, signature block, and desktop toolbar.

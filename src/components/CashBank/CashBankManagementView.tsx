@@ -11,9 +11,12 @@ import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator
 import { CashBankTransferModal } from './CashBankTransferModal.tsx';
 import { DirectCashBankModal } from './DirectCashBankModal.tsx';
 import { AddEditBankAccountModal } from './AddEditBankAccountModal.tsx';
-import { CashBankTransactionDetailModal } from './CashBankTransactionDetailModal.tsx';
 import { CashBankReconciliationPanel } from './CashBankReconciliationPanel.tsx';
 import { AppTab } from '../Shell/Drawer.tsx';
+
+const CashBankTransactionDetailModal = React.lazy(() =>
+  import('./CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
+);
 
 interface CashBankManagementViewProps {
   company: CompanyProfile;
@@ -821,26 +824,30 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         editingAccount={editingAccount}
       />
 
-      <CashBankTransactionDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => {
-          setIsDetailModalOpen(false);
-          setSelectedLedgerEntry(null);
-        }}
-        entry={selectedLedgerEntry}
-        rawTransaction={selectedRawTxn}
-        accounts={accounts}
-        company={_company}
-        parties={parties}
-        vouchers={vouchers}
-        invoices={invoices}
-        purchases={purchases}
-        onViewInvoice={onViewInvoice}
-        onViewPurchase={onViewPurchase}
-        onSaveTransaction={onSaveTransaction}
-        onDeleteTransaction={onDeleteTransaction}
-        onNavigateTab={onNavigateTab}
-      />
+      {isDetailModalOpen && (
+        <React.Suspense fallback={null}>
+          <CashBankTransactionDetailModal
+            isOpen={isDetailModalOpen}
+            onClose={() => {
+              setIsDetailModalOpen(false);
+              setSelectedLedgerEntry(null);
+            }}
+            entry={selectedLedgerEntry}
+            rawTransaction={selectedRawTxn}
+            accounts={accounts}
+            company={_company}
+            parties={parties}
+            vouchers={vouchers}
+            invoices={invoices}
+            purchases={purchases}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
+            onSaveTransaction={onSaveTransaction}
+            onDeleteTransaction={onDeleteTransaction}
+            onNavigateTab={onNavigateTab}
+          />
+        </React.Suspense>
+      )}
 
       <CashBankReconciliationPanel
         isOpen={isReconciliationOpen}

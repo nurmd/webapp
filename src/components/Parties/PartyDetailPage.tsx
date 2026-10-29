@@ -8,17 +8,24 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
-import { SimplifiedPurchaseModal } from '../Purchases/SimplifiedPurchaseModal.tsx';
-import { SimplifiedInvoiceModal } from '../Invoicing/SimplifiedInvoiceModal.tsx';
 import { usePartyPassbook, PassbookEntry } from './usePartyPassbook.ts';
 import { PartyInfoCard } from './PartyInfoCard.tsx';
 import { RecordPaymentModal } from './RecordPaymentModal.tsx';
-import { VoucherEditorModal } from './VoucherEditorModal.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
 import { PartyOrdersTable } from './PartyOrdersTable.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
+
+const SimplifiedPurchaseModal = React.lazy(() =>
+  import('../Purchases/SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
+);
+const SimplifiedInvoiceModal = React.lazy(() =>
+  import('../Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
+);
+const VoucherEditorModal = React.lazy(() =>
+  import('./VoucherEditorModal.tsx').then((m) => ({ default: m.VoucherEditorModal }))
+);
 
 export type { PassbookEntry } from './usePartyPassbook.ts';
 
@@ -590,49 +597,55 @@ export const PartyDetailPage: React.FC<PartyDetailPageProps> = ({
 
       {/* Edit Ledger Item Modal */}
       {editingLedgerEntry && (
-        <VoucherEditorModal
-          editingLedgerEntry={editingLedgerEntry}
-          onClose={() => setEditingLedgerEntry(null)}
-          party={party}
-          company={company}
-          onViewInvoice={onViewInvoice}
-          onEditInvoice={onEditInvoice}
-          onEditPurchase={onEditPurchase}
-          onViewPurchase={(bill) => setSelectedPurchaseBill(bill)}
-          onRefresh={onRefresh}
-        />
+        <React.Suspense fallback={null}>
+          <VoucherEditorModal
+            editingLedgerEntry={editingLedgerEntry}
+            onClose={() => setEditingLedgerEntry(null)}
+            party={party}
+            company={company}
+            onViewInvoice={onViewInvoice}
+            onEditInvoice={onEditInvoice}
+            onEditPurchase={onEditPurchase}
+            onViewPurchase={(bill) => setSelectedPurchaseBill(bill)}
+            onRefresh={onRefresh}
+          />
+        </React.Suspense>
       )}
 
       {/* Simplified Purchase View Modal */}
       {selectedPurchaseBill && (
-        <SimplifiedPurchaseModal
-          bill={selectedPurchaseBill}
-          company={company}
-          onClose={() => setSelectedPurchaseBill(null)}
-          onEditPurchase={(bill) => {
-            setSelectedPurchaseBill(null);
-            if (onEditPurchase) onEditPurchase(bill);
-          }}
-          onDeletePurchase={() => handleDeletePurchaseBill(selectedPurchaseBill, true)}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedPurchaseModal
+            bill={selectedPurchaseBill}
+            company={company}
+            onClose={() => setSelectedPurchaseBill(null)}
+            onEditPurchase={(bill) => {
+              setSelectedPurchaseBill(null);
+              if (onEditPurchase) onEditPurchase(bill);
+            }}
+            onDeletePurchase={() => handleDeletePurchaseBill(selectedPurchaseBill, true)}
+          />
+        </React.Suspense>
       )}
 
       {/* Simplified Invoice View Modal */}
       {selectedInvoiceForView && (
-        <SimplifiedInvoiceModal
-          invoice={selectedInvoiceForView}
-          company={company}
-          onClose={() => setSelectedInvoiceForView(null)}
-          onEditInvoice={(inv) => {
-            setSelectedInvoiceForView(null);
-            if (onEditInvoice) onEditInvoice(inv);
-          }}
-          onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView, true)}
-          onOpenFullA4Preview={(inv) => {
-            setSelectedInvoiceForView(null);
-            if (onViewInvoice) onViewInvoice(inv);
-          }}
-        />
+        <React.Suspense fallback={null}>
+          <SimplifiedInvoiceModal
+            invoice={selectedInvoiceForView}
+            company={company}
+            onClose={() => setSelectedInvoiceForView(null)}
+            onEditInvoice={(inv) => {
+              setSelectedInvoiceForView(null);
+              if (onEditInvoice) onEditInvoice(inv);
+            }}
+            onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView, true)}
+            onOpenFullA4Preview={(inv) => {
+              setSelectedInvoiceForView(null);
+              if (onViewInvoice) onViewInvoice(inv);
+            }}
+          />
+        </React.Suspense>
       )}
 
       {/* Delete Party Confirmation Modal */}

@@ -8,12 +8,15 @@ import { Expense } from '../../models/expense.ts';
 import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { getWhatsAppShareUrl, safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
+import { buildPurchaseWhatsAppMessage, buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 
 const SimplifiedPurchaseModal = React.lazy(() =>
   import('../Purchases/SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
 );
-import { DashboardVoucherModal } from './DashboardVoucherModal.tsx';
+const DashboardVoucherModal = React.lazy(() =>
+  import('./DashboardVoucherModal.tsx').then((m) => ({ default: m.DashboardVoucherModal }))
+);
 import { DashboardExpenseModal } from './DashboardExpenseModal.tsx';
 import {
   DashboardRecordPaymentModal,
@@ -648,32 +651,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const supplier = item.partyId ? activeParties.find((p) => p.id === item.partyId) : undefined;
       const cleanPhone = (supplier?.phone || '').replace(/\D/g, '');
       const phoneParam = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      const totalDue = getPartyTotalBalanceDue(supplier) ?? pur.balanceAmount;
-      const text = `*Purchase Bill Summary - ${company.tradeName || company.businessName}*\n` +
-        `--------------------------------\n` +
-        `*Bill No:* ${pur.billNumber}\n` +
-        `*Supplier:* ${pur.supplierName}\n` +
-        `*Date:* ${pur.date}\n` +
-        `*Amount:* ${formatINR(pur.grandTotal)}\n` +
-        `*Balance Due:* ${formatINR(pur.balanceAmount)}\n` +
-        `*Total Balance Due:* ${formatINR(totalDue)}\n` +
-        `*Status:* ${pur.paymentStatus}`;
+      const text = buildPurchaseWhatsAppMessage(pur, company, supplier);
       const url = `https://wa.me/${phoneParam}?text=${encodeURIComponent(text)}`;
       safeOpenExternalUrl(url);
     } else if (item.type === 'VOUCHER' && item.rawVoucher) {
       const v = item.rawVoucher;
       const vParty = v.partyId ? activeParties.find((p) => p.id === v.partyId) : undefined;
-      const vDue = getPartyTotalBalanceDue(vParty);
-      const text = `*Voucher Summary - ${company.tradeName || company.businessName}*\n` +
-        `--------------------------------\n` +
-        `*Voucher No:* ${v.voucherNumber}\n` +
-        `*Type:* ${v.voucherType}\n` +
-        `*Date:* ${v.date}\n` +
-        `*Amount:* ${formatINR(v.totalAmount)}\n` +
-        (vDue !== null ? `*Total Balance Due:* ${formatINR(vDue)}\n` : '') +
-        (v.narration ? `*Narration:* ${v.narration}\n` : '') +
-        `--------------------------------\n` +
-        `Recorded in GST Billing App`;
+      const text = buildPaymentVoucherWhatsAppMessage(v, vParty, company, undefined, { heading: 'Voucher Summary' });
       safeOpenExternalUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
     } else if (item.type === 'EXPENSE' && item.rawExpense) {
       const exp = item.rawExpense;
@@ -1530,12 +1514,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 2. Voucher Details Modal */}
       {selectedVoucherForModal && (
-        <DashboardVoucherModal
-          voucher={selectedVoucherForModal}
-          company={company}
-          parties={activeParties}
-          onClose={() => setSelectedVoucherForModal(null)}
-        />
+        <React.Suspense fallback={null}>
+          <DashboardVoucherModal
+            voucher={selectedVoucherForModal}
+            company={company}
+            parties={activeParties}
+            onClose={() => setSelectedVoucherForModal(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* 3. Expense Details Modal */}

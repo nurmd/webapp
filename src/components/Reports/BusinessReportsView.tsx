@@ -29,8 +29,19 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { BusinessPerformanceCard } from './BusinessPerformanceCard.tsx';
 import { ReportsNavList, ReportCategoryKey } from './ReportsNavList.tsx';
 import { DedicatedReportPageHeader, SubReportTabOption } from './DedicatedReportPageHeader.tsx';
-import { ReportPdfPreviewModal } from './ReportPdfPreviewModal.tsx';
 import { registerReportPreviewHandler, ReportPdfConfig } from './utils/reportExportUtils.ts';
+
+let reportPdfPreviewModalPromise: Promise<{ default: React.ComponentType<any> }> | null = null;
+const getReportPdfPreviewModal = () => {
+  if (!reportPdfPreviewModalPromise) {
+    reportPdfPreviewModalPromise = import('./ReportPdfPreviewModal.tsx').then((m) => ({
+      default: m.ReportPdfPreviewModal,
+    }));
+  }
+  return reportPdfPreviewModalPromise;
+};
+
+const ReportPdfPreviewModal = React.lazy(getReportPdfPreviewModal);
 
 // 5 Operations & Tax Dedicated Category Views
 import { GstTaxComplianceCategory } from './categories/GstTaxComplianceCategory.tsx';
@@ -248,6 +259,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const [activePdfPreviewConfig, setActivePdfPreviewConfig] = useState<ReportPdfConfig | null>(null);
 
   React.useEffect(() => {
+    getReportPdfPreviewModal();
     registerReportPreviewHandler((config) => {
       setActivePdfPreviewConfig(config);
     });
@@ -401,11 +413,15 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
         />
 
         {/* In-App Report PDF Preview Modal with Hardware & UI Back Navigation */}
-        <ReportPdfPreviewModal
-          isOpen={Boolean(activePdfPreviewConfig)}
-          config={activePdfPreviewConfig}
-          onClose={() => setActivePdfPreviewConfig(null)}
-        />
+        {activePdfPreviewConfig && (
+          <React.Suspense fallback={null}>
+            <ReportPdfPreviewModal
+              isOpen={Boolean(activePdfPreviewConfig)}
+              config={activePdfPreviewConfig}
+              onClose={() => setActivePdfPreviewConfig(null)}
+            />
+          </React.Suspense>
+        )}
       </div>
     );
   }
@@ -594,11 +610,15 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
       </main>
 
       {/* In-App Report PDF Preview Modal with Hardware & UI Back Navigation */}
-      <ReportPdfPreviewModal
-        isOpen={Boolean(activePdfPreviewConfig)}
-        config={activePdfPreviewConfig}
-        onClose={() => setActivePdfPreviewConfig(null)}
-      />
+      {activePdfPreviewConfig && (
+        <React.Suspense fallback={null}>
+          <ReportPdfPreviewModal
+            isOpen={Boolean(activePdfPreviewConfig)}
+            config={activePdfPreviewConfig}
+            onClose={() => setActivePdfPreviewConfig(null)}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 };

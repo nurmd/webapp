@@ -1,3 +1,8 @@
+
+
+/* Print utilities (Shared Print Stylesheet) */
+@import './styles/print.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -95,52 +100,3 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-
-/* Print utilities */
-@media print {
-  @page {
-    margin: 8mm;
-    size: auto;
-  }
-  .no-print, header, aside, nav, .bottom-bar {
-    display: none !important;
-  }
-  body, main {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: visible !important;
-  }
-  .print-modal-overlay {
-    position: static !important;
-    background: transparent !important;
-    padding: 0 !important;
-    display: block !important;
-    overflow: visible !important;
-  }
-  .print-modal-container {
-    height: auto !important;
-    max-height: none !important;
-    min-height: 0 !important;
-    max-width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    overflow: visible !important;
-  }
-  .printable-invoice {
-    box-shadow: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    transform: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    color: #000000 !important;
-    background-color: #ffffff !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-}
-

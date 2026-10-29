@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 interface DirectCashBankModalProps {
   isOpen: boolean;
@@ -204,48 +205,42 @@ export const DirectCashBankModal: React.FC<DirectCashBankModalProps> = ({
             </select>
           </div>
 
-          {/* Amount Input */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                Amount (₹)
-              </label>
+          {/* Amount Input via PaymentEntryForm */}
+          <PaymentEntryForm
+            layout="stacked"
+            showDate={false}
+            showDiscount={false}
+            showMode={false}
+            showSettlementSummary={false}
+            showNotes={false}
+            amount={amount}
+            onChangeAmount={(val) => {
+              setAmount(val);
+              setError(null);
+            }}
+            minAmount="1"
+            autoFocusAmount={true}
+            amountLabel="Amount (₹)"
+            amountLabelRight={
               <span className="text-[11px] text-on-surface-variant font-medium">
                 Current: <strong className="text-on-surface">{formatINR(currentBal)}</strong>
               </span>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-on-surface-variant">₹</span>
-              <input
-                type="number"
-                step="0.01"
-                min="1"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setError(null);
-                }}
-                className="w-full pl-8 pr-3 py-2.5 bg-surface-container-lowest rounded-xl border border-outline-variant/40 text-base font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
-                required
-                autoFocus
-              />
-            </div>
-
-            {/* Quick Amount Chips */}
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {[500, 1000, 2000, 5000, 10000].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => handleApplyPreset(preset)}
-                  className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface-variant text-[11px] font-semibold hover:bg-secondary/15 hover:text-secondary transition-colors cursor-pointer"
-                >
-                  +₹{preset}
-                </button>
-              ))}
-            </div>
-          </div>
+            }
+            amountSlotBottom={
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {[500, 1000, 2000, 5000, 10000].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset)}
+                    className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface-variant text-[11px] font-semibold hover:bg-secondary/15 hover:text-secondary transition-colors cursor-pointer"
+                  >
+                    +₹{preset}
+                  </button>
+                ))}
+              </div>
+            }
+          />
 
           {/* Reason / Category */}
           <div className="flex flex-col gap-1">

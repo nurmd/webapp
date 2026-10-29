@@ -13,8 +13,11 @@ import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
-import { ThermalPrintModal } from '../Printing/ThermalPrintModal.tsx';
 import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
+
+const ThermalPrintModal = React.lazy(() =>
+  import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
+);
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
 import { db } from '../../services/db.ts';
@@ -1273,11 +1276,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
       {/* Thermal POS Receipt Print Modal */}
       {previewInvoiceData && (
-        <ThermalPrintModal
-          invoice={previewInvoiceData}
-          company={company}
-          onClose={() => setPreviewInvoiceData(null)}
-        />
+        <React.Suspense fallback={null}>
+          <ThermalPrintModal
+            invoice={previewInvoiceData}
+            company={company}
+            onClose={() => setPreviewInvoiceData(null)}
+          />
+        </React.Suspense>
       )}
 
       {/* WhatsApp Share Modal */}
