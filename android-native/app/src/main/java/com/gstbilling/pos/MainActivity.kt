@@ -7,9 +7,14 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.print.PageRange
 import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.provider.Settings
 import android.webkit.JavascriptInterface
@@ -544,6 +549,57 @@ class AndroidBridge(
                 printManager.print(safeJobName, adapter, attributes)
             } catch (e: Exception) {
                 Toast.makeText(context, "Print error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun generatePdfFromCurrentPage(jobName: String) {
+        (context as? Activity)?.runOnUiThread {
+            try {
+                val safeJobName = jobName.trim().ifBlank { "Invoice" }.take(60)
+                val cleanFileName = "invoice_${safeJobName.replace(Regex("[^a-zA-Z0-9._-]"), "_")}.pdf"
+                val pdfFile = File(context.cacheDir, cleanFileName)
+                if (pdfFile.exists()) {
+                    pdfFile.delete()
+                }
+
+                val adapter = webView.createPrintDocumentAdapter(safeJobName)
+                val attributes = buildPrintAttributes("A4") ?: PrintAttributes.Builder()
+                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                    .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                    .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                    .build()
+
+                val pdfPrint = android.print.PdfPrint(attributes)
+                pdfPrint.print(adapter, pdfFile, object : android.print.PdfPrint.Callback {
+                    override fun onSuccess() {
+                        (context as? Activity)?.runOnUiThread {
+                            try {
+                                val contentUri = Uri.parse("content://com.gstbilling.pos.fileprovider/$cleanFileName")
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(contentUri, "application/pdf")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open PDF viewer: ${e.message}", Toast.LENGTH_SHORT).show()
+                                printCurrentPage(jobName)
+                            }
+                        }
+                    }
+
+                    override fun onFailure(error: String) {
+                        (context as? Activity)?.runOnUiThread {
+                            Toast.makeText(context, "PDF generation failed: $error", Toast.LENGTH_SHORT).show()
+                            printCurrentPage(jobName)
+                        }
+                    }
+                })
+            } catch (e: Exception) {
+                Toast.makeText(context, "PDF generation error: ${e.message}", Toast.LENGTH_SHORT).show()
+                printCurrentPage(jobName)
             }
         }
     }

@@ -4,7 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { printPurchaseBill } from '../../core/utils/purchaseDocumentPrinter.ts';
-import { DocumentViewModal } from '../Common/DocumentViewModal.tsx';
+import { PurchaseDocumentModal } from './PurchaseDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
 import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
 
@@ -134,16 +134,18 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
 
   return (
     <>
-      <DocumentViewModal
+      <PurchaseDocumentModal
         isOpen={!!bill}
         onClose={onClose}
         title={titleNode}
-        subtitle={`${bill.supplierName} • ${bill.date}`}
-        headerIcon={headerIcon}
-        headerIconClass={headerIconBg}
+        headerLeading={
+          <div className={`w-8 h-8 rounded-xl ${headerIconBg} flex items-center justify-center flex-shrink-0`}>
+            <span className="material-symbols-outlined text-[18px]">{headerIcon}</span>
+          </div>
+        }
         closeAriaLabel="Close purchase details"
         maxWidth="md"
-        footer={footerNode}
+        customFooter={footerNode}
         backNavPriority={25}
       >
         {/* Compact Supplier Details */}
@@ -241,7 +243,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
             )}
           </div>
         )}
-      </DocumentViewModal>
+      </PurchaseDocumentModal>
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (

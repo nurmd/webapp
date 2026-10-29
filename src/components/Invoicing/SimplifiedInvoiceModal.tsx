@@ -7,7 +7,7 @@ import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { db } from '../../services/db.ts';
-import { DocumentViewModal } from '../Common/DocumentViewModal.tsx';
+import { InvoiceDocumentModal } from './InvoiceDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
 import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
 
@@ -196,15 +196,14 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
 
   return (
     <>
-      <DocumentViewModal
+      <InvoiceDocumentModal
         isOpen={!!invoice}
         onClose={onClose}
         title={titleNode}
-        subtitle={`${invoice.partyName || 'Cash Customer'} • ${invoice.date}`}
-        leadingAction={leadingAction}
+        headerLeading={leadingAction}
         closeAriaLabel="Close invoice details"
         maxWidth="md"
-        footer={footerNode}
+        customFooter={footerNode}
         backNavPriority={25}
       >
         {/* Compact Customer Details */}
@@ -292,7 +291,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
             </div>
           )}
         </div>
-      </DocumentViewModal>
+      </InvoiceDocumentModal>
 
       {/* Delete Invoice Confirmation Modal */}
       {isDeleteModalOpen && (

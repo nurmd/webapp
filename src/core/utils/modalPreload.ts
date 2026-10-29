@@ -106,8 +106,24 @@ export function preloadBulkPrintModal() {
   return bulkPrintPromise;
 }
 
+let invoiceDocumentPromise: Promise<any> | null = null;
+export function preloadInvoiceDocumentModal() {
+  if (!invoiceDocumentPromise) {
+    invoiceDocumentPromise = import('../../components/Invoicing/InvoiceDocumentModal.tsx');
+  }
+  return invoiceDocumentPromise;
+}
+
+let purchaseDocumentPromise: Promise<any> | null = null;
+export function preloadPurchaseDocumentModal() {
+  if (!purchaseDocumentPromise) {
+    purchaseDocumentPromise = import('../../components/Purchases/PurchaseDocumentModal.tsx');
+  }
+  return purchaseDocumentPromise;
+}
+
 /**
- * Preloads all 11 heavy modal chunks in the background during idle periods.
+ * Preloads all heavy modal chunks in the background during idle periods.
  * This primes the ServiceWorker cache and browser module cache without blocking main thread.
  */
 export function preloadAllModalsOnIdle(): void {
@@ -115,6 +131,8 @@ export function preloadAllModalsOnIdle(): void {
     preloadSimplifiedInvoiceModal,
     preloadSimplifiedPurchaseModal,
     preloadInvoicePreviewModal,
+    preloadInvoiceDocumentModal,
+    preloadPurchaseDocumentModal,
     preloadTableGridInvoiceModal,
     preloadTableGridPurchaseModal,
     preloadCashBankTransactionDetailModal,

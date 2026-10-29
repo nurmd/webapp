@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { db } from '../../services/db.ts';
+import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface SplitPaymentBreakdown {
   cash: number;
@@ -57,7 +58,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const remaining = Number((grandTotal - totalAllocated).toFixed(2));
   const isValid = Math.abs(remaining) < 0.01;
 
-  const handleFillRemaining = (mode: 'cash' | 'upi' | 'card' | 'credit') => {
+  const handleFillRemaining = (mode: 'cash' | 'upi' | 'card' | 'credit' | 'bank') => {
     if (remaining <= 0) return;
     const currentVal =
       mode === 'cash' ? numCash : mode === 'upi' ? numUpi : mode === 'card' ? numCard : numCredit;
@@ -136,142 +137,36 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
           </div>
         </div>
 
-        {/* Inputs */}
+        {/* Unified Form Body */}
         <form onSubmit={handleSubmit} className="p-4 space-y-3.5">
-          {/* Cash */}
-          <div className="flex items-center gap-2">
-            <div className="w-20 text-xs font-bold text-on-surface flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px] text-secondary">payments</span>
-              <span>Cash</span>
-            </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={cash}
-              onChange={(e) => setCash(e.target.value)}
-              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary"
-            />
-            {remaining > 0 && (
-              <button
-                type="button"
-                onClick={() => handleFillRemaining('cash')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer"
-              >
-                + Fill
-              </button>
-            )}
-          </div>
-
-          {/* UPI */}
-          <div className="flex items-center gap-2">
-            <div className="w-20 text-xs font-bold text-on-surface flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px] text-primary">qr_code_2</span>
-              <span>UPI</span>
-            </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={upi}
-              onChange={(e) => setUpi(e.target.value)}
-              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary"
-            />
-            {bankAccounts.length > 1 && numUpi > 0 && (
-              <select
-                value={upiAccountId}
-                onChange={(e) => setUpiAccountId(e.target.value)}
-                className="w-28 text-[11px] font-semibold bg-surface-container-low border border-outline-variant/30 rounded-lg px-1.5 py-1 text-on-surface outline-none focus:border-secondary truncate cursor-pointer"
-                title="Select bank for UPI receipt"
-              >
-                {bankAccounts.map((b) => (
-                  <option key={b.id} value={b.id}>{b.accountName}</option>
-                ))}
-              </select>
-            )}
-            {remaining > 0 && (
-              <button
-                type="button"
-                onClick={() => handleFillRemaining('upi')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer shrink-0"
-              >
-                + Fill
-              </button>
-            )}
-          </div>
-
-          {/* Card */}
-          <div className="flex items-center gap-2">
-            <div className="w-20 text-xs font-bold text-on-surface flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px] text-blue-600">credit_card</span>
-              <span>Card</span>
-            </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={card}
-              onChange={(e) => setCard(e.target.value)}
-              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary"
-            />
-            {bankAccounts.length > 1 && numCard > 0 && (
-              <select
-                value={cardAccountId}
-                onChange={(e) => setCardAccountId(e.target.value)}
-                className="w-28 text-[11px] font-semibold bg-surface-container-low border border-outline-variant/30 rounded-lg px-1.5 py-1 text-on-surface outline-none focus:border-secondary truncate cursor-pointer"
-                title="Select bank for Card settlement"
-              >
-                {bankAccounts.map((b) => (
-                  <option key={b.id} value={b.id}>{b.accountName}</option>
-                ))}
-              </select>
-            )}
-            {remaining > 0 && (
-              <button
-                type="button"
-                onClick={() => handleFillRemaining('card')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer shrink-0"
-              >
-                + Fill
-              </button>
-            )}
-          </div>
-
-          {/* Credit / Udhaar */}
-          <div className="flex items-center gap-2">
-            <div className="w-20 text-xs font-bold text-on-surface flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px] text-amber-600">account_balance_wallet</span>
-              <span>Credit</span>
-            </div>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              disabled={!hasCustomerSelected}
-              placeholder={hasCustomerSelected ? '0.00' : 'Select Customer First'}
-              value={credit}
-              onChange={(e) => setCredit(e.target.value)}
-              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs font-bold font-tabular-data text-on-surface outline-none focus:border-secondary disabled:opacity-50"
-            />
-            {hasCustomerSelected && remaining > 0 && (
-              <button
-                type="button"
-                onClick={() => handleFillRemaining('credit')}
-                className="px-2.5 py-1.5 bg-surface-container text-outline hover:text-on-surface text-[11px] font-semibold rounded-lg cursor-pointer"
-              >
-                + Fill
-              </button>
-            )}
-          </div>
-
-          {!hasCustomerSelected && (
-            <p className="text-[10px] text-outline">
-              * Credit / Udhaar requires selecting a registered Customer account.
-            </p>
-          )}
+          <PaymentEntryForm
+            mode="SPLIT"
+            splitVariant="rows"
+            amount={grandTotal.toString()}
+            onChangeAmount={() => {}}
+            showDate={false}
+            showDiscount={false}
+            showMode={false}
+            showNotes={false}
+            showSettlementSummary={false}
+            splitCash={cash}
+            onChangeSplitCash={setCash}
+            splitUPI={upi}
+            onChangeSplitUPI={setUpi}
+            splitCard={card}
+            onChangeSplitCard={setCard}
+            splitCredit={credit}
+            onChangeSplitCredit={setCredit}
+            showCreditSplit={true}
+            creditDisabled={!hasCustomerSelected}
+            creditDisabledReason="* Credit / Udhaar requires selecting a registered Customer account."
+            bankAccounts={bankAccounts}
+            upiAccountId={upiAccountId}
+            onChangeUpiAccountId={setUpiAccountId}
+            cardAccountId={cardAccountId}
+            onChangeCardAccountId={setCardAccountId}
+            onFillRemaining={handleFillRemaining}
+          />
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-outline-variant/20">
             <button

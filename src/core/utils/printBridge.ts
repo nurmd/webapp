@@ -103,6 +103,28 @@ export function printCurrentPageNative(
 }
 
 /**
+ * Dispatches direct PDF generation of the current page / document via AndroidBridge.
+ * Renders the WebView to an ISO A4 PDF file in native cache and opens it with ACTION_VIEW.
+ * Returns true if handled by the native bridge without error, or false if bridge is unavailable or throws.
+ */
+export function generatePdfNative(jobName: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const bridge = (window as any).AndroidBridge;
+  if (!bridge) return false;
+
+  try {
+    if (typeof bridge.generatePdfFromCurrentPage === 'function') {
+      bridge.generatePdfFromCurrentPage(jobName);
+      return true;
+    }
+  } catch (err) {
+    console.warn('AndroidBridge direct PDF generation failed, falling back:', err);
+    return false;
+  }
+  return false;
+}
+
+/**
  * Unified printable HTML generator runner:
  * Tries Android native print first, then falls back to window.open, hidden iframe, and window.print().
  */

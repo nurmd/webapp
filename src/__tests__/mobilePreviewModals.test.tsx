@@ -221,7 +221,7 @@ describe('Mobile Clean Previews Suite (Invoice & Reports)', () => {
       expect(container.textContent).toContain('50200012345678');
     });
 
-    it('toggles seamlessly between Mobile, A4 Laser, and Thermal preview modes', () => {
+    it('renders Mobile tab in format selector and renders mobile view by default, while supporting initialViewMode', () => {
       act(() => {
         root.render(
           <InvoicePreviewModal
@@ -232,30 +232,46 @@ describe('Mobile Clean Previews Suite (Invoice & Reports)', () => {
         );
       });
 
-      // Click A4 Laser
+      // Verify format selector has Mobile tab
+      const mobileBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.trim().includes('Mobile')
+      );
+      expect(mobileBtn).toBeDefined();
+
+      // Verify A4 Laser tab is removed from format selector
       const a4Btn = Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.trim().includes('A4 Laser')
       );
-      expect(a4Btn).toBeDefined();
+      expect(a4Btn).toBeUndefined();
 
+      // By default renders Mobile mode
+      expect(container.textContent).toContain('INV-2026-999');
+
+      // Re-render with initialViewMode="A4" to verify A4 printable sheet still renders when requested
       act(() => {
-        a4Btn?.click();
+        root.render(
+          <InvoicePreviewModal
+            invoice={testInvoice}
+            company={testCompany}
+            onClose={vi.fn()}
+            initialViewMode="A4"
+          />
+        );
       });
-
-      // In A4 mode, official printable invoice is present in DOM
       const a4Sheet = container.querySelector('.printable-invoice');
       expect(a4Sheet).not.toBeNull();
 
-      // Click Thermal
-      const thermalBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-        b.textContent?.trim().includes('3" Thermal')
-      );
-      expect(thermalBtn).toBeDefined();
-
+      // Re-render with initialViewMode="THERMAL" to verify thermal slip still renders when requested
       act(() => {
-        thermalBtn?.click();
+        root.render(
+          <InvoicePreviewModal
+            invoice={testInvoice}
+            company={testCompany}
+            onClose={vi.fn()}
+            initialViewMode="THERMAL"
+          />
+        );
       });
-
       expect(container.textContent).toContain('GRAND TOTAL');
     });
 

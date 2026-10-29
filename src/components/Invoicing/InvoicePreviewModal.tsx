@@ -12,7 +12,6 @@ import {
   Receipt,
   FileText,
   Download,
-  MoreVertical,
   Copy,
   Check,
   QrCode,
@@ -27,15 +26,12 @@ import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
 const ThermalPrintModal = React.lazy(() =>
   import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
 );
-import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/gst/eWayBillExport.ts';
-import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { DEFAULT_INVOICES, db } from '../../services/db.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../services/printSettingsService.ts';
-import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { generateQrCodeSvgString } from '../../core/utils/qrCodeSvg.ts';
-import { printCurrentPage } from '../../core/utils/printBridge.ts';
+import { printCurrentPage, generatePdfNative } from '../../core/utils/printBridge.ts';
 import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { useModalPreloadOnMount, preloadThermalPrintModal } from '../../core/utils/modalPreload.ts';
 
@@ -59,14 +55,16 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 }) => {
   useModalPreloadOnMount([preloadThermalPrintModal]);
 
-  const [showEwayThresholdWarning, setShowEwayThresholdWarning] = useState(false);
   const [viewMode, setViewMode] = useState<InvoiceViewMode>(() => {
     if (initialViewMode) return initialViewMode;
-    const defaultPrint = localStorage.getItem('defaultPrintOption');
-    if (defaultPrint === 'Thermal-58mm' || defaultPrint === 'Thermal-80mm') return 'THERMAL';
-    if (typeof window !== 'undefined' && window.innerWidth < 640) return 'MOBILE';
-    return 'A4';
+    return 'MOBILE';
   });
+
+  useEffect(() => {
+    if (initialViewMode) {
+      setViewMode(initialViewMode);
+    }
+  }, [initialViewMode]);
   const [pendingA4Print, setPendingA4Print] = useState(false);
   const [a4FitZoom, setA4FitZoom] = useState(true);
   const [copiedInvoiceNo, setCopiedInvoiceNo] = useState(false);
@@ -100,10 +98,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   });
   const [isThermalModalOpen, setIsThermalModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
-  const [showMoreActions, setShowMoreActions] = useState(false);
-  const [defaultPrintOpt, setDefaultPrintOpt] = useState<string>(() => {
-    return localStorage.getItem('defaultPrintOption') || 'A4';
-  });
   const [copyType, setCopyType] = useState<InvoiceCopyType>('ORIGINAL FOR RECIPIENT');
 
   const handleCopyInvoiceNo = () => {
@@ -121,12 +115,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
       setTimeout(() => setCopiedUpi(false), 2000);
     }
   };
-
-  // Priority 30: Dismiss more actions dropdown before closing preview modal
-  useBackNavigation(() => {
-    setShowMoreActions(false);
-    return true;
-  }, showMoreActions, 30);
 
   // Priority 25: Close preview modal
   useBackNavigation(() => {
@@ -168,10 +156,12 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   }, [pendingA4Print, viewMode, invoice.invoiceNumber]);
 
   const handlePrint = () => {
-    if (viewMode === 'THERMAL') {
-      setViewMode('A4');
-      setPendingA4Print(true);
-      return;
+    try {
+      if (generatePdfNative(`Invoice-${invoice.invoiceNumber || 'Document'}`)) {
+        return;
+      }
+    } catch (err) {
+      console.warn('Direct PDF native generation failed, falling back to printCurrentPage:', err);
     }
     printCurrentPage(`Invoice-${invoice.invoiceNumber || 'Document'}`, 'A4');
   };
@@ -488,62 +478,15 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('MOBILE')}
-                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  viewMode === 'MOBILE'
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
+                className="px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 bg-secondary text-on-secondary shadow-xs"
                 title="Mobile Touch Cards View"
               >
                 <Smartphone size={12} />
                 <span>Mobile</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('A4')}
-                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                  viewMode === 'A4'
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-                title="Official A4 Laser Format"
-              >
-                <FileText size={12} />
-                <span>A4 Laser</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('THERMAL');
-                  setThermalWidth(48);
-                }}
-                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                  viewMode === 'THERMAL' && thermalWidth === 48
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-                title="3-inch Thermal Slip"
-              >
-                3" Thermal
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('THERMAL');
-                  setThermalWidth(32);
-                }}
-                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                  viewMode === 'THERMAL' && thermalWidth === 32
-                    ? 'bg-secondary text-on-secondary shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-                title="2-inch Thermal Slip"
-              >
-                2" Thermal
-              </button>
             </div>
 
-            {/* A4 Zoom Toggle (in A4 mode on mobile/tablet) */}
+            {/* A4 Zoom Toggle (if opened in A4 mode on mobile/tablet) */}
             {viewMode === 'A4' && (
               <button
                 type="button"
@@ -555,38 +498,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <span>{a4FitZoom ? '100% Zoom' : 'Fit Screen'}</span>
               </button>
             )}
-
-            {/* Quick Toggle Default Print Format */}
-            {(() => {
-              const isCurrentDefault =
-                (viewMode === 'A4' && (defaultPrintOpt === 'A4' || defaultPrintOpt === 'None' || !defaultPrintOpt)) ||
-                (viewMode === 'THERMAL' && thermalWidth === 32 && defaultPrintOpt === 'Thermal-58mm') ||
-                (viewMode === 'THERMAL' && thermalWidth === 48 && defaultPrintOpt === 'Thermal-80mm');
-
-              const handleSetDefault = () => {
-                const target = viewMode === 'A4' ? 'A4' : thermalWidth === 32 ? 'Thermal-58mm' : 'Thermal-80mm';
-                localStorage.setItem('defaultPrintOption', target);
-                setDefaultPrintOpt(target);
-              };
-
-              return (
-                <button
-                  type="button"
-                  onClick={handleSetDefault}
-                  title={isCurrentDefault ? 'Current default print format' : 'Set as default print format'}
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer border ${
-                    isCurrentDefault
-                      ? 'bg-secondary/15 text-secondary border-secondary/40'
-                      : 'bg-surface-container text-on-surface-variant hover:text-on-surface border-outline-variant/30'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[13px]">
-                    {isCurrentDefault ? 'star' : 'star_border'}
-                  </span>
-                  <span className="hidden md:inline">{isCurrentDefault ? 'Default' : 'Set Default'}</span>
-                </button>
-              );
-            })()}
           </div>
 
           {/* Close Button */}
@@ -2137,64 +2048,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 <span>Edit</span>
               </button>
             )}
-
-            {/* More Menu (E-Way / E-Invoice / Plain Text) */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowMoreActions(!showMoreActions)}
-                className="h-7 sm:h-8 px-2 rounded-lg bg-surface-container hover:bg-surface-container-high flex items-center gap-1 text-on-surface-variant hover:text-on-surface text-xs font-bold border border-outline-variant/30 cursor-pointer active:scale-95"
-                title="More Export Options"
-                aria-label="More export options"
-              >
-                <MoreVertical size={14} />
-                <span className="hidden sm:inline">Export</span>
-              </button>
-
-              {showMoreActions && (
-                <div className="absolute left-0 bottom-9 z-50 bg-surface-container-lowest border border-outline-variant/30 rounded-xl shadow-xl p-1.5 flex flex-col gap-1 w-52 animate-in fade-in">
-                  <button
-                    onClick={() => {
-                      setShowMoreActions(false);
-                      if (invoice.grandTotal < EWAY_BILL_STATUTORY_THRESHOLD) {
-                        setShowEwayThresholdWarning(true);
-                        return;
-                      }
-                      downloadEWayBillJson(company, invoice);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
-                  >
-                    <Download size={14} className="text-secondary" />
-                    <span>NIC E-Way Bill (JSON)</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowMoreActions(false);
-                      downloadEInvoiceJson(company, invoice);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
-                  >
-                    <Download size={14} className="text-primary" />
-                    <span>NIC E-Invoice (JSON)</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setShowMoreActions(false);
-                      if (navigator.clipboard) {
-                        navigator.clipboard.writeText(thermalText);
-                        alert('Thermal receipt plain text copied to clipboard!');
-                      }
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-on-surface hover:bg-surface-container text-left cursor-pointer"
-                  >
-                    <Receipt size={14} className="text-amber-600" />
-                    <span>Copy Raw Slip Text</span>
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right Primary Actions: WhatsApp & Print */}
@@ -2210,11 +2063,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
             <button
               type="button"
-              onClick={viewMode === 'THERMAL' ? () => setIsThermalModalOpen(true) : handlePrint}
+              onClick={handlePrint}
               className="inline-flex items-center gap-1 bg-secondary hover:bg-secondary/90 text-on-secondary px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
             >
               <Printer size={13} />
-              <span>{viewMode === 'THERMAL' ? 'Print Slip' : 'Print / PDF'}</span>
+              <span>Print / PDF</span>
             </button>
           </div>
         </div>
@@ -2237,20 +2090,6 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           onClose={() => setIsWhatsAppModalOpen(false)}
           initialPhone={party?.phone}
           totalBalanceDue={totalBalanceDue}
-        />
-      )}
-
-      {/* E-Way Bill Statutory Threshold Advisory Modal */}
-      {showEwayThresholdWarning && (
-        <ConfirmDeleteModal
-          isOpen={showEwayThresholdWarning}
-          title="Generate E-Way Bill JSON?"
-          recordName={`Invoice #${invoice.invoiceNumber}`}
-          description={`Notice: Invoice value (₹${invoice.grandTotal.toFixed(2)}) is below the statutory ₹50,000 threshold for mandatory e-Way bill generation under Rule 138 of CGST Rules.\n\nDo you still want to generate the JSON payload?`}
-          confirmText="Generate JSON"
-          cancelText="Cancel"
-          onConfirm={() => downloadEWayBillJson(company, invoice)}
-          onClose={() => setShowEwayThresholdWarning(false)}
         />
       )}
     </div>

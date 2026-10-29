@@ -92,6 +92,7 @@ aapt2 link -I /system/framework/framework-res.apk \
 # 5. Compile Kotlin Sources & DEX
 echo "[5/6] Compiling Kotlin application sources & DEX bytecode..."
 kotlinc -cp "$ANDROID_JAR" \
+  app/src/main/java/android/print/PdfPrint.kt \
   app/src/main/java/com/gstbilling/pos/GenericFileProvider.kt \
   app/src/main/java/com/gstbilling/pos/MainActivity.kt \
   -d build/app-classes

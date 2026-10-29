@@ -5,9 +5,11 @@ import {
   preloadAllModalsOnIdle,
   useModalPreloadOnMount,
   preloadInvoicePreviewModal,
+  preloadInvoiceDocumentModal,
   preloadSimplifiedInvoiceModal,
   preloadTableGridInvoiceModal,
   preloadSimplifiedPurchaseModal,
+  preloadPurchaseDocumentModal,
   preloadTableGridPurchaseModal,
   preloadCashBankTransactionDetailModal,
   preloadVoucherEditorModal,
@@ -37,9 +39,11 @@ describe('modalPreload utility suite', () => {
   it('named preloaders return promises and do not crash', () => {
     const preloaders = [
       preloadInvoicePreviewModal,
+      preloadInvoiceDocumentModal,
       preloadSimplifiedInvoiceModal,
       preloadTableGridInvoiceModal,
       preloadSimplifiedPurchaseModal,
+      preloadPurchaseDocumentModal,
       preloadTableGridPurchaseModal,
       preloadCashBankTransactionDetailModal,
       preloadVoucherEditorModal,

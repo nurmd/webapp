@@ -36,7 +36,14 @@ class GenericFileProvider : ContentProvider() {
         return cursor
     }
 
-    override fun getType(uri: Uri): String = "application/vnd.android.package-archive"
+    override fun getType(uri: Uri): String {
+        val fileName = uri.lastPathSegment ?: ""
+        return if (fileName.endsWith(".pdf", ignoreCase = true)) {
+            "application/pdf"
+        } else {
+            "application/vnd.android.package-archive"
+        }
+    }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         val ctx = context ?: throw FileNotFoundException("Context is null")

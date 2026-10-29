@@ -658,6 +658,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   <button
                     type="button"
                     onClick={onOpenTableGridInvoice}
+                    onMouseEnter={preloadTableGridInvoiceModal}
+                    onFocus={preloadTableGridInvoiceModal}
                     className="min-h-[44px] px-5 py-2.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm shadow-md hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                     aria-label="Create Sale Bill"
                     data-testid="empty-create-bill-btn"
@@ -725,6 +727,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   <button
                     type="button"
                     onClick={onOpenTableGridInvoice}
+                    onMouseEnter={preloadTableGridInvoiceModal}
+                    onFocus={preloadTableGridInvoiceModal}
                     className="min-h-[40px] px-4 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-xs hover:bg-secondary/90 cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
                     aria-label="Create Sale Bill"
                   >
@@ -743,6 +747,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               <div
                 key={inv.id}
                 onClick={() => onViewInvoice(inv)}
+                onMouseEnter={preloadSimplifiedInvoiceModal}
+                onFocus={preloadSimplifiedInvoiceModal}
                 className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
                   isSelected(inv.id)
                     ? 'border-secondary ring-1 ring-secondary/30 bg-secondary/5'

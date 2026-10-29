@@ -503,6 +503,8 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
               <div
                 key={bill.id}
                 onClick={() => setSelectedBillForPreview(bill)}
+                onMouseEnter={preloadSimplifiedPurchaseModal}
+                onFocus={preloadSimplifiedPurchaseModal}
                 className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
                   isSelected(bill.id)
                     ? 'border-orange-500 ring-1 ring-orange-500/30 bg-orange-500/5'
@@ -596,6 +598,8 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             setEditingBill(null);
             setIsModalOpen(true);
           }}
+          onMouseEnter={preloadTableGridPurchaseModal}
+          onFocus={preloadTableGridPurchaseModal}
           className="h-11 px-4 rounded-full bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"
           type="button"
           title="Create New Purchase Bill"

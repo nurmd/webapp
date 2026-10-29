@@ -323,8 +323,9 @@ The `StorageService` class (`db`) is the unified database facade composing focus
 
 ### I. Unified Native Print Bridge, Shared CSS & Modal Unification Phase 1 (`src/core/utils/printBridge.ts`, `src/styles/print.css`, `src/core/utils/whatsAppMessageBuilders.ts`, `src/components/Common/PaymentEntryForm.tsx`)
 - **Shared Print Bridge (`printBridge.ts`)**:
-  - All printing paths route through a unified abstraction: `printDocument` with `documentType` (`'invoice-current-page' | 'standalone-html'`), `printHtmlNative`, `printCurrentPageNative`, `printHtmlDocument`, `printCurrentPage`, and `escapeHtml`.
-  - Android Native Bridge (`MainActivity.kt`): When running inside Android, calls `@JavascriptInterface` methods:
+  - All printing paths route through a unified abstraction: `printDocument` with `documentType` (`'invoice-current-page' | 'standalone-html'`), `printHtmlNative`, `printCurrentPageNative`, `generatePdfNative`, `printHtmlDocument`, `printCurrentPage`, and `escapeHtml`.
+  - Android Native Bridge (`MainActivity.kt` & `android.print.PdfPrint.kt`): When running inside Android, calls `@JavascriptInterface` methods:
+    - `generatePdfFromCurrentPage(jobName)`: Direct PDF generation rendering current WebView to ISO A4 PDF in `cacheDir` via `createPrintDocumentAdapter`, opened with `Intent.ACTION_VIEW` using `GenericFileProvider`.
     - `printHtml(html, jobName)`: ISO A4 portrait printing via offscreen WebView.
     - `printHtmlWithPaper(html, jobName, paperSize)`: Supports `"A4"`, `"A4-landscape"`, and `"default"` using explicit `PrintAttributes` (`MediaSize.ISO_A4`, `MediaSize.ISO_A4.asLandscape()`, `COLOR_MODE_COLOR`, `Margins.NO_MARGINS`).
     - `printCurrentPage(jobName)` and `printCurrentPageWithPaper(jobName, paperSize)`: Dispatches `createPrintDocumentAdapter` on the main UI thread.
@@ -332,10 +333,19 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Browser Fallback: Standalone HTML uses hidden iframe or pop-up window printing; current page printing falls back to `window.print()`.
 - **Shared Print Stylesheet (`src/styles/print.css`)**:
   - Consolidated `@media print` rules imported at top of `src/index.css`. Includes `@page` geometry, `.no-print`, `.print-modal-overlay`, `.print-modal-container`, `.print-preview-viewport` (ensuring non-clipped print viewports), `.printable-invoice`, and `#invoice-a4-print-root` isolation (`body:has(#invoice-a4-print-root) * { visibility: hidden; }` and `#invoice-a4-print-root * { visibility: visible; }`).
-- **Modal Unification & Lazy-Loading Architecture (Phase 1)**:
+- **Modal Unification & Lazy-Loading Architecture (Phases 1-3)**:
   - **Shared WhatsApp Message Builders (`src/core/utils/whatsAppMessageBuilders.ts`)**: Pure typed message builders `buildInvoiceWhatsAppMessage`, `buildPurchaseWhatsAppMessage`, and `buildPaymentVoucherWhatsAppMessage` consolidating message construction across `InvoicePreviewModal`, `TableGridInvoiceModal`, `CashBankTransactionDetailModal`, `DashboardVoucherModal`, `VoucherEditorModal`, and `DashboardView`.
-  - **Lazy-Loaded Modals**: 11 heavy modal dialogs loaded on demand via `React.lazy` and wrapped in `<React.Suspense fallback={null}>` where conditionally rendered: `InvoicePreviewModal`, `TableGridInvoiceModal`, `SimplifiedInvoiceModal`, `SimplifiedPurchaseModal`, `TableGridPurchaseModal`, `CashBankTransactionDetailModal`, `VoucherEditorModal`, `DashboardVoucherModal`, `ReportPdfPreviewModal`, `ThermalPrintModal`, and `BulkPrintModal`.
-  - **Shared Payment Entry Form (`src/components/Common/PaymentEntryForm.tsx`)**: Reusable component encapsulating common payment fields (amount, date, discount, mode selector or chip buttons, bank account selection, split tender breakdown with `+Fill` allocation and secondary bank selector, notes) utilized across `RecordPaymentModal`, `DashboardRecordPaymentModal`, and `DirectCashBankModal` while leaving allocation calculations in their respective consumers.
+  - **Lazy-Loaded Modals & Preloading Engine (`src/core/utils/modalPreload.ts`)**: Heavy modal dialogs loaded on demand via `React.lazy` and wrapped in `<React.Suspense fallback={null}>`. Preloading utilities (`preloadAllModalsOnIdle`, `useModalPreloadOnMount`, and button hover/focus listeners) asynchronously warm up modal chunks before user tap. Service Worker handles dynamic `CACHE_URLS` message to precache lazy chunks.
+  - **Shared Billing Components (`src/components/Common/Billing/`)**:
+    - `DocumentLineItemsGrid.tsx`: Unified line items table supporting `DocumentGridRow`, `InvoiceItemEntry`, and `PurchaseItemEntry` with inline price mode badges (Incl./Excl.), HSN/SAC, discounts, and item tax breakdowns.
+    - `DocumentTaxSummary.tsx`: Unified tax summary dock computing taxable amounts, SGST/CGST/IGST/UTGST/CESS, discounts, shipping, round-off, and grand totals.
+  - **Shared Document Modal Shells (`src/components/Common/DocumentViewModal.tsx`, `InvoiceDocumentModal.tsx`, `PurchaseDocumentModal.tsx`)**:
+    - `DocumentViewModal.tsx`: Generic modal shell providing standardized responsive widths, hardware back navigation, header leading/trailing slots, scrollable viewport, and bottom action bar.
+    - `InvoiceDocumentModal.tsx`: Specialized shell for invoice documents with invoice number/status header, format toggle (Mobile, A4 Laser, 3" Thermal, 2" Thermal), zoom controls, print-preview-viewport, and unified action bar (Print, A4/PDF, WhatsApp, Edit, Delete, E-Way, E-Invoice). Consumed by `SimplifiedInvoiceModal`, `InvoicePreviewModal`, and `TableGridInvoiceModal`.
+    - `PurchaseDocumentModal.tsx`: Specialized shell for purchase documents with PO/Challan/Bill status header, print-preview-viewport, and action bar (Print, Edit, Delete). Consumed by `SimplifiedPurchaseModal` and `TableGridPurchaseModal`.
+  - **Unified Party Selector (`src/components/Parties/SelectPartyModal.tsx`)**:
+    - Unified component with `mode: 'general' | 'pos'` supporting both full customer/supplier filtering, search, and loop sorting (Recent -> Name -> Amount) and POS-optimized quick-add and system walk-in customer row. `SelectPosPartyModal.tsx` serves as a backward-compatible wrapper.
+  - **Shared Payment Entry Form (`src/components/Common/PaymentEntryForm.tsx`)**: Reusable component encapsulating common payment fields (amount, date, discount, mode selector or chip buttons, bank account selection, split tender breakdown with `+Fill` allocation and secondary bank selector, notes) utilized across `RecordPaymentModal`, `DashboardRecordPaymentModal`, `DirectCashBankModal`, and POS `SplitPaymentModal.tsx` (supporting both box and full-width row layouts with multi-tender cash, UPI, card, and credit settlement) while leaving allocation calculations in their respective consumers.
 - **Standalone A4 Document Generators**:
   - Expense vouchers: `expenseVoucherPrinter.ts` (`generateExpenseVoucherHtml`, `printExpenseVoucher`) with `.no-print` desktop toolbar (`window.print()`, `window.close()`).
   - Accounting vouchers: `voucherDocumentPrinter.ts` (`generateAccountingVoucherHtml`, `printAccountingVoucher`) including entries, debits/credits, narration, signature block, and desktop toolbar.
@@ -344,7 +354,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Party ledger statements: `ledgerStatementPrinter.ts` (`generatePartyLedgerStatementHtml`, `printPartyLedgerStatement`).
   - Report previews: `reportExportUtils.ts` (`printReportHtmlNative`, `printReportDocumentDirect` choosing `A4-landscape` whenever `config.orientation === 'landscape' || config.headers.length > 7`).
 - **Modal Integrations & A4/PDF UX**:
-  - `InvoicePreviewModal`: Uses `initialViewMode?: 'MOBILE' | 'A4' | 'THERMAL'`, scoped print CSS targeting `#invoice-a4-print-root` (`height: auto !important; max-height: none !important; overflow: visible !important; min-width: 0 !important;`), and native current-page print.
+  - `InvoicePreviewModal`: Simplified UI displaying only `Mobile` tab in format selector, direct PDF generation on Print/PDF tap via `generatePdfNative` falling back to `printCurrentPage`, removed Set Default and Export menu, and scoped print CSS targeting `#invoice-a4-print-root`.
   - `BulkPrintModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#bulk-print-container` height/overflow resets for multi-page document batches.
   - `BarcodeLabelModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#barcode-print-canvas` resets and conditional `@page` size (`A4 portrait` vs `auto`).
   - Global `.print-modal-container` reset in `src/index.css` (`height: auto !important; max-height: none !important; min-height: 0 !important; overflow: visible !important;`).

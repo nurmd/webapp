@@ -4,6 +4,7 @@ import { createRoot, Root } from 'react-dom/client';
 import {
   printHtmlNative,
   printCurrentPageNative,
+  generatePdfNative,
   printHtmlDocument,
   printCurrentPage,
   printDocument,
@@ -25,6 +26,7 @@ import { printEWayBillSlip } from '../core/gst/eWayBillSlipPrinter.ts';
 import { printPartyLedgerStatement } from '../core/utils/ledgerStatementPrinter.ts';
 import { ThermalPrintModal } from '../components/Printing/ThermalPrintModal.tsx';
 import { SimplifiedInvoiceModal } from '../components/Invoicing/SimplifiedInvoiceModal.tsx';
+import { InvoicePreviewModal } from '../components/Invoicing/InvoicePreviewModal.tsx';
 import { CashBankManagementView } from '../components/CashBank/CashBankManagementView.tsx';
 import { CompanyProfile } from '../models/company.ts';
 import { Expense } from '../models/expense.ts';
@@ -374,6 +376,32 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       expect(res).toBe(false);
     });
 
+    it('returns false when AndroidBridge is absent in generatePdfNative', () => {
+      expect(generatePdfNative('Invoice-101')).toBe(false);
+    });
+
+    it('calls AndroidBridge.generatePdfFromCurrentPage(jobName) in generatePdfNative', () => {
+      const mockGeneratePdf = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfFromCurrentPage: mockGeneratePdf,
+      };
+
+      const res = generatePdfNative('Invoice-101');
+      expect(res).toBe(true);
+      expect(mockGeneratePdf).toHaveBeenCalledWith('Invoice-101');
+    });
+
+    it('catches AndroidBridge exceptions in generatePdfNative and returns false', () => {
+      (window as any).AndroidBridge = {
+        generatePdfFromCurrentPage: vi.fn(() => {
+          throw new Error('Bridge IPC failed');
+        }),
+      };
+
+      const res = generatePdfNative('Invoice-101');
+      expect(res).toBe(false);
+    });
+
     it('printCurrentPage falls back to window.print when bridge is absent', () => {
       const mockWindowPrint = vi.spyOn(window, 'print').mockImplementation(() => {});
       printCurrentPage('Browser-Print', 'A4');
@@ -585,6 +613,68 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       });
 
       expect(handleOpenA4).toHaveBeenCalledWith(mockInvoice);
+    });
+
+    it('InvoicePreviewModal handlePrint prefers direct PDF path via generatePdfNative', () => {
+      const mockGeneratePdf = vi.fn();
+      const mockPrintCurrentPage = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfFromCurrentPage: mockGeneratePdf,
+        printCurrentPage: mockPrintCurrentPage,
+      };
+
+      act(() => {
+        root.render(
+          <InvoicePreviewModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const printBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Print / PDF')
+      );
+      expect(printBtn).toBeDefined();
+
+      act(() => {
+        printBtn?.click();
+      });
+
+      expect(mockGeneratePdf).toHaveBeenCalledWith('Invoice-INV-2026-101');
+      expect(mockPrintCurrentPage).not.toHaveBeenCalled();
+    });
+
+    it('InvoicePreviewModal handlePrint falls back to printCurrentPage when generatePdfNative returns false or fails', () => {
+      const mockPrintCurrentPage = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfFromCurrentPage: vi.fn(() => {
+          throw new Error('Native PDF generation failed');
+        }),
+        printCurrentPage: mockPrintCurrentPage,
+      };
+
+      act(() => {
+        root.render(
+          <InvoicePreviewModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const printBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Print / PDF')
+      );
+      expect(printBtn).toBeDefined();
+
+      act(() => {
+        printBtn?.click();
+      });
+
+      expect(mockPrintCurrentPage).toHaveBeenCalledWith('Invoice-INV-2026-101');
     });
   });
 
