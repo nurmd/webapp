@@ -91,7 +91,7 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
   if (mode === 'compact') {
     return (
       <div className="rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-lowest">
-        <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+        <div className="overflow-x-hidden">
           <table className="w-full text-left text-[11px] border-collapse table-fixed">
             <thead className="sticky top-0 bg-surface-container-low text-on-surface-variant font-bold border-b border-outline-variant/20 z-10">
               <tr>
