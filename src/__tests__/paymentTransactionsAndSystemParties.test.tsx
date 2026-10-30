@@ -1531,5 +1531,39 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
 
       alertMock.mockRestore();
     });
+
+    it('ignores edit request and does not open VoucherEditorModal if voucher is not a RECEIPT or PAYMENT voucher', async () => {
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const journalVoucher: Voucher = {
+        ...testReceiptVoucher,
+        id: 'VCH-JOURNAL-001',
+        voucherNumber: 'JRNL-001',
+        voucherType: 'JOURNAL' as any,
+      };
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[journalVoucher]}
+            parties={[testCustomer]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      // No VoucherEditorModal should be displayed
+      expect(container.textContent).not.toContain('Payment In Details');
+      expect(alertMock).not.toHaveBeenCalled();
+      alertMock.mockRestore();
+    });
   });
 });

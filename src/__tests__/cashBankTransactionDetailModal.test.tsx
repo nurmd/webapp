@@ -1336,5 +1336,37 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
       );
       expect(editBtn).toBeUndefined();
     });
+
+    it('never shows "Edit Payment" button for non-RECEIPT/PAYMENT vouchers (e.g. JOURNAL)', async () => {
+      const journalVoucher: Voucher = {
+        ...testReceiptVoucher,
+        id: 'VCH-JRNL-001',
+        voucherNumber: 'JRNL-001',
+        voucherType: 'JOURNAL' as any,
+      };
+
+      const journalEntry: UnifiedLedgerEntry = {
+        ...voucherEntry,
+        rawVoucherId: journalVoucher.id,
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={journalEntry}
+            vouchers={[journalVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={vi.fn()}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+    });
   });
 });

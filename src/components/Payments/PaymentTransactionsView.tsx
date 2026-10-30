@@ -132,6 +132,9 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   }, [parties]);
 
   const handleEditVoucher = useCallback((voucher: Voucher) => {
+    if (!voucher || (voucher.voucherType !== 'RECEIPT' && voucher.voucherType !== 'PAYMENT')) {
+      return;
+    }
     const party = resolveVoucherParty(voucher);
     if (!party) {
       alert('The party for this payment could not be found. Open the party statement to edit it.');

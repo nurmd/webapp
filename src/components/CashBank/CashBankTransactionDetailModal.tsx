@@ -258,14 +258,8 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     rawTransaction?.type === 'WITHDRAWAL' ||
     (entry?.flow === 'OUT' && entry?.type !== 'CONTRA');
 
-  const isPaymentVoucher = Boolean(
-    linkedVoucher &&
-    linkedVoucher.voucherType !== 'CONTRA' &&
-    (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') &&
-    entry?.type !== 'CONTRA' &&
-    !entry?.contraType &&
-    !isTransferCategory
-  );
+  const isReversed = Boolean(linkedVoucher?.isReversed);
+  const isCancelled = Boolean(linkedVoucher?.isCancelled);
 
   const activeAmount = rawTransaction?.amount ?? entry?.amount ?? 0;
   const activeDate = rawTransaction?.date || entry?.date || '';
@@ -725,7 +719,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                         <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                       </button>
                     )}
-                    {isPaymentVoucher && linkedVoucher && !linkedVoucher.isReversed && !linkedVoucher.isCancelled && onEditVoucher && (
+                    {linkedVoucher && (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') && !isReversed && !isCancelled && onEditVoucher && (
                       <button
                         type="button"
                         onClick={() => {
