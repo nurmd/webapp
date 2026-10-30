@@ -174,7 +174,7 @@ describe('Payment UI Separation Spec Suite', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  describe('1. PaymentTransactionsView UI Mode Separation', () => {
+  describe('1. PaymentTransactionsView UI Mode & Modal Integration', () => {
     it('initial render starts in TRANSACTIONS mode with list, filters, and summary visible', async () => {
       await act(async () => {
         root.render(
@@ -206,12 +206,11 @@ describe('Payment UI Separation Spec Suite', () => {
       const searchInput = container.querySelector('input[placeholder*="party"]');
       expect(searchInput).not.toBeNull();
 
-      // ENTRY mode top header is NOT rendered
-      expect(container.textContent).not.toContain('Back to Existing Transactions');
-      expect(container.textContent).not.toContain('Link to outstanding sales invoices or record an advance');
+      // Modal dialog is NOT rendered initially
+      expect(container.querySelector('[role="dialog"], .fixed.inset-0')).toBeNull();
     });
 
-    it('clicking "+ Record Receipt" switches to ENTRY mode and completely hides transaction list', async () => {
+    it('clicking "+ Record Receipt" opens the payment modal dialog', async () => {
       await act(async () => {
         root.render(
           <PaymentTransactionsView
@@ -241,18 +240,16 @@ describe('Payment UI Separation Spec Suite', () => {
         recordCta?.click();
       });
 
-      // ENTRY mode is now active
+      // Modal dialog is now open
       expect(container.textContent).toContain('Record Payment In (Receipt)');
-      expect(container.textContent).toContain('Back to Existing Transactions');
-      expect(container.textContent).toContain('Cancel');
-      expect(container.textContent).toContain('Link to outstanding sales invoices or record an advance');
+      expect(container.textContent).toContain('Select Customer');
 
-      // Clean separation: transaction list summary strip & search bar are unmounted
-      expect(container.textContent).not.toContain('Total Received');
-      expect(container.querySelector('input[placeholder*="Search by party"]')).toBeNull();
+      // Transaction list remains mounted underneath
+      expect(container.textContent).toContain('Total Received');
+      expect(container.querySelector('input[placeholder*="party"]')).not.toBeNull();
     });
 
-    it('clicking "Back to Existing Transactions" or "Cancel" restores TRANSACTIONS mode', async () => {
+    it('clicking the modal close button closes the payment modal dialog', async () => {
       await act(async () => {
         root.render(
           <PaymentTransactionsView
@@ -273,7 +270,7 @@ describe('Payment UI Separation Spec Suite', () => {
         );
       });
 
-      // Switch to ENTRY
+      // Open modal
       const recordCta = Array.from(container.querySelectorAll('button')).find((b) =>
         b.getAttribute('aria-label') === 'Record Receipt' || b.textContent?.includes('+ Record Receipt')
       );
@@ -282,40 +279,22 @@ describe('Payment UI Separation Spec Suite', () => {
       });
       expect(container.textContent).toContain('Record Payment In (Receipt)');
 
-      // Click "Back to Existing Transactions"
-      const backBtn = container.querySelector('button[aria-label="Back to Existing Transactions"]') as HTMLButtonElement;
-      expect(backBtn).not.toBeNull();
+      // Find modal close button (material icon 'close')
+      const closeBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.trim() === 'close'
+      );
+      expect(closeBtn).toBeDefined();
       await act(async () => {
-        backBtn.click();
+        closeBtn?.click();
       });
 
-      // Restored list view
+      // Restored list view with modal closed
       expect(container.textContent).toContain('Payment In');
       expect(container.textContent).toContain('Total Received');
-      expect(container.textContent).not.toContain('Back to Existing Transactions');
-
-      // Switch to ENTRY again and test Cancel button
-      const recordCta2 = Array.from(container.querySelectorAll('button')).find((b) =>
-        b.getAttribute('aria-label') === 'Record Receipt' || b.textContent?.includes('+ Record Receipt')
-      );
-      await act(async () => {
-        recordCta2?.click();
-      });
-      expect(container.textContent).toContain('Record Payment In (Receipt)');
-
-      const cancelBtn = Array.from(container.querySelectorAll('button')).find(
-        (b) => b.textContent?.trim() === 'Cancel'
-      );
-      expect(cancelBtn).toBeDefined();
-      await act(async () => {
-        cancelBtn?.click();
-      });
-
-      expect(container.textContent).toContain('Payment In');
-      expect(container.textContent).toContain('Total Received');
+      expect(container.textContent).not.toContain('Record Payment In (Receipt)');
     });
 
-    it('Android hardware back navigation priority 20 exits ENTRY mode back to TRANSACTIONS mode', async () => {
+    it('Android hardware back navigation priority 20 closes the modal dialog', async () => {
       await act(async () => {
         root.render(
           <PaymentTransactionsView
@@ -336,14 +315,14 @@ describe('Payment UI Separation Spec Suite', () => {
         );
       });
 
-      // Enter ENTRY mode
+      // Open modal
       const recordCta = Array.from(container.querySelectorAll('button')).find((b) =>
         b.getAttribute('aria-label') === 'Record Receipt' || b.textContent?.includes('+ Record Receipt')
       );
       await act(async () => {
         recordCta?.click();
       });
-      expect(container.textContent).toContain('Back to Existing Transactions');
+      expect(container.textContent).toContain('Record Payment In (Receipt)');
 
       // Trigger Android back key
       await act(async () => {
@@ -351,13 +330,13 @@ describe('Payment UI Separation Spec Suite', () => {
         expect(handled).toBe(true);
       });
 
-      // Should be back to TRANSACTIONS mode
+      // Modal should be closed
       expect(container.textContent).toContain('Payment In');
       expect(container.textContent).toContain('Total Received');
-      expect(container.textContent).not.toContain('Back to Existing Transactions');
+      expect(container.textContent).not.toContain('Record Payment In (Receipt)');
     });
 
-    it('submitting payment in ENTRY mode invokes onRecordPartyPayment and automatically returns to TRANSACTIONS mode', async () => {
+    it('submitting payment in modal invokes onRecordPartyPayment and automatically closes the modal', async () => {
       const onRecordPartyPayment = vi.fn();
 
       await act(async () => {
@@ -380,7 +359,7 @@ describe('Payment UI Separation Spec Suite', () => {
         );
       });
 
-      // Open ENTRY mode
+      // Open modal
       const recordCta = Array.from(container.querySelectorAll('button')).find((b) =>
         b.getAttribute('aria-label') === 'Record Receipt' || b.textContent?.includes('+ Record Receipt')
       );
@@ -426,10 +405,10 @@ describe('Payment UI Separation Spec Suite', () => {
         expect.any(String)
       );
 
-      // Verified automatic return to TRANSACTIONS mode
+      // Verified automatic modal close
       expect(container.textContent).toContain('Payment In');
       expect(container.textContent).toContain('Total Received');
-      expect(container.textContent).not.toContain('Back to Existing Transactions');
+      expect(container.textContent).not.toContain('Record Payment In (Receipt)');
     });
 
     it('works identically in Flow OUT for recording supplier payments', async () => {
@@ -467,10 +446,46 @@ describe('Payment UI Separation Spec Suite', () => {
         recordCta?.click();
       });
 
-      // Entry mode for OUT
+      // Modal dialog for OUT
       expect(container.textContent).toContain('Record Payment Out');
-      expect(container.textContent).toContain('Link to outstanding purchase bills or record an advance');
-      expect(container.textContent).toContain('Back to Existing Transactions');
+      expect(container.textContent).toContain('Select Supplier / Vendor');
+    });
+
+    it('delegates to onOpenPaymentModal prop when provided', async () => {
+      const onOpenPaymentModal = vi.fn();
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, bankAccount]}
+            transactions={mockTransactions}
+            invoices={[mockInvoice]}
+            purchases={[]}
+            parties={[customerParty]}
+            expenses={[]}
+            vouchers={[]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+            onRecordPartyPayment={vi.fn()}
+            onOpenPaymentModal={onOpenPaymentModal}
+          />
+        );
+      });
+
+      const recordCta = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.getAttribute('aria-label') === 'Record Receipt' || b.textContent?.includes('+ Record Receipt')
+      );
+
+      await act(async () => {
+        recordCta?.click();
+      });
+
+      expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
+      // Local modal should NOT open when parent handler is provided
+      expect(container.textContent).not.toContain('Record Payment In (Receipt)');
     });
   });
 

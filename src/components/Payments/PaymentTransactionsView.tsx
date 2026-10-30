@@ -13,6 +13,7 @@ import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DirectCashBankModal } from '../CashBank/DirectCashBankModal.tsx';
 import { RecordPaymentModal } from '../Parties/RecordPaymentModal.tsx';
+import { usePaymentModal } from './PaymentModalContext.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
 import type { PassbookEntry } from '../Parties/usePartyPassbook.ts';
@@ -52,6 +53,7 @@ export interface PaymentTransactionsViewProps {
     allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
     paymentDate?: string
   ) => boolean | void;
+  onOpenPaymentModal?: (flow: 'IN' | 'OUT') => void;
   onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
 }
 
@@ -71,12 +73,13 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   onViewInvoice,
   onViewPurchase,
   onRecordPartyPayment,
+  onOpenPaymentModal,
   onUnlinkAllocation,
 }) => {
   const isFlowIn = flow === 'IN';
+  const paymentModal = usePaymentModal();
 
-  // Modes: 'TRANSACTIONS' (default list) vs 'ENTRY' (separate new payment entry view)
-  const [viewMode, setViewMode] = useState<'TRANSACTIONS' | 'ENTRY'>('TRANSACTIONS');
+  const [isLocalPaymentModalOpen, setIsLocalPaymentModalOpen] = useState(false);
   const [isDirectModalOpen, setIsDirectModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
@@ -93,6 +96,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
   // Android back-navigation priority handling
   useBackNavigation(() => {
+    if (isLocalPaymentModalOpen) {
+      setIsLocalPaymentModalOpen(false);
+      return true;
+    }
     if (editingVoucher) {
       setEditingVoucher(null);
       setEditingVoucherParty(null);
@@ -100,10 +107,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     }
     if (isDateModalOpen) {
       setIsDateModalOpen(false);
-      return true;
-    }
-    if (viewMode === 'ENTRY') {
-      setViewMode('TRANSACTIONS');
       return true;
     }
     if (isDirectModalOpen) {
@@ -116,7 +119,17 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       return true;
     }
     return false;
-  }, Boolean(editingVoucher) || isDateModalOpen || viewMode === 'ENTRY' || isDirectModalOpen || isDetailModalOpen, 20);
+  }, isLocalPaymentModalOpen || Boolean(editingVoucher) || isDateModalOpen || isDirectModalOpen || isDetailModalOpen, 20);
+
+  const handleOpenRecordPayment = useCallback(() => {
+    if (onOpenPaymentModal) {
+      onOpenPaymentModal(flow);
+    } else if (paymentModal.isAvailable) {
+      paymentModal.openPaymentModal({ flow });
+    } else {
+      setIsLocalPaymentModalOpen(true);
+    }
+  }, [onOpenPaymentModal, flow, paymentModal]);
 
   const resolveVoucherParty = useCallback((voucher: Voucher): Party | null => {
     if (voucher.partyId) {
@@ -294,89 +307,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         : accountFilter
       : undefined;
 
-  if (viewMode === 'ENTRY') {
-    return (
-      <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-4xl mx-auto animate-in fade-in">
-        {/* Entry View Top Header with Navigation back to existing transactions */}
-        <div className="flex items-center justify-between gap-2 p-2 sm:p-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode('TRANSACTIONS')}
-              className="h-9 px-2.5 rounded-xl flex items-center gap-1.5 text-on-surface-variant hover:bg-surface-container active:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0 border border-outline-variant/30"
-              title="Back to Existing Transactions"
-              aria-label="Back to Existing Transactions"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              <span className="text-xs font-semibold">Back to Existing Transactions</span>
-            </button>
-            <div className="flex flex-col">
-              <h2 className="font-headline-sm text-sm sm:text-base font-bold text-on-surface">
-                {isFlowIn ? 'Record Payment In (Receipt)' : 'Record Payment Out'}
-              </h2>
-              <span className="text-[11px] text-on-surface-variant">
-                Link to outstanding {isFlowIn ? 'sales invoices' : 'purchase bills'} or record an advance
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setViewMode('TRANSACTIONS')}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-        </div>
-
-        {/* Dedicated Entry Form Panel (not an overlay dialog) */}
-        <section className="w-full">
-          <RecordPaymentModal
-            asDialog={false}
-            isOpen={true}
-            onClose={() => setViewMode('TRANSACTIONS')}
-            parties={parties}
-            invoices={invoices}
-            purchases={purchases}
-            bankAccounts={accounts}
-            initialPaymentType={isFlowIn ? 'IN' : 'OUT'}
-            onRecordPayment={(
-              party,
-              amount,
-              paymentMode,
-              notes,
-              paymentType,
-              paymentSplits,
-              discount,
-              bankAccountId,
-              allocations,
-              allocationMode,
-              paymentDate
-            ) => {
-              const res = onRecordPartyPayment?.(
-                party,
-                amount,
-                paymentMode,
-                notes,
-                paymentType,
-                paymentSplits,
-                discount,
-                bankAccountId,
-                allocations,
-                allocationMode,
-                paymentDate
-              );
-              if (res === false) {
-                return false;
-              }
-              setViewMode('TRANSACTIONS');
-              return true;
-            }}
-          />
-        </section>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-7xl mx-auto">
       {/* 1. Header Bar with Back Button to Dashboard */}
@@ -414,10 +344,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {onRecordPartyPayment && (
+          {(onRecordPartyPayment || onOpenPaymentModal || paymentModal.isAvailable) && (
             <button
               type="button"
-              onClick={() => setViewMode('ENTRY')}
+              onClick={handleOpenRecordPayment}
               className={`h-9 px-3 sm:px-3.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer ${
                 isFlowIn
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
@@ -918,6 +848,52 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             }}
           />
         </React.Suspense>
+      )}
+
+      {/* 9. Standalone Local Payment Modal Fallback (when global context is not active) */}
+      {isLocalPaymentModalOpen && (
+        <RecordPaymentModal
+          asDialog={true}
+          isOpen={isLocalPaymentModalOpen}
+          onClose={() => setIsLocalPaymentModalOpen(false)}
+          parties={parties}
+          invoices={invoices}
+          purchases={purchases}
+          bankAccounts={accounts}
+          initialPaymentType={isFlowIn ? 'IN' : 'OUT'}
+          onRecordPayment={(
+            party,
+            amount,
+            paymentMode,
+            notes,
+            paymentType,
+            paymentSplits,
+            discount,
+            bankAccountId,
+            allocations,
+            allocationMode,
+            paymentDate
+          ) => {
+            const res = onRecordPartyPayment?.(
+              party,
+              amount,
+              paymentMode,
+              notes,
+              paymentType,
+              paymentSplits,
+              discount,
+              bankAccountId,
+              allocations,
+              allocationMode,
+              paymentDate
+            );
+            if (res === false) {
+              return false;
+            }
+            setIsLocalPaymentModalOpen(false);
+            return true;
+          }}
+        />
       )}
     </div>
   );

@@ -52,6 +52,7 @@ import { initBackNavigation, useBackNavigation } from './core/utils/backNavigati
 import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
 import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
+import { PaymentModalProvider } from './components/Payments/PaymentModalContext.tsx';
 
 
 // Secondary Views (Dynamic Code-Splitting with named-export unwrapping)
@@ -1322,7 +1323,15 @@ export const App: React.FC = () => {
   const handleBarcodeClick = useCallback(() => handleSelectTab('pos'), [handleSelectTab]);
 
   return (
-    <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+    <PaymentModalProvider
+      onRecordPartyPayment={handleRecordPartyPayment}
+      parties={parties}
+      invoices={invoices}
+      purchases={purchases}
+      bankAccounts={bankAccounts}
+      onRefresh={refreshData}
+    >
+      <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
       {/* Tablet / Desktop Persistent Sidebar Navigation */}
       <TabletSidebar
         activeTab={activeTab}
@@ -1866,5 +1875,6 @@ export const App: React.FC = () => {
         </div>
       )}
     </div>
+    </PaymentModalProvider>
   );
 };

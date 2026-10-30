@@ -622,7 +622,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   if (asDialog) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-on-surface/50 backdrop-blur-xs animate-fade-in"
+        className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-on-surface/50 backdrop-blur-xs animate-fade-in"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}

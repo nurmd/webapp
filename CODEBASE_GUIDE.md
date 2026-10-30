@@ -247,12 +247,15 @@ The `StorageService` class (`db`) is the unified database facade composing focus
     - Attempting to change `paidAmount` such that the source voucher amount would change while other vouchers exist is blocked before save, advising the user to edit or reverse the linked vouchers separately.
     - The source voucher is NOT rebuilt with document `paymentSplits` (which include later payments and would overstate cash).
   - When no other active payment vouchers exist, source voucher updates may use the document splits.
-- **Payment In/Out Page UI Separation (`PaymentTransactionsView`)**:
-  - Distinguishes two explicit modes: `TRANSACTIONS` (default summary cards, filters, search, and transactions list) and `ENTRY` (dedicated entry panel with inline `RecordPaymentModal` `asDialog={false}`).
-  - Clean separation: the transaction list is completely unmounted while in `ENTRY` mode (not rendered simultaneously).
-  - Top header bar provides a clear "Back to Existing Transactions" button and Cancel button returning to `TRANSACTIONS` mode.
-  - Android hardware back navigation (priority 20) exits `ENTRY` mode back to `TRANSACTIONS` mode before any outer navigation.
-  - Submitting payment through the central `onRecordPartyPayment` handler automatically returns the user to `TRANSACTIONS` mode.
+- **Global Payment Modal Architecture (`PaymentModalContext.tsx` & `PaymentModalProvider`)**:
+  - Centralized application-wide modal provider wrapping `App.tsx` that coordinates recording customer receipts (`flow: 'IN'`) and supplier payouts (`flow: 'OUT'`) across any view or navigation context.
+  - Exposes `usePaymentModal()` hook and global `openPaymentModal({ flow, party, partyId, onSuccess })` dispatching either directly via context callback or custom window events (`open_payment_modal`, `close_payment_modal`).
+  - Automatically resolves payment flow based on party type (`CUSTOMER` -> `IN`, `SUPPLIER` -> `OUT`) when omitted.
+  - Consumed seamlessly by:
+    - **Dashboard Quick Actions (`DashboardView`)**: 1-tap `PAYMENT_IN` and `PAYMENT_OUT` buttons trigger the global modal without full-tab navigation context switching.
+    - **Navigation Menu Hub (`NavigationMenuHubView`)**: "Payment In" and "Payment Out" catalog entries open the global modal directly, with fallback to tab navigation if the provider is unavailable.
+    - **Payment In/Out Hubs (`PaymentTransactionsView`)**: "+ Record Receipt" and "+ Record Payment" trigger the global payment modal (or standalone `RecordPaymentModal` dialog fallback), leaving transaction ledger lists mounted and interactive in the background. Android hardware back key (priority 20) closes the modal.
+    - **Party Detail View (`PartyDetailModal` / `PartyDetailPage`)**: The "Record Payment" button invokes `handleRecordPaymentClick`, routing into the global payment modal with party context pre-selected and invoking `onRefresh` upon successful voucher persistence; falls back to an inline collapsible drawer if rendered outside provider without custom opener.
   - Obsolete direct-settlement fallback blocks in `PartiesView` and `DashboardRecordPaymentModal` were removed to guarantee that all payment recording strictly routes through the central accounting voucher engine.
 - **Passbook & Ledger Presentation**:
   - Passbooks and Payment In / Payment Out views display linked document numbers and unallocated advance amounts.

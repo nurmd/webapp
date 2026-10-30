@@ -22,6 +22,7 @@ import {
   DashboardRecordPaymentModal,
   DashboardPaymentTarget,
 } from './DashboardRecordPaymentModal.tsx';
+import { usePaymentModal } from '../Payments/PaymentModalContext.tsx';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { db } from '../../services/db.ts';
@@ -92,6 +93,7 @@ export interface DashboardViewProps {
   onRefresh?: () => void;
   onNavigateTab: (tab: AppTab) => void;
   onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
+  onOpenPaymentModal?: (flow: 'IN' | 'OUT') => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -113,7 +115,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRefresh,
   onNavigateTab,
   onNavigateToParties,
+  onOpenPaymentModal,
 }) => {
+  const paymentModal = usePaymentModal();
   // Resolve data sources with graceful fallback to DB if props are omitted or undefined
   const activeInvoices = invoices || [];
   const activeParties = parties || [];
@@ -153,10 +157,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onNavigateTab('expenses');
         break;
       case 'PAYMENT_IN':
-        onNavigateTab('payment_in');
+        if (onOpenPaymentModal) {
+          onOpenPaymentModal('IN');
+        } else {
+          paymentModal.openPaymentModal({ flow: 'IN' });
+        }
         break;
       case 'PAYMENT_OUT':
-        onNavigateTab('payment_out');
+        if (onOpenPaymentModal) {
+          onOpenPaymentModal('OUT');
+        } else {
+          paymentModal.openPaymentModal({ flow: 'OUT' });
+        }
         break;
       case 'CASH_BANK':
         onNavigateTab('cash_bank');

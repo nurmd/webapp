@@ -11,6 +11,7 @@ import { db } from '../../services/db.ts';
 import { usePartyPassbook, PassbookEntry } from './usePartyPassbook.ts';
 import { PartyInfoCard } from './PartyInfoCard.tsx';
 import { RecordPaymentModal } from './RecordPaymentModal.tsx';
+import { usePaymentModal } from '../Payments/PaymentModalContext.tsx';
 import { PartyPassbookTable } from './PartyPassbookTable.tsx';
 import { PartyOrdersTable } from './PartyOrdersTable.tsx';
 import { PartyWhatsAppReminder } from './PartyWhatsAppReminder.tsx';
@@ -64,6 +65,7 @@ export interface PartyDetailModalProps {
   onCreateInvoice?: (party: Party) => void;
   onCreatePurchase?: (party: Party) => void;
   onRefresh?: () => void;
+  onOpenPaymentModal?: (flow: 'IN' | 'OUT', party: Party) => void;
 }
 
 export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
@@ -86,7 +88,9 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   onCreateInvoice,
   onCreatePurchase,
   onRefresh,
+  onOpenPaymentModal,
 }) => {
+  const paymentModal = usePaymentModal();
   useModalPreloadOnMount([
     preloadVoucherEditorModal,
     preloadSimplifiedInvoiceModal,
@@ -243,6 +247,20 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
       setDeletePurchaseTarget(bill);
     }
   };
+
+  const handleRecordPaymentClick = useCallback(() => {
+    if (onOpenPaymentModal) {
+      onOpenPaymentModal(isCustomer ? 'IN' : 'OUT', party);
+    } else if (paymentModal.isAvailable) {
+      paymentModal.openPaymentModal({
+        flow: isCustomer ? 'IN' : 'OUT',
+        party,
+        onSuccess: onRefresh,
+      });
+    } else {
+      setIsPaymentOpen((prev) => !prev);
+    }
+  }, [onOpenPaymentModal, isCustomer, party, paymentModal, onRefresh]);
 
   if (!isOpen) return null;
 
@@ -479,7 +497,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               {/* Record Payment */}
               <button
                 type="button"
-                onClick={() => setIsPaymentOpen(!isPaymentOpen)}
+                onClick={handleRecordPaymentClick}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
                   isPaymentOpen
                     ? 'bg-secondary text-on-secondary'

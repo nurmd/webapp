@@ -10,6 +10,7 @@ import { AppTab } from '../Shell/Drawer.tsx';
 import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
 import { CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
+import { usePaymentModal } from '../Payments/PaymentModalContext.tsx';
 
 interface NavigationMenuHubViewProps {
   company: CompanyProfile;
@@ -26,6 +27,7 @@ interface NavigationMenuHubViewProps {
   hasUpdate?: boolean;
   latestVersion?: string;
   isCheckingUpdate?: boolean;
+  onOpenPaymentModal?: (flow: 'IN' | 'OUT') => void;
 }
 
 type HubCategory =
@@ -69,7 +71,9 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   hasUpdate,
   latestVersion,
   isCheckingUpdate,
+  onOpenPaymentModal,
 }) => {
+  const paymentModal = usePaymentModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<HubCategory>('all');
   const [copiedReferral, setCopiedReferral] = useState(false);
@@ -286,7 +290,15 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Record customer payments, receipts & money-in ledger entries',
       icon: 'call_received',
       category: 'sales',
-      action: () => onNavigate('payment_in'),
+      action: () => {
+        if (onOpenPaymentModal) {
+          onOpenPaymentModal('IN');
+        } else if (paymentModal.isAvailable) {
+          paymentModal.openPaymentModal({ flow: 'IN' });
+        } else {
+          onNavigate('payment_in');
+        }
+      },
       keywords: ['payment in', 'receipt', 'money in', 'collection', 'payment', 'inflow'],
     },
     {
@@ -359,7 +371,15 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Record supplier payments, expenses & money-out ledger entries',
       icon: 'call_made',
       category: 'purchases',
-      action: () => onNavigate('payment_out'),
+      action: () => {
+        if (onOpenPaymentModal) {
+          onOpenPaymentModal('OUT');
+        } else if (paymentModal.isAvailable) {
+          paymentModal.openPaymentModal({ flow: 'OUT' });
+        } else {
+          onNavigate('payment_out');
+        }
+      },
       keywords: ['payment out', 'payment', 'money out', 'disbursement', 'payout', 'vendor payment', 'outflow'],
     },
     {

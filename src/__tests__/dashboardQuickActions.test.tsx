@@ -266,4 +266,39 @@ describe('Dashboard Quick Actions configuration', () => {
 
     expect(db.getDashboardQuickActions()).toContain('REPORTS');
   });
+
+  it('dispatches payment modal on PAYMENT_IN and PAYMENT_OUT quick action clicks', () => {
+    db.setDashboardQuickActions(['PAYMENT_IN', 'PAYMENT_OUT']);
+    const onOpenPaymentModal = vi.fn();
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[]}
+          items={[]}
+          parties={[]}
+          purchases={[]}
+          vouchers={[]}
+          expenses={[]}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={vi.fn()}
+          onOpenPaymentModal={onOpenPaymentModal}
+        />
+      );
+    });
+
+    const paymentInBtn = container.querySelector('[data-quick-action="PAYMENT_IN"]') as HTMLButtonElement | null;
+    const paymentOutBtn = container.querySelector('[data-quick-action="PAYMENT_OUT"]') as HTMLButtonElement | null;
+
+    act(() => {
+      paymentInBtn?.click();
+      paymentOutBtn?.click();
+    });
+
+    expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
+    expect(onOpenPaymentModal).toHaveBeenCalledWith('OUT');
+  });
 });
