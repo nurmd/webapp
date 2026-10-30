@@ -1,15 +1,15 @@
 {
-  "version": "1.2.49",
+  "version": "1.2.50",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-30T07:04:35.334Z",
+  "buildTime": "2026-10-30T07:34:07.366Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "restrict Edit Payment to RECEIPT/PAYMENT vouchers only",
+    "edit party payment-in/out from Payment In/Out sections via VoucherEditorModal (v1.2.49)",
     "bump version to v1.2.48 (Payment Linking, Dedupe & Save Safety)",
     "bump version to v1.2.47 (Modal Unification, Direct PDF & AI Bill Intake)",
     "integrate master (v1.2.46 AI Bill Intake) into payments-work",
-    "bump version to v1.2.46 (AI Bill Intake)",
-    "AI GST purchase bill intake (scan + GSTR-2B) with review queue",
-    "phase 4 modal unification, report/party modals, preload, and direct PDF expansion"
+    "bump version to v1.2.46 (AI Bill Intake)"
   ]
 }
