@@ -15,6 +15,7 @@ import type { Party } from '../models/party.ts';
 import type { Invoice } from '../models/invoice.ts';
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../models/bankAccount.ts';
 import type { CompanyProfile } from '../models/company.ts';
+import type { Voucher } from '../core/accounting/voucherTypes.ts';
 import { computeCashBankSummary } from '../core/accounting/cashBankCalculator.ts';
 import { resetBackNavigationForTesting, triggerBack, useBackNavigation } from '../core/utils/backNavigation.ts';
 import { exportReportToCsv } from '../components/Reports/utils/reportExportUtils.ts';
@@ -1367,6 +1368,168 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       });
       expect(handled).toBe(true);
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('7. Payment In / Payment Out Voucher Editing Integration', () => {
+    const testCustomer: Party = {
+      id: 'PTY-EDIT-VCH-1',
+      name: 'Ramesh Hardware',
+      type: 'CUSTOMER',
+      phone: '9876543210',
+      billingAddress: 'Main Bazar, Guwahati',
+      stateCode: '18',
+      openingBalance: 0,
+      currentBalance: 0,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+
+    const testReceiptVoucher: Voucher = {
+      id: 'VCH-IN-EDIT-001',
+      voucherNumber: 'RCPT-EDIT-001',
+      voucherType: 'RECEIPT',
+      date: '2026-05-15',
+      partyId: 'PTY-EDIT-VCH-1',
+      partyName: 'Ramesh Hardware',
+      totalAmount: 4500,
+      narration: 'Advance payment received at counter',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        {
+          accountId: 'ACC_CASH',
+          accountName: 'Cash in Hand',
+          debit: 4500,
+          credit: 0,
+          narration: 'Receipt into cash',
+        },
+        {
+          accountId: 'PTY-EDIT-VCH-1',
+          accountName: 'Ramesh Hardware',
+          debit: 0,
+          credit: 4500,
+          narration: 'Payment received from Ramesh Hardware',
+        },
+      ],
+      createdAt: '2026-05-15T10:00:00.000Z',
+    };
+
+    it('opens VoucherEditorModal when clicking Edit Payment on a voucher row in PaymentTransactionsView', async () => {
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[testReceiptVoucher]}
+            parties={[testCustomer]}
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      // 1. Assert row renders in Payment In list
+      expect(container.textContent).toContain('Ramesh Hardware');
+      expect(container.textContent).toContain('4,500');
+
+      // 2. Click the voucher row to open CashBankTransactionDetailModal
+      const row = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Ramesh Hardware')
+      );
+      expect(row).toBeDefined();
+
+      await act(async () => {
+        row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      // 3. Assert CashBankTransactionDetailModal is open and has Edit Payment button
+      expect(container.textContent).toContain('Transaction Details');
+      const editPaymentBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editPaymentBtn).toBeDefined();
+
+      // 4. Click Edit Payment
+      await act(async () => {
+        editPaymentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      // 5. Assert CashBankTransactionDetailModal closed and VoucherEditorModal opened
+      expect(container.textContent).not.toContain('Transaction Details');
+      expect(container.textContent).toContain('Payment In Details');
+      expect(container.textContent).toContain('Ramesh Hardware');
+
+      // 6. Test Android back navigation closes VoucherEditorModal
+      let backHandled = false;
+      await act(async () => {
+        backHandled = triggerBack();
+      });
+      expect(backHandled).toBe(true);
+      expect(container.textContent).not.toContain('Payment In Details');
+    });
+
+    it('shows alert and does not open VoucherEditorModal if party cannot be resolved', async () => {
+      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const orphanedVoucher: Voucher = {
+        ...testReceiptVoucher,
+        id: 'VCH-ORPHAN-001',
+        voucherNumber: 'RCPT-ORPHAN-001',
+        partyId: 'UNKNOWN-PARTY-999',
+        partyName: 'Unknown Ghost Party',
+        entries: [
+          { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 4500, credit: 0 },
+          { accountId: 'UNKNOWN-PARTY-999', accountName: 'Unknown Ghost Party', debit: 0, credit: 4500 },
+        ],
+      };
+
+      await act(async () => {
+        root.render(
+          <PaymentTransactionsView
+            flow="IN"
+            company={mockCompany}
+            accounts={[cashAccount, defaultBank]}
+            transactions={[]}
+            invoices={[]}
+            purchases={[]}
+            expenses={[]}
+            vouchers={[orphanedVoucher]}
+            parties={[testCustomer]} // testCustomer does not match UNKNOWN-PARTY-999
+            onSaveTransaction={vi.fn()}
+            onDeleteTransaction={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      const row = Array.from(container.querySelectorAll('div.cursor-pointer')).find((el) =>
+        el.textContent?.includes('Unknown Ghost Party')
+      );
+      expect(row).toBeDefined();
+
+      await act(async () => {
+        row?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const editPaymentBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editPaymentBtn).toBeDefined();
+
+      await act(async () => {
+        editPaymentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(alertMock).toHaveBeenCalledWith('The party for this payment could not be found. Open the party statement to edit it.');
+      expect(container.textContent).not.toContain('Payment In Details');
+
+      alertMock.mockRestore();
     });
   });
 });

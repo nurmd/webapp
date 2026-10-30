@@ -30,6 +30,7 @@ export interface CashBankTransactionDetailModalProps {
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
+  onEditVoucher?: (voucher: Voucher) => void;
 }
 
 export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailModalProps> = ({
@@ -49,6 +50,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   onViewInvoice,
   onViewPurchase,
   onUnlinkAllocation,
+  onEditVoucher,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -60,10 +62,30 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   } | null>(null);
 
   const linkedVoucher = useMemo(() => {
-    if (!entry?.rawVoucherId) return null;
+    if (!entry) return null;
     const all = vouchers && vouchers.length > 0 ? vouchers : db.getVouchers();
-    return all.find((v) => v.id === entry.rawVoucherId) || null;
-  }, [entry?.rawVoucherId, vouchers]);
+    if (entry.rawVoucherId) {
+      return all.find((v) => v.id === entry.rawVoucherId) || null;
+    }
+    // Fallback resolution for payment vouchers (excluding CONTRA entries)
+    if (
+      entry.id?.startsWith('LEDGER-VCH-') &&
+      !entry.id.startsWith('LEDGER-VCH-IN-') &&
+      !entry.id.startsWith('LEDGER-VCH-OUT-') &&
+      entry.type !== 'CONTRA' &&
+      !entry.contraType
+    ) {
+      const candidateId = entry.id.replace(/^LEDGER-VCH-/, '').replace(/-\d+$/, '');
+      const match = all.find(
+        (v) =>
+          v.voucherType !== 'CONTRA' &&
+          (v.voucherType === 'RECEIPT' || v.voucherType === 'PAYMENT') &&
+          (v.id === candidateId || entry.id.includes(v.id))
+      );
+      if (match) return match;
+    }
+    return null;
+  }, [entry, vouchers]);
 
   const linkedParty = useMemo(() => {
     if (!entry || !parties || parties.length === 0) return null;
@@ -235,6 +257,15 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     rawTransaction?.type === 'REDUCE_MONEY' ||
     rawTransaction?.type === 'WITHDRAWAL' ||
     (entry?.flow === 'OUT' && entry?.type !== 'CONTRA');
+
+  const isPaymentVoucher = Boolean(
+    linkedVoucher &&
+    linkedVoucher.voucherType !== 'CONTRA' &&
+    (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') &&
+    entry?.type !== 'CONTRA' &&
+    !entry?.contraType &&
+    !isTransferCategory
+  );
 
   const activeAmount = rawTransaction?.amount ?? entry?.amount ?? 0;
   const activeDate = rawTransaction?.date || entry?.date || '';
@@ -683,16 +714,31 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                     </div>
                   </div>
 
-                  {onNavigateTab && (
-                    <button
-                      type="button"
-                      onClick={handleNavigateSource}
-                      className="self-start mt-1 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>Open Source Document</span>
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                    </button>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {onNavigateTab && (
+                      <button
+                        type="button"
+                        onClick={handleNavigateSource}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>Open Source Document</span>
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </button>
+                    )}
+                    {isPaymentVoucher && linkedVoucher && !linkedVoucher.isReversed && !linkedVoucher.isCancelled && onEditVoucher && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onEditVoucher(linkedVoucher);
+                        }}
+                        className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit</span>
+                        <span>Edit Payment</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 

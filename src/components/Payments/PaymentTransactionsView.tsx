@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import type { CompanyProfile } from '../../models/company.ts';
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
 import type { Invoice, PaymentSplit } from '../../models/invoice.ts';
@@ -14,9 +14,14 @@ import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DirectCashBankModal } from '../CashBank/DirectCashBankModal.tsx';
 import { RecordPaymentModal } from '../Parties/RecordPaymentModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
+import type { PassbookEntry } from '../Parties/usePartyPassbook.ts';
 
 const CashBankTransactionDetailModal = React.lazy(() =>
   import('../CashBank/CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
+);
+const VoucherEditorModal = React.lazy(() =>
+  import('../Parties/VoucherEditorModal.tsx').then((m) => ({ default: m.VoucherEditorModal }))
 );
 
 export interface PaymentTransactionsViewProps {
@@ -76,6 +81,8 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
+  const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+  const [editingVoucherParty, setEditingVoucherParty] = useState<Party | null>(null);
 
   // Filters: Payment In/Out defaults to ALL_TIME as mandated by invariant #17
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');
@@ -86,6 +93,11 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
   // Android back-navigation priority handling
   useBackNavigation(() => {
+    if (editingVoucher) {
+      setEditingVoucher(null);
+      setEditingVoucherParty(null);
+      return true;
+    }
     if (isDateModalOpen) {
       setIsDateModalOpen(false);
       return true;
@@ -104,7 +116,50 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       return true;
     }
     return false;
-  }, isDateModalOpen || viewMode === 'ENTRY' || isDirectModalOpen || isDetailModalOpen, 20);
+  }, Boolean(editingVoucher) || isDateModalOpen || viewMode === 'ENTRY' || isDirectModalOpen || isDetailModalOpen, 20);
+
+  const resolveVoucherParty = useCallback((voucher: Voucher): Party | null => {
+    if (voucher.partyId) {
+      const byId = parties.find((p) => p.id === voucher.partyId);
+      if (byId) return byId;
+    }
+    if (voucher.partyName) {
+      const norm = voucher.partyName.trim().toLowerCase();
+      const byName = parties.find((p) => p.name.trim().toLowerCase() === norm);
+      if (byName) return byName;
+    }
+    return null;
+  }, [parties]);
+
+  const handleEditVoucher = useCallback((voucher: Voucher) => {
+    const party = resolveVoucherParty(voucher);
+    if (!party) {
+      alert('The party for this payment could not be found. Open the party statement to edit it.');
+      return;
+    }
+    setEditingVoucher(voucher);
+    setEditingVoucherParty(party);
+    setIsDetailModalOpen(false);
+    setSelectedLedgerEntry(null);
+  }, [resolveVoucherParty]);
+
+  const editingPassbookEntry = useMemo<PassbookEntry | null>(() => {
+    if (!editingVoucher) return null;
+    return {
+      id: `vchr-${editingVoucher.id}`,
+      rawId: editingVoucher.id,
+      date: editingVoucher.date,
+      docNumber: editingVoucher.voucherNumber,
+      type: editingVoucher.voucherType === 'RECEIPT' ? 'PAYMENT_IN' : 'PAYMENT_OUT',
+      description: editingVoucher.narration || '',
+      debit: editingVoucher.voucherType === 'PAYMENT' ? editingVoucher.totalAmount : 0,
+      credit: editingVoucher.voucherType === 'RECEIPT' ? editingVoucher.totalAmount : 0,
+      runningBalance: 0,
+      status: 'PAID',
+      paymentMode: inferVoucherPaymentMode(editingVoucher),
+      rawVoucher: editingVoucher,
+    };
+  }, [editingVoucher]);
 
   // Date range bounds
   const dateRange = useMemo(() => {
@@ -820,6 +875,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             onDeleteTransaction={onDeleteTransaction}
             onNavigateTab={onNavigateTab}
             onUnlinkAllocation={onUnlinkAllocation}
+            onEditVoucher={handleEditVoucher}
           />
         </React.Suspense>
       )}
@@ -839,6 +895,27 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         }}
         accentColor={isFlowIn ? 'emerald-600' : 'rose-600'}
       />
+
+      {/* 8. Voucher Editor Modal (Edit Payment from Payment In / Payment Out) */}
+      {editingPassbookEntry && editingVoucherParty && (
+        <React.Suspense fallback={null}>
+          <VoucherEditorModal
+            editingLedgerEntry={editingPassbookEntry}
+            party={editingVoucherParty}
+            company={company}
+            onClose={() => {
+              setEditingVoucher(null);
+              setEditingVoucherParty(null);
+            }}
+            onViewInvoice={onViewInvoice}
+            onViewPurchase={onViewPurchase}
+            onRefresh={() => {
+              setEditingVoucher(null);
+              setEditingVoucherParty(null);
+            }}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 };

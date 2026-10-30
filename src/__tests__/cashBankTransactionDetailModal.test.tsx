@@ -1066,4 +1066,275 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
       expect(decoded).toContain('Payment Received - GST Billing App');
     });
   });
+
+  describe('Edit Payment from CashBankTransactionDetailModal', () => {
+    const testReceiptVoucher: Voucher = {
+      id: 'VCH-EDIT-001',
+      voucherNumber: 'RCPT-EDIT-001',
+      voucherType: 'RECEIPT',
+      date: '2026-10-16',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      totalAmount: 3500,
+      narration: 'Advance payment received',
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 3500, credit: 0 },
+        { accountId: 'party_1', accountName: 'Customer One', debit: 0, credit: 3500 },
+      ],
+      createdAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    const voucherEntry: UnifiedLedgerEntry = {
+      id: 'LEDGER-VCH-VCH-EDIT-001-0',
+      date: '2026-10-16',
+      type: 'PARTY_RECEIPT',
+      category: 'CASH',
+      accountId: 'ACC_CASH',
+      accountName: 'Cash in Hand',
+      counterpartyOrTitle: 'Customer One',
+      referenceNo: 'RCPT-EDIT-001',
+      mode: 'CASH',
+      flow: 'IN',
+      amount: 3500,
+      description: 'Receipt Voucher #RCPT-EDIT-001',
+      rawVoucherId: testReceiptVoucher.id,
+      partyId: 'party_1',
+    };
+
+    it('renders "Edit Payment" button for voucher-backed entry and invokes onClose followed by onEditVoucher', async () => {
+      const handleClose = vi.fn();
+      const handleEditVoucher = vi.fn();
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={handleClose}
+            entry={voucherEntry}
+            vouchers={[testReceiptVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={handleEditVoucher}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeDefined();
+
+      await act(async () => {
+        editBtn?.click();
+      });
+
+      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleEditVoucher).toHaveBeenCalledTimes(1);
+      expect(handleEditVoucher).toHaveBeenCalledWith(testReceiptVoucher);
+    });
+
+    it('resolves linked voucher via LEDGER-VCH- fallback and shows "Edit Payment" when rawVoucherId is omitted', async () => {
+      const handleClose = vi.fn();
+      const handleEditVoucher = vi.fn();
+      const fallbackEntry: UnifiedLedgerEntry = {
+        ...voucherEntry,
+        rawVoucherId: undefined,
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={handleClose}
+            entry={fallbackEntry}
+            vouchers={[testReceiptVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={handleEditVoucher}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeDefined();
+
+      await act(async () => {
+        editBtn?.click();
+      });
+
+      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleEditVoucher).toHaveBeenCalledWith(testReceiptVoucher);
+    });
+
+    it('hides "Edit Payment" button when voucher is reversed or cancelled', async () => {
+      const reversedVoucher: Voucher = { ...testReceiptVoucher, isReversed: true };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={voucherEntry}
+            vouchers={[reversedVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={vi.fn()}
+          />
+        );
+      });
+
+      let editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+
+      const cancelledVoucher: Voucher = { ...testReceiptVoucher, isCancelled: true };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={voucherEntry}
+            vouchers={[cancelledVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={vi.fn()}
+          />
+        );
+      });
+
+      editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+    });
+
+    it('hides "Edit Payment" button when onEditVoucher prop is omitted', async () => {
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={voucherEntry}
+            vouchers={[testReceiptVoucher]}
+            accounts={mockAccounts}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+    });
+
+    it('never shows "Edit Payment" button for CONTRA vouchers with rawVoucherId', async () => {
+      const contraVoucher: Voucher = {
+        id: 'VCH-CONTRA-001',
+        voucherNumber: 'CONTRA-001',
+        voucherType: 'CONTRA',
+        date: '2026-10-16',
+        totalAmount: 5000,
+        narration: 'Contra Transfer: Cash in Hand ➔ SBI Current A/C',
+        entries: [
+          { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 0, credit: 5000 },
+          { accountId: 'ACC_BANK_SBI', accountName: 'SBI Current A/C', debit: 5000, credit: 0 },
+        ],
+        createdAt: '2026-10-16T10:00:00.000Z',
+      };
+
+      const contraEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-VCH-OUT-VCH-CONTRA-001',
+        date: '2026-10-16',
+        type: 'CONTRA',
+        category: 'CASH',
+        accountId: 'ACC_CASH',
+        accountName: 'Cash in Hand',
+        counterpartyOrTitle: 'Transfer to SBI Current A/C',
+        referenceNo: 'CONTRA-001',
+        mode: 'CONTRA',
+        flow: 'OUT',
+        amount: 5000,
+        description: 'Contra Transfer: Cash in Hand ➔ SBI Current A/C',
+        fromAccountId: 'ACC_CASH',
+        fromAccountName: 'Cash in Hand',
+        toAccountId: 'ACC_BANK_SBI',
+        toAccountName: 'SBI Current A/C',
+        contraType: 'DEPOSIT',
+        rawVoucherId: contraVoucher.id,
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={contraEntry}
+            vouchers={[contraVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={vi.fn()}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+    });
+
+    it('never shows "Edit Payment" for CONTRA entries during fallback voucher resolution (omitted rawVoucherId)', async () => {
+      const contraVoucher: Voucher = {
+        id: 'VCH-CONTRA-002',
+        voucherNumber: 'CONTRA-002',
+        voucherType: 'CONTRA',
+        date: '2026-10-16',
+        totalAmount: 3000,
+        narration: 'Contra Transfer: Cash in Hand ➔ SBI Current A/C',
+        entries: [
+          { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 0, credit: 3000 },
+          { accountId: 'ACC_BANK_SBI', accountName: 'SBI Current A/C', debit: 3000, credit: 0 },
+        ],
+        createdAt: '2026-10-16T10:00:00.000Z',
+      };
+
+      const fallbackContraEntry: UnifiedLedgerEntry = {
+        id: 'LEDGER-VCH-OUT-VCH-CONTRA-002',
+        date: '2026-10-16',
+        type: 'CONTRA',
+        category: 'CASH',
+        accountId: 'ACC_CASH',
+        accountName: 'Cash in Hand',
+        counterpartyOrTitle: 'Transfer to SBI Current A/C',
+        referenceNo: 'CONTRA-002',
+        mode: 'CONTRA',
+        flow: 'OUT',
+        amount: 3000,
+        description: 'Contra Transfer: Cash in Hand ➔ SBI Current A/C',
+        fromAccountId: 'ACC_CASH',
+        fromAccountName: 'Cash in Hand',
+        toAccountId: 'ACC_BANK_SBI',
+        toAccountName: 'SBI Current A/C',
+        contraType: 'DEPOSIT',
+        rawVoucherId: undefined, // Omitted rawVoucherId to test fallback resolution
+      };
+
+      await act(async () => {
+        root.render(
+          <CashBankTransactionDetailModal
+            isOpen={true}
+            onClose={vi.fn()}
+            entry={fallbackContraEntry}
+            vouchers={[contraVoucher]}
+            accounts={mockAccounts}
+            onEditVoucher={vi.fn()}
+          />
+        );
+      });
+
+      const editBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Edit Payment')
+      );
+      expect(editBtn).toBeUndefined();
+    });
+  });
 });
