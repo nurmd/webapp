@@ -43,13 +43,13 @@ import {
 import { DashboardView } from './components/Dashboard/DashboardView.tsx';
 
 // Data models and utilities
-import { findConflictingInvoice } from './core/utils/invoiceNumber.ts';
+import { findConflictingInvoice, getDocumentSeriesConfig, formatDocumentNumberPreview } from './core/utils/invoiceNumber.ts';
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
 import { withWalkInCustomer, isSystemParty } from './core/utils/systemParties.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
-import { isItemInBills, getActiveItems } from './core/utils/itemStatus.ts';
+import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
 import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
 import { PaymentModalProvider } from './components/Payments/PaymentModalContext.tsx';
@@ -1066,6 +1066,12 @@ export const App: React.FC = () => {
     const docId = Date.now().toString().slice(-6);
     const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
 
+    const receiptConfig = getDocumentSeriesConfig(company, 'PAYMENT_RECEIPT');
+    const paymentConfig = getDocumentSeriesConfig(company, 'PAYMENT_VOUCHER');
+    const voucherDate = new Date(dateStr);
+    const receiptNumber = formatDocumentNumberPreview(receiptConfig, parseInt(docId, 10) || 1, voucherDate);
+    const paymentNumber = formatDocumentNumberPreview(paymentConfig, parseInt(docId, 10) || 1, voucherDate);
+
     let resolvedAllocations = allocations;
     let resolvedMode = allocationMode;
 
@@ -1088,7 +1094,7 @@ export const App: React.FC = () => {
     try {
       if (isPaymentIn) {
         const voucher = createPaymentReceiptVoucher({
-          receiptNumber: `RCPT-${docId}`,
+          receiptNumber: receiptNumber,
           date: dateStr,
           customerName: party.name,
           customerId: party.id,
@@ -1109,7 +1115,7 @@ export const App: React.FC = () => {
         db.savePaymentVoucher(voucher);
       } else {
         const voucher = createPaymentOutVoucher({
-          voucherNumber: `PYMT-${docId}`,
+          voucherNumber: paymentNumber,
           date: dateStr,
           supplierName: party.name,
           supplierId: party.id,
@@ -1160,6 +1166,7 @@ export const App: React.FC = () => {
   }, [activeUser.role]);
 
   const activeItems = React.useMemo(() => getActiveItems(items), [items]);
+  const restockCount = React.useMemo(() => getItemsNeedingRestock(activeItems).length, [activeItems]);
 
   const handleSaveItem = useCallback((item: InventoryItem) => {
     const trimmed = (item.name || '').normalize('NFC').trim().toLowerCase();
@@ -1695,6 +1702,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
         onNewInvoice={handleOpenNewInvoice}
+        restockCount={restockCount}
       />
 
       {/* Modals */}

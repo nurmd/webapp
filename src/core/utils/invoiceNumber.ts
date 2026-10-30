@@ -267,6 +267,12 @@ export const DOCUMENT_SERIES_LABELS: Record<DocumentSeriesType, { title: string;
     icon: 'payments',
     description: 'Cash / Bank money receipt voucher',
   },
+  PAYMENT_VOUCHER: {
+    title: 'Payment Voucher',
+    shortCode: 'PYMT',
+    icon: 'payments',
+    description: 'Cash / Bank money payment voucher',
+  },
 };
 
 export const DEFAULT_SERIES_CONFIGS: Record<DocumentSeriesType, DocumentSeriesConfig> = {
@@ -342,6 +348,13 @@ export const DEFAULT_SERIES_CONFIGS: Record<DocumentSeriesType, DocumentSeriesCo
   },
   PAYMENT_RECEIPT: {
     prefix: 'REC',
+    separator: '-',
+    yearFormat: 'NONE',
+    paddingDigits: 4,
+    startingNumber: 1,
+  },
+  PAYMENT_VOUCHER: {
+    prefix: 'PYMT',
     separator: '-',
     yearFormat: 'NONE',
     paddingDigits: 4,

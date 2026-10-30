@@ -9,7 +9,8 @@ export type DocumentSeriesType =
   | 'PURCHASE_BILL'    // Purchase Invoices
   | 'PURCHASE_ORDER'   // Purchase Order
   | 'PURCHASE_CHALLAN' // Inward Goods Receipt / Purchase Challan
-  | 'PAYMENT_RECEIPT'; // Cash / Bank Receipt Voucher
+  | 'PAYMENT_RECEIPT'   // Cash / Bank Receipt Voucher (Payment In)
+  | 'PAYMENT_VOUCHER';   // Cash / Bank Payment Voucher (Payment Out)
 
 export type SeriesYearFormat = 'NONE' | 'YYYY' | 'YY_YY';
 export type SeriesSeparator = '-' | '/' | '.' | '';

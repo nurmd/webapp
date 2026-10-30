@@ -32,6 +32,7 @@ const DOCUMENT_TYPES_ORDER: DocumentSeriesType[] = [
   'DEBIT_NOTE',
   'PURCHASE_BILL',
   'PAYMENT_RECEIPT',
+  'PAYMENT_VOUCHER',
 ];
 
 export const InvoicePrefixSettingsModal: React.FC<InvoicePrefixSettingsModalProps> = ({
