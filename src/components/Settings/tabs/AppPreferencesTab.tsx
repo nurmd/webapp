@@ -1,4 +1,9 @@
 import React from 'react';
+import {
+  DASHBOARD_QUICK_ACTIONS,
+  DashboardQuickActionId,
+  MAX_DASHBOARD_QUICK_ACTIONS,
+} from '../../../core/settings/dashboardQuickActions.ts';
 
 export interface AppPreferencesTabProps {
   appLanguage: 'English (India)' | 'हिंदी (Hindi)';
@@ -10,6 +15,9 @@ export interface AppPreferencesTabProps {
   handleCheckForUpdates: () => void;
   isUpdateChecking: boolean;
   setActiveSubModal?: (modal: string | null) => void;
+  dashboardQuickActions?: DashboardQuickActionId[];
+  onToggleDashboardQuickAction?: (id: DashboardQuickActionId) => void;
+  maxDashboardQuickActions?: number;
 }
 
 export const AppPreferencesTab: React.FC<AppPreferencesTabProps> = ({
@@ -22,7 +30,14 @@ export const AppPreferencesTab: React.FC<AppPreferencesTabProps> = ({
   handleCheckForUpdates,
   isUpdateChecking,
   setActiveSubModal,
+  dashboardQuickActions = [],
+  onToggleDashboardQuickAction,
+  maxDashboardQuickActions = MAX_DASHBOARD_QUICK_ACTIONS,
 }) => {
+  const selectedCount = dashboardQuickActions.length;
+  const atMax = selectedCount >= maxDashboardQuickActions;
+  const canConfigureQuickActions = Boolean(onToggleDashboardQuickAction);
+
   return (
     <div className="flex flex-col gap-4">
       {/* 1. App Updates & OTA Channel Card */}
@@ -139,6 +154,79 @@ export const AppPreferencesTab: React.FC<AppPreferencesTabProps> = ({
           </button>
         )}
       </section>
+
+      {/* 3. Dashboard Quick Actions */}
+      {canConfigureQuickActions && (
+      <section className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 overflow-hidden">
+        <div className="p-4 border-b border-outline-variant/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-secondary/15 flex items-center justify-center text-secondary flex-shrink-0">
+              <span className="material-symbols-outlined text-[22px]">dashboard_customize</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-label-md text-sm font-bold text-on-surface">Dashboard Quick Actions</div>
+              <div className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+                Choose up to {maxDashboardQuickActions} shortcuts for your dashboard.
+              </div>
+            </div>
+          </div>
+          <span
+            className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 ${
+              atMax
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                : 'bg-secondary-container text-on-secondary-container'
+            }`}
+          >
+            {selectedCount}/{maxDashboardQuickActions}
+          </span>
+        </div>
+
+        <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {Object.values(DASHBOARD_QUICK_ACTIONS).map((action) => {
+            const selected = dashboardQuickActions.includes(action.id);
+            const isLastSelected = selected && selectedCount === 1;
+            const disabled = (!selected && atMax) || isLastSelected;
+            return (
+              <button
+                key={action.id}
+                data-quick-action-setting={action.id}
+                type="button"
+                onClick={() => onToggleDashboardQuickAction?.(action.id)}
+                disabled={disabled}
+                aria-pressed={selected}
+                title={isLastSelected ? 'At least one quick action is required' : action.description}
+                className={`min-h-[44px] flex items-center gap-2 px-2.5 py-2 rounded-xl border text-left transition-all ${
+                  selected
+                    ? 'bg-secondary/10 border-secondary text-on-surface shadow-xs'
+                    : 'bg-surface-container-low/60 border-outline-variant/30 text-on-surface-variant hover:border-secondary/50 hover:text-on-surface'
+                } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-[0.98]'}`}
+              >
+                <span
+                  className={`material-symbols-outlined text-[18px] flex-shrink-0 ${
+                    selected ? 'text-secondary' : action.accentClass
+                  }`}
+                >
+                  {action.icon}
+                </span>
+                <span className="text-xs font-bold truncate flex-1">{action.label}</span>
+                {selected && (
+                  <span className="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">
+                    check_circle
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {atMax && (
+          <div className="px-4 pb-3 text-[11px] text-on-surface-variant flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[14px]">info</span>
+            Maximum {maxDashboardQuickActions} quick actions selected. Deselect one to choose another.
+          </div>
+        )}
+      </section>
+      )}
     </div>
   );
 };

@@ -2,6 +2,11 @@ import { CompanyProfile } from '../../models/company.ts';
 import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
 import { StorageEngine, STORAGE_KEYS, SyncedSettings, DEFAULT_COMPANY } from './storageEngine.ts';
+import {
+  DashboardQuickActionId,
+  DEFAULT_DASHBOARD_QUICK_ACTIONS,
+  normalizeDashboardQuickActions,
+} from '../../core/settings/dashboardQuickActions.ts';
 
 /**
  * Settings and Company Profile domain storage.
@@ -67,9 +72,19 @@ export class SettingsStorage extends StorageEngine {
       ewayBillThreshold: 50000,
       autoWhatsAppAlerts: true,
       allowNegativeStock: this.getAllowNegativeStock(),
+      dashboardQuickActions: DEFAULT_DASHBOARD_QUICK_ACTIONS,
       updatedAt: new Date().toISOString(),
     };
     return this.get<SyncedSettings>(STORAGE_KEYS.SETTINGS, defaultSettings);
+  }
+
+  // Configurable Dashboard Quick Actions (Max 6)
+  getDashboardQuickActions(): DashboardQuickActionId[] {
+    return normalizeDashboardQuickActions(this.getSettings().dashboardQuickActions);
+  }
+
+  setDashboardQuickActions(ids: readonly string[]): void {
+    this.saveSettings({ dashboardQuickActions: normalizeDashboardQuickActions(ids) });
   }
 
   // Allow Negative Stock Inventory Setting

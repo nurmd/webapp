@@ -29,6 +29,12 @@ import { getOverdueDays } from '../../core/accounting/aging.ts';
 import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
 import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
+import { useSettings } from '../../core/store/useDataStore.ts';
+import {
+  DASHBOARD_QUICK_ACTIONS,
+  DashboardQuickActionId,
+  normalizeDashboardQuickActions,
+} from '../../core/settings/dashboardQuickActions.ts';
 
 export type ActivityType = 'SALE' | 'PURCHASE' | 'VOUCHER' | 'EXPENSE';
 export type CashFlowDirection = 'IN' | 'OUT';
@@ -115,6 +121,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const activePurchases = (propPurchases !== undefined && propPurchases !== null ? propPurchases : db.getPurchases()) || [];
   const activeVouchers = (propVouchers !== undefined && propVouchers !== null ? propVouchers : db.getVouchers()) || [];
   const activeExpenses = (propExpenses !== undefined && propExpenses !== null ? propExpenses : db.getExpenses()) || [];
+
+  // Configurable dashboard quick actions (max 6)
+  const settings = useSettings();
+  const quickActionIds = normalizeDashboardQuickActions(settings.dashboardQuickActions);
+  const quickActionDefinitions = quickActionIds
+    .map((id) => DASHBOARD_QUICK_ACTIONS[id])
+    .filter(Boolean);
+
+  const handleQuickAction = (id: DashboardQuickActionId) => {
+    switch (id) {
+      case 'SALE_BILL':
+        onNavigateTab('sales');
+        break;
+      case 'QUICK_POS':
+        onQuickPos();
+        break;
+      case 'NEW_INVOICE':
+        onNewInvoice();
+        break;
+      case 'PURCHASE':
+        onNavigateTab('purchases');
+        break;
+      case 'ADD_PARTY':
+        onNavigateTab('parties');
+        break;
+      case 'ITEMS':
+        onNavigateTab('inventory');
+        break;
+      case 'EXPENSES':
+        onNavigateTab('expenses');
+        break;
+      case 'PAYMENT_IN':
+        onNavigateTab('payment_in');
+        break;
+      case 'PAYMENT_OUT':
+        onNavigateTab('payment_out');
+        break;
+      case 'CASH_BANK':
+        onNavigateTab('cash_bank');
+        break;
+      case 'REPORTS':
+        onNavigateTab('reports');
+        break;
+    }
+  };
 
   // Filters & Search State
   const [txTypeFilter, setTxTypeFilter] = useState<TxTypeFilter>('ALL');
@@ -883,7 +934,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </section>
 
-        {/* Right: Quick Action Buttons (4-Col on mobile, 2x2 on tablet) */}
+        {/* Right: Configurable Quick Action Buttons (max 6) */}
         <section className="md:col-span-4 bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-3">
           <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
             <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
@@ -893,48 +944,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-outline font-semibold">Fast Shortcuts</span>
           </div>
 
-          <div className="grid grid-cols-4 md:grid-cols-2 gap-2 sm:gap-3">
-            {/* Sale Bill */}
-            <button
-              onClick={() => onNavigateTab('sales')}
-              type="button"
-              className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-secondary text-on-secondary shadow-sm active:scale-95 transition-all cursor-pointer"
-              title="Open Sales Ledger"
-            >
-              <span className="material-symbols-outlined text-[22px]">receipt_long</span>
-              <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Sale Bill</span>
-            </button>
-
-            {/* POS Counter */}
-            <button
-              onClick={onQuickPos}
-              type="button"
-              className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs active:scale-95 transition-all cursor-pointer hover:border-secondary"
-            >
-              <span className="material-symbols-outlined text-[22px] text-secondary">point_of_sale</span>
-              <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Quick POS</span>
-            </button>
-
-            {/* Purchase */}
-            <button
-              onClick={() => onNavigateTab('purchases')}
-              type="button"
-              className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs active:scale-95 transition-all cursor-pointer hover:border-orange-500/50"
-              title="Open Purchase Ledger"
-            >
-              <span className="material-symbols-outlined text-[22px] text-orange-600 dark:text-orange-400">shopping_bag</span>
-              <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Purchase</span>
-            </button>
-
-            {/* Add Party */}
-            <button
-              onClick={() => onNavigateTab('parties')}
-              type="button"
-              className="flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs active:scale-95 transition-all cursor-pointer hover:border-secondary"
-            >
-              <span className="material-symbols-outlined text-[22px] text-on-surface-variant">person_add</span>
-              <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">Add Party</span>
-            </button>
+          <div className="grid grid-cols-3 md:grid-cols-2 gap-2 sm:gap-3">
+            {quickActionDefinitions.map((action, index) => {
+              const isPrimary = index === 0;
+              return (
+                <button
+                  key={action.id}
+                  data-quick-action={action.id}
+                  onClick={() => handleQuickAction(action.id)}
+                  type="button"
+                  className={`flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl active:scale-95 transition-all cursor-pointer ${
+                    isPrimary
+                      ? 'bg-secondary text-on-secondary shadow-sm'
+                      : 'bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs hover:border-secondary'
+                  }`}
+                  title={action.description}
+                >
+                  <span className={`material-symbols-outlined text-[22px] ${isPrimary ? '' : action.accentClass}`}>
+                    {action.icon}
+                  </span>
+                  <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">{action.label}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
       </div>
@@ -1063,53 +1095,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 expand_more
               </span>
             </div>
-
-            {/* Date Range / Period Dropdown */}
-            <div className="relative flex-1 min-w-0">
-              <select
-                id="timeline-filter-period"
-                value={datePreset}
-                onChange={(e) => {
-                  const val = e.target.value as DatePreset;
-                  if (val === 'CUSTOM') {
-                    setIsDateModalOpen(true);
-                  } else {
-                    const bounds = getDateFilterBounds(val);
-                    setDatePreset(val);
-                    setCustomStart(bounds.start);
-                    setCustomEnd(bounds.end);
-                  }
-                }}
-                className={`w-full appearance-none min-h-[38px] pl-2.5 pr-6 sm:pr-7 rounded-xl border text-xs font-semibold transition-all cursor-pointer truncate ${
-                  datePreset !== 'ALL_TIME'
-                    ? 'bg-secondary/15 border-secondary text-secondary font-bold'
-                    : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:border-outline-variant/60'
-                }`}
-                aria-label="Filter by date period"
-              >
-                <option value="ALL_TIME">All Time</option>
-                <option value="TODAY">Today</option>
-                <option value="THIS_WEEK">This Week</option>
-                <option value="THIS_MONTH">This Month</option>
-                <option value="CUSTOM">{datePreset === 'CUSTOM' ? `Custom: ${dateRange.label}` : 'Custom Date...'}</option>
-              </select>
-              <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant pointer-events-none">
-                expand_more
-              </span>
-            </div>
-
-            {/* Custom Date Modal Trigger Button when custom active */}
-            {datePreset === 'CUSTOM' && (
-              <button
-                type="button"
-                onClick={() => setIsDateModalOpen(true)}
-                className="min-h-[38px] px-2 rounded-xl bg-secondary text-on-secondary text-xs flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
-                title="Edit Custom Date Range"
-                aria-label="Edit Custom Date Range"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
-              </button>
-            )}
 
             {/* Quick Reset Button when any filter is active */}
             {(txTypeFilter !== 'ALL' || txStatusFilter !== 'ALL' || datePreset !== 'ALL_TIME' || searchQuery) && (

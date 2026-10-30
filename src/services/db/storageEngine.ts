@@ -51,6 +51,7 @@ export interface SyncedSettings {
   allowNegativeStock?: boolean;
   defaultDueDays?: number;
   autoRoundOff?: boolean;
+  dashboardQuickActions?: string[];
   updatedAt: string;
 }
 

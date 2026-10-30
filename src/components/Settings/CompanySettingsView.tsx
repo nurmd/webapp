@@ -34,6 +34,11 @@ import { SettingsSubModal } from './modals/SettingsSubModal.tsx';
 import { DatabaseBackupModal } from './modals/DatabaseBackupModal.tsx';
 import { InvoicePrefixSettingsModal } from './modals/InvoicePrefixSettingsModal.tsx';
 import { CategoryManagementModal } from './modals/CategoryManagementModal.tsx';
+import {
+  DashboardQuickActionId,
+  MAX_DASHBOARD_QUICK_ACTIONS,
+  normalizeDashboardQuickActions,
+} from '../../core/settings/dashboardQuickActions.ts';
 
 export type SettingsCategoryId =
   | 'business_profile'
@@ -255,6 +260,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   // App preferences
   const [appLanguage, setAppLanguage] = useState<'English (India)' | 'हिंदी (Hindi)'>('English (India)');
   const [isAppLockEnabled, setIsAppLockEnabled] = useState(true);
+  const [dashboardQuickActions, setDashboardQuickActions] = useState<DashboardQuickActionId[]>(() =>
+    db.getDashboardQuickActions()
+  );
 
   // Device-local preference: Never synced across devices
   const [showBuyPricesGlobally, setShowBuyPricesGlobally] = useState<boolean>(() => {
@@ -292,6 +300,23 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
   const handleToggleNegativeStock = (enabled: boolean) => {
     setAllowNegativeStock(enabled);
     db.setAllowNegativeStock(enabled);
+    showSavedNotice(2000);
+  };
+
+  const handleToggleDashboardQuickAction = (id: DashboardQuickActionId) => {
+    const current = dashboardQuickActions;
+    let next: DashboardQuickActionId[];
+
+    if (current.includes(id)) {
+      if (current.length === 1) return;
+      next = current.filter((actionId) => actionId !== id);
+    } else {
+      if (current.length >= MAX_DASHBOARD_QUICK_ACTIONS) return;
+      next = [...current, id];
+    }
+
+    setDashboardQuickActions(next);
+    db.setDashboardQuickActions(next);
     showSavedNotice(2000);
   };
 
@@ -576,6 +601,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       appLanguage,
       isAppLockEnabled,
       allowNegativeStock,
+      dashboardQuickActions,
     });
     showSavedNotice(3000);
   };
@@ -590,6 +616,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         appLanguage,
         isAppLockEnabled,
         allowNegativeStock,
+        dashboardQuickActions,
       });
       setLastProfileSyncTime(res.lastSyncedAt);
       setProfileSyncNotice('All settings synced with all devices! (Printing settings preserved locally)');
@@ -610,12 +637,13 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         appLanguage,
         isAppLockEnabled,
         allowNegativeStock,
+        dashboardQuickActions,
       };
       return btoa(unescape(encodeURIComponent(JSON.stringify(fullSettings))));
     } catch {
       return '';
     }
-  }, [profile, isGstActive, appLanguage, isAppLockEnabled, allowNegativeStock]);
+  }, [profile, isGstActive, appLanguage, isAppLockEnabled, allowNegativeStock, dashboardQuickActions]);
 
   const handleCopySyncCode = () => {
     if (allSettingsSyncPayload) {
@@ -654,6 +682,11 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         setAllowNegativeStock(parsed.allowNegativeStock);
         db.setAllowNegativeStock(parsed.allowNegativeStock);
       }
+      if (parsed.dashboardQuickActions !== undefined) {
+        const nextQuickActions = normalizeDashboardQuickActions(parsed.dashboardQuickActions);
+        setDashboardQuickActions(nextQuickActions);
+        db.setDashboardQuickActions(nextQuickActions);
+      }
 
       db.syncAllSettingsAcrossDevices({
         company: incomingCompany,
@@ -661,6 +694,10 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
         appLanguage: parsed.appLanguage || appLanguage,
         isAppLockEnabled: parsed.isAppLockEnabled !== undefined ? parsed.isAppLockEnabled : isAppLockEnabled,
         allowNegativeStock: parsed.allowNegativeStock !== undefined ? parsed.allowNegativeStock : allowNegativeStock,
+        dashboardQuickActions:
+          parsed.dashboardQuickActions !== undefined
+            ? normalizeDashboardQuickActions(parsed.dashboardQuickActions)
+            : dashboardQuickActions,
       });
 
       setProfile(incomingCompany);
@@ -682,6 +719,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
       appLanguage,
       isAppLockEnabled,
       allowNegativeStock,
+      dashboardQuickActions,
     });
     setIsEditModalOpen(false);
     showSavedNotice(3000);
@@ -919,6 +957,9 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                 handleCheckForUpdates={handleCheckForUpdates}
                 isUpdateChecking={isUpdateChecking}
                 setActiveSubModal={setActiveSubModal}
+                dashboardQuickActions={dashboardQuickActions}
+                onToggleDashboardQuickAction={handleToggleDashboardQuickAction}
+                maxDashboardQuickActions={MAX_DASHBOARD_QUICK_ACTIONS}
               />
             )}
 
@@ -1044,6 +1085,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
             appLanguage,
             isAppLockEnabled,
             allowNegativeStock,
+            dashboardQuickActions,
           });
         }}
       />

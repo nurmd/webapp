@@ -47,6 +47,7 @@ gst-billing-app/
     │   ├── inventory/         # Stock decrement/increment engine & constraints
     │   ├── accounting/        # Double-entry ledger vouchers & daybook rules
     │   ├── security/          # RBAC roles & access permissions
+    │   ├── settings/          # Dashboard quick-action catalog & normalization
     │   └── utils/             # Formatters (INR ₹, dates), number-to-words (Lakhs/Crores)
     ├── models/                # TypeScript data schemas & entity contracts
     │   ├── invoice.ts         # Invoice, InvoiceItemEntry, PaymentMode, PaymentStatus
@@ -439,9 +440,10 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   2. Billing & Invoices (Prefixes, numbering, payment QR, default print format)
   3. Inventory & Items (Negative stock allow toggle, buy price visibility)
   4. Hardware & Printing (Thermal 58mm/80mm, margins, auto-cut)
-  5. App Preferences (Language, theme, app lock, OTA updates)
+  5. App Preferences (Language, theme, app lock, OTA updates, Dashboard Quick Actions — choose 1–6 shortcuts)
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
+- Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 6, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` using the same navigation/creation handlers as the legacy shortcuts.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:
