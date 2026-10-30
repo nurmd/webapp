@@ -998,40 +998,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Date Range Selector Pill Button */}
-              <button
-                type="button"
-                onClick={() => setIsDateModalOpen(true)}
-                className={`min-h-[36px] flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border shadow-xs active:scale-95 ${
-                  datePreset !== 'ALL_TIME'
-                    ? 'bg-secondary text-on-secondary border-secondary'
-                    : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-low hover:text-on-surface'
-                }`}
-                title="Filter timeline by date range"
-                aria-label="Filter timeline by date range"
-              >
-                <span className="material-symbols-outlined text-[16px]">calendar_month</span>
-                <span className="truncate max-w-[120px] sm:max-w-[170px]">{dateRange.label}</span>
-                {datePreset !== 'ALL_TIME' ? (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDatePreset('ALL_TIME');
-                      setCustomStart('');
-                      setCustomEnd('');
-                    }}
-                    className="material-symbols-outlined text-[14px] hover:text-error ml-0.5"
-                    title="Reset to All Time"
-                    aria-label="Reset date filter"
-                  >
-                    close
-                  </span>
-                ) : (
-                  <span className="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
-                )}
-              </button>
-            </div>
           </div>
 
           {/* Real-Time Live Search Input (R2) */}
@@ -1107,6 +1073,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 expand_more
               </span>
             </div>
+
+            {/* Date Range / Period Dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <select
+                id="timeline-filter-period"
+                value={datePreset}
+                onChange={(e) => {
+                  const val = e.target.value as DatePreset;
+                  if (val === 'CUSTOM') {
+                    setIsDateModalOpen(true);
+                  } else {
+                    const bounds = getDateFilterBounds(val);
+                    setDatePreset(val);
+                    setCustomStart(bounds.start);
+                    setCustomEnd(bounds.end);
+                  }
+                }}
+                className={`w-full appearance-none min-h-[38px] pl-2.5 pr-6 sm:pr-7 rounded-xl border text-xs font-semibold transition-all cursor-pointer truncate ${
+                  datePreset !== 'ALL_TIME'
+                    ? 'bg-secondary/15 border-secondary text-secondary font-bold'
+                    : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:border-outline-variant/60'
+                }`}
+                aria-label="Filter by date period"
+              >
+                <option value="ALL_TIME">All Time</option>
+                <option value="TODAY">Today</option>
+                <option value="THIS_WEEK">This Week</option>
+                <option value="THIS_MONTH">This Month</option>
+                <option value="CUSTOM">{datePreset === 'CUSTOM' ? `Custom: ${dateRange.label}` : 'Custom Date...'}</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant pointer-events-none">
+                expand_more
+              </span>
+            </div>
+
+            {/* Custom Date Modal Trigger Button when custom active */}
+            {datePreset === 'CUSTOM' && (
+              <button
+                type="button"
+                onClick={() => setIsDateModalOpen(true)}
+                className="min-h-[38px] px-2 rounded-xl bg-secondary text-on-secondary text-xs flex items-center justify-center shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
+                title="Edit Custom Date Range"
+                aria-label="Edit Custom Date Range"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
+              </button>
+            )}
 
             {/* Quick Reset Button when any filter is active */}
             {(txTypeFilter !== 'ALL' || txStatusFilter !== 'ALL' || datePreset !== 'ALL_TIME' || searchQuery) && (

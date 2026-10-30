@@ -517,7 +517,7 @@ describe('Empirical Adversarial Stress Testing: Dashboard Date Filtering', () =>
       expect(container.textContent).not.toContain('INV-PAST-99');
     });
 
-    it('3.4: Date Range selector pill opens DateFilterModal on click', () => {
+    it('3.4: Date Range dropdown (Custom) opens DateFilterModal on change', () => {
       act(() => {
         root.render(
           <DashboardView
@@ -539,12 +539,13 @@ describe('Empirical Adversarial Stress Testing: Dashboard Date Filtering', () =>
       // DateFilterModal should initially not be visible
       expect(container.textContent).not.toContain('Filter by Date Range');
 
-      // Click the date range pill button
-      const dateRangePill = container.querySelector('button[aria-label="Filter timeline by date range"]');
-      expect(dateRangePill).toBeTruthy();
+      // Open the DateFilterModal via the inline date period dropdown
+      const datePeriodSelect = container.querySelector('#timeline-filter-period') as HTMLSelectElement;
+      expect(datePeriodSelect).toBeTruthy();
 
       act(() => {
-        dateRangePill!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        datePeriodSelect.value = 'CUSTOM';
+        datePeriodSelect.dispatchEvent(new Event('change', { bubbles: true }));
       });
 
       // DateFilterModal should now be open
