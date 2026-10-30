@@ -1,15 +1,15 @@
 {
-  "version": "1.2.50",
+  "version": "1.2.51",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-30T07:34:07.366Z",
+  "buildTime": "2026-10-30T11:38:52.759Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "configurable dashboard quick actions and timeline filter cleanup",
+    "improve invoice preview fit and long item wrapping",
+    "let compact invoice/purchase item grid use full modal height",
+    "bump version to v1.2.50 (Edit Payment voucher-type guard)",
     "restrict Edit Payment to RECEIPT/PAYMENT vouchers only",
-    "edit party payment-in/out from Payment In/Out sections via VoucherEditorModal (v1.2.49)",
-    "bump version to v1.2.48 (Payment Linking, Dedupe & Save Safety)",
-    "bump version to v1.2.47 (Modal Unification, Direct PDF & AI Bill Intake)",
-    "integrate master (v1.2.46 AI Bill Intake) into payments-work",
-    "bump version to v1.2.46 (AI Bill Intake)"
+    "edit party payment-in/out from Payment In/Out sections via VoucherEditorModal (v1.2.49)"
   ]
 }
