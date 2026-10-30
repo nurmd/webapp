@@ -72,22 +72,57 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
   const [containerWidth, setContainerWidth] = useState<number>(() => {
     return typeof window !== 'undefined' ? window.innerWidth : 800;
   });
-  const [a4ContentHeight, setA4ContentHeight] = useState<number>(1120);
+  const [a4ContentHeight, setA4ContentHeight] = useState<number>(0);
   const a4ContentRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateDims = () => {
       if (typeof window !== 'undefined') {
-        setContainerWidth(window.innerWidth);
+        const vpWidth = viewportRef.current?.clientWidth;
+        setContainerWidth(vpWidth && vpWidth > 0 ? vpWidth : window.innerWidth);
       }
       if (a4ContentRef.current) {
-        setA4ContentHeight(a4ContentRef.current.offsetHeight || 1120);
+        const h = a4ContentRef.current.scrollHeight || a4ContentRef.current.offsetHeight;
+        if (h > 0) {
+          setA4ContentHeight(h);
+        }
       }
     };
     updateDims();
     window.addEventListener('resize', updateDims);
     return () => window.removeEventListener('resize', updateDims);
   }, [viewMode]);
+
+  // Dynamically observe content size changes (e.g. line items rendered, fonts loaded, QR code generated)
+  useEffect(() => {
+    const el = a4ContentRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const h = el.scrollHeight || el.offsetHeight;
+      if (h > 0) {
+        setA4ContentHeight(h);
+      }
+      const vpWidth = viewportRef.current?.clientWidth;
+      if (vpWidth && vpWidth > 0) {
+        setContainerWidth(vpWidth);
+      }
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        measure();
+      });
+      observer.observe(el);
+      if (viewportRef.current) {
+        observer.observe(viewportRef.current);
+      }
+      return () => observer.disconnect();
+    }
+  }, [viewMode, propInvoice]);
 
   const [thermalWidth, setThermalWidth] = useState<32 | 48>(() => {
     const defaultPrint = localStorage.getItem('defaultPrintOption');
@@ -519,6 +554,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
         {/* Document Preview Viewport Container */}
         <div
+          ref={viewportRef}
           className={`print-preview-viewport overflow-auto py-1 sm:py-2 px-1 flex ${
             viewMode === 'THERMAL' || viewMode === 'MOBILE'
               ? 'justify-center'
@@ -918,7 +954,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className="text-xs font-black text-on-surface block leading-tight">
+                        <span className="text-xs font-black text-on-surface block leading-tight break-words">
                           {idx + 1}. {item.name}
                         </span>
                         {item.hsnSacCode && item.hsnSacCode !== '-' && (
@@ -1141,7 +1177,10 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 viewMode === 'A4' && a4FitZoom && containerWidth < 794
                   ? {
                       width: `${Math.floor(794 * Math.min(1, Math.max(0.35, (containerWidth - 16) / 794)))}px`,
-                      height: a4ContentHeight
+                      height: (a4ContentHeight > 0 ? a4ContentHeight : 1120)
+                        ? `${Math.ceil((a4ContentHeight > 0 ? a4ContentHeight : 1120) * Math.min(1, Math.max(0.35, (containerWidth - 16) / 794)))}px`
+                        : undefined,
+                      minHeight: a4ContentHeight > 0
                         ? `${Math.ceil(a4ContentHeight * Math.min(1, Math.max(0.35, (containerWidth - 16) / 794)))}px`
                         : undefined,
                       overflow: 'hidden',
@@ -1157,6 +1196,9 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                 style={{
                   color: '#090d16',
                   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  width: viewMode === 'A4' && a4FitZoom && containerWidth < 794 ? '794px' : undefined,
+                  minWidth: viewMode === 'A4' && a4FitZoom && containerWidth < 794 ? '794px' : undefined,
+                  maxWidth: viewMode === 'A4' && a4FitZoom && containerWidth < 794 ? '794px' : undefined,
                   transform:
                     viewMode === 'A4' && a4FitZoom && containerWidth < 794
                       ? `scale(${Math.min(1, Math.max(0.35, (containerWidth - 16) / 794))})`
@@ -1492,7 +1534,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                   <thead>
                     <tr className="bg-slate-100 border-b-2 border-slate-900 text-slate-900 font-black uppercase text-[10px]">
                       <th className="py-2 px-2 text-center w-8 border-r border-slate-400">Sl.</th>
-                      <th className="py-2 px-3 border-r border-slate-400 min-w-[220px]">
+                      <th className="py-2 px-3 border-r border-slate-400 min-w-[180px]">
                         Description of Goods / Services
                       </th>
                       {isGst && (
@@ -1526,7 +1568,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                           {idx + 1}
                         </td>
                         <td className="py-2 px-3 border-r border-slate-300">
-                          <span className="font-bold text-slate-950 block text-xs">{line.name}</span>
+                          <span className="font-bold text-slate-950 block text-xs break-words">{line.name}</span>
                           {line.discountPercent > 0 && (
                             <span className="text-[10px] text-emerald-700 font-semibold block">
                               Discount applied: {line.discountPercent}%

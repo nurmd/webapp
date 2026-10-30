@@ -120,10 +120,10 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                   return (
                     <tr key={idx} className="hover:bg-surface-container-low/40">
                       <td className="py-1.5 px-2.5 min-w-0 text-left">
-                        <div className="truncate font-bold text-on-surface" title={item.name}>
+                        <div className="font-bold text-on-surface break-words line-clamp-2" title={item.name}>
                           {item.name}
                         </div>
-                        <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono truncate">
+                        <div className="text-[9px] text-on-surface-variant flex flex-wrap items-center gap-1 font-mono">
                           {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
                           {isGstActive && item.hsnSacCode && <span>•</span>}
                           {isGst && (
