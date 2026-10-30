@@ -69,26 +69,51 @@ export function computeCashBankSummary(params: {
   };
 
   // 2. Process Sales Invoices (Inflow from upfront payments without vouchers)
-  // Calculate total voucher receipts per party so we only count unvouchered upfront invoice payments
-  const partyVoucherReceipts: Record<string, number> = {};
+  // Build a per-document map of active receipt-voucher allocations:
+  // allocatedReceiptsByInvoice[documentId] += allocation.amount
+  // Only use the old party-aggregate fallback for legacy vouchers that have no paymentAllocations.
+  const allocatedReceiptsByInvoice: Record<string, number> = {};
+  const legacyPartyVoucherReceipts: Record<string, number> = {};
+
   vouchers.forEach((v) => {
     if (!v || v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'RECEIPT') {
-      (v.entries || []).forEach((e) => {
-        if (!e) return;
-        if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
-          const key = e.accountId.toLowerCase();
-          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
-        } else if (e.accountName) {
-          const key = e.accountName.trim().toLowerCase();
-          partyVoucherReceipts[key] = (partyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
-        }
-      });
+      if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+        v.paymentAllocations.forEach((alloc) => {
+          if (alloc && alloc.documentType === 'INVOICE' && alloc.documentId) {
+            allocatedReceiptsByInvoice[alloc.documentId] = Number(
+              ((allocatedReceiptsByInvoice[alloc.documentId] || 0) + (alloc.amount || 0)).toFixed(2)
+            );
+          }
+        });
+      } else if (v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId) {
+        // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
+        allocatedReceiptsByInvoice[v.sourceDocumentId] = Number(
+          ((allocatedReceiptsByInvoice[v.sourceDocumentId] || 0) + (v.totalAmount || 0)).toFixed(2)
+        );
+      } else {
+        // Legacy fallback: aggregate voucher receipts per party key only when neither an allocation nor a sourceDocument link exists
+        const partyKeys = new Set<string>();
+        if (v.partyId) partyKeys.add(v.partyId.trim().toLowerCase());
+        if (v.partyName) partyKeys.add(v.partyName.trim().toLowerCase());
+        (v.entries || []).forEach((e) => {
+          if (!e) return;
+          if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK' && !e.accountId.startsWith('BANK') && !e.accountId.startsWith('ACC_BANK')) {
+            partyKeys.add(e.accountId.trim().toLowerCase());
+          }
+          if (e.accountName) {
+            partyKeys.add(e.accountName.trim().toLowerCase());
+          }
+        });
+        partyKeys.forEach((key) => {
+          legacyPartyVoucherReceipts[key] = (legacyPartyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
+        });
+      }
     }
   });
 
-  // Track remaining voucher credit per party to offset against invoice paidAmount
-  const remainingVoucherCredit = { ...partyVoucherReceipts };
+  // Track remaining voucher credit per party to offset against invoice paidAmount for legacy vouchers
+  const remainingLegacyCredit = { ...legacyPartyVoucherReceipts };
 
   const orderedInvoices = [...invoices].sort(chronological);
   orderedInvoices.forEach((inv) => {
@@ -98,14 +123,22 @@ export function computeCashBankSummary(params: {
       : (inv.paymentStatus === 'PAID' ? inv.grandTotal : 0);
 
     if (paid > 0 && inv.paymentMode !== 'CREDIT') {
+      // 1. Direct document allocation suppression
+      const directAlloc = allocatedReceiptsByInvoice[inv.id] || 0;
+      const coveredByDirectAlloc = Math.min(paid, directAlloc);
+      const remainingPaidToCover = paid - coveredByDirectAlloc;
+
+      // 2. Legacy party-aggregate fallback only for vouchers without paymentAllocations
       const partyKey = (inv.partyId || inv.partyName || '').trim().toLowerCase();
-      const availCredit = remainingVoucherCredit[partyKey] || 0;
-      // Amount covered by vouchers is handled by section 5 (vouchers), only take unvouchered upfront amount here
-      const coveredByVoucher = Math.min(paid, availCredit);
-      const unvoucheredPaid = paid - coveredByVoucher;
-      if (partyKey && coveredByVoucher > 0) {
-        remainingVoucherCredit[partyKey] -= coveredByVoucher;
+      const legacyAvail = remainingLegacyCredit[partyKey] || 0;
+      const coveredByLegacy = Math.min(remainingPaidToCover, legacyAvail);
+      if (partyKey && coveredByLegacy > 0) {
+        remainingLegacyCredit[partyKey] -= coveredByLegacy;
       }
+
+      // Amount covered by vouchers is handled by section 5 (vouchers), only take unvouchered upfront amount here
+      const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
+      const unvoucheredPaid = Number((paid - coveredByVoucher).toFixed(2));
 
       if (unvoucheredPaid > 0) {
         const splits = (inv.paymentSplits && inv.paymentSplits.length > 0)
@@ -183,24 +216,51 @@ export function computeCashBankSummary(params: {
   });
 
   // 3. Process Purchases (Outflow from upfront payments without vouchers)
-  const supplierVoucherPayments: Record<string, number> = {};
+  // Build a per-document map of active payment-voucher allocations:
+  // allocatedPaymentsByPurchase[documentId] += allocation.amount
+  // Only use the old supplier-aggregate fallback for legacy vouchers that have no paymentAllocations.
+  const allocatedPaymentsByPurchase: Record<string, number> = {};
+  const legacySupplierVoucherPayments: Record<string, number> = {};
+
   vouchers.forEach((v) => {
     if (!v || v.isReversed || v.isCancelled) return;
     if (v.voucherType === 'PAYMENT') {
-      (v.entries || []).forEach((e) => {
-        if (!e) return;
-        if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK') {
-          const key = e.accountId.toLowerCase();
-          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
-        } else if (e.accountName) {
-          const key = e.accountName.trim().toLowerCase();
-          supplierVoucherPayments[key] = (supplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
-        }
-      });
+      if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+        v.paymentAllocations.forEach((alloc) => {
+          if (alloc && alloc.documentType === 'PURCHASE' && alloc.documentId) {
+            allocatedPaymentsByPurchase[alloc.documentId] = Number(
+              ((allocatedPaymentsByPurchase[alloc.documentId] || 0) + (alloc.amount || 0)).toFixed(2)
+            );
+          }
+        });
+      } else if (v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId) {
+        // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
+        allocatedPaymentsByPurchase[v.sourceDocumentId] = Number(
+          ((allocatedPaymentsByPurchase[v.sourceDocumentId] || 0) + (v.totalAmount || 0)).toFixed(2)
+        );
+      } else {
+        // Legacy fallback: aggregate voucher payments per supplier key only when neither an allocation nor a sourceDocument link exists
+        const supKeys = new Set<string>();
+        if (v.partyId) supKeys.add(v.partyId.trim().toLowerCase());
+        if (v.partyName) supKeys.add(v.partyName.trim().toLowerCase());
+        (v.entries || []).forEach((e) => {
+          if (!e) return;
+          if (e.accountId && e.accountId !== 'ACC_CASH' && e.accountId !== 'ACC_BANK' && !e.accountId.startsWith('BANK') && !e.accountId.startsWith('ACC_BANK')) {
+            supKeys.add(e.accountId.trim().toLowerCase());
+          }
+          if (e.accountName) {
+            supKeys.add(e.accountName.trim().toLowerCase());
+          }
+        });
+        supKeys.forEach((key) => {
+          legacySupplierVoucherPayments[key] = (legacySupplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
+        });
+      }
     }
   });
 
-  const remainingVoucherDebit = { ...supplierVoucherPayments };
+  // Track remaining voucher debit per supplier to offset against purchase paidAmount for legacy vouchers
+  const remainingLegacyDebit = { ...legacySupplierVoucherPayments };
 
   const orderedPurchases = [...purchases].sort(chronological);
   orderedPurchases.forEach((pur) => {
@@ -210,13 +270,21 @@ export function computeCashBankSummary(params: {
       : (pur.paymentStatus === 'PAID' ? pur.grandTotal : 0);
 
     if (paid > 0 && pur.paymentMode !== 'CREDIT') {
+      // 1. Direct document allocation suppression
+      const directAlloc = allocatedPaymentsByPurchase[pur.id] || 0;
+      const coveredByDirectAlloc = Math.min(paid, directAlloc);
+      const remainingPaidToCover = paid - coveredByDirectAlloc;
+
+      // 2. Legacy supplier-aggregate fallback only for vouchers without paymentAllocations
       const supKey = (pur.supplierId || pur.supplierName || '').trim().toLowerCase();
-      const availDebit = remainingVoucherDebit[supKey] || 0;
-      const coveredByVoucher = Math.min(paid, availDebit);
-      const unvoucheredPaid = paid - coveredByVoucher;
-      if (supKey && coveredByVoucher > 0) {
-        remainingVoucherDebit[supKey] -= coveredByVoucher;
+      const legacyAvail = remainingLegacyDebit[supKey] || 0;
+      const coveredByLegacy = Math.min(remainingPaidToCover, legacyAvail);
+      if (supKey && coveredByLegacy > 0) {
+        remainingLegacyDebit[supKey] -= coveredByLegacy;
       }
+
+      const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
+      const unvoucheredPaid = Number((paid - coveredByVoucher).toFixed(2));
 
       if (unvoucheredPaid > 0) {
         const splits = (pur.paymentSplits && pur.paymentSplits.length > 0)

@@ -455,12 +455,34 @@ export const App: React.FC = () => {
 
   const handleSaveInvoice = useCallback((
     newInvoice: Invoice,
-    options?: { openPreview?: boolean; openPrint?: boolean }
+    options?: { openPreview?: boolean; openPrint?: boolean; paymentChanged?: boolean }
   ) => {
     // Enforce uniqueness of invoice number under GST compliance
     const conflict = findConflictingInvoice(newInvoice.invoiceNumber, newInvoice.id, db.getInvoices());
     if (conflict) {
       showToast(`Conflict: Invoice #${newInvoice.invoiceNumber} already exists for ${conflict.partyName} (${conflict.date}). Only unique numbers allowed.`);
+      return;
+    }
+
+    // Reject if new grand total is less than the total amount currently allocated to the invoice
+    const allActiveLinkedVouchers = db.getVouchers().filter(
+      (v) =>
+        !v.isCancelled &&
+        !v.isReversed &&
+        v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === newInvoice.id)
+    );
+    const totalAllocatedAmount = Number(
+      allActiveLinkedVouchers
+        .reduce((sum, v) => {
+          const vAllocSum = (v.paymentAllocations || [])
+            .filter((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id)
+            .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
+          return sum + vAllocSum;
+        }, 0)
+        .toFixed(2)
+    );
+    if (newInvoice.grandTotal < totalAllocatedAmount - 0.01) {
+      showToast(`Cannot reduce invoice grand total (₹${newInvoice.grandTotal.toFixed(2)}) below total linked payment allocations (₹${totalAllocatedAmount.toFixed(2)}). Unlink or adjust payments first.`);
       return;
     }
 
@@ -475,6 +497,21 @@ export const App: React.FC = () => {
     }
 
     const { isNew: isNewInvoice, existingSourceVoucher, otherActiveLinked, otherAllocatedTotal } = validation;
+
+    // Detect a real party change against stored invoice and reassign linked payment vouchers
+    const storedInvoice = db.getInvoices().find((i) => i.id === newInvoice.id);
+    let partyMovedWithPayments = false;
+    if (storedInvoice && storedInvoice.partyId !== newInvoice.partyId) {
+      try {
+        const reassignedCount = db.reassignLinkedPaymentParty(newInvoice.id, newInvoice.partyId || 'ACC_CASH', newInvoice.partyName || 'Retail Customer');
+        if (reassignedCount > 0) {
+          partyMovedWithPayments = true;
+        }
+      } catch (err: any) {
+        showToast(err.message || 'Cannot change party on invoice with linked payments.');
+        return;
+      }
+    }
 
     const isSpecialDocument =
       newInvoice.invoiceType === 'CREDIT_NOTE' ||
@@ -577,15 +614,12 @@ export const App: React.FC = () => {
       }
     } else {
       // On EDITING an existing document:
-      // Never create a new source voucher. Never touch non-source party payment vouchers.
-      // Special documents (CREDIT_NOTE / DEBIT_NOTE) do not create or update source vouchers.
-      // When other active payment vouchers exist, do not rebuild source voucher with invoice paymentSplits.
-      if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length === 0) {
-        const newSourceAmount = Number(((newInvoice.paidAmount || 0) - otherAllocatedTotal).toFixed(2));
-        if (isUnpaidOrCancelled || newSourceAmount <= 0) {
+      // Status change: Cancellation or conversion to estimate/order reverses the source voucher
+      if (isOrderOrEstimate || newInvoice.isCancelled) {
+        if (existingSourceVoucher && !existingSourceVoucher.isReversed) {
           const rev = createReversalVoucher({
             originalVoucher: existingSourceVoucher,
-            reason: `Reversal of source receipt #${existingSourceVoucher.voucherNumber} for invoice #${newInvoice.invoiceNumber}`,
+            reason: `Reversal of source receipt #${existingSourceVoucher.voucherNumber} for non-taxable/cancelled document`,
           });
           db.saveVoucher(rev);
           db.saveVoucher({
@@ -593,61 +627,69 @@ export const App: React.FC = () => {
             isReversed: true,
             reversalVoucherId: rev.id,
           });
-        } else if (newSourceAmount !== existingSourceVoucher.totalAmount || newInvoice.date !== existingSourceVoucher.date || newInvoice.partyId !== existingSourceVoucher.partyId) {
-          const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
-            newSourceAmount,
-            newInvoice.paymentSplits,
-            newInvoice.paymentMode
-          );
-
-          const updatedSourceVoucher = createPaymentReceiptVoucher({
-            voucherId: existingSourceVoucher.id,
-            receiptNumber: existingSourceVoucher.voucherNumber.replace(/^VCH-RCPT-/, ''),
-            date: newInvoice.date,
-            customerName: newInvoice.partyName,
-            customerId: newInvoice.partyId || 'ACC_CASH',
-            amount: newSourceAmount,
-            paymentMode: sourceMode,
-            paymentSplits: sourceSplits,
-            narration: `Upfront payment received for Invoice #${newInvoice.invoiceNumber}`,
-          });
-
-          updatedSourceVoucher.partyId = newInvoice.partyId;
-          updatedSourceVoucher.partyName = newInvoice.partyName;
-          updatedSourceVoucher.sourceDocumentType = 'INVOICE';
-          updatedSourceVoucher.sourceDocumentId = newInvoice.id;
-          updatedSourceVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
-          updatedSourceVoucher.allocationMode = 'SOURCE_DOCUMENT';
-          updatedSourceVoucher.paymentAllocations = [
-            {
-              documentType: 'INVOICE',
-              documentId: newInvoice.id,
-              documentNumber: newInvoice.invoiceNumber,
-              amount: newSourceAmount,
-              date: newInvoice.date,
-            },
-          ];
-
-          db.savePaymentVoucher(updatedSourceVoucher, { skipDocumentUpdate: true });
         }
-      } else if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length > 0) {
-        // When other vouchers are also linked:
-        // Update the source voucher's date (and narration if applicable) without recreating entries or changing the allocation amount
-        if (newInvoice.date !== existingSourceVoucher.date) {
-          const updatedSourceVoucher: Voucher = {
-            ...existingSourceVoucher,
-            date: newInvoice.date,
-            paymentAllocations: (existingSourceVoucher.paymentAllocations || []).map((a) =>
-              a.documentId === newInvoice.id ? { ...a, date: newInvoice.date } : { ...a }
-            ),
-          };
-          db.savePaymentVoucher(updatedSourceVoucher, { skipDocumentUpdate: true });
+      } else if (options?.paymentChanged) {
+        // Only reconcile/create/update/reverse source vouchers when paymentChanged is true
+        if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length === 0) {
+          const newSourceAmount = Number(((newInvoice.paidAmount || 0) - otherAllocatedTotal).toFixed(2));
+          if (isUnpaidOrCancelled || newSourceAmount <= 0) {
+            const rev = createReversalVoucher({
+              originalVoucher: existingSourceVoucher,
+              reason: `Reversal of source receipt #${existingSourceVoucher.voucherNumber} for invoice #${newInvoice.invoiceNumber}`,
+            });
+            db.saveVoucher(rev);
+            db.saveVoucher({
+              ...existingSourceVoucher,
+              isReversed: true,
+              reversalVoucherId: rev.id,
+            });
+          } else if (newSourceAmount !== existingSourceVoucher.totalAmount || newInvoice.date !== existingSourceVoucher.date || newInvoice.partyId !== existingSourceVoucher.partyId) {
+            const { paymentSplits: sourceSplits, paymentMode: sourceMode } = resolveSourceVoucherSplits(
+              newSourceAmount,
+              newInvoice.paymentSplits,
+              newInvoice.paymentMode
+            );
+
+            const updatedSourceVoucher = createPaymentReceiptVoucher({
+              voucherId: existingSourceVoucher.id,
+              receiptNumber: existingSourceVoucher.voucherNumber.replace(/^VCH-RCPT-/, ''),
+              date: newInvoice.date,
+              customerName: newInvoice.partyName,
+              customerId: newInvoice.partyId || 'ACC_CASH',
+              amount: newSourceAmount,
+              paymentMode: sourceMode,
+              paymentSplits: sourceSplits,
+              narration: `Upfront payment received for Invoice #${newInvoice.invoiceNumber}`,
+            });
+
+            updatedSourceVoucher.partyId = newInvoice.partyId;
+            updatedSourceVoucher.partyName = newInvoice.partyName;
+            updatedSourceVoucher.sourceDocumentType = 'INVOICE';
+            updatedSourceVoucher.sourceDocumentId = newInvoice.id;
+            updatedSourceVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
+            updatedSourceVoucher.allocationMode = 'SOURCE_DOCUMENT';
+            updatedSourceVoucher.paymentAllocations = [
+              {
+                documentType: 'INVOICE',
+                documentId: newInvoice.id,
+                documentNumber: newInvoice.invoiceNumber,
+                amount: newSourceAmount,
+                date: newInvoice.date,
+              },
+            ];
+
+            db.savePaymentVoucher(updatedSourceVoucher, { skipDocumentUpdate: true });
+          }
         }
       }
+      // If !options?.paymentChanged and not cancelled/order: plain save leaves linked vouchers untouched
     }
 
     if (newInvoice.partyId) {
       db.recalculatePartyBalance(newInvoice.partyId);
+    }
+    if (partyMovedWithPayments) {
+      showToast(`Invoice party updated to ${newInvoice.partyName} and linked payments reassigned.`);
     }
     setIsStandardInvoiceOpen(false);
     setIsTableGridInvoiceOpen(false);
@@ -1214,6 +1256,18 @@ export const App: React.FC = () => {
     });
   }, [activeUser.role]);
 
+  const handleUnlinkPaymentAllocation = useCallback(
+    (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => {
+      try {
+        db.unlinkPaymentAllocation(voucherId, documentType, documentId);
+        showToast(`Payment allocation for ${documentType === 'INVOICE' ? 'invoice' : 'purchase bill'} unlinked.`);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to unlink payment allocation.');
+      }
+    },
+    [showToast]
+  );
+
   useEffect(() => {
     const mainEl = document.getElementById('main-content-scroll');
     if (mainEl) {
@@ -1374,6 +1428,7 @@ export const App: React.FC = () => {
             onViewInvoice={setPreviewInvoice}
             onViewPurchase={handleEditPurchase}
             onRecordPartyPayment={handleRecordPartyPayment}
+            onUnlinkAllocation={handleUnlinkPaymentAllocation}
           />
         )}
 
@@ -1453,6 +1508,7 @@ export const App: React.FC = () => {
             onViewInvoice={setPreviewInvoice}
             onViewPurchase={handleEditPurchase}
             onRecordPartyPayment={handleRecordPartyPayment}
+            onUnlinkAllocation={handleUnlinkPaymentAllocation}
           />
         )}
 
@@ -1563,6 +1619,7 @@ export const App: React.FC = () => {
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
             onOpenAccountStatement={handleOpenAccountStatement}
+            onUnlinkAllocation={handleUnlinkPaymentAllocation}
           />
         )}
 

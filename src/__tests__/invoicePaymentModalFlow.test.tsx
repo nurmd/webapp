@@ -40,6 +40,8 @@ import { CompanyProfile } from '../models/company.ts';
 import { Party } from '../models/party.ts';
 import { InventoryItem } from '../models/item.ts';
 import { Invoice } from '../models/invoice.ts';
+import { draftService } from '../services/draftService.ts';
+import { db } from '../services/db.ts';
 
 const mockCompany: CompanyProfile = {
   id: 'COMP-001',
@@ -150,7 +152,7 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
     expect(paymentSettlementHeader).toBeFalsy();
   });
 
-  it('TC-BILL-02: Save & Print saves invoice as UNPAID and triggers print option', () => {
+  it('TC-BILL-02: Save & Print preserves existing paid invoice details and triggers print option', () => {
     let savedInvoice: Invoice | null = null;
     let savedOptions: { openPrint?: boolean } | undefined = undefined;
 
@@ -204,6 +206,8 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       paymentStatus: 'PAID',
       paidAmount: 2832,
       balanceAmount: 0,
+      paymentSplits: [{ id: 's1', mode: 'CASH', amount: 2832 }],
+      notes: 'Paid in full',
       createdAt: '2026-10-10T10:00:00Z',
       updatedAt: '2026-10-10T10:00:00Z',
     };
@@ -233,12 +237,277 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
 
     expect(onSave).toHaveBeenCalled();
     expect(savedInvoice).not.toBeNull();
-    // Strictly saved with unpaid / credit
+    // Payment details are preserved from existing paid invoice
+    expect(savedInvoice!.paymentStatus).toBe('PAID');
+    expect(savedInvoice!.paymentMode).toBe('CASH');
+    expect(savedInvoice!.paidAmount).toBe(2832);
+    expect(savedInvoice!.balanceAmount).toBe(0);
+    expect(savedInvoice!.paymentSplits).toEqual([{ id: 's1', mode: 'CASH', amount: 2832 }]);
+    expect(savedInvoice!.notes).toBe('Paid in full');
+    expect(savedOptions).toEqual({ openPrint: true });
+  });
+
+  it('TC-BILL-02B: Save & Print saves a NEW invoice as UNPAID and triggers print option', () => {
+    let savedInvoice: Invoice | null = null;
+    let savedOptions: { openPrint?: boolean } | undefined = undefined;
+
+    const onSave = vi.fn((inv: Invoice, opts?: { openPrint?: boolean }) => {
+      savedInvoice = inv;
+      savedOptions = opts;
+    });
+
+    draftService.saveInvoiceDraft({
+      invoiceNumber: 'INV-NEW-01',
+      invoiceDate: '2026-10-12',
+      selectedParty: mockParty,
+      posStateCode: '27',
+      rows: [
+        {
+          itemId: mockItem.id,
+          name: mockItem.name,
+          unit: 'PCS',
+          quantity: 1,
+          unitPrice: 1200,
+          unitPriceInclusive: 1416,
+          priceMode: 'EXCLUSIVE',
+          cessRate: 0,
+          mrp: 1500,
+          discountPercent: 0,
+          hsnSacCode: '847160',
+          gstRate: 18,
+        },
+      ],
+    });
+
+    act(() => {
+      root.render(
+        <TableGridInvoiceModal
+          company={mockCompany}
+          parties={[mockParty]}
+          itemsCatalog={[mockItem]}
+          initialInvoice={null}
+          onClose={vi.fn()}
+          onSave={onSave}
+        />
+      );
+    });
+
+    // Find and click "Save & Print" button
+    const saveAndPrintBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save & Print')
+    );
+    expect(saveAndPrintBtn).toBeTruthy();
+
+    act(() => {
+      saveAndPrintBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).toHaveBeenCalled();
+    expect(savedInvoice).not.toBeNull();
+    // New invoices without payment override default to unpaid credit
     expect(savedInvoice!.paymentStatus).toBe('UNPAID');
     expect(savedInvoice!.paymentMode).toBe('CREDIT');
     expect(savedInvoice!.paidAmount).toBe(0);
     expect(savedInvoice!.balanceAmount).toBe(savedInvoice!.grandTotal);
     expect(savedOptions).toEqual({ openPrint: true });
+  });
+
+  it('TC-BILL-02C: Save Invoice preserves paidAmount, paymentStatus, paymentMode, paymentSplits, and balanceAmount for an existing invoice', () => {
+    let savedInvoice: Invoice | null = null;
+    let savedOptions: any = undefined;
+
+    const onSave = vi.fn((inv: Invoice, opts?: any) => {
+      savedInvoice = inv;
+      savedOptions = opts;
+    });
+
+    const initialInv: Invoice = {
+      id: 'INV-TEST-02',
+      invoiceNumber: 'INV-TEST-02',
+      invoiceType: 'B2CS',
+      date: '2026-10-11',
+      partyId: mockParty.id,
+      partyName: mockParty.name,
+      partyAddress: mockParty.billingAddress,
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: mockItem.id,
+          name: mockItem.name,
+          unit: 'PCS',
+          quantity: 1,
+          unitPrice: 1200,
+          discountPercent: 0,
+          discountAmount: 0,
+          taxableAmount: 1200,
+          gstRate: 18,
+          cgstAmount: 108,
+          sgstAmount: 108,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1416,
+          hsnSacCode: '847160',
+        },
+      ],
+      totalGrossAmount: 1200,
+      totalDiscount: 0,
+      totalTaxableAmount: 1200,
+      totalCgst: 108,
+      totalSgst: 108,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 216,
+      roundOff: 0,
+      grandTotal: 1416,
+      amountInWords: 'One Thousand Four Hundred Sixteen',
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      paidAmount: 1416,
+      balanceAmount: 0,
+      paymentSplits: [{ id: 's2', mode: 'CASH', amount: 1416 }],
+      notes: 'Full Cash Payment',
+      createdAt: '2026-10-11T10:00:00Z',
+      updatedAt: '2026-10-11T10:00:00Z',
+    };
+
+    act(() => {
+      root.render(
+        <TableGridInvoiceModal
+          company={mockCompany}
+          parties={[mockParty]}
+          itemsCatalog={[mockItem]}
+          initialInvoice={initialInv}
+          onClose={vi.fn()}
+          onSave={onSave}
+        />
+      );
+    });
+
+    // Find and click "Save Invoice" button
+    const saveInvoiceBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save Invoice')
+    );
+    expect(saveInvoiceBtn).toBeTruthy();
+
+    act(() => {
+      saveInvoiceBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).toHaveBeenCalled();
+    expect(savedInvoice).not.toBeNull();
+    expect(savedInvoice!.paidAmount).toBe(1416);
+    expect(savedInvoice!.paymentStatus).toBe('PAID');
+    expect(savedInvoice!.paymentMode).toBe('CASH');
+    expect(savedInvoice!.paymentSplits).toEqual([{ id: 's2', mode: 'CASH', amount: 1416 }]);
+    expect(savedInvoice!.balanceAmount).toBe(0);
+    expect(savedInvoice!.notes).toBe('Full Cash Payment');
+    expect(savedOptions).toBeUndefined();
+  });
+
+  it('TC-BILL-02D: Save Invoice on an existing paid invoice with no paymentSplits preserves paidAmount, paymentStatus, paymentMode, balanceAmount, and db.saveInvoice does not reset paidAmount', () => {
+    let savedInvoice: Invoice | null = null;
+    let savedOptions: any = undefined;
+
+    const onSave = vi.fn((inv: Invoice, opts?: any) => {
+      savedInvoice = inv;
+      savedOptions = opts;
+    });
+
+    const initialInv: Invoice = {
+      id: 'INV-TEST-02D',
+      invoiceNumber: 'INV-TEST-02D',
+      invoiceType: 'B2CS',
+      date: '2026-10-11',
+      partyId: mockParty.id,
+      partyName: mockParty.name,
+      partyAddress: mockParty.billingAddress,
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: mockItem.id,
+          name: mockItem.name,
+          unit: 'PCS',
+          quantity: 1,
+          unitPrice: 1200,
+          discountPercent: 0,
+          discountAmount: 0,
+          taxableAmount: 1200,
+          gstRate: 18,
+          cgstAmount: 108,
+          sgstAmount: 108,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1416,
+          hsnSacCode: '847160',
+        },
+      ],
+      totalGrossAmount: 1200,
+      totalDiscount: 0,
+      totalTaxableAmount: 1200,
+      totalCgst: 108,
+      totalSgst: 108,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 216,
+      roundOff: 0,
+      grandTotal: 1416,
+      amountInWords: 'One Thousand Four Hundred Sixteen',
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      paidAmount: 1416,
+      balanceAmount: 0,
+      paymentSplits: undefined,
+      notes: 'Paid without explicit splits',
+      createdAt: '2026-10-11T10:00:00Z',
+      updatedAt: '2026-10-11T10:00:00Z',
+    };
+
+    db.saveInvoice(initialInv);
+
+    act(() => {
+      root.render(
+        <TableGridInvoiceModal
+          company={mockCompany}
+          parties={[mockParty]}
+          itemsCatalog={[mockItem]}
+          initialInvoice={initialInv}
+          onClose={vi.fn()}
+          onSave={onSave}
+        />
+      );
+    });
+
+    // Find and click "Save Invoice" button
+    const saveInvoiceBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save Invoice')
+    );
+    expect(saveInvoiceBtn).toBeTruthy();
+
+    act(() => {
+      saveInvoiceBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).toHaveBeenCalled();
+    expect(savedInvoice).not.toBeNull();
+    expect(savedInvoice!.paidAmount).toBe(1416);
+    expect(savedInvoice!.paymentStatus).toBe('PAID');
+    expect(savedInvoice!.paymentMode).toBe('CASH');
+    expect(savedInvoice!.paymentSplits).toBeUndefined();
+    expect(savedInvoice!.balanceAmount).toBe(0);
+    expect(savedInvoice!.notes).toBe('Paid without explicit splits');
+    expect(savedOptions).toBeUndefined();
+
+    // Verify db.saveInvoice of the payload does not reset paidAmount
+    db.saveInvoice(savedInvoice!);
+    const stored = db.getInvoices().find((i) => i.id === 'INV-TEST-02D');
+    expect(stored).toBeDefined();
+    expect(stored!.paidAmount).toBe(1416);
+    expect(stored!.paymentStatus).toBe('PAID');
+    expect(stored!.balanceAmount).toBe(0);
   });
 
   it('TC-BILL-03: Pay & Save opens payment modal to configure split payments and saves settled invoice', () => {

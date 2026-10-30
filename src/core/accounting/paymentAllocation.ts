@@ -601,26 +601,43 @@ export function validateInvoicePreSave(params: {
       v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === newInvoice.id)
   );
 
-  // Guard: Reject party change if any active linked payment voucher exists
-  if (prevInvoice && newInvoice.partyId !== prevInvoice.partyId) {
-    if (existingSourceVoucher || otherActiveLinked.length > 0) {
-      return {
-        valid: false,
-        error: 'Cannot change party on an invoice with linked payment vouchers. Reverse or edit linked payment vouchers first.',
-        isNew: false,
-        existingSourceVoucher,
-        otherActiveLinked,
-        otherAllocatedTotal: 0,
-        targetSourceAmount: 0,
-      };
-    }
+  // Check if grand total is less than total amount allocated to this invoice across all active linked vouchers
+  const allActiveLinked = vouchers.filter(
+    (v) =>
+      !v.isCancelled &&
+      !v.isReversed &&
+      v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === newInvoice.id)
+  );
+  const totalAllocatedToInvoice = Number(
+    allActiveLinked
+      .reduce((sum, v) => {
+        const vAllocSum = (v.paymentAllocations || [])
+          .filter((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id)
+          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
+        return sum + vAllocSum;
+      }, 0)
+      .toFixed(2)
+  );
+
+  if (newInvoice.grandTotal < totalAllocatedToInvoice - 0.01) {
+    return {
+      valid: false,
+      error: `Cannot reduce invoice grand total (₹${newInvoice.grandTotal.toFixed(2)}) below total linked payment allocations (₹${totalAllocatedToInvoice.toFixed(2)}). Unlink or adjust payments first.`,
+      isNew: false,
+      existingSourceVoucher,
+      otherActiveLinked,
+      otherAllocatedTotal: totalAllocatedToInvoice,
+      targetSourceAmount: 0,
+    };
   }
 
   const otherAllocatedTotal = Number(
     otherActiveLinked
       .reduce((sum, v) => {
-        const a = v.paymentAllocations?.find((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id);
-        return sum + (a?.amount || 0);
+        const vAllocSum = (v.paymentAllocations || [])
+          .filter((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id)
+          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
+        return sum + vAllocSum;
       }, 0)
       .toFixed(2)
   );
@@ -733,8 +750,10 @@ export function validatePurchasePreSave(params: {
   const otherAllocatedTotal = Number(
     otherActiveLinked
       .reduce((sum, v) => {
-        const a = v.paymentAllocations?.find((x) => x.documentType === 'PURCHASE' && x.documentId === newBill.id);
-        return sum + (a?.amount || 0);
+        const vAllocSum = (v.paymentAllocations || [])
+          .filter((x) => x.documentType === 'PURCHASE' && x.documentId === newBill.id)
+          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
+        return sum + vAllocSum;
       }, 0)
       .toFixed(2)
   );

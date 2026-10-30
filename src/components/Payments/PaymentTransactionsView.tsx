@@ -47,6 +47,7 @@ export interface PaymentTransactionsViewProps {
     allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
     paymentDate?: string
   ) => boolean | void;
+  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
 }
 
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
@@ -65,6 +66,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   onViewInvoice,
   onViewPurchase,
   onRecordPartyPayment,
+  onUnlinkAllocation,
 }) => {
   const isFlowIn = flow === 'IN';
 
@@ -817,6 +819,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             onSaveTransaction={onSaveTransaction}
             onDeleteTransaction={onDeleteTransaction}
             onNavigateTab={onNavigateTab}
+            onUnlinkAllocation={onUnlinkAllocation}
           />
         </React.Suspense>
       )}

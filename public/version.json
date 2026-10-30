@@ -1,15 +1,15 @@
 {
-  "version": "1.2.47",
+  "version": "1.2.48",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-29T16:16:29.176Z",
+  "buildTime": "2026-10-30T05:31:57.364Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Complete modal unification across invoicing, reports, challans, parties, and purchases",
-    "Direct PDF generation and unified native printing bridge for fast, 1-tap document exports",
-    "AI Bill Intake: Automated purchase bill extraction from PDF/images and GSTR-2B imports",
-    "Smart HSN and entity matching with non-destructive multi-item resolution",
-    "Background modal preloading and offline service worker chunk caching",
-    "Performance optimizations: reduced initial bundle size and zero-CLS lazy fallbacks"
+    "bump version to v1.2.47 (Modal Unification, Direct PDF & AI Bill Intake)",
+    "integrate master (v1.2.46 AI Bill Intake) into payments-work",
+    "bump version to v1.2.46 (AI Bill Intake)",
+    "AI GST purchase bill intake (scan + GSTR-2B) with review queue",
+    "phase 4 modal unification, report/party modals, preload, and direct PDF expansion",
+    "phase 3 modal unification plus direct PDF generation and simplified invoice preview"
   ]
 }

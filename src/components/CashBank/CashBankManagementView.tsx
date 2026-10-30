@@ -39,6 +39,7 @@ interface CashBankManagementViewProps {
   onOpenAccountStatement?: (accountId: string) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
+  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
 }
 
 export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
@@ -58,6 +59,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onOpenAccountStatement,
   onViewInvoice,
   onViewPurchase,
+  onUnlinkAllocation,
 }) => {
   useModalPreloadOnMount([preloadCashBankTransactionDetailModal]);
 
@@ -851,6 +853,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             onSaveTransaction={onSaveTransaction}
             onDeleteTransaction={onDeleteTransaction}
             onNavigateTab={onNavigateTab}
+            onUnlinkAllocation={onUnlinkAllocation}
           />
         </React.Suspense>
       )}

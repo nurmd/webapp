@@ -690,6 +690,143 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
     expect(handleViewInvoice).toHaveBeenCalledWith(testInvoice);
   });
 
+  it('renders Unlink button for linked allocation, shows confirmation on click, and invokes onUnlinkAllocation when confirmed', async () => {
+    const handleClose = vi.fn();
+    const handleUnlink = vi.fn();
+
+    const testInvoice: Invoice = {
+      id: 'INV-UNLINK-01',
+      invoiceNumber: 'INV-UNLINK-01',
+      invoiceType: 'B2CS',
+      date: '2026-10-16',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      partyAddress: '123 Main St',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [],
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      paidAmount: 2000,
+      balanceAmount: 0,
+      grandTotal: 2000,
+      totalGrossAmount: 2000,
+      totalDiscount: 0,
+      totalTaxableAmount: 2000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      amountInWords: 'Two Thousand Only',
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    const testReceiptVoucher: Voucher = {
+      id: 'VCH-UNLINK-101',
+      voucherNumber: 'RCPT-UNLINK-101',
+      voucherType: 'RECEIPT',
+      date: '2026-10-16',
+      referenceNo: 'INV-UNLINK-01',
+      partyId: 'party_1',
+      partyName: 'Customer One',
+      totalAmount: 2000,
+      narration: 'Payment received for INV-UNLINK-01',
+      allocationMode: 'SOURCE_DOCUMENT',
+      paymentAllocations: [
+        {
+          documentType: 'INVOICE',
+          documentId: testInvoice.id,
+          documentNumber: testInvoice.invoiceNumber,
+          amount: 2000,
+          date: '2026-10-16',
+        },
+      ],
+      entries: [
+        {
+          accountId: 'ACC_CASH',
+          accountName: 'Cash in Hand',
+          debit: 2000,
+          credit: 0,
+          narration: 'Receipt into cash',
+        },
+        {
+          accountId: 'party_1',
+          accountName: 'Customer One',
+          debit: 0,
+          credit: 2000,
+          narration: 'Payment received from Customer One',
+        },
+      ],
+      createdAt: '2026-10-16T10:00:00.000Z',
+    };
+
+    const voucherEntry: UnifiedLedgerEntry = {
+      id: 'LEDGER-VCH-VCH-UNLINK-101-0',
+      date: '2026-10-16',
+      type: 'PARTY_RECEIPT',
+      category: 'CASH',
+      accountId: 'ACC_CASH',
+      accountName: 'Cash in Hand',
+      counterpartyOrTitle: 'Customer One',
+      referenceNo: 'RCPT-UNLINK-101',
+      mode: 'CASH',
+      flow: 'IN',
+      amount: 2000,
+      description: 'Receipt Voucher #RCPT-UNLINK-101',
+      rawVoucherId: testReceiptVoucher.id,
+      partyId: 'party_1',
+    };
+
+    await act(async () => {
+      root.render(
+        <CashBankTransactionDetailModal
+          isOpen={true}
+          onClose={handleClose}
+          entry={voucherEntry}
+          vouchers={[testReceiptVoucher]}
+          invoices={[testInvoice]}
+          accounts={mockAccounts}
+          onUnlinkAllocation={handleUnlink}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain('Linked Documents');
+    expect(container.textContent).toContain('#INV-UNLINK-01');
+    expect(container.textContent).toContain('Unlink');
+
+    // Click "Unlink" button
+    const unlinkBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Unlink')
+    );
+    expect(unlinkBtn).toBeDefined();
+
+    await act(async () => {
+      unlinkBtn?.click();
+    });
+
+    // Confirmation modal should appear
+    expect(container.textContent).toContain('Unlink Payment Allocation');
+    expect(container.textContent).toContain('The invoice balance will be restored, and the payment voucher will remain as an unallocated advance.');
+
+    // Click "Yes, Unlink"
+    const confirmBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Yes, Unlink')
+    );
+    expect(confirmBtn).toBeDefined();
+
+    await act(async () => {
+      confirmBtn?.click();
+    });
+
+    expect(handleUnlink).toHaveBeenCalledWith('VCH-UNLINK-101', 'INVOICE', 'INV-UNLINK-01');
+    expect(handleClose).toHaveBeenCalled();
+  });
+
   describe('WhatsApp Sharing on Cash / Bank Transactions', () => {
     it('shares native direct transaction on WhatsApp with company, amount, date, txnNumber, narration', async () => {
       const mockOpenWhatsApp = vi.fn();

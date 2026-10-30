@@ -942,4 +942,188 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
     super.deleteVoucher(id);
   }
+
+  /**
+   * Unlinks a specific payment allocation from a voucher:
+   * 1. Finds active voucher and matching allocation.
+   * 2. Rejects if missing, reversed, or cancelled.
+   * 3. Removes that allocation.
+   * 4. Updates allocationMode ('UNALLOCATED' if none remain, 'MANUAL' otherwise) and clears stale source fields.
+   * 5. Saves through savePaymentVoucher so original allocation is reversed and remaining re-applied.
+   * 6. Restores linked document balances/status/splits.
+   */
+  unlinkPaymentAllocation(
+    voucherId: string,
+    documentType: 'INVOICE' | 'PURCHASE',
+    documentId: string
+  ): Voucher {
+    const voucher = this.getVouchers().find((v) => v.id === voucherId);
+    if (!voucher) {
+      throw new Error(`Voucher #${voucherId} not found.`);
+    }
+    if (voucher.isReversed || voucher.isCancelled) {
+      throw new Error(`Cannot unlink allocation from reversed or cancelled voucher #${voucher.voucherNumber}.`);
+    }
+
+    const allocations = voucher.paymentAllocations || [];
+    const allocIndex = allocations.findIndex(
+      (a) => a.documentType === documentType && a.documentId === documentId
+    );
+    if (allocIndex === -1) {
+      throw new Error(
+        `Allocation for ${documentType} #${documentId} not found on voucher #${voucher.voucherNumber}.`
+      );
+    }
+
+    // Remove only that allocation
+    const remainingAllocations = allocations.filter((_, idx) => idx !== allocIndex);
+
+    const updatedVoucher: Voucher = {
+      ...voucher,
+      paymentAllocations: remainingAllocations,
+    };
+
+    if (remainingAllocations.length === 0) {
+      updatedVoucher.allocationMode = 'UNALLOCATED';
+      delete (updatedVoucher as any).sourceDocumentType;
+      delete (updatedVoucher as any).sourceDocumentId;
+      delete (updatedVoucher as any).sourceDocumentNumber;
+    } else {
+      updatedVoucher.allocationMode = 'MANUAL';
+      if (
+        (updatedVoucher.sourceDocumentType === documentType && updatedVoucher.sourceDocumentId === documentId) ||
+        !remainingAllocations.some((a) => a.documentId === updatedVoucher.sourceDocumentId)
+      ) {
+        delete (updatedVoucher as any).sourceDocumentType;
+        delete (updatedVoucher as any).sourceDocumentId;
+        delete (updatedVoucher as any).sourceDocumentNumber;
+      }
+    }
+
+    this.savePaymentVoucher(updatedVoucher);
+
+    const saved = this.getVouchers().find((v) => v.id === voucherId);
+    return saved || updatedVoucher;
+  }
+
+  /**
+   * Reassigns all active linked payment vouchers from an old party to a new party:
+   * 1. Finds existing invoice and all active RECEIPT/PAYMENT vouchers linked to it.
+   * 2. Rejects switch if any linked voucher allocates to another document belonging to a different party.
+   * 3. Updates partyId/partyName and only the party journal credit/debit line (or ACC_CASH).
+   * 4. Saves via savePaymentVoucher with skipDocumentUpdate: true.
+   * 5. Recalculates both old and new party balances and notifies listeners.
+   */
+  reassignLinkedPaymentParty(
+    invoiceId: string,
+    newPartyId: string,
+    newPartyName: string
+  ): number {
+    const invoice = this.getInvoices().find((i) => i.id === invoiceId);
+    if (!invoice) {
+      throw new Error(`Invoice #${invoiceId} not found.`);
+    }
+    const oldPartyId = invoice.partyId;
+    if (
+      oldPartyId === newPartyId &&
+      (invoice.partyName || '').trim().toLowerCase() === (newPartyName || '').trim().toLowerCase()
+    ) {
+      return 0;
+    }
+
+    // Find all active RECEIPT/PAYMENT vouchers linked to this invoice
+    const linkedVouchers = this.getVouchers().filter(
+      (v) =>
+        !v.isCancelled &&
+        !v.isReversed &&
+        (v.voucherType === 'RECEIPT' || v.voucherType === 'PAYMENT') &&
+        ((v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId === invoiceId) ||
+          v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === invoiceId))
+    );
+
+    if (linkedVouchers.length === 0) {
+      return 0;
+    }
+
+    // Before changing anything, reject the switch if any linked voucher also allocates to another document
+    // whose party does not match the new party.
+    const invoices = this.getInvoices();
+    const purchases = this.getPurchases();
+
+    for (const v of linkedVouchers) {
+      for (const alloc of v.paymentAllocations || []) {
+        if (alloc.documentType === 'INVOICE' && alloc.documentId !== invoiceId) {
+          const otherInv = invoices.find((i) => i.id === alloc.documentId);
+          if (otherInv && otherInv.partyId !== newPartyId) {
+            throw new Error(
+              `Cannot change invoice party: linked payment voucher #${v.voucherNumber} is also allocated to invoice #${otherInv.invoiceNumber} which belongs to a different party. Unlink those payments first.`
+            );
+          }
+        } else if (alloc.documentType === 'PURCHASE') {
+          const otherPur = purchases.find((p) => p.id === alloc.documentId);
+          if (otherPur && otherPur.supplierId !== newPartyId) {
+            throw new Error(
+              `Cannot change invoice party: linked payment voucher #${v.voucherNumber} is also allocated to purchase bill #${otherPur.billNumber} which belongs to a different party. Unlink those payments first.`
+            );
+          }
+        }
+      }
+    }
+
+    // Update each linked voucher
+    for (const v of linkedVouchers) {
+      const updatedEntries = (v.entries || []).map((entry) => {
+        if (v.voucherType === 'RECEIPT') {
+          // RECEIPT: credit line for old party (or ACC_CASH)
+          const isPartyLine =
+            entry.credit > 0 &&
+            (entry.accountId === v.partyId ||
+              entry.accountId === oldPartyId ||
+              entry.accountId === 'ACC_CASH' ||
+              (entry.accountName && (entry.accountName === v.partyName || entry.accountName === invoice.partyName)));
+          if (isPartyLine) {
+            return {
+              ...entry,
+              accountId: newPartyId || 'ACC_CASH',
+              accountName: newPartyName || 'Retail Customer',
+            };
+          }
+        } else if (v.voucherType === 'PAYMENT') {
+          // PAYMENT: debit line for old party (or ACC_CASH)
+          const isPartyLine =
+            entry.debit > 0 &&
+            (entry.accountId === v.partyId ||
+              entry.accountId === oldPartyId ||
+              entry.accountId === 'ACC_CASH' ||
+              (entry.accountName && (entry.accountName === v.partyName || entry.accountName === invoice.partyName)));
+          if (isPartyLine) {
+            return {
+              ...entry,
+              accountId: newPartyId || 'ACC_CASH',
+              accountName: newPartyName || 'Retail Customer',
+            };
+          }
+        }
+        return entry;
+      });
+
+      const updatedVoucher: Voucher = {
+        ...v,
+        partyId: newPartyId,
+        partyName: newPartyName,
+        entries: updatedEntries,
+      };
+
+      this.savePaymentVoucher(updatedVoucher, { skipDocumentUpdate: true });
+    }
+
+    if (oldPartyId && oldPartyId !== 'ACC_CASH') {
+      this.recalculatePartyBalance(oldPartyId);
+    }
+    if (newPartyId && newPartyId !== 'ACC_CASH') {
+      this.recalculatePartyBalance(newPartyId);
+    }
+    this.notifyListeners();
+    return linkedVouchers.length;
+  }
 }

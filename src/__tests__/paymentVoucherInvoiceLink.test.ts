@@ -1799,7 +1799,7 @@ describe('Payment Voucher & Invoice/Bill Link Spec Test Suite', () => {
     expect(storedPartyVch.allocationMode).toBe('MANUAL');
   });
 
-  it('Scenario 31: Block party/supplier changes on documents with active linked payments; allow date changes', () => {
+  it('Scenario 31: Allow invoice party changes with linked payments; block supplier changes on bills; allow date changes', () => {
     db.saveParty(sampleCustomer);
     db.saveParty(sampleSupplier);
 
@@ -1839,19 +1839,18 @@ describe('Payment Voucher & Invoice/Bill Link Spec Test Suite', () => {
     ];
     db.savePaymentVoucher(sourceVoucher, { skipDocumentUpdate: true });
 
-    // 1. Changing party while payment voucher is linked must be rejected
+    // 1. Changing invoice party while payment voucher is linked is now allowed by validateInvoicePreSave
     const partyChangedInv: Invoice = {
       ...inv,
       partyId: otherCustomer.id,
       partyName: otherCustomer.name,
     };
-    const blockPartyResult = validateInvoicePreSave({
+    const allowPartyResult = validateInvoicePreSave({
       newInvoice: partyChangedInv,
       existingInvoices: db.getInvoices(),
       vouchers: db.getVouchers(),
     });
-    expect(blockPartyResult.valid).toBe(false);
-    expect(blockPartyResult.error).toContain('Cannot change party on an invoice with linked payment vouchers');
+    expect(allowPartyResult.valid).toBe(true);
 
     // 2. Changing date is allowed
     const dateChangedInv: Invoice = {
@@ -2251,5 +2250,600 @@ describe('Payment Voucher & Invoice/Bill Link Spec Test Suite', () => {
     expect(storedInvoice.paidAmount).toBe(6000);
     expect(storedInvoice.balanceAmount).toBe(4000);
     expect(storedInvoice.date).toBe('2026-10-18');
+  });
+
+  // Scenario 35: Multiple invoices with partial linked receipts do not create duplicate Payment In rows
+  it('Scenario 35: Multiple invoices with partial linked receipts do not create duplicate Payment In rows', () => {
+    const cust: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-CUST-MULTI-LINK',
+      name: 'Multi Link Customer',
+      currentBalance: 0,
+    };
+    db.saveParty(cust);
+
+    // 1. Older invoice with a paid amount but no voucher (to prove party aggregate is no longer consumed by this invoice)
+    const oldInv: Invoice = {
+      ...makeInvoice('INV-OLD-01', 'INV-OLD-01', '2026-08-01', 1000, 1000),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.saveInvoice(oldInv);
+
+    // 2. Newer invoice 1: Total 3000, paid 1500, with linked receipt voucher
+    const inv1: Invoice = {
+      ...makeInvoice('INV-LINK-01', 'INV-LINK-01', '2026-08-15', 3000, 1500),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PARTIAL',
+    };
+    db.saveInvoice(inv1);
+
+    const v1 = createPaymentReceiptVoucher({
+      receiptNumber: `INV-${inv1.invoiceNumber}`,
+      date: '2026-08-15',
+      customerName: cust.name,
+      customerId: cust.id,
+      amount: 1500,
+      paymentMode: 'CASH',
+      narration: 'Receipt for INV-LINK-01',
+    });
+    v1.partyId = cust.id;
+    v1.partyName = cust.name;
+    v1.sourceDocumentType = 'INVOICE';
+    v1.sourceDocumentId = inv1.id;
+    v1.sourceDocumentNumber = inv1.invoiceNumber;
+    v1.allocationMode = 'SOURCE_DOCUMENT';
+    v1.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv1.id,
+        documentNumber: inv1.invoiceNumber,
+        amount: 1500,
+        date: '2026-08-15',
+      },
+    ];
+    db.savePaymentVoucher(v1, { skipDocumentUpdate: true });
+
+    // 3. Newer invoice 2: Total 2000, paid 800, with linked receipt voucher
+    const inv2: Invoice = {
+      ...makeInvoice('INV-LINK-02', 'INV-LINK-02', '2026-08-20', 2000, 800),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PARTIAL',
+    };
+    db.saveInvoice(inv2);
+
+    const v2 = createPaymentReceiptVoucher({
+      receiptNumber: `INV-${inv2.invoiceNumber}`,
+      date: '2026-08-20',
+      customerName: cust.name,
+      customerId: cust.id,
+      amount: 800,
+      paymentMode: 'CASH',
+      narration: 'Receipt for INV-LINK-02',
+    });
+    v2.partyId = cust.id;
+    v2.partyName = cust.name;
+    v2.sourceDocumentType = 'INVOICE';
+    v2.sourceDocumentId = inv2.id;
+    v2.sourceDocumentNumber = inv2.invoiceNumber;
+    v2.allocationMode = 'SOURCE_DOCUMENT';
+    v2.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv2.id,
+        documentNumber: inv2.invoiceNumber,
+        amount: 800,
+        date: '2026-08-20',
+      },
+    ];
+    db.savePaymentVoucher(v2, { skipDocumentUpdate: true });
+
+    // Compute cash bank summary
+    const summary = computeCashBankSummary({
+      accounts: db.getBankAccounts(),
+      invoices: db.getInvoices(),
+      purchases: db.getPurchases(),
+      expenses: db.getExpenses(),
+      vouchers: db.getVouchers(),
+      transactions: db.getCashBankTransactions(),
+    });
+
+    const inflowEntries = summary.ledgerEntries.filter((e) => e.flow === 'IN');
+
+    // Expected inflows:
+    // oldInv: synthetic SALE row = 1000 (no voucher)
+    // inv1: voucher v1 row = 1500 (NO synthetic sale row)
+    // inv2: voucher v2 row = 800 (NO synthetic sale row)
+    const oldInvEntries = inflowEntries.filter((e) => e.rawInvoiceId === oldInv.id || e.referenceNo === oldInv.invoiceNumber);
+    expect(oldInvEntries.length).toBe(1);
+    expect(oldInvEntries[0].amount).toBe(1000);
+    expect(oldInvEntries[0].type).toBe('SALE');
+
+    const inv1Entries = inflowEntries.filter((e) => e.rawInvoiceId === inv1.id || e.rawVoucherId === v1.id || e.referenceNo === v1.voucherNumber);
+    expect(inv1Entries.length).toBe(1);
+    expect(inv1Entries[0].amount).toBe(1500);
+    expect(inv1Entries[0].type).toBe('PARTY_RECEIPT');
+
+    const inv2Entries = inflowEntries.filter((e) => e.rawInvoiceId === inv2.id || e.rawVoucherId === v2.id || e.referenceNo === v2.voucherNumber);
+    expect(inv2Entries.length).toBe(1);
+    expect(inv2Entries[0].amount).toBe(800);
+    expect(inv2Entries[0].type).toBe('PARTY_RECEIPT');
+
+    // Total inflow equals total paid
+    const totalPaidExpected = 1000 + 1500 + 800; // 3300
+    const relevantInflow = oldInvEntries[0].amount + inv1Entries[0].amount + inv2Entries[0].amount;
+    expect(relevantInflow).toBe(totalPaidExpected);
+  });
+
+  // Scenario 36: unlinkPaymentAllocation restores invoice balance and keeps the voucher as an unallocated advance
+  it('Scenario 36: unlinkPaymentAllocation restores invoice balance and keeps the voucher as an unallocated advance', () => {
+    const cust: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-UNLINK-CUST',
+      name: 'Unlink Customer',
+      currentBalance: 0,
+    };
+    db.saveParty(cust);
+
+    const inv: Invoice = {
+      ...makeInvoice('INV-UNL-01', 'INV-UNL-01', '2026-09-01', 5000, 0),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+    };
+    db.saveInvoice(inv);
+
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: 'RCPT-UNL-01',
+      date: '2026-09-01',
+      customerName: cust.name,
+      customerId: cust.id,
+      amount: 2000,
+      paymentMode: 'CASH',
+      narration: 'Payment for invoice',
+    });
+    voucher.partyId = cust.id;
+    voucher.partyName = cust.name;
+    voucher.sourceDocumentType = 'INVOICE';
+    voucher.sourceDocumentId = inv.id;
+    voucher.sourceDocumentNumber = inv.invoiceNumber;
+    voucher.allocationMode = 'SOURCE_DOCUMENT';
+    voucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv.id,
+        documentNumber: inv.invoiceNumber,
+        amount: 2000,
+        date: '2026-09-01',
+      },
+    ];
+    db.savePaymentVoucher(voucher);
+
+    // Initial check: invoice is partially paid by the voucher
+    const storedInvBefore = db.getInvoices().find((i) => i.id === inv.id)!;
+    expect(storedInvBefore.paidAmount).toBe(2000);
+    expect(storedInvBefore.balanceAmount).toBe(3000);
+    expect(storedInvBefore.paymentStatus).toBe('PARTIAL');
+
+    // Unlink the payment allocation
+    const unlinkedVoucher = db.unlinkPaymentAllocation(voucher.id, 'INVOICE', inv.id);
+
+    // Voucher verification: kept alive as unallocated advance
+    expect(unlinkedVoucher.id).toBe(voucher.id);
+    expect(unlinkedVoucher.voucherNumber).toBe(voucher.voucherNumber);
+    expect(unlinkedVoucher.totalAmount).toBe(2000);
+    expect(unlinkedVoucher.partyId).toBe(cust.id);
+    expect(unlinkedVoucher.allocationMode).toBe('UNALLOCATED');
+    expect(unlinkedVoucher.paymentAllocations).toEqual([]);
+    expect(unlinkedVoucher.sourceDocumentId).toBeUndefined();
+    expect(unlinkedVoucher.sourceDocumentType).toBeUndefined();
+    expect(unlinkedVoucher.sourceDocumentNumber).toBeUndefined();
+
+    // Invoice verification: balance restored, status UNPAID, mode CREDIT
+    const storedInvAfter = db.getInvoices().find((i) => i.id === inv.id)!;
+    expect(storedInvAfter.paidAmount).toBe(0);
+    expect(storedInvAfter.balanceAmount).toBe(5000);
+    expect(storedInvAfter.paymentStatus).toBe('UNPAID');
+    expect(storedInvAfter.paymentMode).toBe('CREDIT');
+
+    // Party balance verification:
+    // Invoice owes 5000 (receivable), unallocated voucher provides 2000 (advance receipt/credit)
+    // Net receivable balance = 3000
+    const partyAfter = db.getParties().find((p) => p.id === cust.id)!;
+    expect(partyAfter.currentBalance).toBe(3000);
+  });
+
+  // Scenario 37: reassignLinkedPaymentParty moves source and manual linked receipts, updates party journal line, preserves cash/bank lines and allocations, and corrects party balances
+  it('Scenario 37: reassignLinkedPaymentParty moves source and manual linked receipts, updates party journal line, preserves cash/bank lines and allocations, and corrects party balances', () => {
+    const oldParty: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-OLD-01',
+      name: 'Old Party Corp',
+      currentBalance: 0,
+    };
+    const newParty: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-NEW-01',
+      name: 'New Party Inc',
+      currentBalance: 0,
+    };
+    db.saveParty(oldParty);
+    db.saveParty(newParty);
+
+    const inv: Invoice = {
+      ...makeInvoice('INV-REASSIGN-01', 'INV-REASSIGN-01', '2026-09-01', 5000, 5000),
+      partyId: oldParty.id,
+      partyName: oldParty.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.saveInvoice(inv);
+
+    // Source voucher (upfront receipt 3000)
+    const sourceVoucher = createPaymentReceiptVoucher({
+      receiptNumber: `INV-${inv.invoiceNumber}`,
+      date: '2026-09-01',
+      customerName: oldParty.name,
+      customerId: oldParty.id,
+      amount: 3000,
+      paymentMode: 'CASH',
+      narration: 'Upfront receipt',
+    });
+    sourceVoucher.partyId = oldParty.id;
+    sourceVoucher.partyName = oldParty.name;
+    sourceVoucher.sourceDocumentType = 'INVOICE';
+    sourceVoucher.sourceDocumentId = inv.id;
+    sourceVoucher.sourceDocumentNumber = inv.invoiceNumber;
+    sourceVoucher.allocationMode = 'SOURCE_DOCUMENT';
+    sourceVoucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv.id,
+        documentNumber: inv.invoiceNumber,
+        amount: 3000,
+        date: '2026-09-01',
+      },
+    ];
+    db.savePaymentVoucher(sourceVoucher, { skipDocumentUpdate: true });
+
+    // Manual linked voucher (later receipt 2000)
+    const manualVoucher = createPaymentReceiptVoucher({
+      receiptNumber: 'RCPT-MAN-01',
+      date: '2026-09-05',
+      customerName: oldParty.name,
+      customerId: oldParty.id,
+      amount: 2000,
+      paymentMode: 'CASH',
+      narration: 'Later manual receipt',
+    });
+    manualVoucher.partyId = oldParty.id;
+    manualVoucher.partyName = oldParty.name;
+    manualVoucher.allocationMode = 'MANUAL';
+    manualVoucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv.id,
+        documentNumber: inv.invoiceNumber,
+        amount: 2000,
+        date: '2026-09-05',
+      },
+    ];
+    db.savePaymentVoucher(manualVoucher, { skipDocumentUpdate: true });
+
+    // Reassign linked payments to new party
+    db.reassignLinkedPaymentParty(inv.id, newParty.id, newParty.name);
+
+    // Verify source voucher
+    const storedSource = db.getVouchers().find((v) => v.id === sourceVoucher.id)!;
+    expect(storedSource.partyId).toBe(newParty.id);
+    expect(storedSource.partyName).toBe(newParty.name);
+    expect(storedSource.totalAmount).toBe(3000);
+    expect(storedSource.paymentAllocations![0].amount).toBe(3000);
+    // Cash debit line preserved
+    const sourceDebit = storedSource.entries.find((e) => e.debit > 0)!;
+    expect(sourceDebit.accountId).toBe('ACC_CASH');
+    expect(sourceDebit.debit).toBe(3000);
+    // Party credit line updated
+    const sourceCredit = storedSource.entries.find((e) => e.credit > 0)!;
+    expect(sourceCredit.accountId).toBe(newParty.id);
+    expect(sourceCredit.accountName).toBe(newParty.name);
+    expect(sourceCredit.credit).toBe(3000);
+
+    // Verify manual voucher
+    const storedManual = db.getVouchers().find((v) => v.id === manualVoucher.id)!;
+    expect(storedManual.partyId).toBe(newParty.id);
+    expect(storedManual.partyName).toBe(newParty.name);
+    expect(storedManual.totalAmount).toBe(2000);
+    expect(storedManual.paymentAllocations![0].amount).toBe(2000);
+    const manualCredit = storedManual.entries.find((e) => e.credit > 0)!;
+    expect(manualCredit.accountId).toBe(newParty.id);
+    expect(manualCredit.accountName).toBe(newParty.name);
+
+    // Update invoice party to new party as App.handleSaveInvoice does
+    const updatedInv = { ...inv, partyId: newParty.id, partyName: newParty.name };
+    db.saveInvoice(updatedInv);
+
+    // Both old and new party balances are updated
+    const oldPartyFinal = db.getParties().find((p) => p.id === oldParty.id)!;
+    expect(oldPartyFinal.currentBalance).toBe(0);
+
+    const newPartyFinal = db.getParties().find((p) => p.id === newParty.id)!;
+    // Invoice grand total 5000, paid 5000 => net balance 0
+    expect(newPartyFinal.currentBalance).toBe(0);
+  });
+
+  // Scenario 38: validateInvoicePreSave allows invoice party changes with linked payments
+  it('Scenario 38: validateInvoicePreSave allows invoice party changes with linked payments', () => {
+    const cust1: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-PRE-01',
+      name: 'PreSave Party 1',
+    };
+    const cust2: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-PRE-02',
+      name: 'PreSave Party 2',
+    };
+    db.saveParty(cust1);
+    db.saveParty(cust2);
+
+    const inv: Invoice = {
+      ...makeInvoice('INV-PRE-01', 'INV-PRE-01', '2026-09-01', 3000, 3000),
+      partyId: cust1.id,
+      partyName: cust1.name,
+    };
+    db.saveInvoice(inv);
+
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: 'RCPT-PRE-01',
+      date: '2026-09-01',
+      customerName: cust1.name,
+      customerId: cust1.id,
+      amount: 3000,
+      paymentMode: 'CASH',
+    });
+    voucher.partyId = cust1.id;
+    voucher.sourceDocumentType = 'INVOICE';
+    voucher.sourceDocumentId = inv.id;
+    voucher.sourceDocumentNumber = inv.invoiceNumber;
+    voucher.allocationMode = 'SOURCE_DOCUMENT';
+    voucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv.id,
+        documentNumber: inv.invoiceNumber,
+        amount: 3000,
+        date: '2026-09-01',
+      },
+    ];
+    db.savePaymentVoucher(voucher, { skipDocumentUpdate: true });
+
+    // Editing party to cust2
+    const editedInv: Invoice = {
+      ...inv,
+      partyId: cust2.id,
+      partyName: cust2.name,
+    };
+
+    const validation = validateInvoicePreSave({
+      newInvoice: editedInv,
+      existingInvoices: db.getInvoices(),
+      vouchers: db.getVouchers(),
+    });
+
+    expect(validation.valid).toBe(true);
+    expect(validation.error).toBeUndefined();
+  });
+
+  // Scenario 39: Plain db.saveInvoice of an edited invoice leaves linked vouchers unchanged
+  it('Scenario 39: Plain db.saveInvoice of an edited invoice leaves linked vouchers unchanged', () => {
+    const cust: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-PLAIN-01',
+      name: 'Plain Save Customer',
+    };
+    db.saveParty(cust);
+
+    const inv: Invoice = {
+      ...makeInvoice('INV-PLAIN-01', 'INV-PLAIN-01', '2026-09-01', 4000, 4000),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.saveInvoice(inv);
+
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: `INV-${inv.invoiceNumber}`,
+      date: '2026-09-01',
+      customerName: cust.name,
+      customerId: cust.id,
+      amount: 4000,
+      paymentMode: 'CASH',
+      narration: 'Upfront receipt',
+    });
+    voucher.partyId = cust.id;
+    voucher.partyName = cust.name;
+    voucher.sourceDocumentType = 'INVOICE';
+    voucher.sourceDocumentId = inv.id;
+    voucher.sourceDocumentNumber = inv.invoiceNumber;
+    voucher.allocationMode = 'SOURCE_DOCUMENT';
+    voucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: inv.id,
+        documentNumber: inv.invoiceNumber,
+        amount: 4000,
+        date: '2026-09-01',
+      },
+    ];
+    db.savePaymentVoucher(voucher, { skipDocumentUpdate: true });
+
+    const voucherBefore = JSON.stringify(db.getVouchers().find((v) => v.id === voucher.id));
+
+    // Edit invoice notes, leaving payment state unchanged
+    const editedInv: Invoice = {
+      ...inv,
+      notes: 'Updated invoice notes for delivery instructions',
+    };
+    db.saveInvoice(editedInv);
+
+    const voucherAfter = JSON.stringify(db.getVouchers().find((v) => v.id === voucher.id));
+    expect(voucherAfter).toBe(voucherBefore);
+  });
+
+  // Scenario 40: Legacy source receipt voucher with sourceDocumentId but no paymentAllocations suppresses its linked invoice without duplicate SALE row
+  it('Scenario 40: Legacy source receipt voucher with sourceDocumentId but no paymentAllocations suppresses its linked invoice without duplicate SALE row', () => {
+    const cust: Party = {
+      ...sampleCustomer,
+      id: 'PARTY-LEG-SRC-01',
+      name: 'Legacy Source Customer',
+    };
+    db.saveParty(cust);
+
+    // 1. Older invoice with upfront cash payment and NO voucher
+    const oldInv: Invoice = {
+      ...makeInvoice('INV-LEG-OLD', 'INV-LEG-OLD', '2026-08-01', 2000, 2000),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.saveInvoice(oldInv);
+
+    // 2. Newer invoice with upfront cash payment and a legacy source voucher (no paymentAllocations)
+    const linkedInv: Invoice = {
+      ...makeInvoice('INV-LEG-LINK', 'INV-LEG-LINK', '2026-08-10', 3500, 3500),
+      partyId: cust.id,
+      partyName: cust.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.saveInvoice(linkedInv);
+
+    const legacyVoucher = createPaymentReceiptVoucher({
+      receiptNumber: `INV-${linkedInv.invoiceNumber}`,
+      date: '2026-08-10',
+      customerName: cust.name,
+      customerId: cust.id,
+      amount: 3500,
+      paymentMode: 'CASH',
+      narration: 'Legacy receipt for INV-LEG-LINK',
+    });
+    legacyVoucher.partyId = cust.id;
+    legacyVoucher.partyName = cust.name;
+    legacyVoucher.sourceDocumentType = 'INVOICE';
+    legacyVoucher.sourceDocumentId = linkedInv.id;
+    legacyVoucher.sourceDocumentNumber = linkedInv.invoiceNumber;
+    // Explicitly no paymentAllocations (simulating legacy data)
+    legacyVoucher.paymentAllocations = undefined;
+    db.savePaymentVoucher(legacyVoucher, { skipDocumentUpdate: true });
+
+    const summary = computeCashBankSummary({
+      accounts: db.getBankAccounts(),
+      invoices: db.getInvoices(),
+      purchases: db.getPurchases(),
+      expenses: db.getExpenses(),
+      vouchers: db.getVouchers(),
+      transactions: db.getCashBankTransactions(),
+    });
+
+    // Verify:
+    // 1. linkedInv must NOT generate a synthetic SALE entry (voucher suppresses it directly via sourceDocumentId)
+    const linkedSale = summary.ledgerEntries.find((e) => e.rawInvoiceId === linkedInv.id);
+    expect(linkedSale).toBeUndefined();
+
+    // 2. oldInv MUST still generate a synthetic SALE entry (not stolen by party-aggregate fallback)
+    const oldSale = summary.ledgerEntries.find((e) => e.rawInvoiceId === oldInv.id);
+    expect(oldSale).toBeDefined();
+    expect(oldSale!.amount).toBe(2000);
+    expect(oldSale!.type).toBe('SALE');
+
+    // 3. The voucher itself is present as a PARTY_RECEIPT entry
+    const voucherEntry = summary.ledgerEntries.find((e) => e.rawVoucherId === legacyVoucher.id || e.referenceNo === legacyVoucher.voucherNumber);
+    expect(voucherEntry).toBeDefined();
+    expect(voucherEntry!.amount).toBe(3500);
+    expect(voucherEntry!.type).toBe('PARTY_RECEIPT');
+  });
+
+  // Scenario 41: Legacy source payment voucher with sourceDocumentType=PURCHASE and sourceDocumentId but no paymentAllocations suppresses its linked bill
+  it('Scenario 41: Legacy source payment voucher with sourceDocumentType=PURCHASE and sourceDocumentId but no paymentAllocations suppresses its linked bill', () => {
+    const supp: Party = {
+      ...sampleSupplier,
+      id: 'SUPP-LEG-SRC-01',
+      name: 'Legacy Source Supplier',
+    };
+    db.saveParty(supp);
+
+    // 1. Older bill with upfront cash payment and NO voucher
+    const oldBill: PurchaseBill = {
+      ...makePurchase('PUR-LEG-OLD', 'PUR-LEG-OLD', '2026-08-01', 1500, 1500),
+      supplierId: supp.id,
+      supplierName: supp.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.savePurchase(oldBill);
+
+    // 2. Newer bill with upfront cash payment and a legacy source voucher (no paymentAllocations)
+    const linkedBill: PurchaseBill = {
+      ...makePurchase('PUR-LEG-LINK', 'PUR-LEG-LINK', '2026-08-10', 4500, 4500),
+      supplierId: supp.id,
+      supplierName: supp.name,
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+    };
+    db.savePurchase(linkedBill);
+
+    const legacyPaymentVoucher = createPaymentOutVoucher({
+      receiptNumber: `PUR-${linkedBill.billNumber}`,
+      date: '2026-08-10',
+      supplierName: supp.name,
+      supplierId: supp.id,
+      amount: 4500,
+      paymentMode: 'CASH',
+      narration: 'Legacy payment for PUR-LEG-LINK',
+    });
+    legacyPaymentVoucher.partyId = supp.id;
+    legacyPaymentVoucher.partyName = supp.name;
+    legacyPaymentVoucher.sourceDocumentType = 'PURCHASE';
+    legacyPaymentVoucher.sourceDocumentId = linkedBill.id;
+    legacyPaymentVoucher.sourceDocumentNumber = linkedBill.billNumber;
+    // Explicitly no paymentAllocations
+    legacyPaymentVoucher.paymentAllocations = undefined;
+    db.savePaymentVoucher(legacyPaymentVoucher, { skipDocumentUpdate: true });
+
+    const summary = computeCashBankSummary({
+      accounts: db.getBankAccounts(),
+      invoices: db.getInvoices(),
+      purchases: db.getPurchases(),
+      expenses: db.getExpenses(),
+      vouchers: db.getVouchers(),
+      transactions: db.getCashBankTransactions(),
+    });
+
+    // Verify:
+    // 1. linkedBill must NOT generate a synthetic PURCHASE entry
+    const linkedPur = summary.ledgerEntries.find((e) => e.rawPurchaseId === linkedBill.id);
+    expect(linkedPur).toBeUndefined();
+
+    // 2. oldBill MUST still generate a synthetic PURCHASE entry
+    const oldPur = summary.ledgerEntries.find((e) => e.rawPurchaseId === oldBill.id);
+    expect(oldPur).toBeDefined();
+    expect(oldPur!.amount).toBe(1500);
+    expect(oldPur!.type).toBe('PURCHASE');
+
+    // 3. The voucher itself is present as a PARTY_PAYMENT entry
+    const voucherEntry = summary.ledgerEntries.find((e) => e.rawVoucherId === legacyPaymentVoucher.id || e.referenceNo === legacyPaymentVoucher.voucherNumber);
+    expect(voucherEntry).toBeDefined();
+    expect(voucherEntry!.amount).toBe(4500);
+    expect(voucherEntry!.type).toBe('PARTY_PAYMENT');
   });
 });

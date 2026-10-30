@@ -49,7 +49,7 @@ interface TableGridInvoiceModalProps {
   existingInvoices?: Invoice[];
   defaultInvoiceType?: InvoiceType;
   onClose: () => void;
-  onSave: (invoice: Invoice, options?: { openPrint?: boolean }) => void;
+  onSave: (invoice: Invoice, options?: { openPrint?: boolean; paymentChanged?: boolean; openPreview?: boolean }) => void;
   onAddNewParty?: () => void;
   onPartyCreated?: (party: Party) => void;
 }
@@ -638,20 +638,43 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     });
 
     const hasPaymentOverride = paymentOverride !== undefined;
-    const resolvedPaymentMode: PaymentMode = hasPaymentOverride
-      ? paymentOverride.paymentMode
-      : 'CREDIT';
-    const autoPaymentStatus: PaymentStatus = hasPaymentOverride
-      ? paymentOverride.paymentStatus
-      : 'UNPAID';
-    const totalPaid = hasPaymentOverride ? paymentOverride.paidAmount : 0;
-    const balanceDue = hasPaymentOverride ? paymentOverride.balanceAmount : finalGrandTotal;
-    const savedSplits: PaymentSplit[] = hasPaymentOverride
-      ? paymentOverride.paymentSplits
-      : [{ id: 'split-credit', mode: 'CREDIT', amount: finalGrandTotal }];
-    const finalNotes = hasPaymentOverride
-      ? (paymentOverride.paymentNotes || initialInvoice?.notes)
-      : initialInvoice?.notes;
+    let resolvedPaymentMode: PaymentMode;
+    let autoPaymentStatus: PaymentStatus;
+    let totalPaid: number;
+    let balanceDue: number;
+    let savedSplits: PaymentSplit[] | undefined;
+    let finalNotes: string | undefined;
+
+    if (hasPaymentOverride) {
+      resolvedPaymentMode = paymentOverride.paymentMode;
+      autoPaymentStatus = paymentOverride.paymentStatus;
+      totalPaid = paymentOverride.paidAmount;
+      balanceDue = paymentOverride.balanceAmount;
+      savedSplits = paymentOverride.paymentSplits;
+      finalNotes = paymentOverride.paymentNotes || initialInvoice?.notes;
+    } else if (initialInvoice) {
+      // Editing existing invoice without payment override: preserve existing payment state
+      totalPaid = typeof initialInvoice.paidAmount === 'number'
+        ? initialInvoice.paidAmount
+        : (initialInvoice.paymentStatus === 'PAID' ? initialInvoice.grandTotal : 0);
+      balanceDue = Number(Math.max(0, finalGrandTotal - totalPaid).toFixed(2));
+      autoPaymentStatus = balanceDue <= 0.01
+        ? 'PAID'
+        : (totalPaid > 0 ? 'PARTIAL' : 'UNPAID');
+      resolvedPaymentMode = initialInvoice.paymentMode || (autoPaymentStatus === 'UNPAID' ? 'CREDIT' : 'CASH');
+      savedSplits = initialInvoice.paymentSplits && initialInvoice.paymentSplits.length > 0
+        ? initialInvoice.paymentSplits
+        : (totalPaid === 0 ? [{ id: 'split-credit', mode: 'CREDIT', amount: finalGrandTotal }] : undefined);
+      finalNotes = initialInvoice.notes;
+    } else {
+      // New invoice without payment override: default to unpaid/CREDIT
+      resolvedPaymentMode = 'CREDIT';
+      autoPaymentStatus = 'UNPAID';
+      totalPaid = 0;
+      balanceDue = finalGrandTotal;
+      savedSplits = [{ id: 'split-credit', mode: 'CREDIT', amount: finalGrandTotal }];
+      finalNotes = undefined;
+    }
 
     const isSpecialDoc = ['SALES_ORDER', 'ESTIMATE', 'DELIVERY_CHALLAN', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(effectiveInvoiceType);
     const resolvedInvoiceType = (company.isCompositionScheme && !isSpecialDoc) ? 'B2CS' : effectiveInvoiceType;
@@ -1053,7 +1076,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         draftService.clearInvoiceDraft(effectiveInvoiceType);
       }
       setIsPaymentModalOpen(false);
-      onSave(paidInvoice, { openPrint: andPrint });
+      onSave(paidInvoice, { openPrint: andPrint, paymentChanged: true });
       if (andPrint) {
         setPreviewInvoiceData(paidInvoice);
       }

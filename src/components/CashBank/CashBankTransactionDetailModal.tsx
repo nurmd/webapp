@@ -29,6 +29,7 @@ export interface CashBankTransactionDetailModalProps {
   onNavigateTab?: (tab: AppTab) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
+  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
 }
 
 export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailModalProps> = ({
@@ -47,9 +48,16 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   onNavigateTab,
   onViewInvoice,
   onViewPurchase,
+  onUnlinkAllocation,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [unlinkTarget, setUnlinkTarget] = useState<{
+    voucherId: string;
+    documentType: 'INVOICE' | 'PURCHASE';
+    documentId: string;
+    documentNumber: string;
+  } | null>(null);
 
   const linkedVoucher = useMemo(() => {
     if (!entry?.rawVoucherId) return null;
@@ -170,13 +178,22 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     }
   }, [isOpen, rawTransaction, entry, defaultBank]);
 
-  // Hardware back navigation: tiered priorities (p30 confirm -> p25 edit -> p20 close)
+  // Hardware back navigation: tiered priorities (p30 unlink/confirm -> p25 edit -> p20 close)
+  useBackNavigation(
+    () => {
+      setUnlinkTarget(null);
+      return true;
+    },
+    isOpen && !!unlinkTarget,
+    30
+  );
+
   useBackNavigation(
     () => {
       setShowDeleteConfirm(false);
       return true;
     },
-    isOpen && showDeleteConfirm,
+    isOpen && !unlinkTarget && showDeleteConfirm,
     30
   );
 
@@ -185,7 +202,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
       setIsEditing(false);
       return true;
     },
-    isOpen && !showDeleteConfirm && isEditing,
+    isOpen && !unlinkTarget && !showDeleteConfirm && isEditing,
     25
   );
 
@@ -194,7 +211,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
       onClose();
       return true;
     },
-    isOpen && !showDeleteConfirm && !isEditing,
+    isOpen && !unlinkTarget && !showDeleteConfirm && !isEditing,
     20
   );
 
@@ -591,40 +608,59 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                           <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
                           <span className="text-secondary font-bold">({formatINR(alloc.amount)})</span>
                         </div>
-                        {alloc.documentType === 'INVOICE' && onViewInvoice && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const allInvs = invoices && invoices.length > 0 ? invoices : db.getInvoices();
-                              const inv = allInvs.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
-                              if (inv) {
-                                onClose();
-                                onViewInvoice(inv);
-                              }
-                            }}
-                            className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">visibility</span>
-                            <span>View</span>
-                          </button>
-                        )}
-                        {alloc.documentType === 'PURCHASE' && onViewPurchase && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const allPurs = purchases && purchases.length > 0 ? purchases : db.getPurchases();
-                              const pur = allPurs.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
-                              if (pur) {
-                                onClose();
-                                onViewPurchase(pur);
-                              }
-                            }}
-                            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">visibility</span>
-                            <span>View</span>
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {alloc.documentType === 'INVOICE' && onViewInvoice && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allInvs = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+                                const inv = allInvs.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
+                                if (inv) {
+                                  onClose();
+                                  onViewInvoice(inv);
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">visibility</span>
+                              <span>View</span>
+                            </button>
+                          )}
+                          {alloc.documentType === 'PURCHASE' && onViewPurchase && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const allPurs = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+                                const pur = allPurs.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
+                                if (pur) {
+                                  onClose();
+                                  onViewPurchase(pur);
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">visibility</span>
+                              <span>View</span>
+                            </button>
+                          )}
+                          {onUnlinkAllocation && linkedVoucher && !linkedVoucher.isReversed && !linkedVoucher.isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnlinkTarget({
+                                  voucherId: linkedVoucher.id,
+                                  documentType: alloc.documentType,
+                                  documentId: alloc.documentId,
+                                  documentNumber: alloc.documentNumber,
+                                });
+                              }}
+                              className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">link_off</span>
+                              <span>Unlink</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -658,6 +694,29 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                     </button>
                   )}
                 </div>
+              )}
+
+              {/* Unlink Confirmation Modal */}
+              {unlinkTarget && (
+                <ConfirmDeleteModal
+                  isOpen={!!unlinkTarget}
+                  title="Unlink Payment Allocation"
+                  recordName={`${unlinkTarget.documentType === 'INVOICE' ? 'Invoice' : 'Bill'} #${unlinkTarget.documentNumber}`}
+                  description={`Are you sure you want to unlink this payment? The ${unlinkTarget.documentType === 'INVOICE' ? 'invoice' : 'bill'} balance will be restored, and the payment voucher will remain as an unallocated advance.`}
+                  confirmText="Yes, Unlink"
+                  cancelText="Cancel"
+                  confirmButtonClass="bg-amber-600 hover:bg-amber-700 text-white"
+                  icon="link_off"
+                  iconBgClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  onConfirm={() => {
+                    if (onUnlinkAllocation && unlinkTarget) {
+                      onUnlinkAllocation(unlinkTarget.voucherId, unlinkTarget.documentType, unlinkTarget.documentId);
+                    }
+                    setUnlinkTarget(null);
+                    onClose();
+                  }}
+                  onClose={() => setUnlinkTarget(null)}
+                />
               )}
 
               {/* Delete Confirmation Modal */}
