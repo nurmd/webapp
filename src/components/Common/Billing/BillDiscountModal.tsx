@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 
@@ -24,6 +24,38 @@ export const BillDiscountModal: React.FC<BillDiscountModalProps> = ({
     return true;
   }, isOpen, 25);
 
+  const [amountDraft, setAmountDraft] = useState<string>(
+    overallDiscountAmount > 0 ? String(overallDiscountAmount) : ''
+  );
+  const lastAmountPercentRef = useRef<number | null>(null);
+  const prevIsOpenRef = useRef(isOpen);
+
+  // Sync local draft when the modal opens or when overallDiscountAmount/percent changes externally
+  useEffect(() => {
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      return;
+    }
+
+    const justOpened = !prevIsOpenRef.current && isOpen;
+    prevIsOpenRef.current = isOpen;
+
+    if (justOpened) {
+      lastAmountPercentRef.current = null;
+      setAmountDraft(overallDiscountAmount > 0 ? String(overallDiscountAmount) : '');
+      return;
+    }
+
+    // Do not overwrite user draft while typing in amount input
+    if (lastAmountPercentRef.current !== null && lastAmountPercentRef.current === overallDiscountPercent) {
+      return;
+    }
+
+    // External change (preset button, % input, or external update)
+    lastAmountPercentRef.current = null;
+    setAmountDraft(overallDiscountAmount > 0 ? String(overallDiscountAmount) : '');
+  }, [isOpen, overallDiscountAmount, overallDiscountPercent]);
+
   if (!isOpen) return null;
 
   return (
@@ -38,7 +70,10 @@ export const BillDiscountModal: React.FC<BillDiscountModalProps> = ({
             <button
               key={pct}
               type="button"
-              onClick={() => onApplyDiscountPercent(pct)}
+              onClick={() => {
+                lastAmountPercentRef.current = null;
+                onApplyDiscountPercent(pct);
+              }}
               className={`flex-1 py-1.5 rounded-xl font-label-md text-xs font-bold cursor-pointer transition-colors ${
                 overallDiscountPercent === pct
                   ? 'bg-secondary text-on-secondary'
@@ -62,7 +97,10 @@ export const BillDiscountModal: React.FC<BillDiscountModalProps> = ({
                 max="100"
                 step="0.1"
                 value={overallDiscountPercent || ''}
-                onChange={(e) => onApplyDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                onChange={(e) => {
+                  lastAmountPercentRef.current = null;
+                  onApplyDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))));
+                }}
                 className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl pl-3 pr-7 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40 text-right"
                 placeholder="0"
               />
@@ -84,12 +122,18 @@ export const BillDiscountModal: React.FC<BillDiscountModalProps> = ({
                 type="number"
                 min="0"
                 step="0.01"
-                value={overallDiscountAmount || ''}
+                value={amountDraft}
                 onChange={(e) => {
-                  const amt = Number(e.target.value) || 0;
+                  const val = e.target.value;
+                  setAmountDraft(val);
+                  const amt = Number(val) || 0;
                   if (taxableBaseAmount > 0) {
                     const pct = Math.min(100, Math.round(((amt / taxableBaseAmount) * 100) * 100) / 100);
+                    lastAmountPercentRef.current = pct;
                     onApplyDiscountPercent(pct);
+                  } else {
+                    lastAmountPercentRef.current = 0;
+                    onApplyDiscountPercent(0);
                   }
                 }}
                 className="w-full bg-surface-container-low border border-outline-variant/40 rounded-xl pl-7 pr-3 py-2 text-sm text-on-surface font-semibold outline-none focus:ring-2 focus:ring-secondary/40 text-right"

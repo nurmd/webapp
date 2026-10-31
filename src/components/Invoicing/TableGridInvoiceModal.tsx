@@ -476,10 +476,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     return calculateInvoice(company.stateCode, posStateCode, calcInputs);
   }, [company.stateCode, posStateCode, calcInputs]);
 
-  // Overall discount deduction amount
-  const overallDiscountAmount = useMemo(() => {
-    if (overallDiscountPercent <= 0) return 0;
-    const rawTaxable = rows.reduce((sum, r) => {
+  // Taxable base before overall discount (for discount conversion & calculation)
+  const preOverallDiscountTaxableAmount = useMemo(() => {
+    return rows.reduce((sum, r) => {
       const activeRate = r.priceMode === 'INCLUSIVE' && r.unitPriceInclusive !== undefined
         ? Number(r.unitPriceInclusive) || 0
         : Number(r.unitPrice) || 0;
@@ -487,8 +486,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       const itemDisc = r.discountAmount && r.discountAmount > 0 ? r.discountAmount : (gross * (Number(r.discountPercent) || 0)) / 100;
       return sum + (gross - itemDisc);
     }, 0);
-    return Number(((rawTaxable * overallDiscountPercent) / 100).toFixed(2));
-  }, [rows, overallDiscountPercent]);
+  }, [rows]);
+
+  // Overall discount deduction amount
+  const overallDiscountAmount = useMemo(() => {
+    if (overallDiscountPercent <= 0) return 0;
+    return Number(((preOverallDiscountTaxableAmount * overallDiscountPercent) / 100).toFixed(2));
+  }, [preOverallDiscountTaxableAmount, overallDiscountPercent]);
 
   const finalGrandTotal = useMemo(() => {
     const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
@@ -1353,7 +1357,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         isOpen={isExtraDiscountModalOpen}
         overallDiscountPercent={overallDiscountPercent}
         overallDiscountAmount={overallDiscountAmount}
-        taxableBaseAmount={calcSummary.totalTaxableAmount}
+        taxableBaseAmount={preOverallDiscountTaxableAmount}
         onApplyDiscountPercent={setOverallDiscountPercent}
         onClose={() => setIsExtraDiscountModalOpen(false)}
       />
