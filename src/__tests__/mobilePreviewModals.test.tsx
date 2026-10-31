@@ -309,6 +309,36 @@ describe('Mobile Clean Previews Suite (Invoice & Reports)', () => {
 
       expect(printSpy).toHaveBeenCalledTimes(1);
     });
+
+    it('ensures preview viewport is scrollable with min-h-0 and header/footer are shrink-0', () => {
+      act(() => {
+        root.render(
+          <InvoicePreviewModal
+            invoice={testInvoice}
+            company={testCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const viewport = container.querySelector('.print-preview-viewport');
+      expect(viewport).not.toBeNull();
+      expect(viewport?.className).toContain('overflow-auto');
+      expect(viewport?.className).toContain('flex-1');
+      expect(viewport?.className).toContain('min-h-0');
+
+      // Verify header and footer toolbars are non-scrolling shrink-0
+      const headerToolbar = container.querySelector('.print-modal-container > .border-b');
+      expect(headerToolbar?.className).toContain('shrink-0');
+
+      const footerToolbar = container.querySelector('.print-modal-container > .border-t');
+      expect(footerToolbar?.className).toContain('shrink-0');
+
+      // Verify all items are present inside the scrollable viewport
+      testInvoice.items.forEach((item) => {
+        expect(viewport?.textContent).toContain(item.name);
+      });
+    });
   });
 
   describe('2. ReportPdfPreviewModal Mobile Cards & A4 Sheet Modes', () => {

@@ -941,7 +941,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onClick={() => handleQuickAction(action.id)}
                   type="button"
                   aria-label={action.label}
-                  className={`flex flex-col items-center justify-center gap-0.5 h-[36px] sm:h-10 px-1 rounded-xl active:scale-95 transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-1 aspect-square p-1 sm:p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer ${
                     isPrimary
                       ? 'bg-secondary text-on-secondary shadow-sm'
                       : 'bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs hover:border-secondary'
@@ -950,11 +950,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 >
                   <span
                     aria-hidden="true"
-                    className={`material-symbols-outlined text-[16px] leading-none ${isPrimary ? '' : action.accentClass}`}
+                    className={`material-symbols-outlined text-[18px] sm:text-[20px] leading-none ${isPrimary ? '' : action.accentClass}`}
                   >
                     {action.icon}
                   </span>
-                  <span className="font-bold text-[9px] sm:text-[10px] leading-tight truncate w-full text-center">
+                  <span className="font-bold text-[9px] sm:text-[10px] leading-tight truncate w-full text-center px-0.5">
                     {action.label}
                   </span>
                 </button>

@@ -547,7 +547,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
         {/* Notice banner if displaying sample fallback items */}
         {!hasItems && (
-          <div className="no-print bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-center text-xs font-semibold text-amber-900 dark:text-amber-200">
+          <div className="no-print bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-center text-xs font-semibold text-amber-900 dark:text-amber-200 shrink-0">
             ★ Previewing with standard sample GST items &amp; tax calculations.
           </div>
         )}
@@ -559,7 +559,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
             viewMode === 'THERMAL' || viewMode === 'MOBILE'
               ? 'justify-center'
               : 'justify-start sm:justify-center'
-          } bg-slate-200/40 flex-1`}
+          } bg-slate-200/40 flex-1 min-h-0`}
         >
           {viewMode === 'THERMAL' && (
             /* Standard POS Thermal Slip Preview */
