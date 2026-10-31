@@ -3,7 +3,14 @@ import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
-import { Voucher, JournalEntryLine } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, JournalEntryLine, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
+import {
+  getOutstandingDocuments,
+  allocateOldestFirst,
+  validateAllocations,
+  reverseAllocations,
+  OutstandingDocument,
+} from '../../core/accounting/paymentAllocation.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
@@ -24,6 +31,9 @@ export interface VoucherEditorModalProps {
   onEditPurchase?: (bill: PurchaseBill) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onRefresh?: () => void;
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
+  parties?: Party[];
 }
 
 export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
@@ -37,6 +47,9 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   onEditPurchase,
   onViewPurchase,
   onRefresh,
+  invoices,
+  purchases,
+  parties,
 }) => {
   const isPayment = Boolean(
     editingLedgerEntry &&
@@ -65,6 +78,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const [editNotes, setEditNotes] = useState('');
   const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
   const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
+
+  // Allocation State for Manual Payment Linking
+  const [allocationsMap, setAllocationsMap] = useState<Record<string, number>>({});
+  const [allocationModeState, setAllocationModeState] = useState<'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT'>('UNALLOCATED');
+  const [isManualAllocation, setIsManualAllocation] = useState<boolean>(false);
 
   const availableBankAccounts = useMemo(() => {
     const all = db.getBankAccounts() || [];
@@ -134,7 +152,23 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         setEditSplitUPI('');
         setEditSplitBank('');
       }
+
+      const initialMap: Record<string, number> = {};
+      if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+        for (const alloc of v.paymentAllocations) {
+          if (typeof alloc.amount === 'number' && alloc.amount > 0) {
+            initialMap[alloc.documentId] = alloc.amount;
+          }
+        }
+      }
+      setAllocationsMap(initialMap);
+      setAllocationModeState(v.allocationMode || (v.paymentAllocations?.length ? 'MANUAL' : 'UNALLOCATED'));
+      setIsManualAllocation(v.allocationMode === 'MANUAL');
     } else if (editingLedgerEntry.rawInvoice?.paymentSplits && editingLedgerEntry.rawInvoice.paymentSplits.length > 1) {
+      setAllocationsMap({});
+      setAllocationModeState('UNALLOCATED');
+      setIsManualAllocation(false);
+      setEditMode('SPLIT');
       setEditMode('SPLIT');
       const c = editingLedgerEntry.rawInvoice.paymentSplits.find((s) => s.mode === 'CASH')?.amount || 0;
       const u = editingLedgerEntry.rawInvoice.paymentSplits.find((s) => s.mode === 'UPI')?.amount || 0;
@@ -178,6 +212,121 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     }
   }, [editingLedgerEntry?.id, initialEditing, isPayment]);
 
+  const prevEditTypeRef = React.useRef(editType);
+  useEffect(() => {
+    if (prevEditTypeRef.current !== editType) {
+      prevEditTypeRef.current = editType;
+      setAllocationsMap({});
+      setAllocationModeState('UNALLOCATED');
+      setIsManualAllocation(false);
+    }
+  }, [editType]);
+
+  const resolvedParties = useMemo(() => {
+    const list = parties && parties.length > 0 ? [...parties] : db.getParties();
+    if (party && !list.some((p) => p.id === party.id)) {
+      list.push(party);
+    }
+    return list;
+  }, [parties, party]);
+
+  const rawVoucherAllocations = useMemo(() => {
+    return editingLedgerEntry?.rawVoucher?.paymentAllocations || [];
+  }, [editingLedgerEntry?.rawVoucher?.paymentAllocations]);
+
+  const effectiveInvoices = useMemo(() => {
+    const allInvs = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+    if (
+      editingLedgerEntry?.rawVoucher &&
+      !editingLedgerEntry.rawVoucher.isReversed &&
+      !editingLedgerEntry.rawVoucher.isCancelled
+    ) {
+      const invAllocs = rawVoucherAllocations.filter((a) => a.documentType === 'INVOICE');
+      if (invAllocs.length > 0) {
+        return reverseAllocations(allInvs, invAllocs);
+      }
+    }
+    return allInvs;
+  }, [invoices, editingLedgerEntry?.rawVoucher, rawVoucherAllocations]);
+
+  const effectivePurchases = useMemo(() => {
+    const allPurs = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+    if (
+      editingLedgerEntry?.rawVoucher &&
+      !editingLedgerEntry.rawVoucher.isReversed &&
+      !editingLedgerEntry.rawVoucher.isCancelled
+    ) {
+      const purAllocs = rawVoucherAllocations.filter((a) => a.documentType === 'PURCHASE');
+      if (purAllocs.length > 0) {
+        return reverseAllocations(allPurs, purAllocs);
+      }
+    }
+    return allPurs;
+  }, [purchases, editingLedgerEntry?.rawVoucher, rawVoucherAllocations]);
+
+  const outstandingDocs: OutstandingDocument[] = useMemo(() => {
+    if (!isPayment || !party) return [];
+    const targetDocType = editType === 'IN' ? 'INVOICE' : 'PURCHASE';
+    const docs = getOutstandingDocuments({
+      partyId: party.id,
+      partyName: party.name,
+      documentType: targetDocType,
+      invoices: effectiveInvoices,
+      purchases: effectivePurchases,
+      parties: resolvedParties,
+    });
+
+    if (editingLedgerEntry?.rawVoucher?.paymentAllocations) {
+      for (const alloc of editingLedgerEntry.rawVoucher.paymentAllocations) {
+        if (alloc.documentType !== targetDocType) continue;
+        if (!docs.some((d) => d.id === alloc.documentId)) {
+          docs.push({
+            id: alloc.documentId,
+            documentNumber: alloc.documentNumber,
+            number: alloc.documentNumber,
+            date: alloc.date || editingLedgerEntry.rawVoucher.date,
+            grandTotal: alloc.amount,
+            paidAmount: 0,
+            balanceAmount: alloc.amount,
+            documentType: alloc.documentType,
+            partyId: party.id,
+            partyName: party.name,
+          });
+        }
+      }
+    }
+
+    return docs;
+  }, [
+    isPayment,
+    party,
+    editType,
+    effectiveInvoices,
+    effectivePurchases,
+    resolvedParties,
+    editingLedgerEntry?.rawVoucher,
+  ]);
+
+  const totalSettled = useMemo(() => {
+    const numPayAmount = parseFloat(editAmount) || 0;
+    const numDiscount = parseFloat(editDiscount) || 0;
+    return Number((numPayAmount + numDiscount).toFixed(2));
+  }, [editAmount, editDiscount]);
+
+  const totalAllocated = useMemo(() => {
+    let sum = 0;
+    for (const val of Object.values(allocationsMap)) {
+      sum += Number(val) || 0;
+    }
+    return Number(sum.toFixed(2));
+  }, [allocationsMap]);
+
+  const unallocatedAmount = useMemo(() => {
+    return Math.max(0, Number((totalSettled - totalAllocated).toFixed(2)));
+  }, [totalSettled, totalAllocated]);
+
+  const isOverAllocated = totalAllocated > totalSettled + 0.01;
+
   useBackNavigation(() => {
     if (isEditing && isPayment) {
       populateForm();
@@ -202,6 +351,78 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     0;
 
   const currentDiscount = parseFloat(editDiscount) || 0;
+
+  const handleAutoAllocate = () => {
+    if (totalSettled <= 0) return;
+    const auto = allocateOldestFirst(outstandingDocs, totalSettled);
+    const map: Record<string, number> = {};
+    for (const a of auto) {
+      map[a.documentId] = a.amount;
+    }
+    setAllocationsMap(map);
+    setIsManualAllocation(false);
+    setAllocationModeState('AUTO_FIFO');
+  };
+
+  const handleSelectAll = () => {
+    let remaining = totalSettled;
+    const map: Record<string, number> = {};
+    for (const doc of outstandingDocs) {
+      if (remaining <= 0) break;
+      const allocAmt = Math.min(doc.balanceAmount, remaining);
+      map[doc.id] = Number(allocAmt.toFixed(2));
+      remaining = Number((remaining - allocAmt).toFixed(2));
+    }
+    setAllocationsMap(map);
+    setIsManualAllocation(true);
+    setAllocationModeState('MANUAL');
+  };
+
+  const handleClearAllocations = () => {
+    setAllocationsMap({});
+    setIsManualAllocation(true);
+    setAllocationModeState('UNALLOCATED');
+  };
+
+  const handleToggleDoc = (doc: OutstandingDocument) => {
+    const currentAlloc = allocationsMap[doc.id] || 0;
+    if (currentAlloc > 0) {
+      setAllocationsMap((prev) => {
+        const next = { ...prev };
+        delete next[doc.id];
+        return next;
+      });
+      setIsManualAllocation(true);
+      setAllocationModeState('MANUAL');
+    } else {
+      const alreadyAllocated = Object.entries(allocationsMap).reduce(
+        (sum, [id, val]) => (id === doc.id ? sum : sum + (Number(val) || 0)),
+        0
+      );
+      const remaining = Math.max(0, Number((totalSettled - alreadyAllocated).toFixed(2)));
+      if (remaining <= 0) {
+        alert('All payment funds have already been allocated. Increase payment amount or reduce other allocations first.');
+        return;
+      }
+      const allocAmt = Math.min(doc.balanceAmount, remaining);
+      setAllocationsMap((prev) => ({
+        ...prev,
+        [doc.id]: Number(allocAmt.toFixed(2)),
+      }));
+      setIsManualAllocation(true);
+      setAllocationModeState('MANUAL');
+    }
+  };
+
+  const handleAllocationValueChange = (docId: string, valStr: string) => {
+    const val = parseFloat(valStr) || 0;
+    setAllocationsMap((prev) => ({
+      ...prev,
+      [docId]: val,
+    }));
+    setIsManualAllocation(true);
+    setAllocationModeState('MANUAL');
+  };
 
   const handleSaveLedgerItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,37 +454,65 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       const totalSettled = Number((newAmt + disc).toFixed(2));
 
       // Allocation validation & handling
-      const oldAllocations = v.paymentAllocations || [];
-      const allocatedSum = oldAllocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
       const isTypeChanged = (v.voucherType === 'RECEIPT' && editType !== 'IN') || (v.voucherType === 'PAYMENT' && editType === 'IN');
 
-      let finalAllocations = oldAllocations.map((a) => ({
-        ...a,
-        date: editDate,
-      }));
-      let finalAllocationMode = v.allocationMode;
+      let finalAllocations: PaymentAllocation[] = [];
+      let finalAllocationMode: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT' = 'UNALLOCATED';
 
-      if (isTypeChanged) {
-        finalAllocations = [];
-        finalAllocationMode = 'UNALLOCATED';
-      } else if (v.allocationMode === 'SOURCE_DOCUMENT') {
+      if (v.allocationMode === 'SOURCE_DOCUMENT') {
         if (Math.abs(totalSettled - v.totalAmount) > 0.01) {
           alert(
             'Cannot change the amount of an upfront payment voucher directly. Please edit the paid amount from the invoice or bill instead.'
           );
           return;
         }
+        finalAllocations = (v.paymentAllocations || []).map((a) => ({
+          ...a,
+          date: editDate,
+        }));
+        finalAllocationMode = 'SOURCE_DOCUMENT';
+      } else if (isTypeChanged) {
+        finalAllocations = [];
+        finalAllocationMode = 'UNALLOCATED';
       } else {
-        if (allocatedSum > 0) {
-          if (totalSettled < allocatedSum - 0.01) {
-            alert(
-              `New total settled amount (${formatINR(totalSettled)}) cannot be less than the total allocated to linked documents (${formatINR(allocatedSum)}). Please adjust the amount or un-link documents.`
-            );
-            return;
+        const docMap = new Map<string, OutstandingDocument>();
+        outstandingDocs.forEach((d) => docMap.set(d.id, d));
+
+        for (const [docId, amt] of Object.entries(allocationsMap)) {
+          const numAmt = Number(amt) || 0;
+          if (numAmt > 0) {
+            const doc = docMap.get(docId);
+            if (doc) {
+              finalAllocations.push({
+                documentType: doc.documentType,
+                documentId: doc.id,
+                documentNumber: doc.documentNumber,
+                amount: Number(numAmt.toFixed(2)),
+                date: doc.date || editDate,
+              });
+            }
           }
         }
-        if (Math.abs(totalSettled - v.totalAmount) > 0.01) {
-          finalAllocationMode = finalAllocations.length > 0 ? 'MANUAL' : 'UNALLOCATED';
+
+        const valResult = validateAllocations({
+          allocations: finalAllocations,
+          documents: outstandingDocs,
+          totalSettled,
+          partyId: party.id,
+          partyName: party.name,
+        });
+
+        if (!valResult.valid) {
+          alert(valResult.error || 'Invalid payment allocations.');
+          return;
+        }
+
+        if (finalAllocations.length === 0) {
+          finalAllocationMode = 'UNALLOCATED';
+        } else if (allocationModeState === 'AUTO_FIFO' && !isManualAllocation && Math.abs(totalSettled - v.totalAmount) <= 0.01) {
+          finalAllocationMode = 'AUTO_FIFO';
+        } else {
+          finalAllocationMode = 'MANUAL';
         }
       }
 
@@ -596,61 +845,81 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       {/* Linked Documents Section for Vouchers */}
       {editingLedgerEntry.rawVoucher?.paymentAllocations && editingLedgerEntry.rawVoucher.paymentAllocations.length > 0 && (
         <div className="p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
-          <span className="text-[11px] font-bold text-on-surface flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
-            <span>Linked Documents ({editingLedgerEntry.rawVoucher.paymentAllocations.length})</span>
-          </span>
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[11px] font-bold text-on-surface flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
+              <span>Linked Documents ({editingLedgerEntry.rawVoucher.paymentAllocations.length})</span>
+            </span>
+            {editingLedgerEntry.rawVoucher.allocationMode !== 'SOURCE_DOCUMENT' && !isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="px-2 py-0.5 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary text-[11px] font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                title="Edit payment links"
+              >
+                <span className="material-symbols-outlined text-[13px]">edit_note</span>
+                <span>Edit Links</span>
+              </button>
+            )}
+          </div>
           <div className="flex flex-col gap-1.5 divide-y divide-outline-variant/15 text-xs">
-            {editingLedgerEntry.rawVoucher.paymentAllocations.map((alloc) => (
-              <div key={alloc.documentId} className="pt-1.5 pb-0.5 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                      alloc.documentType === 'INVOICE'
-                        ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                        : 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
-                    }`}
-                  >
-                    {alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
-                  </span>
-                  <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
-                  <span className="text-secondary font-bold font-tabular-data">({formatINR(alloc.amount)})</span>
+            {editingLedgerEntry.rawVoucher.paymentAllocations.map((alloc) => {
+              const isOpeningBal = alloc.documentId?.startsWith('OPENING-BALANCE-') || alloc.documentNumber === 'Opening Balance';
+              return (
+                <div key={alloc.documentId} className="pt-1.5 pb-0.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                        isOpeningBal
+                          ? 'bg-secondary/15 text-secondary'
+                          : alloc.documentType === 'INVOICE'
+                          ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                          : 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
+                      }`}
+                    >
+                      {isOpeningBal ? 'Opening' : alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
+                    </span>
+                    <span className="font-bold text-on-surface truncate">
+                      {isOpeningBal ? (alloc.documentNumber || 'Opening Balance') : `#${alloc.documentNumber}`}
+                    </span>
+                    <span className="text-secondary font-bold font-tabular-data">({formatINR(alloc.amount)})</span>
+                  </div>
+                  {!isOpeningBal && alloc.documentType === 'INVOICE' && onViewInvoice && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inv = db.getInvoices().find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
+                        if (inv) {
+                          onClose();
+                          onViewInvoice(inv);
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">visibility</span>
+                      <span>View</span>
+                    </button>
+                  )}
+                  {!isOpeningBal && alloc.documentType === 'PURCHASE' && (onViewPurchase || onEditPurchase) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pur = db.getPurchases().find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
+                        if (pur) {
+                          onClose();
+                          if (onViewPurchase) onViewPurchase(pur);
+                          else if (onEditPurchase) onEditPurchase(pur);
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">visibility</span>
+                      <span>View</span>
+                    </button>
+                  )}
                 </div>
-                {alloc.documentType === 'INVOICE' && onViewInvoice && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const inv = db.getInvoices().find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
-                      if (inv) {
-                        onClose();
-                        onViewInvoice(inv);
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[13px]">visibility</span>
-                    <span>View</span>
-                  </button>
-                )}
-                {alloc.documentType === 'PURCHASE' && (onViewPurchase || onEditPurchase) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const pur = db.getPurchases().find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
-                      if (pur) {
-                        onClose();
-                        if (onViewPurchase) onViewPurchase(pur);
-                        else if (onEditPurchase) onEditPurchase(pur);
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[13px]">visibility</span>
-                    <span>View</span>
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -978,8 +1247,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                 <span className="font-semibold">{editingLedgerEntry.type.replace('_', ' ')}</span>
               </div>
 
-              {/* Linked Documents in Edit Mode */}
-              {renderLinkedDocs()}
+              {/* Linked Documents in Edit Mode (for SOURCE_DOCUMENT vouchers) */}
+              {editingLedgerEntry.rawVoucher?.allocationMode === 'SOURCE_DOCUMENT' && renderLinkedDocs()}
 
               {/* Payment Type switch if payment */}
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
@@ -1216,6 +1485,123 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                       </div>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* ── INVOICE / BILL LINK SECTION (for payment vouchers) ── */}
+              {isPayment && editingLedgerEntry.rawVoucher && editingLedgerEntry.rawVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
+                <div className="p-2.5 bg-surface rounded-xl border border-outline-variant/25 flex flex-col gap-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
+                      <span className="text-xs font-bold text-on-surface">
+                        Link {editType === 'IN' ? 'Invoices' : 'Bills'} ({outstandingDocs.length} outstanding)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleAutoAllocate}
+                        className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer"
+                        title="Auto-allocate FIFO oldest first"
+                      >
+                        Auto FIFO
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSelectAll}
+                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllocations}
+                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {outstandingDocs.length === 0 ? (
+                    <p className="text-[11px] text-on-surface-variant italic py-1">
+                      No outstanding {editType === 'IN' ? 'invoices' : 'bills'} found for this party. Payment will be saved as an unallocated on-account advance.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto flex flex-col gap-1 divide-y divide-outline-variant/15">
+                      {outstandingDocs.map((doc) => {
+                        const allocVal = allocationsMap[doc.id] || 0;
+                        const isChecked = allocVal > 0;
+                        const isExceedsDocBal = allocVal > doc.balanceAmount + 0.01;
+                        const isOpeningBal = doc.id.startsWith('OPENING-BALANCE-') || doc.documentNumber === 'Opening Balance';
+
+                        return (
+                          <div
+                            key={doc.id}
+                            className={`pt-1 pb-1 flex items-center justify-between gap-2 text-xs transition-colors ${
+                              isChecked ? 'bg-secondary/5 -mx-1 px-1 rounded' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleDoc(doc)}
+                                className="rounded accent-secondary cursor-pointer"
+                              />
+                              <div className="min-w-0 flex flex-col">
+                                <span className="font-bold text-on-surface truncate text-[11px]">
+                                  {isOpeningBal ? (doc.documentNumber || 'Opening Balance') : `#${doc.documentNumber}`}
+                                </span>
+                                <span className="text-[10px] text-on-surface-variant">
+                                  {formatDate(doc.date)} • Bal: {formatINR(doc.balanceAmount)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <div className="relative flex items-center">
+                                <span className="absolute left-1.5 text-[10px] text-on-surface-variant font-bold">₹</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={doc.balanceAmount}
+                                  value={allocVal > 0 ? allocVal : ''}
+                                  placeholder="0.00"
+                                  onChange={(e) => handleAllocationValueChange(doc.id, e.target.value)}
+                                  className={`w-20 pl-4 pr-1 py-0.5 bg-surface rounded text-right font-bold text-xs border ${
+                                    isExceedsDocBal
+                                      ? 'border-error text-error'
+                                      : isChecked
+                                      ? 'border-secondary text-secondary'
+                                      : 'border-outline-variant/30 text-on-surface'
+                                  } focus:outline-none`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Allocation summary strip */}
+                  <div className="pt-1.5 border-t border-outline-variant/20 flex items-center justify-between text-[11px] font-bold">
+                    <span className={isOverAllocated ? 'text-error' : 'text-secondary'}>
+                      Allocated: {formatINR(totalAllocated)}
+                    </span>
+                    <span className="text-on-surface-variant">
+                      Unallocated / Advance: {formatINR(unallocatedAmount)}
+                    </span>
+                  </div>
+
+                  {isOverAllocated && (
+                    <p className="text-[10px] font-bold text-error">
+                      Allocated sum ({formatINR(totalAllocated)}) exceeds payment total ({formatINR(totalSettled)}). Please adjust amounts.
+                    </p>
+                  )}
                 </div>
               )}
 

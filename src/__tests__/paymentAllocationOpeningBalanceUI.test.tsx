@@ -3,11 +3,13 @@ import { createRoot, Root } from 'react-dom/client';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { RecordPaymentModal } from '../components/Parties/RecordPaymentModal.tsx';
 import { PaymentTransactionsView } from '../components/Payments/PaymentTransactionsView.tsx';
+import { CashBankTransactionDetailModal } from '../components/CashBank/CashBankTransactionDetailModal.tsx';
 import { Party } from '../models/party.ts';
 import { Invoice } from '../models/invoice.ts';
-import { BankAccount } from '../models/bankAccount.ts';
+import { BankAccount, UnifiedLedgerEntry } from '../models/bankAccount.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { createPaymentReceiptVoucher } from '../core/accounting/ledger.ts';
+import { preloadVoucherEditorModal } from '../core/utils/modalPreload.ts';
 
 class TestStorage implements Storage {
   private store: Map<string, string> = new Map();
@@ -189,5 +191,157 @@ describe('Opening Balance Payment Allocation UI', () => {
     // It must NOT display "Unallocated Advance" or "Advance:" because it was allocated to Opening Balance
     expect(content).not.toContain('Unallocated Advance');
     expect(content).not.toContain('Advance:');
+  });
+
+  it('CashBankTransactionDetailModal renders non-clickable "Opening Balance" (without # prefix) and invokes onEditVoucher with initialEditing on Edit Links click', async () => {
+    const handleEditVoucher = vi.fn();
+    const handleClose = vi.fn();
+
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: 'RCPT-OB-02',
+      date: '2026-08-01',
+      customerName: customerWithOpeningBal.name,
+      customerId: customerWithOpeningBal.id,
+      amount: 4500,
+      paymentMode: 'UPI',
+      narration: 'Settlement for opening balance',
+    });
+    voucher.partyId = customerWithOpeningBal.id;
+    voucher.partyName = customerWithOpeningBal.name;
+    voucher.allocationMode = 'MANUAL';
+    voucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: `OPENING-BALANCE-${customerWithOpeningBal.id}`,
+        documentNumber: 'Opening Balance',
+        amount: 4500,
+        date: '2026-07-01',
+      },
+    ];
+
+    const ledgerEntry: UnifiedLedgerEntry = {
+      id: `LEDGER-${voucher.id}`,
+      rawVoucherId: voucher.id,
+      date: voucher.date,
+      type: 'PARTY_RECEIPT',
+      category: 'BANK',
+      accountId: 'ACC_BANK_1',
+      accountName: 'HDFC Bank',
+      counterpartyOrTitle: customerWithOpeningBal.name,
+      flow: 'IN',
+      amount: 4500,
+      partyId: customerWithOpeningBal.id,
+      description: voucher.narration,
+      mode: 'UPI',
+      runningBalance: 4500,
+    };
+
+    await act(async () => {
+      root.render(
+        <CashBankTransactionDetailModal
+          isOpen={true}
+          onClose={handleClose}
+          entry={ledgerEntry}
+          accounts={mockAccounts}
+          parties={[customerWithOpeningBal]}
+          vouchers={[voucher]}
+          onEditVoucher={handleEditVoucher}
+        />
+      );
+    });
+
+    const content = container.textContent || '';
+    // 1. Clean "Opening Balance" label without "#" prefix
+    expect(content).toContain('Opening Balance');
+    expect(content).not.toContain('#Opening Balance');
+    expect(content).toContain('(₹ 4,500.00)');
+
+    // 2. Non-clickable (no "View" button for opening balance)
+    const viewButtons = Array.from(container.querySelectorAll('button')).filter((b) =>
+      b.textContent?.includes('View')
+    );
+    expect(viewButtons).toHaveLength(0);
+
+    // 3. Edit Links action button is rendered
+    const editLinksBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Edit Links')
+    );
+    expect(editLinksBtn).toBeDefined();
+
+    // 4. Click "Edit Links"
+    await act(async () => {
+      editLinksBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(handleClose).toHaveBeenCalledTimes(1);
+    expect(handleEditVoucher).toHaveBeenCalledTimes(1);
+    expect(handleEditVoucher).toHaveBeenCalledWith(voucher, { initialEditing: true });
+  });
+
+  it('PaymentTransactionsView renders "Edit Links" button on voucher row and opens VoucherEditorModal with allocation linker', async () => {
+    await preloadVoucherEditorModal();
+
+    const voucher = createPaymentReceiptVoucher({
+      receiptNumber: 'RCPT-OB-03',
+      date: '2026-08-01',
+      customerName: customerWithOpeningBal.name,
+      customerId: customerWithOpeningBal.id,
+      amount: 4500,
+      paymentMode: 'UPI',
+      narration: 'Settlement for opening balance',
+    });
+    voucher.partyId = customerWithOpeningBal.id;
+    voucher.partyName = customerWithOpeningBal.name;
+    voucher.allocationMode = 'MANUAL';
+    voucher.paymentAllocations = [
+      {
+        documentType: 'INVOICE',
+        documentId: `OPENING-BALANCE-${customerWithOpeningBal.id}`,
+        documentNumber: 'Opening Balance',
+        amount: 4500,
+        date: '2026-07-01',
+      },
+    ];
+
+    await act(async () => {
+      root.render(
+        <PaymentTransactionsView
+          flow="IN"
+          company={mockCompany}
+          accounts={mockAccounts}
+          transactions={[]}
+          invoices={[]}
+          purchases={[]}
+          expenses={[]}
+          vouchers={[voucher]}
+          parties={[customerWithOpeningBal]}
+          onSaveTransaction={vi.fn()}
+          onDeleteTransaction={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    // 1. Assert Edit Links button is rendered on the row
+    const editLinksBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Edit Links')
+    );
+    expect(editLinksBtn).toBeDefined();
+
+    // 2. Click "Edit Links"
+    await act(async () => {
+      editLinksBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    // Wait for React.lazy VoucherEditorModal chunk to load
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // 3. Assert VoucherEditorModal opened directly in edit mode with allocation linker
+    expect(container.textContent).toContain('Edit Payment In');
+    expect(container.textContent).toContain('Link Invoices');
+    expect(container.textContent).toContain('Opening Balance');
+    expect(container.textContent).not.toContain('#Opening Balance');
   });
 });

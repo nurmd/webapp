@@ -30,7 +30,7 @@ export interface CashBankTransactionDetailModalProps {
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
-  onEditVoucher?: (voucher: Voucher) => void;
+  onEditVoucher?: (voucher: Voucher, options?: { initialEditing?: boolean }) => void;
 }
 
 export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailModalProps> = ({
@@ -613,9 +613,25 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
               {/* Linked Documents for Vouchers */}
               {linkedVoucher?.paymentAllocations && linkedVoucher.paymentAllocations.length > 0 && (
                 <div className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/30 flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface">
-                    <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
-                    <span>Linked Documents ({linkedVoucher.paymentAllocations.length})</span>
+                  <div className="flex items-center justify-between gap-1.5 text-xs font-bold text-on-surface">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
+                      <span>Linked Documents ({linkedVoucher.paymentAllocations.length})</span>
+                    </div>
+                    {onEditVoucher && linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && !isReversed && !isCancelled && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onEditVoucher(linkedVoucher, { initialEditing: true });
+                        }}
+                        className="px-2.5 py-1 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-colors"
+                        title="Edit linked documents"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">edit_note</span>
+                        <span>Edit Links</span>
+                      </button>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1.5 divide-y divide-outline-variant/15 text-xs">
                     {linkedVoucher.paymentAllocations.map((alloc) => {
@@ -727,19 +743,57 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                       </button>
                     )}
                     {linkedVoucher && (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') && !isReversed && !isCancelled && onEditVoucher && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onEditVoucher(linkedVoucher);
-                        }}
-                        className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">edit</span>
-                        <span>Edit Payment</span>
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onEditVoucher(linkedVoucher);
+                          }}
+                          className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">edit</span>
+                          <span>Edit Payment</span>
+                        </button>
+                        {linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onEditVoucher(linkedVoucher, { initialEditing: true });
+                            }}
+                            className="px-3 py-1.5 bg-secondary/15 hover:bg-secondary/25 text-secondary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">link</span>
+                            <span>Edit Links</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* Unallocated Advance Banner for Vouchers without allocations */}
+              {linkedVoucher && (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') && (!linkedVoucher.paymentAllocations || linkedVoucher.paymentAllocations.length === 0) && !isReversed && !isCancelled && linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 min-w-0">
+                    <span className="material-symbols-outlined text-[16px]">info</span>
+                    <span className="font-semibold truncate">Unallocated Advance ({formatINR(linkedVoucher.totalAmount)})</span>
+                  </div>
+                  {onEditVoucher && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onEditVoucher(linkedVoucher, { initialEditing: true });
+                      }}
+                      className="px-2.5 py-1 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-colors shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">link</span>
+                      <span>Edit Links</span>
+                    </button>
+                  )}
                 </div>
               )}
 

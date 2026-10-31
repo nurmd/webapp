@@ -144,7 +144,9 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     return null;
   }, [parties]);
 
-  const handleEditVoucher = useCallback((voucher: Voucher) => {
+  const [initialVoucherEditing, setInitialVoucherEditing] = useState<boolean>(false);
+
+  const handleEditVoucher = useCallback((voucher: Voucher, options?: { initialEditing?: boolean }) => {
     if (!voucher || (voucher.voucherType !== 'RECEIPT' && voucher.voucherType !== 'PAYMENT')) {
       return;
     }
@@ -155,6 +157,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     }
     setEditingVoucher(voucher);
     setEditingVoucherParty(party);
+    setInitialVoucherEditing(Boolean(options?.initialEditing));
     setIsDetailModalOpen(false);
     setSelectedLedgerEntry(null);
   }, [resolveVoucherParty]);
@@ -735,16 +738,44 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                 Advance: {formatINR(unallocatedAmount)}
                               </span>
                             ) : null}
+                            {linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditVoucher(linkedVoucher, { initialEditing: true });
+                                }}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Edit payment links"
+                              >
+                                <span className="material-symbols-outlined text-[11px]">link</span>
+                                <span>Edit Links</span>
+                              </button>
+                            )}
                           </div>
                         );
                       }
 
                       if (linkedVoucher.allocationMode === 'UNALLOCATED' || (!linkedVoucher.paymentAllocations?.length && linkedVoucher.partyId)) {
                         return (
-                          <div className="flex items-center gap-1 mt-1.5">
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
                               Unallocated Advance: {formatINR(linkedVoucher.totalAmount || entry.amount)}
                             </span>
+                            {linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditVoucher(linkedVoucher, { initialEditing: true });
+                                }}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Link to invoices/bills"
+                              >
+                                <span className="material-symbols-outlined text-[11px]">link</span>
+                                <span>Edit Links</span>
+                              </button>
+                            )}
                           </div>
                         );
                       }
@@ -850,16 +881,22 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             editingLedgerEntry={editingPassbookEntry}
             party={editingVoucherParty}
             company={company}
+            initialEditing={initialVoucherEditing}
             onClose={() => {
               setEditingVoucher(null);
               setEditingVoucherParty(null);
+              setInitialVoucherEditing(false);
             }}
             onViewInvoice={onViewInvoice}
             onViewPurchase={onViewPurchase}
             onRefresh={() => {
               setEditingVoucher(null);
               setEditingVoucherParty(null);
+              setInitialVoucherEditing(false);
             }}
+            invoices={invoices}
+            purchases={purchases}
+            parties={parties}
           />
         </React.Suspense>
       )}

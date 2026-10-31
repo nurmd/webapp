@@ -703,13 +703,17 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       let sumAllocated = 0;
 
       for (const alloc of voucher.paymentAllocations) {
+        const docLabel = alloc.documentId?.startsWith('OPENING-BALANCE-')
+          ? (alloc.documentNumber || 'Opening Balance')
+          : `#${alloc.documentNumber || alloc.documentId}`;
+
         if (seenDocIds.has(alloc.documentId)) {
-          throw new Error(`Duplicate document allocation detected for #${alloc.documentNumber || alloc.documentId}.`);
+          throw new Error(`Duplicate document allocation detected for ${docLabel}.`);
         }
         seenDocIds.add(alloc.documentId);
 
         if (typeof alloc.amount !== 'number' || alloc.amount <= 0) {
-          throw new Error(`Allocation amount for #${alloc.documentNumber || alloc.documentId} must be greater than zero.`);
+          throw new Error(`Allocation amount for ${docLabel} must be greater than zero.`);
         }
         sumAllocated = Number((sumAllocated + alloc.amount).toFixed(2));
 

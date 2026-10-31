@@ -70,6 +70,7 @@ vi.mock('../services/pouchdb.ts', () => ({
 
 import { db } from '../services/db.ts';
 import { Party } from '../models/party.ts';
+import { Invoice } from '../models/invoice.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { VoucherEditorModal } from '../components/Parties/VoucherEditorModal.tsx';
@@ -991,5 +992,371 @@ describe('VoucherEditorModal Component-Level Verification', () => {
       );
     });
     expect(container!.innerHTML).toBe('');
+  });
+
+  it('11. VoucherEditorModal manual linking to opening balance + invoice saves with allocationMode MANUAL', () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const saveVoucherSpy = vi.spyOn(db, 'savePaymentVoucher');
+
+    const custWithOp: Party = {
+      id: 'PTY-OP-01',
+      name: 'Sharma Electronics',
+      type: 'CUSTOMER',
+      phone: '9876543210',
+      stateCode: '27',
+      billingAddress: 'Main Road, Pune',
+      openingBalance: 3000,
+      openingBalanceType: 'TO_RECEIVE',
+      openingBalanceDate: '2026-09-01',
+      currentBalance: 5000,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    db.saveParty(custWithOp);
+
+    const inv1: Invoice = {
+      id: 'INV-TEST-01',
+      invoiceNumber: 'INV-01',
+      invoiceType: 'B2B',
+      date: '2026-10-05',
+      partyId: custWithOp.id,
+      partyName: custWithOp.name,
+      partyAddress: custWithOp.billingAddress,
+      partyStateCode: custWithOp.stateCode,
+      placeOfSupplyStateCode: custWithOp.stateCode,
+      isIntraState: true,
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      items: [],
+      totalGrossAmount: 2000,
+      totalDiscount: 0,
+      totalTaxableAmount: 2000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 2000,
+      paidAmount: 0,
+      balanceAmount: 2000,
+      amountInWords: 'Two Thousand Only',
+      createdAt: '2026-10-05T00:00:00.000Z',
+      updatedAt: '2026-10-05T00:00:00.000Z',
+    };
+    db.saveInvoice(inv1);
+
+    const receiptVoucher: Voucher = {
+      id: 'VCH-RCPT-OP-01',
+      voucherNumber: 'RCPT-5000',
+      voucherType: 'RECEIPT',
+      date: '2026-10-10',
+      partyId: custWithOp.id,
+      partyName: custWithOp.name,
+      totalAmount: 5000,
+      narration: 'Payment for opening balance and invoice',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 5000, credit: 0 },
+        { accountId: custWithOp.id, accountName: custWithOp.name, debit: 0, credit: 5000 },
+      ],
+      createdAt: '2026-10-10T00:00:00.000Z',
+    };
+    db.savePaymentVoucher(receiptVoucher, { skipDocumentUpdate: true });
+    saveVoucherSpy.mockClear();
+
+    const ledgerEntry = {
+      id: receiptVoucher.id,
+      date: receiptVoucher.date,
+      docNumber: receiptVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      paymentMode: 'CASH',
+      description: receiptVoucher.narration,
+      debit: 0,
+      credit: 5000,
+      runningBalance: 0,
+      status: 'PAID',
+      rawVoucher: receiptVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={custWithOp}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          initialEditing={true}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // 1. Assert outstanding documents header shows 2 outstanding
+    expect(container!.textContent).toContain('Link Invoices (2 outstanding)');
+    // 2. Assert clean "Opening Balance" label without "#" prefix
+    expect(container!.textContent).toContain('Opening Balance');
+    expect(container!.textContent).not.toContain('#Opening Balance');
+    expect(container!.textContent).toContain('#INV-01');
+
+    // 3. Click "Select All" button to allocate all 5000 across Opening Balance (3000) and INV-01 (2000)
+    const selectAllBtn = Array.from(container!.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim() === 'Select All'
+    );
+    expect(selectAllBtn).toBeDefined();
+
+    act(() => {
+      selectAllBtn?.click();
+    });
+
+    // Verify allocated summary
+    expect(container!.textContent).toContain('Allocated: ₹ 5,000.00');
+    expect(container!.textContent).toContain('Unallocated / Advance: ₹ 0.00');
+
+    // Submit form
+    const form = container!.querySelector('form');
+    expect(form).not.toBeNull();
+
+    act(() => {
+      form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(saveVoucherSpy).toHaveBeenCalledTimes(1);
+
+    const savedVoucher: Voucher = saveVoucherSpy.mock.calls[0][0];
+    expect(savedVoucher.allocationMode).toBe('MANUAL');
+    expect(savedVoucher.paymentAllocations).toHaveLength(2);
+
+    const opAlloc = savedVoucher.paymentAllocations?.find((a) => a.documentId === `OPENING-BALANCE-${custWithOp.id}`);
+    expect(opAlloc).toBeDefined();
+    expect(opAlloc?.amount).toBe(3000);
+    expect(opAlloc?.documentNumber).toBe('Opening Balance');
+
+    const invAlloc = savedVoucher.paymentAllocations?.find((a) => a.documentId === inv1.id);
+    expect(invAlloc).toBeDefined();
+    expect(invAlloc?.amount).toBe(2000);
+    expect(invAlloc?.documentNumber).toBe('INV-01');
+  });
+
+  it('12. VoucherEditorModal validation errors: over-allocation rejects save with alert and does not mutate db', () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const saveVoucherSpy = vi.spyOn(db, 'savePaymentVoucher');
+
+    const custWithOp: Party = {
+      id: 'PTY-OP-02',
+      name: 'Verma Stores',
+      type: 'CUSTOMER',
+      phone: '9876543211',
+      stateCode: '27',
+      billingAddress: 'Main Road, Nashik',
+      openingBalance: 3000,
+      openingBalanceType: 'TO_RECEIVE',
+      currentBalance: 3000,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    db.saveParty(custWithOp);
+
+    const receiptVoucher: Voucher = {
+      id: 'VCH-RCPT-OP-02',
+      voucherNumber: 'RCPT-2000',
+      voucherType: 'RECEIPT',
+      date: '2026-10-10',
+      partyId: custWithOp.id,
+      partyName: custWithOp.name,
+      totalAmount: 2000,
+      narration: 'Payment voucher',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 2000, credit: 0 },
+        { accountId: custWithOp.id, accountName: custWithOp.name, debit: 0, credit: 2000 },
+      ],
+      createdAt: '2026-10-10T00:00:00.000Z',
+    };
+    db.savePaymentVoucher(receiptVoucher, { skipDocumentUpdate: true });
+    saveVoucherSpy.mockClear();
+
+    const ledgerEntry = {
+      id: receiptVoucher.id,
+      date: receiptVoucher.date,
+      docNumber: receiptVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      paymentMode: 'CASH',
+      description: receiptVoucher.narration,
+      debit: 0,
+      credit: 2000,
+      runningBalance: 1000,
+      status: 'PAID',
+      rawVoucher: receiptVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={custWithOp}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          initialEditing={true}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    // Find the allocation amount input for Opening Balance (it has max=3000)
+    const inputs = Array.from(container!.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
+    // inputs[0] is Amount (2000), inputs[1] is Discount, inputs[2] has max={doc.balanceAmount} (the document allocation input)
+    const docAllocInput = inputs.find((i) => i.hasAttribute('max'));
+    expect(docAllocInput).toBeDefined();
+
+    // Type 2500 which exceeds payment amount 2000
+    act(() => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(docAllocInput, '2500');
+      docAllocInput?.dispatchEvent(new Event('input', { bubbles: true }));
+      docAllocInput?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Check that warning text appears
+    expect(container!.textContent).toContain('exceeds payment total');
+
+    // Submit form
+    const form = container!.querySelector('form');
+    act(() => {
+      form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    // Alert was shown and save was blocked
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    expect(alertMock.mock.calls[0][0]).toContain('exceeds payment amount');
+    expect(saveVoucherSpy).not.toHaveBeenCalled();
+  });
+
+  it('13. VoucherEditorModal Auto FIFO button allocates oldest first and preserves AUTO_FIFO mode on save', () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const saveVoucherSpy = vi.spyOn(db, 'savePaymentVoucher');
+
+    const custWithOp: Party = {
+      id: 'PTY-OP-03',
+      name: 'Kulkarni Traders',
+      type: 'CUSTOMER',
+      phone: '9876543212',
+      stateCode: '27',
+      billingAddress: 'Main Road, Kolhapur',
+      openingBalance: 1000,
+      openingBalanceType: 'TO_RECEIVE',
+      openingBalanceDate: '2026-08-01',
+      currentBalance: 3000,
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    db.saveParty(custWithOp);
+
+    const inv1: Invoice = {
+      id: 'INV-TEST-03',
+      invoiceNumber: 'INV-03',
+      invoiceType: 'B2B',
+      date: '2026-09-01',
+      partyId: custWithOp.id,
+      partyName: custWithOp.name,
+      partyAddress: custWithOp.billingAddress,
+      partyStateCode: custWithOp.stateCode,
+      placeOfSupplyStateCode: custWithOp.stateCode,
+      isIntraState: true,
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      items: [],
+      totalGrossAmount: 2000,
+      totalDiscount: 0,
+      totalTaxableAmount: 2000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 2000,
+      paidAmount: 0,
+      balanceAmount: 2000,
+      amountInWords: 'Two Thousand Only',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    db.saveInvoice(inv1);
+
+    const receiptVoucher: Voucher = {
+      id: 'VCH-RCPT-OP-03',
+      voucherNumber: 'RCPT-2500',
+      voucherType: 'RECEIPT',
+      date: '2026-10-10',
+      partyId: custWithOp.id,
+      partyName: custWithOp.name,
+      totalAmount: 2500,
+      narration: 'Auto FIFO test',
+      allocationMode: 'UNALLOCATED',
+      paymentAllocations: [],
+      entries: [
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 2500, credit: 0 },
+        { accountId: custWithOp.id, accountName: custWithOp.name, debit: 0, credit: 2500 },
+      ],
+      createdAt: '2026-10-10T00:00:00.000Z',
+    };
+    db.savePaymentVoucher(receiptVoucher, { skipDocumentUpdate: true });
+    saveVoucherSpy.mockClear();
+
+    const ledgerEntry = {
+      id: receiptVoucher.id,
+      date: receiptVoucher.date,
+      docNumber: receiptVoucher.voucherNumber,
+      type: 'PAYMENT_IN' as const,
+      paymentMode: 'CASH',
+      description: receiptVoucher.narration,
+      debit: 0,
+      credit: 2500,
+      runningBalance: 500,
+      status: 'PAID',
+      rawVoucher: receiptVoucher,
+    };
+
+    act(() => {
+      root!.render(
+        <VoucherEditorModal
+          party={custWithOp}
+          company={sampleCompany}
+          editingLedgerEntry={ledgerEntry as any}
+          initialEditing={true}
+          onClose={() => {}}
+          onRefresh={() => {}}
+        />
+      );
+    });
+
+    const autoFifoBtn = Array.from(container!.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim() === 'Auto FIFO'
+    );
+    expect(autoFifoBtn).toBeDefined();
+
+    act(() => {
+      autoFifoBtn?.click();
+    });
+
+    // 2500 should allocate 1000 to opening balance and 1500 to INV-03
+    expect(container!.textContent).toContain('Allocated: ₹ 2,500.00');
+
+    // Submit form
+    const form = container!.querySelector('form');
+    act(() => {
+      form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    expect(saveVoucherSpy).toHaveBeenCalledTimes(1);
+
+    const savedVoucher: Voucher = saveVoucherSpy.mock.calls[0][0];
+    expect(savedVoucher.allocationMode).toBe('AUTO_FIFO');
+    expect(savedVoucher.paymentAllocations).toHaveLength(2);
   });
 });
