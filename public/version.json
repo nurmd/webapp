@@ -1,14 +1,14 @@
 {
-  "version": "1.2.55",
+  "version": "1.2.56",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-31T07:27:46.773Z",
+  "buildTime": "2026-10-31T11:59:29.397Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "invoice-linked returns with item picker and balance reversal",
     "tag sales/purchase returns correctly in activity timeline",
+    "party payment linking with remaining balance clamping",
     "horizontal pill scrolling, party invoice preview cleanup, PDF bridge fixes",
-    "square quick action cards and scrollable invoice preview",
-    "correct overall discount base and amount input handling",
-    "manual payment linking to opening balance and invoices"
+    "square quick action cards and scrollable invoice preview"
   ]
 }
