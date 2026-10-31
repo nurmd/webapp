@@ -1,10 +1,11 @@
 {
-  "version": "1.2.56",
+  "version": "1.2.57",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-31T11:59:29.397Z",
+  "buildTime": "2026-10-31T14:50:47.853Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "3-line transaction card layout with voucher type, doc number, and balance/linking metadata",
     "invoice-linked returns with item picker and balance reversal",
     "tag sales/purchase returns correctly in activity timeline",
     "party payment linking with remaining balance clamping",
