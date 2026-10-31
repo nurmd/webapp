@@ -286,7 +286,9 @@ export class PartyStorage extends SettingsStorage {
       );
 
       const totalReceipts = partyReceipts.reduce((sum, v) => sum + v.totalAmount, 0);
-      const totalInvoicePaid = partyInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+      const totalInvoicePaid = partyInvoices
+        .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
+        .reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
       if (totalReceipts > totalInvoicePaid) {
         // Customer paid more than total settled on invoices (advance from customer)
         balance -= (totalReceipts - totalInvoicePaid);
@@ -321,7 +323,7 @@ export class PartyStorage extends SettingsStorage {
       );
       const totalPayments = partyPayments.reduce((sum, v) => sum + v.totalAmount, 0);
       const totalPurchasePaid = partyPurchases
-        .filter((pur) => pur.purchaseType !== 'PO' && pur.purchaseType !== 'CHALLAN' && !pur.isCancelled)
+        .filter((pur) => pur.purchaseType !== 'PO' && pur.purchaseType !== 'CHALLAN' && !pur.isCancelled && pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
         .reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
       if (totalPayments > totalPurchasePaid) {
         // We paid vendor more than total billed on purchases (advance to vendor)
@@ -393,7 +395,9 @@ export class PartyStorage extends SettingsStorage {
       const acc = accMap.get(party.id);
       if (!acc) continue;
 
-      acc.totalInvoicePaid += (inv.paidAmount || 0);
+      if (inv.invoiceType !== 'CREDIT_NOTE') {
+        acc.totalInvoicePaid += (inv.paidAmount || 0);
+      }
 
       if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
         continue;
@@ -420,7 +424,9 @@ export class PartyStorage extends SettingsStorage {
 
       if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) continue;
 
-      acc.totalPurchasePaid += (pur.paidAmount || 0);
+      if (pur.purchaseType !== 'RETURN' && pur.noteType !== 'D') {
+        acc.totalPurchasePaid += (pur.paidAmount || 0);
+      }
 
       const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
       if (pur.purchaseType === 'RETURN') {

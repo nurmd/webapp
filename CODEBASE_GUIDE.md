@@ -110,6 +110,12 @@ gst-billing-app/
   - `TO_PAY` / Supplier payable / Customer advance: Negative balance (`-`).
 - **Passbook Baseline Invariant**:
   - The `OPENING` transaction entry MUST ALWAYS be anchored at **index 0** as the starting baseline in the passbook ledger statement. Subsequent sales, purchases, and vouchers calculate running balances chronologically from this baseline.
+- **Return Ledger & Netting Invariant**:
+  - Sales Returns (`CREDIT_NOTE`): In `usePartyPassbook`, Credit Notes post as **Credit** (`credit: inv.grandTotal, debit: 0`), strictly reducing customer receivable balance rather than increasing it.
+  - Purchase Returns (`RETURN` / `noteType: 'D'`): Post as **Debit** (`debit: pur.grandTotal, credit: 0`), reducing supplier payable balance.
+  - `totalBilled` nets returns (`CREDIT_NOTE` subtracted for customers, `RETURN`/`D` subtracted for suppliers).
+  - Returns are excluded from upfront payment derivation (`totalPaidOnInvoices`, `totalPaidOnPurchases`) so return credits are never double-counted as incoming/outgoing cash vouchers.
+  - In `PartyPassbookTable`, sales returns display with `assignment_return` icon, `Return #<doc>` title, and `- ₹<amount>` rose styling.
 - **System Walk-in Customer Invariant (`systemParties.ts`)**:
   - Canonical system party `SYSTEM_WALK_IN_PARTY_ID = 'CUSTOM_PARTY'`, `name: 'Walk-in Customer'`.
   - Pure virtual balance aggregation (`computeWalkInVirtualBalance`): dynamically aggregates unpaid, non-cancelled retail invoices matching historical walk-in variants without DB migrations.

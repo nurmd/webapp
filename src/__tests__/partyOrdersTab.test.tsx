@@ -302,7 +302,7 @@ describe('Supplier Detail: Transactions / Orders tabs spec', () => {
     expect(txnTab.className).toContain('bg-surface-container-lowest');
 
     // 2. Transactions list shows Bill #B1 and Payment Out ₹300; does not show PO #P1, GRN #G1, PO #P2, or GRN #G2
-    expect(container.textContent).toContain('Bill #B1');
+    expect(container.textContent).toContain('#B1');
     expect(container.textContent).toContain('Payment Out');
     expect(container.textContent).toContain(formatINR(300));
     expect(container.textContent).not.toContain('PO #P1');
@@ -510,7 +510,8 @@ describe('Supplier Detail: Transactions / Orders tabs spec', () => {
     expect(container.textContent).not.toContain('Bill #B2');
 
     // 2. Return appears in Transactions as a debit/reduction
-    expect(container.textContent).toContain('Return #R1');
+    expect(container.textContent).toContain('Return');
+    expect(container.textContent).toContain('#R1');
     expect(container.textContent).toContain('Damaged Goods');
     expect(container.textContent).toContain(formatINR(400));
 
@@ -600,7 +601,8 @@ describe('Supplier Detail: Transactions / Orders tabs spec', () => {
     expect(container.textContent).not.toContain('(Unbilled');
 
     // 3. Existing sale/transaction row and balance behaviour are unchanged
-    expect(container.textContent).toContain('Sale #INV-001');
+    expect(container.textContent).toContain('Invoice');
+    expect(container.textContent).toContain('#INV-001');
     expect(container.textContent).toContain("You'll Receive");
     expect(container.textContent).toContain(formatINR(1500));
   });

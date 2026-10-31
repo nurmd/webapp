@@ -125,33 +125,40 @@ export function usePartyPassbook({
   // Aggregate totals
   const totalBilled = useMemo(() => {
     return isCustomer
-      ? partyInvoices.reduce((s, inv) => s + inv.grandTotal, 0)
-      : partyPurchases.reduce((s, pur) => s + (pur.purchaseType === 'RETURN' ? -pur.grandTotal : pur.grandTotal), 0);
+      ? partyInvoices.reduce((s, inv) => s + (inv.invoiceType === 'CREDIT_NOTE' ? -inv.grandTotal : inv.grandTotal), 0)
+      : partyPurchases.reduce((s, pur) => s + (pur.purchaseType === 'RETURN' || pur.noteType === 'D' ? -pur.grandTotal : pur.grandTotal), 0);
   }, [isCustomer, partyInvoices, partyPurchases]);
 
   const totalPaid = useMemo(() => {
     return isCustomer
-      ? partyInvoices.reduce((s, inv) => s + inv.paidAmount, 0)
-      : partyPurchases.reduce((s, pur) => s + pur.paidAmount, 0);
+      ? partyInvoices
+          .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
+          .reduce((s, inv) => s + (inv.paidAmount || 0), 0)
+      : partyPurchases
+          .filter((pur) => pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
+          .reduce((s, pur) => s + (pur.paidAmount || 0), 0);
   }, [isCustomer, partyInvoices, partyPurchases]);
 
   // Build Chronological Passbook with Running Balance
   const passbook: PassbookEntry[] = useMemo(() => {
     const rawEntries: Omit<PassbookEntry, 'runningBalance'>[] = [];
 
-    // Sales Invoices (Debit the full billed amount)
+    // Sales Invoices (Debit the full billed amount for sales, Credit for sales returns/Credit Notes)
     partyInvoices.forEach((inv) => {
+      const isCreditNote = inv.invoiceType === 'CREDIT_NOTE';
       rawEntries.push({
         id: `sale-${inv.id}`,
         rawId: inv.id,
         date: inv.date,
         docNumber: inv.invoiceNumber,
         type: 'SALE',
-        description: inv.items && inv.items.length > 0
+        description: isCreditNote
+          ? (inv.returnReason ? `Sales Return (${inv.returnReason})` : `Sales Return #${inv.invoiceNumber}`)
+          : inv.items && inv.items.length > 0
           ? `${inv.items.length} items (${inv.items.map((i) => i.name).slice(0, 2).join(', ')})`
           : `Sale #${inv.invoiceNumber}`,
-        debit: inv.grandTotal,
-        credit: 0,
+        debit: isCreditNote ? 0 : inv.grandTotal,
+        credit: isCreditNote ? inv.grandTotal : 0,
         billAmount: inv.grandTotal,
         status: inv.paymentStatus,
         paymentMode: inv.paymentMode,
@@ -161,7 +168,7 @@ export function usePartyPassbook({
 
     // Purchase Bills (Credit the full billed amount for BILL, debit for RETURN)
     partyPurchases.forEach((pur) => {
-      const isReturn = pur.purchaseType === 'RETURN';
+      const isReturn = pur.purchaseType === 'RETURN' || pur.noteType === 'D';
       rawEntries.push({
         id: `pur-${pur.id}`,
         rawId: pur.id,
@@ -258,12 +265,14 @@ export function usePartyPassbook({
 
     // Account for upfront payments made directly on invoices/bills without separate vouchers
     if (isCustomer) {
-      const totalPaidOnInvoices = partyInvoices.reduce((s, inv) => s + (inv.paidAmount || 0), 0);
+      const totalPaidOnInvoices = partyInvoices
+        .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
+        .reduce((s, inv) => s + (inv.paidAmount || 0), 0);
       let unvoucheredPaid = Math.max(0, totalPaidOnInvoices - totalVoucherReceipts);
 
       if (unvoucheredPaid > 0) {
         const sortedInvs = [...partyInvoices]
-          .filter((inv) => (inv.paidAmount || 0) > 0)
+          .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE' && (inv.paidAmount || 0) > 0)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         for (const inv of sortedInvs) {
@@ -291,13 +300,13 @@ export function usePartyPassbook({
       }
     } else {
       const totalPaidOnPurchases = partyPurchases
-        .filter((pur) => pur.purchaseType !== 'RETURN')
+        .filter((pur) => pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
         .reduce((s, pur) => s + (pur.paidAmount || 0), 0);
       let unvoucheredPaid = Math.max(0, totalPaidOnPurchases - totalVoucherPayments);
 
       if (unvoucheredPaid > 0) {
         const sortedPurs = [...partyPurchases]
-          .filter((pur) => pur.purchaseType !== 'RETURN' && (pur.paidAmount || 0) > 0)
+          .filter((pur) => pur.purchaseType !== 'RETURN' && pur.noteType !== 'D' && (pur.paidAmount || 0) > 0)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         for (const pur of sortedPurs) {
@@ -358,6 +367,13 @@ export function usePartyPassbook({
       if (timeDiff !== 0) return timeDiff;
       if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
       if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
+      // Normal sales come before sales returns (Credit Notes) on the same date
+      if (a.type === 'SALE' && b.type === 'SALE') {
+        const aIsCN = a.rawInvoice?.invoiceType === 'CREDIT_NOTE';
+        const bIsCN = b.rawInvoice?.invoiceType === 'CREDIT_NOTE';
+        if (!aIsCN && bIsCN) return -1;
+        if (aIsCN && !bIsCN) return 1;
+      }
       return 0;
     });
 
