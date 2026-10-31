@@ -123,12 +123,12 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                         <div className="font-bold text-on-surface break-words line-clamp-2" title={item.name}>
                           {item.name}
                         </div>
-                        <div className="text-[9px] text-on-surface-variant flex flex-wrap items-center gap-1 font-mono">
-                          {isGstActive && item.hsnSacCode && <span>HSN {item.hsnSacCode}</span>}
-                          {isGstActive && item.hsnSacCode && <span>•</span>}
+                        <div className="text-[9px] text-on-surface-variant flex items-center gap-1 font-mono overflow-x-auto no-scrollbar py-0.5">
+                          {isGstActive && item.hsnSacCode && <span className="whitespace-nowrap shrink-0">HSN {item.hsnSacCode}</span>}
+                          {isGstActive && item.hsnSacCode && <span className="shrink-0">•</span>}
                           {isGst && (
                             <span
-                              className={`font-semibold ${
+                              className={`font-semibold whitespace-nowrap shrink-0 ${
                                 isPurchase
                                   ? 'text-orange-600 dark:text-orange-400'
                                   : 'text-secondary'
@@ -137,7 +137,7 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                               GST {item.gstRate || 0}%
                             </span>
                           )}
-                          {isGst && cess > 0 && <span>• CESS {cess}%</span>}
+                          {isGst && cess > 0 && <span className="whitespace-nowrap shrink-0">• CESS {cess}%</span>}
                         </div>
                       </td>
                       <td className="py-1.5 px-2 text-center min-w-0">
@@ -457,16 +457,16 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-mono text-outline font-bold">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                        <span className="text-[10px] font-mono text-outline font-bold whitespace-nowrap shrink-0">
                           #{idx + 1}
                         </span>
-                        <h4 className="font-bold text-xs text-on-surface truncate">
+                        <h4 className="font-bold text-xs text-on-surface truncate whitespace-nowrap shrink-0">
                           {row.name}
                         </h4>
                         {isGstActive && (
                           <span
-                            className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                            className={`px-1 py-0.2 rounded text-[9px] font-bold whitespace-nowrap shrink-0 ${
                               priceMode === 'INCLUSIVE'
                                 ? 'bg-secondary/15 text-secondary'
                                 : 'bg-surface-container-high text-on-surface-variant'
@@ -505,23 +505,23 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-on-surface-variant mt-1.5 pt-1.5 border-t border-outline-variant/10">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-tabular-data font-bold text-on-surface">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                      <span className="font-tabular-data font-bold text-on-surface whitespace-nowrap shrink-0">
                         {formatQuantity(row.quantity, 4)} {row.unit}
                       </span>
-                      <span className="text-outline">×</span>
+                      <span className="text-outline shrink-0">×</span>
                       {isGstActive ? (
-                        <span className="font-tabular-data font-semibold text-on-surface">
+                        <span className="font-tabular-data font-semibold text-on-surface whitespace-nowrap shrink-0">
                           Excl. {formatINR(row.unitPrice)} · Incl. {formatINR(inclusiveRate)}
                         </span>
                       ) : (
-                        <span className="font-tabular-data font-semibold text-on-surface">
+                        <span className="font-tabular-data font-semibold text-on-surface whitespace-nowrap shrink-0">
                           {formatINR(row.unitPrice)}
                         </span>
                       )}
                       {(discPct > 0 || discAmt > 0) && (
                         <span
-                          className={`px-1 py-0.2 rounded text-[10px] font-bold ${
+                          className={`px-1 py-0.2 rounded text-[10px] font-bold whitespace-nowrap shrink-0 ${
                             isPurchase
                               ? 'text-orange-600 dark:text-orange-400 font-semibold'
                               : 'bg-secondary/15 text-secondary'

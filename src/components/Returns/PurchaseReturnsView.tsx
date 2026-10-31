@@ -226,18 +226,18 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
               </div>
 
               {/* Line 2: Debit Note # & Original Bill reference */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono whitespace-nowrap">
                   #{dn.billNumber}
                 </span>
 
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800 whitespace-nowrap shrink-0">
                   <span className="material-symbols-outlined text-[12px]">post_add</span>
                   <span>Debit Note</span>
                 </span>
 
                 {dn.originalBillNumber && (
-                  <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-low px-1.5 py-0.2 rounded">
+                  <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-low px-1.5 py-0.2 rounded whitespace-nowrap shrink-0">
                     Against Purchase #{dn.originalBillNumber}
                   </span>
                 )}

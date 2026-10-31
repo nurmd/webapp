@@ -297,13 +297,13 @@ export const CashBankTransferModal: React.FC<CashBankTransferModalProps> = ({
             </div>
 
             {/* Quick Amount Chips */}
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-1 overflow-x-auto no-scrollbar py-0.5">
               {[500, 1000, 2000, 5000, 10000].map((preset) => (
                 <button
                   key={preset}
                   type="button"
                   onClick={() => handleApplyPreset(preset)}
-                  className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface-variant text-[11px] font-semibold hover:bg-secondary/15 hover:text-secondary transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-surface-container text-on-surface-variant text-[11px] font-semibold hover:bg-secondary/15 hover:text-secondary transition-colors cursor-pointer whitespace-nowrap shrink-0 min-h-[32px]"
                 >
                   +₹{preset}
                 </button>

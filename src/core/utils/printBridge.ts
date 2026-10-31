@@ -117,6 +117,10 @@ export function generatePdfNative(jobName: string): boolean {
       bridge.generatePdfFromCurrentPage(jobName);
       return true;
     }
+    if (typeof bridge.generatePdf === 'function') {
+      bridge.generatePdf(jobName);
+      return true;
+    }
   } catch (err) {
     console.warn('AndroidBridge direct PDF generation failed, falling back:', err);
     return false;
@@ -141,6 +145,10 @@ export function generatePdfFromHtmlNative(
   try {
     if (typeof bridge.generatePdfFromHtml === 'function') {
       bridge.generatePdfFromHtml(html, jobName, paperSize);
+      return true;
+    }
+    if (typeof bridge.generatePdfHtml === 'function') {
+      bridge.generatePdfHtml(html, jobName, paperSize);
       return true;
     }
   } catch (err) {
@@ -177,6 +185,19 @@ export function printHtmlDocument(
       printWindow.document.open();
       printWindow.document.write(html);
       printWindow.document.close();
+      setTimeout(() => {
+        try {
+          printWindow.focus();
+          if (typeof printWindow.print === 'function') {
+            printWindow.print();
+          }
+        } catch (err) {
+          console.warn('printWindow.print failed, attempting window.print fallback:', err);
+          if (typeof window !== 'undefined' && typeof window.print === 'function') {
+            window.print();
+          }
+        }
+      }, 300);
       return;
     }
   } catch (err) {

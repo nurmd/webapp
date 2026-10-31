@@ -987,8 +987,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               </span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <h3 className="font-bold text-sm sm:text-base text-on-surface truncate whitespace-nowrap shrink-0">
                   {isEditing
                     ? editingLedgerEntry.type === 'SALE'
                       ? 'Edit Sales Invoice'
@@ -1006,7 +1006,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                     : 'Payment Out Details'}
                 </h3>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
                     isReceipt
                       ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                       : 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
@@ -1070,12 +1070,12 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   {formatINR(currentAmount)}
                 </div>
 
-                <div className="flex items-center gap-2 mt-1 flex-wrap justify-center text-xs">
-                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1">
+                <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar justify-center text-xs py-0.5">
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1 whitespace-nowrap shrink-0">
                     <span className="material-symbols-outlined text-[13px]">calendar_today</span>
                     <span>{formatDate(editDate || editingLedgerEntry.date)}</span>
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1">
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-medium flex items-center gap-1 whitespace-nowrap shrink-0">
                     <span className="material-symbols-outlined text-[13px]">
                       {editMode === 'CASH' ? 'payments' : editMode === 'BANK' ? 'account_balance' : editMode === 'SPLIT' ? 'call_split' : 'qr_code_2'}
                     </span>
@@ -1164,19 +1164,19 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                       <span className="material-symbols-outlined text-[13px] text-secondary">call_split</span>
                       <span>Split Tender Breakdown</span>
                     </span>
-                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar text-xs py-0.5">
                       {parseFloat(editSplitCash) > 0 && (
-                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface whitespace-nowrap shrink-0">
                           Cash: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitCash))}</span>
                         </span>
                       )}
                       {parseFloat(editSplitUPI) > 0 && (
-                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface whitespace-nowrap shrink-0">
                           UPI: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitUPI))}</span>
                         </span>
                       )}
                       {parseFloat(editSplitBank) > 0 && (
-                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface">
+                        <span className="px-2 py-0.5 rounded-lg bg-surface border border-outline-variant/25 font-bold text-on-surface whitespace-nowrap shrink-0">
                           Bank: <span className="text-secondary font-tabular-data">{formatINR(parseFloat(editSplitBank))}</span>
                         </span>
                       )}
@@ -1491,18 +1491,18 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               {/* ── INVOICE / BILL LINK SECTION (for payment vouchers) ── */}
               {isPayment && editingLedgerEntry.rawVoucher && editingLedgerEntry.rawVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
                 <div className="p-2.5 bg-surface rounded-xl border border-outline-variant/25 flex flex-col gap-2">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between overflow-x-auto no-scrollbar py-0.5 gap-1">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
                       <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
                       <span className="text-xs font-bold text-on-surface">
                         Link {editType === 'IN' ? 'Invoices' : 'Bills'} ({outstandingDocs.length} outstanding)
                       </span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 whitespace-nowrap shrink-0">
                       <button
                         type="button"
                         onClick={handleAutoAllocate}
-                        className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer"
+                        className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                         title="Auto-allocate FIFO oldest first"
                       >
                         Auto FIFO
@@ -1510,14 +1510,14 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                       <button
                         type="button"
                         onClick={handleSelectAll}
-                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer"
+                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                       >
                         Select All
                       </button>
                       <button
                         type="button"
                         onClick={handleClearAllocations}
-                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer"
+                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                       >
                         Clear
                       </button>

@@ -194,15 +194,15 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 ${
             profile.isCompositionScheme
               ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
               : 'bg-secondary/15 text-secondary border border-secondary/20'
           }`}>
             {profile.isCompositionScheme ? 'Bill of Supply' : 'GST Tax Invoice'}
           </span>
-          <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[11px] font-medium">
+          <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant text-[11px] font-medium whitespace-nowrap shrink-0">
             Format: {defaultPrintOption === 'Thermal-58mm' ? '2" (58mm)' : defaultPrintOption === 'Thermal-80mm' ? '3" (80mm)' : 'A4 Laser'}
           </span>
         </div>
@@ -799,7 +799,7 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto flex-wrap">
+          <div className="flex items-center bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto overflow-x-auto no-scrollbar max-w-full">
             {[
               { id: 'A4', label: 'A4 Laser', icon: 'description' },
               { id: 'Thermal-80mm', label: '3" (80mm)', icon: 'receipt_long' },
@@ -813,7 +813,7 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
                   key={opt.id}
                   type="button"
                   onClick={() => handleDefaultPrintOptionChange(opt.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                     isSelected
                       ? 'bg-secondary text-on-secondary shadow-xs'
                       : 'text-on-surface-variant hover:text-on-surface'

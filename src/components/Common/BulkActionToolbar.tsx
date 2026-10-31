@@ -47,13 +47,13 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
         </div>
 
         {/* Right: Action Buttons */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 overflow-x-auto no-scrollbar py-0.5 justify-end">
           {onBulkPrint && (
             <button
               type="button"
               onClick={onBulkPrint}
               disabled={isProcessing}
-              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50"
+              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50 whitespace-nowrap shrink-0"
               title="Print selected documents"
             >
               <span className="material-symbols-outlined text-[16px]">print</span>
@@ -66,7 +66,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               type="button"
               onClick={onBulkExport}
               disabled={isProcessing}
-              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50"
+              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-xs border border-outline-variant/30 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50 whitespace-nowrap shrink-0"
               title="Export selected to Excel / CSV"
             >
               <span className="material-symbols-outlined text-[16px]">file_download</span>
@@ -79,7 +79,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               type="button"
               onClick={onBulkMarkPaid}
               disabled={isProcessing}
-              className="min-h-[36px] px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50"
+              className="min-h-[36px] px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-secondary text-on-secondary font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-xs disabled:opacity-50 whitespace-nowrap shrink-0"
               title={markPaidLabel}
             >
               <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -92,7 +92,7 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
               type="button"
               onClick={onBulkDelete}
               disabled={isProcessing}
-              className="min-h-[36px] px-2.5 py-1.5 rounded-xl bg-error/15 hover:bg-error/25 text-error font-semibold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all disabled:opacity-50"
+              className="min-h-[36px] px-2.5 py-1.5 rounded-xl bg-error/15 hover:bg-error/25 text-error font-semibold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all disabled:opacity-50 whitespace-nowrap shrink-0"
               title="Delete selected documents"
               aria-label="Delete selected documents"
             >

@@ -139,11 +139,11 @@ export const ItemSettingsTab: React.FC<ItemSettingsTabProps> = ({
               <span className="material-symbols-outlined text-[22px]">production_quantity_limits</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-label-md text-sm font-bold text-on-surface">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <span className="font-label-md text-sm font-bold text-on-surface whitespace-nowrap shrink-0">
                   Allow Negative Stock
                 </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${
                   allowNegativeStock
                     ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
                     : 'bg-surface-container-high text-on-surface-variant'

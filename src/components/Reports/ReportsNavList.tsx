@@ -207,12 +207,12 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h4 className="text-xs sm:text-sm font-bold text-on-surface group-hover:text-primary transition-colors m-0 truncate">
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    <h4 className="text-xs sm:text-sm font-bold text-on-surface group-hover:text-primary transition-colors m-0 truncate shrink-0">
                       {item.title}
                     </h4>
                     {item.badge && (
-                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-primary/10 text-primary border border-primary/20">
+                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0">
                         {item.badge}
                       </span>
                     )}
@@ -222,11 +222,11 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                     {item.subtitle}
                   </p>
 
-                  <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                     {item.chips.map((chip, idx) => (
                       <span
                         key={idx}
-                        className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded bg-surface font-medium text-on-surface-variant border border-outline-variant/20"
+                        className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded bg-surface font-medium text-on-surface-variant border border-outline-variant/20 whitespace-nowrap shrink-0"
                       >
                         {chip}
                       </span>

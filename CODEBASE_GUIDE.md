@@ -349,7 +349,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
     - `PurchaseDocumentModal.tsx`: Specialized shell for purchase documents with PO/Challan/Bill status header, print-preview-viewport, and action bar (Print, Edit, Delete). Consumed by `SimplifiedPurchaseModal` and `TableGridPurchaseModal`.
     - `ReportPreviewModal.tsx`: Shared report preview shell featuring report name header, date range badge, back button, mobile cards vs A4 sheet mode switch, zoom fit toggle, page count indicator, CSV export action, and direct PDF/print action bar. Consumed by `ReportPdfPreviewModal.tsx`, `BusinessReportsView.tsx`, and `DaybookView.tsx`.
   - **Consolidated Party Detail Architecture (`src/components/Parties/PartyDetailModal.tsx`)**:
-    - Single consolidated component supporting `mode: 'page' | 'modal'`. Employs shared subcomponents `PartyInfoCard`, `PartyPassbookTable`, `PartyOrdersTable`, and `PartyWhatsAppReminder`. `PartyDetailPage.tsx` acts as a clean backward-compatible wrapper (`mode="page"`).
+    - Single consolidated component supporting `mode: 'page' | 'modal'`. Employs shared subcomponents `PartyInfoCard`, `PartyPassbookTable`, `PartyOrdersTable`, and `PartyWhatsAppReminder`. `PartyDetailPage.tsx` acts as a clean backward-compatible wrapper (`mode="page"`). In Party invoice preview (`SimplifiedInvoiceModal`), redundant A4/PDF button is omitted in favor of a clean Print button that opens `ThermalPrintModal`, which directly connects to full A4/PDF preview (`InvoicePreviewModal`).
   - **Unified Delete Confirmation Pattern (`ConfirmDeleteModal.tsx`)**:
     - Standardized confirmation across all domain deletion actions: invoices, purchases, payments/vouchers, parties, inventory items/categories, bank accounts, and cash/bank ledger transactions. Protects against accidental data loss and preserves statutory warnings.
   - **Unified Party Selector (`src/components/Parties/SelectPartyModal.tsx`)**:
@@ -365,7 +365,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Party ledger statements: `ledgerStatementPrinter.ts` (`generatePartyLedgerStatementHtml`, `printPartyLedgerStatement`).
   - Report previews: `reportExportUtils.ts` (`printReportHtmlNative`, `printReportDocumentDirect` choosing `A4-landscape` whenever `config.orientation === 'landscape' || config.headers.length > 7`).
 - **Modal Integrations & A4/PDF UX**:
-  - `InvoicePreviewModal`: Simplified UI displaying only `Mobile` tab in format selector, direct PDF generation on Print/PDF tap via `generatePdfNative` falling back to `printCurrentPage`, removed Set Default and Export menu, and scoped print CSS targeting `#invoice-a4-print-root`.
+  - `InvoicePreviewModal`: Responsive preview with Mobile touch cards and official A4 Sheet toggle, direct PDF generation on Print/PDF tap via `generatePdfNative` falling back to `printCurrentPage`, removed Set Default and Export menu, and scoped print CSS targeting `#invoice-a4-print-root`.
   - `BulkPrintModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#bulk-print-container` height/overflow resets for multi-page document batches.
   - `BarcodeLabelModal`: Uses `print-modal-overlay` and `print-modal-container` with scoped `#barcode-print-canvas` resets and conditional `@page` size (`A4 portrait` vs `auto`).
   - Global `.print-modal-container` reset in `src/index.css` (`height: auto !important; max-height: none !important; min-height: 0 !important; overflow: visible !important;`).

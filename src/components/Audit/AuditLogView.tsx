@@ -375,15 +375,15 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               Cryptographically chained SHA-256 event ledger. Immutable, tamper-evident record of all financial mutations.
             </p>
             {/* Legacy Archive Notice */}
-            <div className="mt-2 text-xs flex flex-wrap items-center gap-2">
+            <div className="mt-2 text-xs flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
               <span
                 data-testid="legacy-archive-badge"
-                className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20"
+                className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20 whitespace-nowrap shrink-0"
               >
                 <span className="material-symbols-outlined text-[14px]">archive</span>
                 <span>Legacy archive: {legacyCount} records preserved</span>
               </span>
-              <span className="text-[11px] text-on-surface-variant/80">
+              <span className="text-[11px] text-on-surface-variant/80 whitespace-nowrap shrink-0">
                 (Archived and not re-verified)
               </span>
             </div>
@@ -466,12 +466,12 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       <div className="bg-surface-container-low rounded-2xl p-4 border border-outline-variant/30 flex flex-col gap-3">
         {/* Scope Selector (Current Epoch / Legacy / All) */}
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-outline-variant/15">
-          <div className="flex items-center gap-1.5 bg-surface-container-lowest p-1 rounded-xl border border-outline-variant/30">
+          <div className="flex items-center gap-1.5 bg-surface-container-lowest p-1 rounded-xl border border-outline-variant/30 overflow-x-auto no-scrollbar max-w-full">
             <button
               type="button"
               data-testid="scope-current"
               onClick={() => setSelectedScope('CURRENT')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 selectedScope === 'CURRENT'
                   ? 'bg-primary text-on-primary shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -494,7 +494,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               type="button"
               data-testid="scope-legacy"
               onClick={() => setSelectedScope('LEGACY')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 selectedScope === 'LEGACY'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
@@ -517,7 +517,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               type="button"
               data-testid="scope-all"
               onClick={() => setSelectedScope('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                 selectedScope === 'ALL'
                   ? 'bg-surface-container-highest text-on-surface shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'

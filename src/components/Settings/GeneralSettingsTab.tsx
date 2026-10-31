@@ -135,9 +135,9 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
               </span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-label-md text-sm font-bold text-on-surface">Enable GST Billing</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <span className="font-label-md text-sm font-bold text-on-surface whitespace-nowrap shrink-0">Enable GST Billing</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap shrink-0 ${
                   isGstActive
                     ? 'bg-secondary-container text-on-secondary-container'
                     : 'bg-surface-container-high text-on-surface-variant'

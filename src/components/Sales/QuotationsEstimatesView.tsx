@@ -303,21 +303,21 @@ export const QuotationsEstimatesView: React.FC<QuotationsEstimatesViewProps> = (
               </div>
 
               {/* Line 2: Quote # and Status Badges */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono whitespace-nowrap">
                   #{inv.invoiceNumber}
                 </span>
 
                 {inv.isConverted ? (
                   <span
                     data-testid="converted-badge"
-                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                    className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap shrink-0"
                   >
                     <span className="material-symbols-outlined text-[12px]">check_circle</span>
                     <span>Converted {inv.convertedToInvoiceNumber ? `#${inv.convertedToInvoiceNumber}` : ''}</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800 whitespace-nowrap shrink-0">
                     <span className="material-symbols-outlined text-[12px]">schedule</span>
                     <span>Open Quote</span>
                   </span>

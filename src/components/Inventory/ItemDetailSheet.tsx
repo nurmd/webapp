@@ -493,21 +493,21 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-on-surface truncate text-xs">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                        <span className="font-bold text-on-surface truncate text-xs whitespace-nowrap shrink-0">
                           {isSale ? 'Sale' : isPurchase ? 'Purchase' : txn.type.replace('_', ' ')}
                         </span>
-                        <span className="text-[10px] text-outline font-mono truncate">
+                        <span className="text-[10px] text-outline font-mono truncate whitespace-nowrap shrink-0">
                           #{txn.referenceNo}
                         </span>
                         {isSale && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary whitespace-nowrap shrink-0">
                             <span className="material-symbols-outlined text-[11px]">receipt</span>
                             <span>Invoice</span>
                           </span>
                         )}
                         {isPurchase && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-500/10 text-orange-600 dark:text-orange-400 whitespace-nowrap shrink-0">
                             <span className="material-symbols-outlined text-[11px]">shopping_bag</span>
                             <span>Bill</span>
                           </span>

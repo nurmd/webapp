@@ -110,14 +110,14 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
         </div>
 
         {/* Right: Date Picker & Export Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap self-start lg:self-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 self-start lg:self-auto max-w-full">
           {extraActions}
 
           {onSelectDateRange && (
             <button
               type="button"
               onClick={() => setIsDateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/40 transition-all cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/40 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
               aria-label="Select report date range"
             >
               <Calendar size={13} className="text-primary" />
@@ -131,7 +131,7 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
               type="button"
               onClick={onExportPdf}
               disabled={isExportingPdf}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/40 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-container-high text-on-surface text-xs font-semibold border border-outline-variant/40 transition-all cursor-pointer shadow-xs disabled:opacity-50 whitespace-nowrap shrink-0"
               aria-label="Export report to printable PDF"
             >
               <Printer size={13} className="text-secondary" />
@@ -144,7 +144,7 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
               type="button"
               onClick={onExportExcel}
               disabled={isExportingExcel}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
               aria-label="Export report to Excel or CSV"
             >
               <FileSpreadsheet size={13} />

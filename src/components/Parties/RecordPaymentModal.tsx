@@ -485,18 +485,18 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       {/* ── INVOICE / BILL LINK SECTION ── */}
       {activeParty && (
         <div className="p-2.5 bg-surface rounded-xl border border-outline-variant/25 flex flex-col gap-2">
-          <div className="flex items-center justify-between flex-wrap gap-1">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between overflow-x-auto no-scrollbar py-0.5 gap-1">
+            <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
               <span className="material-symbols-outlined text-[16px] text-secondary">link</span>
               <span className="text-xs font-bold text-on-surface">
                 Link {paymentType === 'IN' ? 'Invoices' : 'Bills'} ({outstandingDocs.length} outstanding)
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 whitespace-nowrap shrink-0">
               <button
                 type="button"
                 onClick={handleAutoAllocate}
-                className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer"
+                className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 title="Auto-allocate FIFO oldest first"
               >
                 Auto FIFO
@@ -504,14 +504,14 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               <button
                 type="button"
                 onClick={handleSelectAll}
-                className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer"
+                className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 Select All
               </button>
               <button
                 type="button"
                 onClick={handleClearAllocations}
-                className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer"
+                className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 Clear
               </button>

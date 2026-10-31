@@ -712,10 +712,10 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-headline-sm font-bold text-xs text-on-surface truncate">{party.name}</span>
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                      <span className="font-headline-sm font-bold text-xs text-on-surface truncate whitespace-nowrap shrink-0">{party.name}</span>
                       <span
-                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap shrink-0 ${
                           isCustomer
                             ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
                             : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
@@ -724,7 +724,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
                         {party.type}
                       </span>
                       {party.stateCode && (
-                        <span className="text-[9px] font-mono bg-surface-container-high text-on-surface-variant px-1 rounded">
+                        <span className="text-[9px] font-mono bg-surface-container-high text-on-surface-variant px-1 rounded whitespace-nowrap shrink-0">
                           State {party.stateCode}
                         </span>
                       )}

@@ -108,12 +108,12 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers, company }) =
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5 max-w-full">
         {['ALL', 'SALES', 'PURCHASE', 'PAYMENT', 'RECEIPT'].map((type) => (
           <button
             key={type}
             onClick={() => setFilterType(type)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border whitespace-nowrap shrink-0 ${
               filterType === type
                 ? 'bg-primary text-on-primary border-transparent shadow-xs'
                 : 'bg-surface-container-low text-on-surface-variant border-outline-variant/30 hover:bg-surface-container'

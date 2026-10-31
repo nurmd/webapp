@@ -137,13 +137,13 @@ export const InvoiceDocumentModal: React.FC<InvoiceDocumentModalProps> = ({
                   title
                 )
               ) : (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-bold text-sm text-on-surface truncate">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <h3 className="font-bold text-sm text-on-surface truncate shrink-0">
                     {invoiceType ? `${invoiceType} ` : ''}
                     {invoiceNumber ? `#${invoiceNumber}` : 'Invoice'}
                   </h3>
                   {compositionBadge && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container whitespace-nowrap shrink-0">
                       Composition
                     </span>
                   )}
@@ -193,13 +193,13 @@ export const InvoiceDocumentModal: React.FC<InvoiceDocumentModalProps> = ({
                   title
                 )
               ) : (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-bold text-sm text-on-surface truncate">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <h3 className="font-bold text-sm text-on-surface truncate shrink-0">
                     {invoiceType ? `${invoiceType} ` : ''}
                     {invoiceNumber ? `#${invoiceNumber}` : 'Invoice'}
                   </h3>
                   {compositionBadge && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container whitespace-nowrap shrink-0">
                       Composition
                     </span>
                   )}
@@ -309,14 +309,14 @@ export const InvoiceDocumentModal: React.FC<InvoiceDocumentModalProps> = ({
         ) : showActionBar ? (
           <div className="no-print border-t border-outline-variant/20 px-3 py-2 bg-surface-container-low/95 flex items-center justify-between gap-2 shrink-0 flex-wrap">
             {/* Left Actions */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
               {footerLeading}
 
               {/* Close Button */}
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-[36px] px-3 py-1.5 rounded-xl border border-outline-variant/30 text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer active:scale-95 transition-all"
+                className="min-h-[36px] px-3 py-1.5 rounded-xl border border-outline-variant/30 text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer active:scale-95 transition-all whitespace-nowrap shrink-0"
               >
                 Close
               </button>
@@ -326,7 +326,7 @@ export const InvoiceDocumentModal: React.FC<InvoiceDocumentModalProps> = ({
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all whitespace-nowrap shrink-0"
                   title="Delete invoice"
                 >
                   <span className="material-symbols-outlined text-[15px]">delete</span>

@@ -93,8 +93,8 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
                   title
                 )
               ) : (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-bold text-sm text-on-surface truncate">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <h3 className="font-bold text-sm text-on-surface truncate shrink-0">
                     {purchaseType ? `${purchaseType} ` : ''}
                     {billNumber ? `#${billNumber}` : 'Purchase'}
                   </h3>
@@ -144,8 +144,8 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
                   title
                 )
               ) : (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-bold text-sm text-on-surface truncate">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <h3 className="font-bold text-sm text-on-surface truncate shrink-0">
                     {purchaseType ? `${purchaseType} ` : ''}
                     {billNumber ? `#${billNumber}` : 'Purchase'}
                   </h3>
@@ -179,12 +179,12 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
           </div>
         ) : showActionBar ? (
           <div className="no-print border-t border-outline-variant/20 px-3 py-2 bg-surface-container-low/95 flex items-center justify-between gap-2 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
               {footerLeading}
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-[36px] px-3.5 py-1.5 rounded-xl border border-outline-variant/30 text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer active:scale-95 transition-all"
+                className="min-h-[36px] px-3.5 py-1.5 rounded-xl border border-outline-variant/30 text-xs font-bold text-on-surface-variant hover:bg-surface-container cursor-pointer active:scale-95 transition-all whitespace-nowrap shrink-0"
               >
                 Close
               </button>
@@ -192,7 +192,7 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
                 <button
                   type="button"
                   onClick={onDelete}
-                  className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
+                  className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-1 cursor-pointer active:scale-95 transition-all whitespace-nowrap shrink-0"
                   title="Delete purchase"
                 >
                   <Trash2 size={14} />

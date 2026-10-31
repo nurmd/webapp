@@ -1245,9 +1245,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 >
                   {/* Top Header: Entity Type Badge & Date + Expand Chevron */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar py-0.5">
                       {/* Entity Type Badge */}
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass}`}>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass} whitespace-nowrap shrink-0`}>
                         {item.typeLabel}
                       </span>
 
@@ -1261,7 +1261,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         return (
                           <span
                             data-testid="overdue-badge"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800 whitespace-nowrap shrink-0"
                           >
                             <span className="material-symbols-outlined text-[11px]">schedule</span>
                             <span>{overdueDays} days overdue</span>
@@ -1358,10 +1358,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {isMoneyIn ? '+' : '-'} {formatINR(item.amount)}
                       </span>
 
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap justify-end">
+                      <div className="flex items-center gap-1.5 mt-0.5 overflow-x-auto no-scrollbar justify-end py-0.5">
                         {/* Settlement Status Pill */}
                         <span
-                          className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap ${
+                          className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap shrink-0 ${
                             isPaid
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                               : isPartial
@@ -1373,7 +1373,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </span>
 
                         {hasBalance && item.balanceAmount && (
-                          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap leading-none">
+                          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap shrink-0 leading-none">
                             Due: {formatINR(item.balanceAmount)}
                           </span>
                         )}

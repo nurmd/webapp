@@ -247,15 +247,15 @@ export const CashBankReconciliationPanel: React.FC<CashBankReconciliationPanelPr
                     <div className="text-[11px] uppercase tracking-wider text-on-surface-variant font-sans font-semibold mb-1">
                       Equation: Opening + Inflows − Outflows = Closing
                     </div>
-                    <div className="font-tabular-data flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <span>{formatINR(acc.openingBalance)} (Opening)</span>
-                      <span className="text-emerald-600 font-bold">+</span>
-                      <span>{formatINR(acc.totalInflow)} (Inflows)</span>
-                      <span className="text-rose-600 font-bold">−</span>
-                      <span>{formatINR(acc.totalOutflow)} (Outflows)</span>
-                      <span className="font-bold">=</span>
+                    <div className="font-tabular-data flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 whitespace-nowrap">
+                      <span className="shrink-0">{formatINR(acc.openingBalance)} (Opening)</span>
+                      <span className="text-emerald-600 font-bold shrink-0">+</span>
+                      <span className="shrink-0">{formatINR(acc.totalInflow)} (Inflows)</span>
+                      <span className="text-rose-600 font-bold shrink-0">−</span>
+                      <span className="shrink-0">{formatINR(acc.totalOutflow)} (Outflows)</span>
+                      <span className="font-bold shrink-0">=</span>
                       <span
-                        className={`font-bold ${
+                        className={`font-bold shrink-0 ${
                           acc.ledgerClosing < 0
                             ? 'text-rose-600 dark:text-rose-400'
                             : 'text-on-surface'
@@ -264,7 +264,7 @@ export const CashBankReconciliationPanel: React.FC<CashBankReconciliationPanelPr
                         {formatINR(acc.ledgerClosing)}
                       </span>
                       {acc.difference !== 0 && (
-                        <span className="text-rose-500 font-bold text-[11px]">
+                        <span className="text-rose-500 font-bold text-[11px] shrink-0">
                           (Diff: {formatINR(acc.difference)})
                         </span>
                       )}
@@ -408,11 +408,11 @@ export const CashBankReconciliationPanel: React.FC<CashBankReconciliationPanelPr
               <p className="text-xs text-amber-800 dark:text-amber-300">
                 The following account IDs appear in transactions or ledger balances but are not yet registered in the bank accounts master list:
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 {report.unconfiguredAccountIds.map((id) => (
                   <span
                     key={id}
-                    className="font-mono text-xs px-2 py-0.5 rounded bg-surface-container-lowest border border-amber-500/30 text-amber-900 dark:text-amber-200 font-bold"
+                    className="font-mono text-xs px-2 py-0.5 rounded bg-surface-container-lowest border border-amber-500/30 text-amber-900 dark:text-amber-200 font-bold whitespace-nowrap shrink-0"
                   >
                     {id}
                   </span>
@@ -448,10 +448,10 @@ export const CashBankReconciliationPanel: React.FC<CashBankReconciliationPanelPr
                         {formatINR(dup.amount)}
                       </span>
                     </div>
-                    <div className="text-[11px] text-on-surface-variant flex flex-wrap gap-x-3 gap-y-1">
-                      <span>Date: {dup.date}</span>
-                      <span>Reference: {dup.referenceNo}</span>
-                      <span>Entries: {dup.entryIds.join(', ')}</span>
+                    <div className="text-[11px] text-on-surface-variant flex items-center gap-x-3 overflow-x-auto no-scrollbar py-0.5">
+                      <span className="whitespace-nowrap shrink-0">Date: {dup.date}</span>
+                      <span className="whitespace-nowrap shrink-0">Reference: {dup.referenceNo}</span>
+                      <span className="whitespace-nowrap shrink-0">Entries: {dup.entryIds.join(', ')}</span>
                     </div>
                   </div>
                 ))}

@@ -783,8 +783,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 </div>
 
                 {/* Line 2 (Middle): Invoice # & Overdue Badge */}
-                <div className="flex items-center gap-1.5 -mt-0.5 flex-wrap">
-                  <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono">
+                <div className="flex items-center gap-1.5 -mt-0.5 overflow-x-auto no-scrollbar py-0.5">
+                  <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono whitespace-nowrap">
                     #{inv.invoiceNumber}
                   </span>
 
@@ -798,7 +798,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                     return (
                       <span
                         data-testid="overdue-badge"
-                        className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800 whitespace-nowrap shrink-0"
                       >
                         <span className="material-symbols-outlined text-[10px]">schedule</span>
                         <span>{overdueDays} days overdue</span>

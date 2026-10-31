@@ -22,6 +22,8 @@ import {
   preloadVoucherEditorModal,
   preloadSimplifiedInvoiceModal,
   preloadSimplifiedPurchaseModal,
+  preloadThermalPrintModal,
+  preloadInvoicePreviewModal,
 } from '../../core/utils/modalPreload.ts';
 
 const SimplifiedPurchaseModal = React.lazy(() =>
@@ -32,6 +34,12 @@ const SimplifiedInvoiceModal = React.lazy(() =>
 );
 const VoucherEditorModal = React.lazy(() =>
   import('./VoucherEditorModal.tsx').then((m) => ({ default: m.VoucherEditorModal }))
+);
+const ThermalPrintModal = React.lazy(() =>
+  import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
+);
+const InvoicePreviewModal = React.lazy(() =>
+  import('../Invoicing/InvoicePreviewModal.tsx').then((m) => ({ default: m.InvoicePreviewModal }))
 );
 
 export type { PassbookEntry } from './usePartyPassbook.ts';
@@ -95,6 +103,8 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
     preloadVoucherEditorModal,
     preloadSimplifiedInvoiceModal,
     preloadSimplifiedPurchaseModal,
+    preloadThermalPrintModal,
+    preloadInvoicePreviewModal,
   ]);
 
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -103,6 +113,8 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<PassbookEntry | null>(null);
   const [selectedPurchaseBill, setSelectedPurchaseBill] = useState<PurchaseBill | null>(null);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
+  const [thermalPrintInvoice, setThermalPrintInvoice] = useState<Invoice | null>(null);
+  const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isDeletePartyConfirmOpen, setIsDeletePartyConfirmOpen] = useState(false);
@@ -685,10 +697,36 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               if (onEditInvoice) onEditInvoice(inv);
             }}
             onDeleteInvoice={() => handleDeleteInvoiceBill(selectedInvoiceForView, true)}
-            onOpenFullA4Preview={(inv) => {
-              setSelectedInvoiceForView(null);
-              if (onViewInvoice) onViewInvoice(inv);
+            onPrintInvoice={(inv) => {
+              setThermalPrintInvoice(inv);
             }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Thermal POS Receipt Print Modal */}
+      {thermalPrintInvoice && (
+        <React.Suspense fallback={null}>
+          <ThermalPrintModal
+            invoice={thermalPrintInvoice}
+            company={company}
+            onClose={() => setThermalPrintInvoice(null)}
+            onPrintA4={(inv) => {
+              setThermalPrintInvoice(null);
+              setFullA4Invoice(inv);
+            }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Full A4 / PDF Laser Invoice Preview Modal */}
+      {fullA4Invoice && (
+        <React.Suspense fallback={null}>
+          <InvoicePreviewModal
+            invoice={fullA4Invoice}
+            company={company}
+            onClose={() => setFullA4Invoice(null)}
+            initialViewMode="A4"
           />
         </React.Suspense>
       )}

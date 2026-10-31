@@ -403,11 +403,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
               <span className="material-symbols-outlined text-[20px]">wallet</span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h2 className="font-bold text-base sm:text-lg text-on-surface">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <h2 className="font-bold text-base sm:text-lg text-on-surface whitespace-nowrap shrink-0">
                   Expense Register
                 </h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container-low font-bold text-on-surface-variant">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container-low font-bold text-on-surface-variant whitespace-nowrap shrink-0">
                   {filtered.length} of {expenses.length}
                 </span>
               </div>
@@ -706,11 +706,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             >
               {/* Line 1: Category Tag & Date (left) | Amount (right) */}
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 whitespace-nowrap shrink-0">
                     {exp.category}
                   </span>
-                  <span className="text-[11px] text-on-surface-variant font-medium">
+                  <span className="text-[11px] text-on-surface-variant font-medium whitespace-nowrap shrink-0">
                     {formatDate(exp.date)}
                   </span>
                 </div>
@@ -735,13 +735,13 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
 
               {/* Line 3: Meta & Quick Action Buttons */}
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/15 text-[11px] text-on-surface-variant">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="px-1.5 py-0.5 rounded-md bg-surface-container-low font-bold text-[10px]">
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <span className="px-1.5 py-0.5 rounded-md bg-surface-container-low font-bold text-[10px] whitespace-nowrap shrink-0">
                     {exp.paymentMode}
                   </span>
 
                   {exp.voucherNumber && (
-                    <span className="font-mono text-[10px] opacity-80">#{exp.voucherNumber}</span>
+                    <span className="font-mono text-[10px] opacity-80 whitespace-nowrap shrink-0">#{exp.voucherNumber}</span>
                   )}
 
                   {isGstActive && exp.itcEligible && (exp.taxAmount || 0) > 0 && (
@@ -1085,11 +1085,11 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
                   <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="font-bold text-sm text-on-surface truncate">
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    <h3 className="font-bold text-sm text-on-surface truncate whitespace-nowrap shrink-0">
                       {viewingExpense.title}
                     </h3>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 truncate">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 truncate whitespace-nowrap shrink-0">
                       {viewingExpense.category}
                     </span>
                   </div>

@@ -187,11 +187,11 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
               </span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-headline-sm text-base font-bold text-on-surface">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <h3 className="font-headline-sm text-base font-bold text-on-surface whitespace-nowrap shrink-0">
                   {isPwa ? 'PWA Update Available' : 'App Update Available'}
                 </h3>
-                <span className="bg-secondary text-on-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-secondary text-on-secondary text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                   v{info.version}
                 </span>
               </div>

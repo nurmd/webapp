@@ -730,21 +730,21 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                   </div>
 
                   <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span data-testid="party-card-name" className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                      <span data-testid="party-card-name" className="font-headline-sm text-xs sm:text-sm text-on-surface font-bold truncate whitespace-nowrap shrink-0">
                         {party.name}
                       </span>
                       {isSystemParty(party) && (
                         <span
                           data-testid="system-party-badge"
-                          className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-secondary/15 text-secondary border border-secondary/20 flex-shrink-0"
+                          className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-secondary/15 text-secondary border border-secondary/20 flex-shrink-0 whitespace-nowrap shrink-0"
                         >
                           System
                         </span>
                       )}
                       {isGstActive && party.gstin && (
                         <span
-                          className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0"
+                          className="material-symbols-outlined text-[13px] text-secondary flex-shrink-0 shrink-0"
                           title={`GSTIN: ${party.gstin}`}
                         >
                           verified
@@ -761,10 +761,10 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                       )}
                     </div>
                     {(party.groupId || party.categoryId) && (
-                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar mt-1 py-0.5">
                         {party.groupId && groupMap.get(party.groupId) && (
                           <span
-                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1"
+                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                             style={{
                               backgroundColor: `${groupMap.get(party.groupId)!.color || '#2563eb'}18`,
                               color: groupMap.get(party.groupId)!.color || '#2563eb',
@@ -779,7 +779,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                         )}
                         {party.categoryId && categoryMap.get(party.categoryId) && (
                           <span
-                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1"
+                            className="text-[9px] px-1.5 py-0.2 rounded-md font-bold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                             style={{
                               backgroundColor: `${categoryMap.get(party.categoryId)!.color || '#0d9488'}18`,
                               color: categoryMap.get(party.categoryId)!.color || '#0d9488',

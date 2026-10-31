@@ -169,13 +169,13 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
           </div>
 
           {/* Center / Right: Mode Switcher, Zoom, Export, Print & Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0 overflow-x-auto no-scrollbar py-0.5">
             {/* View Mode Toggle: Cards (Mobile) vs A4 Sheet */}
-            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30 text-[11px] font-bold">
+            <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30 text-[11px] font-bold whitespace-nowrap shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode('CARDS')}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   viewMode === 'CARDS'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -188,7 +188,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('A4')}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-md transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   viewMode === 'A4'
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'
@@ -202,14 +202,14 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
 
             {/* A4 Sheet Zoom Fit Toggle & Page Count Indicator */}
             {viewMode === 'A4' && (
-              <div className="hidden xs:flex items-center gap-1 text-[11px] text-on-surface-variant">
-                <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-semibold border border-outline-variant/20">
+              <div className="hidden xs:flex items-center gap-1 text-[11px] text-on-surface-variant whitespace-nowrap shrink-0">
+                <span className="px-1.5 py-0.5 rounded bg-surface-container text-[10px] font-semibold border border-outline-variant/20 whitespace-nowrap shrink-0">
                   {estimatedPages} {estimatedPages === 1 ? 'Page' : 'Pages'}
                 </span>
                 <button
                   type="button"
                   onClick={() => setZoomFit((prev) => !prev)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/30 cursor-pointer transition-all"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-container hover:bg-surface-container-high text-on-surface-variant border border-outline-variant/30 cursor-pointer transition-all whitespace-nowrap shrink-0"
                   title={zoomFit ? 'View at 100% Zoom' : 'Fit to Screen Width'}
                 >
                   {zoomFit ? <ZoomIn className="w-3.5 h-3.5 text-primary" /> : <ZoomOut className="w-3.5 h-3.5 text-primary" />}
@@ -223,7 +223,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               type="button"
               onClick={handleExportCsv}
               title="Export Report to CSV spreadsheet"
-              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs border border-outline-variant/30 active:scale-95 transition-all cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-xs border border-outline-variant/30 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               <Download className="w-3.5 h-3.5 text-primary" />
               <span>CSV</span>
@@ -234,7 +234,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               type="button"
               onClick={handlePrint}
               data-testid="report-preview-print-button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs sm:text-sm active:scale-95 transition-all cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-bold text-xs sm:text-sm active:scale-95 transition-all cursor-pointer shadow-xs whitespace-nowrap shrink-0"
             >
               <Printer className="w-4 h-4" />
               <span className="hidden xs:inline">Print / Save PDF</span>
@@ -246,7 +246,7 @@ export const ReportPreviewModal: React.FC<ReportPreviewModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
             </button>

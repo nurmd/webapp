@@ -53,11 +53,11 @@ export const DashboardExpenseModal: React.FC<DashboardExpenseModalProps> = ({
               <span className="material-symbols-outlined text-[20px]">shopping_cart_checkout</span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-bold text-sm text-on-surface truncate">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <h3 className="font-bold text-sm text-on-surface truncate whitespace-nowrap shrink-0">
                   {expense.title}
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 truncate">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 truncate whitespace-nowrap shrink-0">
                   {expense.category}
                 </span>
               </div>

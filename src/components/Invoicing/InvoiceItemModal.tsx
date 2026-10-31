@@ -1062,13 +1062,13 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1 bg-surface-container-high/60 p-0.5 rounded-lg border border-outline-variant/20">
+              <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <div className="flex items-center gap-1 bg-surface-container-high/60 p-0.5 rounded-lg border border-outline-variant/20 whitespace-nowrap shrink-0">
                   <button
                     type="button"
                     aria-pressed={priceMode === 'EXCLUSIVE'}
                     onClick={() => setPriceMode('EXCLUSIVE')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       priceMode === 'EXCLUSIVE'
                         ? 'bg-surface text-on-surface shadow-xs'
                         : 'text-on-surface-variant hover:text-on-surface'
@@ -1080,7 +1080,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     type="button"
                     aria-pressed={priceMode === 'INCLUSIVE'}
                     onClick={() => setPriceMode('INCLUSIVE')}
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       priceMode === 'INCLUSIVE'
                         ? 'bg-surface text-on-surface shadow-xs'
                         : 'text-on-surface-variant hover:text-on-surface'
@@ -1089,7 +1089,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     Incl. GST
                   </button>
                 </div>
-                <span className="text-[11px] text-on-surface-variant font-medium">
+                <span className="text-[11px] text-on-surface-variant font-medium whitespace-nowrap shrink-0">
                   Last edited: {priceMode === 'EXCLUSIVE' ? 'Excl. GST' : 'Incl. GST'}
                 </span>
               </div>

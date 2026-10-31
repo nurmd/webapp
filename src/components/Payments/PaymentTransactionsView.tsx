@@ -644,19 +644,19 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                   </div>
 
                   <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate whitespace-nowrap shrink-0">
                         {entry.counterpartyOrTitle || (isFlowIn ? 'Direct Inflow' : 'Direct Outflow')}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant flex-shrink-0">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant shrink-0 whitespace-nowrap">
                         {entry.type.replace('_', ' ')}
                       </span>
                       {isNative ? (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-primary/10 text-primary border border-primary/20 shrink-0 whitespace-nowrap">
                           Direct
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex-shrink-0">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0 whitespace-nowrap">
                           Auto
                         </span>
                       )}
@@ -694,15 +694,15 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                         const allocatedSum = linkedVoucher.paymentAllocations.reduce((s, a) => s + (a.amount || 0), 0);
                         const unallocatedAmount = Math.max(0, Math.round((linkedVoucher.totalAmount - allocatedSum) * 100) / 100);
                         return (
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                            <span className="text-[10px] text-on-surface-variant font-medium">Linked to:</span>
+                          <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
+                            <span className="text-[10px] text-on-surface-variant font-medium whitespace-nowrap shrink-0">Linked to:</span>
                             {linkedVoucher.paymentAllocations.map((alloc) => {
                               const isOpeningBal = alloc.documentId.startsWith('OPENING-BALANCE-');
                               if (isOpeningBal) {
                                 return (
                                   <span
                                     key={alloc.documentId}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-bold font-mono"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-bold font-mono whitespace-nowrap shrink-0"
                                   >
                                     <span>Opening Balance</span>
                                     <span className="font-sans font-medium text-[9px] text-on-surface-variant">
@@ -722,7 +722,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                     if (inv && onViewInvoice) onViewInvoice(inv);
                                     else if (pur && onViewPurchase) onViewPurchase(pur);
                                   }}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold font-mono transition-colors cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold font-mono transition-colors cursor-pointer whitespace-nowrap shrink-0"
                                   title={`Click to view ${alloc.documentNumber}`}
                                 >
                                   <span>{alloc.documentNumber}</span>
@@ -734,7 +734,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                               );
                             })}
                             {unallocatedAmount > 0 ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium whitespace-nowrap shrink-0">
                                 Advance: {formatINR(unallocatedAmount)}
                               </span>
                             ) : null}
@@ -745,7 +745,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                   e.stopPropagation();
                                   handleEditVoucher(linkedVoucher, { initialEditing: true });
                                 }}
-                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                                 title="Edit payment links"
                               >
                                 <span className="material-symbols-outlined text-[11px]">link</span>
@@ -758,8 +758,8 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
                       if (linkedVoucher.allocationMode === 'UNALLOCATED' || (!linkedVoucher.paymentAllocations?.length && linkedVoucher.partyId)) {
                         return (
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+                          <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium whitespace-nowrap shrink-0">
                               Unallocated Advance: {formatINR(linkedVoucher.totalAmount || entry.amount)}
                             </span>
                             {linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
@@ -769,7 +769,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                   e.stopPropagation();
                                   handleEditVoucher(linkedVoucher, { initialEditing: true });
                                 }}
-                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/20 text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                                 title="Link to invoices/bills"
                               >
                                 <span className="material-symbols-outlined text-[11px]">link</span>

@@ -76,9 +76,9 @@ export const DocumentViewModal: React.FC<DocumentViewModalProps> = ({
               </div>
             ) : null}
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 {typeof title === 'string' ? (
-                  <h3 className="font-bold text-sm text-on-surface truncate">{title}</h3>
+                  <h3 className="font-bold text-sm text-on-surface truncate shrink-0">{title}</h3>
                 ) : (
                   title
                 )}

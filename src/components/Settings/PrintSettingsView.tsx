@@ -173,7 +173,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
           </div>
         </div>
 
-        <div className="flex bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto flex-wrap">
+        <div className="flex bg-surface-container p-1 rounded-xl border border-outline-variant/30 gap-1 self-start sm:self-auto overflow-x-auto no-scrollbar max-w-full">
           {[
             { id: 'A4' as const, label: 'A4 Laser', icon: 'description' },
             { id: 'Thermal-80mm' as const, label: '3" Thermal (80mm)', icon: 'receipt_long' },
@@ -185,7 +185,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
                 key={opt.id}
                 type="button"
                 onClick={() => handleDefaultFormatChange(opt.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   isSelected
                     ? 'bg-secondary text-on-secondary shadow-xs'
                     : 'text-on-surface-variant hover:text-on-surface'

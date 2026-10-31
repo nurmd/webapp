@@ -26,8 +26,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
   return (
     <section className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
       {/* Header & Filter Controls */}
-      <div className="flex items-center justify-between gap-1 flex-wrap">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span className="text-xs font-bold text-on-surface">Transactions</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container font-bold text-on-surface-variant">
             {filteredPassbook.length}
@@ -35,7 +35,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
         </div>
 
         {/* Segmented Filter Pills & Sort Toggle */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
             {(['ALL', 'BILLS', 'PAYMENTS'] as const).map((tab) => (
               <button
@@ -106,6 +106,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
             return (
               <div
                 key={entry.id}
+                data-testid={`passbook-entry-${entry.id}`}
                 onClick={() => onTransactionClick(entry)}
                 className="p-2.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low active:scale-[0.99] transition-all flex items-center justify-between gap-2 cursor-pointer"
               >
@@ -195,12 +196,12 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                           const allocatedSum = entry.rawVoucher.paymentAllocations.reduce((s, a) => s + (a.amount || 0), 0);
                           const unalloc = Math.max(0, Math.round((entry.rawVoucher.totalAmount - allocatedSum) * 100) / 100);
                           return (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span>{entry.date}</span>
-                              <span>•</span>
-                              <span>{entry.description}</span>
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                              <span className="whitespace-nowrap shrink-0">{entry.date}</span>
+                              <span className="whitespace-nowrap shrink-0">•</span>
+                              <span className="whitespace-nowrap shrink-0">{entry.description}</span>
                               {unalloc > 0 ? (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium">
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 font-medium whitespace-nowrap shrink-0">
                                   Advance: {formatINR(unalloc)}
                                 </span>
                               ) : null}

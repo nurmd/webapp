@@ -396,12 +396,12 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
         </div>
 
         {/* Invoice Metadata Pills (Invoice No, Dates, Billing Mode) */}
-        <div className="flex items-center flex-wrap gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
           {/* Invoice Number */}
           <button
             type="button"
             onClick={onOpenInvoiceNumberModal}
-            className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border ${
+            className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer border whitespace-nowrap shrink-0 ${
               currentConflict
                 ? 'bg-error/15 text-error border-error/50 hover:bg-error/25 animate-pulse'
                 : 'bg-surface-container-low hover:bg-surface-container text-on-surface border-outline-variant/20'
@@ -423,7 +423,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
           <button
             type="button"
             onClick={onOpenInvoiceNumberModal}
-            className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+            className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 whitespace-nowrap shrink-0"
             title="Change Invoice Date"
           >
             <span className="material-symbols-outlined text-[13px] text-outline">calendar_today</span>
@@ -434,7 +434,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
           <button
             type="button"
             onClick={onOpenDueDateModal}
-            className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20"
+            className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors cursor-pointer border border-outline-variant/20 whitespace-nowrap shrink-0"
             title={
               isDeliveryChallan
                 ? 'Change Dispatch / Transit Date'
@@ -549,7 +549,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
 
           {/* Mode & PoS */}
           {isGstActive && (
-            <div className="h-7 px-2 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1 border border-secondary/20">
+            <div className="h-7 px-2 rounded-lg bg-secondary/10 text-secondary font-bold text-[11px] flex items-center gap-1 border border-secondary/20 whitespace-nowrap shrink-0">
               <span>GST</span>
               <span className="text-[10px] font-mono opacity-80">({posStateCode})</span>
             </div>
@@ -557,7 +557,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
 
           {/* Invoice Type Selector Dropdown */}
           {onInvoiceTypeChange && (
-            <div className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors border border-outline-variant/20">
+            <div className="h-7 px-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-medium text-xs flex items-center gap-1 transition-colors border border-outline-variant/20 whitespace-nowrap shrink-0">
               <span className="text-[9px] uppercase font-bold text-outline">Type:</span>
               <select
                 aria-label="Invoice Type"
@@ -598,7 +598,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
               role="switch"
               aria-checked={Boolean(isRcm)}
               onClick={() => onRcmChange(!isRcm)}
-              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border whitespace-nowrap shrink-0 ${
                 isRcm
                   ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40 shadow-2xs'
                   : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/20'
@@ -624,7 +624,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
             <button
               type="button"
               onClick={() => setIsShippingExpanded(!isShippingExpanded)}
-              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border ${
+              className={`h-7 px-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer border whitespace-nowrap shrink-0 ${
                 isShippingExpanded || shippingAddress || shippingPincode
                   ? 'bg-secondary/15 text-secondary border-secondary/40 shadow-2xs'
                   : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant border-outline-variant/20'

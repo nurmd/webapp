@@ -504,21 +504,21 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                   {isInflow ? '+' : isOutflow ? '-' : '⇄'} {formatINR(activeAmount)}
                 </span>
 
-                <div className="mt-2.5 flex items-center gap-1.5 flex-wrap justify-center">
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-surface-container text-on-surface border border-outline-variant/30">
+                <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar justify-center py-0.5">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide bg-surface-container text-on-surface border border-outline-variant/30 whitespace-nowrap shrink-0">
                     {rawTransaction?.type || entry?.type}
                   </span>
                   {entry?.mode && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-container-highest text-on-surface-variant">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-container-highest text-on-surface-variant whitespace-nowrap shrink-0">
                       Mode: {entry.mode}
                     </span>
                   )}
                   {isNativeTxn ? (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0">
                       Editable Native Txn
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shrink-0">
                       Auto-Linked Entry
                     </span>
                   )}
@@ -731,26 +731,26 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar py-0.5">
                     {onNavigateTab && (
                       <button
                         type="button"
                         onClick={handleNavigateSource}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
                       >
                         <span>Open Source Document</span>
                         <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                       </button>
                     )}
                     {linkedVoucher && (linkedVoucher.voucherType === 'RECEIPT' || linkedVoucher.voucherType === 'PAYMENT') && !isReversed && !isCancelled && onEditVoucher && (
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
                         <button
                           type="button"
                           onClick={() => {
                             onClose();
                             onEditVoucher(linkedVoucher);
                           }}
-                          className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+                          className="px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95 whitespace-nowrap shrink-0"
                         >
                           <span className="material-symbols-outlined text-[14px]">edit</span>
                           <span>Edit Payment</span>
@@ -762,7 +762,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                               onClose();
                               onEditVoucher(linkedVoucher, { initialEditing: true });
                             }}
-                            className="px-3 py-1.5 bg-secondary/15 hover:bg-secondary/25 text-secondary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95"
+                            className="px-3 py-1.5 bg-secondary/15 hover:bg-secondary/25 text-secondary rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 active:scale-95 whitespace-nowrap shrink-0"
                           >
                             <span className="material-symbols-outlined text-[14px]">link</span>
                             <span>Edit Links</span>

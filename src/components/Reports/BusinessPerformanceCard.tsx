@@ -618,26 +618,26 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
       <div className="bg-slate-900/90 rounded-xl p-2.5 sm:p-3 border border-slate-850 shadow-sm mt-2.5">
         {/* Header with Clean Title, Granularity Badge, and Dynamic Responsive Amounts */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1.5 mb-1.5 border-b border-slate-800/80 gap-1.5">
-          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar py-0.5">
             <BarChart3 size={13} className="text-emerald-400 shrink-0" />
-            <span className="text-[11px] sm:text-xs font-bold text-white uppercase tracking-wider truncate">
+            <span className="text-[11px] sm:text-xs font-bold text-white uppercase tracking-wider truncate shrink-0">
               {title}
             </span>
             {granularityBadge && (
-              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 whitespace-nowrap shrink-0">
                 {granularityBadge}
               </span>
             )}
             {isScrubbing && (
-              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80 animate-pulse">
+              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-sky-950 text-sky-300 border border-sky-800/80 animate-pulse whitespace-nowrap shrink-0">
                 {activeDateLabel}
               </span>
             )}
           </div>
 
           {/* Dynamic Real-time Metric Amounts */}
-          <div className="flex items-center gap-3 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3 shrink-0 overflow-x-auto no-scrollbar py-0.5">
+            <div className="flex items-center gap-1 whitespace-nowrap shrink-0">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: line1.strokeColor }} />
               <span className="text-[10px] text-slate-300 font-semibold">{line1.label}:</span>
               <span className="text-[10px] font-mono font-bold" style={{ color: line1.badgeColor }}>

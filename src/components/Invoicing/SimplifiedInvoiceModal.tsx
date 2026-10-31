@@ -66,17 +66,17 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   };
 
   const titleNode = (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <h3 className="font-bold text-sm text-on-surface truncate">
+    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+      <h3 className="font-bold text-sm text-on-surface truncate shrink-0">
         {company.isCompositionScheme ? `Bill of Supply #${invoice.invoiceNumber}` : `Invoice #${invoice.invoiceNumber}`}
       </h3>
       {company.isCompositionScheme && (
-        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container">
+        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-secondary-container text-on-secondary-container whitespace-nowrap shrink-0">
           Composition
         </span>
       )}
       <span
-        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap shrink-0 ${
           isPaid
             ? 'bg-secondary/15 text-secondary'
             : isPartial
@@ -274,17 +274,17 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           </div>
           {/* Split Tender Breakdown */}
           {((invoice.paymentSplits && invoice.paymentSplits.length > 1) || (invoice.notes && invoice.notes.includes('Split'))) && (
-            <div className="flex flex-wrap gap-1.5 pt-0.5 border-t border-outline-variant/15 text-[10px]">
+            <div className="flex overflow-x-auto no-scrollbar gap-1.5 pt-0.5 border-t border-outline-variant/15 text-[10px] py-0.5">
               {invoice.paymentSplits && invoice.paymentSplits.length > 0
                 ? invoice.paymentSplits
                     .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
                     .map((s, idx) => (
-                      <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant">
+                      <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant whitespace-nowrap shrink-0">
                         {s.mode}: {formatINR(s.amount)}
                       </span>
                     ))
                 : (invoice.notes?.replace('Split Payment — ', '') || '').split(', ').map((chunk, idx) => (
-                    <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant">
+                    <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant whitespace-nowrap shrink-0">
                       {chunk}
                     </span>
                   ))}

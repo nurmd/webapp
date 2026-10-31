@@ -404,12 +404,12 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
         </div>
 
         {/* Selected Account Details Pill */}
-        <div className="flex items-center gap-3 text-xs sm:text-sm flex-wrap">
+        <div className="flex items-center gap-3 text-xs sm:text-sm overflow-x-auto no-scrollbar py-0.5">
           {selectedAccount.bankName && (
-            <span className="text-on-surface-variant text-[11px] sm:text-xs">Bank: <strong className="text-on-surface">{selectedAccount.bankName}</strong></span>
+            <span className="text-on-surface-variant text-[11px] sm:text-xs whitespace-nowrap shrink-0">Bank: <strong className="text-on-surface">{selectedAccount.bankName}</strong></span>
           )}
           {selectedAccount.ifscCode && (
-            <span className="text-on-surface-variant font-mono text-[11px] sm:text-xs">IFSC: <strong className="text-on-surface">{selectedAccount.ifscCode}</strong></span>
+            <span className="text-on-surface-variant font-mono text-[11px] sm:text-xs whitespace-nowrap shrink-0">IFSC: <strong className="text-on-surface">{selectedAccount.ifscCode}</strong></span>
           )}
         </div>
       </div>
@@ -575,12 +575,12 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
                       <td className="py-3 px-4 text-on-surface font-medium">
                         {isContra ? (
                           <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-xs sm:text-sm text-on-surface">
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                              <span className="font-bold text-xs sm:text-sm text-on-surface whitespace-nowrap shrink-0">
                                 {entry.counterpartyOrTitle}
                               </span>
                               {/* Visual From -> To Route Pill */}
-                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs">
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-xs whitespace-nowrap shrink-0">
                                 <span className="text-[9px] uppercase font-bold text-blue-700 dark:text-blue-300 tracking-wider">From:</span>
                                 <span className={`text-[11px] font-bold ${
                                   !isDeposit ? 'text-rose-700 dark:text-rose-400 underline underline-offset-2' : 'text-on-surface'
@@ -596,8 +596,8 @@ export const BankStatementCategory: React.FC<BankStatementCategoryProps> = ({
                                 </span>
                               </div>
                             </div>
-                            <div className="text-[11px] text-on-surface-variant flex items-center gap-1.5 flex-wrap">
-                              <span className={`inline-flex items-center gap-0.5 font-semibold ${
+                            <div className="text-[11px] text-on-surface-variant flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                              <span className={`inline-flex items-center gap-0.5 font-semibold whitespace-nowrap shrink-0 ${
                                 isDeposit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                               }`}>
                                 {isDeposit ? (

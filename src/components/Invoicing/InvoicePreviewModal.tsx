@@ -513,11 +513,28 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => setViewMode('MOBILE')}
-                className="px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 bg-secondary text-on-secondary shadow-xs"
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  viewMode === 'MOBILE'
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
                 title="Mobile Touch Cards View"
               >
                 <Smartphone size={12} />
                 <span>Mobile</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('A4')}
+                className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                  viewMode === 'A4'
+                    ? 'bg-secondary text-on-secondary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+                title="Official A4 Laser Format"
+              >
+                <FileText size={12} />
+                <span>A4 Sheet</span>
               </button>
             </div>
 

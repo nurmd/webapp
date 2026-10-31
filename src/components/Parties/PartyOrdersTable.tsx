@@ -31,8 +31,8 @@ export const PartyOrdersTable: React.FC<PartyOrdersTableProps> = ({
   return (
     <section className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-1 flex-wrap">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span className="text-xs font-bold text-on-surface">Orders</span>
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container font-bold text-on-surface-variant">
             {orders.length}
@@ -41,14 +41,14 @@ export const PartyOrdersTable: React.FC<PartyOrdersTableProps> = ({
       </div>
 
       {/* Totals chips */}
-      <div className="flex items-center justify-between gap-2 flex-wrap text-xs font-bold p-2 rounded-xl bg-surface-container-low border border-outline-variant/15">
-        <span className="px-2 py-1 rounded-lg bg-surface-container text-on-surface">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 text-xs font-bold p-2 rounded-xl bg-surface-container-low border border-outline-variant/15">
+        <span className="px-2 py-1 rounded-lg bg-surface-container text-on-surface whitespace-nowrap shrink-0">
           PO Total {formatINR(purchaseOrderTotal)}
         </span>
-        <span className="px-2 py-1 rounded-lg bg-surface-container text-on-surface">
+        <span className="px-2 py-1 rounded-lg bg-surface-container text-on-surface whitespace-nowrap shrink-0">
           GRN Total {formatINR(grnTotal)}
         </span>
-        <span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
+        <span className="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 whitespace-nowrap shrink-0">
           Unbilled {formatINR(unbilledOrdersTotal)}
         </span>
       </div>
@@ -108,9 +108,9 @@ export const PartyOrdersTable: React.FC<PartyOrdersTableProps> = ({
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                       <span
-                        className={`font-bold text-xs truncate ${
+                        className={`font-bold text-xs truncate whitespace-nowrap shrink-0 ${
                           isCancelled ? 'line-through text-outline' : 'text-on-surface'
                         }`}
                       >
@@ -119,7 +119,7 @@ export const PartyOrdersTable: React.FC<PartyOrdersTableProps> = ({
 
                       {/* Status badge */}
                       <span
-                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap shrink-0 ${
                           isCancelled
                             ? 'bg-outline-variant/30 text-outline'
                             : order.isConverted || statusBadgeText === 'BILLED'

@@ -153,10 +153,10 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
               </span>
             </div>
             {(group || category) && (
-              <div className="col-span-2 pt-1 border-t border-outline-variant/15 flex items-center gap-2 flex-wrap">
+              <div className="col-span-2 pt-1 border-t border-outline-variant/15 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
                 {group && (
                   <span
-                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1"
+                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                     style={{
                       backgroundColor: `${group.color || '#2563eb'}18`,
                       color: group.color || '#2563eb',
@@ -171,7 +171,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 )}
                 {category && (
                   <span
-                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1"
+                    className="text-[10px] px-2 py-0.5 rounded-md font-bold inline-flex items-center gap-1 whitespace-nowrap shrink-0"
                     style={{
                       backgroundColor: `${category.color || '#0d9488'}18`,
                       color: category.color || '#0d9488',

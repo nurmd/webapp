@@ -145,14 +145,14 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             </div>
 
             {/* Quick Add Chips */}
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              <span className="text-[10px] text-outline font-semibold">Quick add:</span>
+            <div className="flex items-center gap-1.5 mt-2 overflow-x-auto no-scrollbar py-0.5">
+              <span className="text-[10px] text-outline font-semibold whitespace-nowrap shrink-0">Quick add:</span>
               {[1, 5, 10, 25, 50].map((step) => (
                 <button
                   key={step}
                   type="button"
                   onClick={() => setAdjQty((prev) => String((Number(prev) || 0) + step))}
-                  className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface text-xs font-semibold hover:bg-secondary/15 hover:text-secondary active:scale-95 transition-all cursor-pointer"
+                  className="px-2 py-0.5 rounded-md bg-surface-container text-on-surface text-xs font-semibold hover:bg-secondary/15 hover:text-secondary active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[32px]"
                 >
                   +{step}
                 </button>

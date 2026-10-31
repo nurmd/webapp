@@ -473,23 +473,23 @@ export const PurchaseChallansView: React.FC<PurchaseChallansViewProps> = ({
                   <div className="flex items-start justify-between gap-3">
                     {/* Left Details */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center flex-wrap gap-2">
-                        <span className="font-mono font-bold text-sm text-on-surface">
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                        <span className="font-mono font-bold text-sm text-on-surface whitespace-nowrap shrink-0">
                           #{challan.billNumber}
                         </span>
 
                         {/* GRN Tag */}
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 whitespace-nowrap shrink-0">
                           GRN
                         </span>
 
                         {/* Status Badges */}
                         {isCancelled ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/15 text-error">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/15 text-error whitespace-nowrap shrink-0">
                             Cancelled
                           </span>
                         ) : isConverted ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 flex items-center gap-1 whitespace-nowrap shrink-0">
                             <span className="material-symbols-outlined text-[12px]">check</span>
                             Billed #{challan.convertedToBillNumber || ''}
                           </span>

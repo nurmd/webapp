@@ -70,11 +70,11 @@ export const DashboardVoucherModal: React.FC<DashboardVoucherModalProps> = ({
               </span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-bold text-sm text-on-surface truncate">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <h3 className="font-bold text-sm text-on-surface truncate whitespace-nowrap shrink-0">
                   {voucher.voucherNumber}
                 </h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeColor}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeColor} whitespace-nowrap shrink-0`}>
                   {voucher.voucherType}
                 </span>
               </div>

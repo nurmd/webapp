@@ -668,21 +668,21 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
               </span>
             </div>
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+                <span className="font-headline-sm text-sm font-bold text-on-secondary-container truncate shrink-0">
                   Store Data Protected
                 </span>
                 <span
                   data-testid="sync-status-badge"
                   data-sync-state={derived.state}
-                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${derived.badgeColorClass}`}
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0 ${derived.badgeColorClass}`}
                 >
                   {derived.badgeLabel}
                 </span>
                 {derived.pendingChanges > 0 && (
                   <span
                     data-testid="sync-pending-badge"
-                    className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-200 text-[10px] font-bold"
+                    className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-200 text-[10px] font-bold whitespace-nowrap shrink-0"
                   >
                     {derived.pendingChanges} Pending
                   </span>
@@ -773,13 +773,13 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                   {activeDbName || 'vyapar_fintech_store'}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 {isRemoteDbActive && handleSwitchToOffline && (
                   <button
                     type="button"
                     data-testid="switch-to-offline-btn"
                     onClick={handleSwitchToOffline}
-                    className="px-2.5 py-1.5 rounded-lg bg-surface-container text-on-surface text-xs font-bold flex items-center gap-1 hover:bg-surface-container-high transition-colors cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-surface-container text-on-surface text-xs font-bold flex items-center gap-1 hover:bg-surface-container-high transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     title="Switch to offline primary database (vyapar_fintech_store). Saved remote link is preserved."
                   >
                     <span className="material-symbols-outlined text-[14px]">cloud_off</span>
@@ -791,7 +791,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                     type="button"
                     data-testid="reconnect-cloud-btn"
                     onClick={handleReconnectCloud}
-                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     title="Reconnect to cloud-synced database"
                   >
                     <span className="material-symbols-outlined text-[14px]">cloud_sync</span>
@@ -803,7 +803,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                     type="button"
                     data-testid="exit-demo-mode-btn"
                     onClick={handleExitDemoMode}
-                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-secondary text-on-secondary text-xs font-bold flex items-center gap-1 hover:bg-secondary/90 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                     title="Exit demo sandbox and return to your live business data"
                   >
                     <span className="material-symbols-outlined text-[14px]">exit_to_app</span>

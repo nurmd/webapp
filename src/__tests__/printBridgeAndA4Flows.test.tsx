@@ -27,16 +27,35 @@ import { printEWayBillSlip } from '../core/gst/eWayBillSlipPrinter.ts';
 import { printPartyLedgerStatement } from '../core/utils/ledgerStatementPrinter.ts';
 import { ThermalPrintModal } from '../components/Printing/ThermalPrintModal.tsx';
 import { SimplifiedInvoiceModal } from '../components/Invoicing/SimplifiedInvoiceModal.tsx';
+import {
+  preloadSimplifiedInvoiceModal,
+  preloadThermalPrintModal,
+  preloadInvoicePreviewModal,
+} from '../core/utils/modalPreload.ts';
 import { InvoicePreviewModal } from '../components/Invoicing/InvoicePreviewModal.tsx';
+import { PartyDetailModal } from '../components/Parties/PartyDetailModal.tsx';
 import { CashBankManagementView } from '../components/CashBank/CashBankManagementView.tsx';
 import { CompanyProfile } from '../models/company.ts';
 import { Expense } from '../models/expense.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { PurchaseBill } from '../models/purchase.ts';
 import { Invoice } from '../models/invoice.ts';
+import { Party } from '../models/party.ts';
 import { BankAccount, CashBankTransaction } from '../models/bankAccount.ts';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mockParty: Party = {
+  id: 'PARTY-1',
+  name: 'Tata Motors Limited',
+  type: 'CUSTOMER',
+  phone: '9876543210',
+  stateCode: '27',
+  billingAddress: 'Pune Industrial Area',
+  currentBalance: 3540,
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+};
 
 const mockCompany: CompanyProfile = {
   id: 'COMP-1',
@@ -392,6 +411,17 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       expect(mockGeneratePdf).toHaveBeenCalledWith('Invoice-101');
     });
 
+    it('calls AndroidBridge.generatePdf(jobName) as fallback when generatePdfFromCurrentPage is absent in generatePdfNative', () => {
+      const mockGeneratePdf = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdf: mockGeneratePdf,
+      };
+
+      const res = generatePdfNative('Invoice-102');
+      expect(res).toBe(true);
+      expect(mockGeneratePdf).toHaveBeenCalledWith('Invoice-102');
+    });
+
     it('catches AndroidBridge exceptions in generatePdfNative and returns false', () => {
       (window as any).AndroidBridge = {
         generatePdfFromCurrentPage: vi.fn(() => {
@@ -418,6 +448,17 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       expect(mockGeneratePdfFromHtml).toHaveBeenCalledWith('<html><body>Test</body></html>', 'Purchase-101', 'A4');
     });
 
+    it('calls AndroidBridge.generatePdfHtml(html, jobName, paperSize) as fallback when generatePdfFromHtml is absent in generatePdfFromHtmlNative', () => {
+      const mockGeneratePdfHtml = vi.fn();
+      (window as any).AndroidBridge = {
+        generatePdfHtml: mockGeneratePdfHtml,
+      };
+
+      const res = generatePdfFromHtmlNative('<html><body>Test</body></html>', 'Purchase-102', 'A4');
+      expect(res).toBe(true);
+      expect(mockGeneratePdfHtml).toHaveBeenCalledWith('<html><body>Test</body></html>', 'Purchase-102', 'A4');
+    });
+
     it('catches AndroidBridge exceptions in generatePdfFromHtmlNative and returns false', () => {
       (window as any).AndroidBridge = {
         generatePdfFromHtml: vi.fn(() => {
@@ -440,6 +481,40 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       printHtmlDocument('<html>Doc</html>', 'Voucher-V1', 'A4');
       expect(mockGeneratePdfFromHtml).toHaveBeenCalledWith('<html>Doc</html>', 'Voucher-V1', 'A4');
       expect(mockPrintHtml).not.toHaveBeenCalled();
+    });
+
+    it('printHtmlDocument browser popup fallback writes HTML and calls printWindow.print', () => {
+      vi.useFakeTimers();
+      const mockOpen = vi.fn();
+      const mockWrite = vi.fn();
+      const mockClose = vi.fn();
+      const mockFocus = vi.fn();
+      const mockPrint = vi.fn();
+
+      const mockPrintWindow = {
+        closed: false,
+        document: {
+          open: mockOpen,
+          write: mockWrite,
+          close: mockClose,
+        },
+        focus: mockFocus,
+        print: mockPrint,
+      };
+
+      vi.spyOn(window, 'open').mockReturnValue(mockPrintWindow as any);
+
+      printHtmlDocument('<html>PopupDoc</html>', 'Doc-Popup', 'A4');
+
+      expect(mockOpen).toHaveBeenCalled();
+      expect(mockWrite).toHaveBeenCalledWith('<html>PopupDoc</html>');
+      expect(mockClose).toHaveBeenCalled();
+
+      vi.advanceTimersByTime(350);
+
+      expect(mockFocus).toHaveBeenCalled();
+      expect(mockPrint).toHaveBeenCalled();
+      vi.useRealTimers();
     });
 
     it('printCurrentPage falls back to window.print when bridge is absent', () => {
@@ -653,6 +728,133 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       });
 
       expect(handleOpenA4).toHaveBeenCalledWith(mockInvoice);
+    });
+
+    it('SimplifiedInvoiceModal displays Print button and omits A4 / PDF when only onPrintInvoice is provided', () => {
+      const handlePrint = vi.fn();
+      act(() => {
+        root.render(
+          <SimplifiedInvoiceModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+            onPrintInvoice={handlePrint}
+          />
+        );
+      });
+
+      const a4Btn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('A4 / PDF')
+      );
+      expect(a4Btn).toBeUndefined();
+
+      const printBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('Print')
+      );
+      expect(printBtn).toBeDefined();
+
+      act(() => {
+        printBtn?.click();
+      });
+
+      expect(handlePrint).toHaveBeenCalledWith(mockInvoice);
+    });
+
+    it('InvoicePreviewModal switches between Mobile and A4 Sheet views via format selector', () => {
+      act(() => {
+        root.render(
+          <InvoicePreviewModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+            initialViewMode="A4"
+          />
+        );
+      });
+
+      const buttons = Array.from(container.querySelectorAll('button'));
+      const mobileBtn = buttons.find((b) => b.textContent?.includes('Mobile'));
+      const a4Btn = buttons.find((b) => b.textContent?.includes('A4 Sheet'));
+
+      expect(mobileBtn).toBeDefined();
+      expect(a4Btn).toBeDefined();
+
+      act(() => {
+        mobileBtn?.click();
+      });
+      expect(container.textContent).toContain('Mobile');
+
+      act(() => {
+        a4Btn?.click();
+      });
+      expect(container.textContent).toContain('A4 Sheet');
+    });
+
+    it('PartyDetailModal invoice preview renders Print button, omits redundant A4/PDF, and Print opens ThermalPrintModal with A4/PDF', async () => {
+      await preloadSimplifiedInvoiceModal();
+      await preloadThermalPrintModal();
+      await preloadInvoicePreviewModal();
+
+      await act(async () => {
+        root.render(
+          <PartyDetailModal
+            isOpen={true}
+            party={mockParty}
+            company={mockCompany}
+            invoices={[mockInvoice]}
+            purchases={[]}
+            vouchers={[]}
+            onEditParty={vi.fn()}
+            onRecordPayment={vi.fn()}
+          />
+        );
+      });
+
+      // 1. In passbook or transactions, click invoice row to open SimplifiedInvoiceModal
+      const saleRow = container.querySelector('[data-testid="passbook-entry-sale-INV-101"]') as HTMLElement;
+      expect(saleRow).not.toBeNull();
+
+      await act(async () => {
+        saleRow.click();
+      });
+      // Wait for lazy dynamic import to resolve
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // 2. SimplifiedInvoiceModal is open. Verify "A4 / PDF" is omitted and "Print" is present!
+      const modalButtons = Array.from(container.querySelectorAll('button'));
+      const a4BtnInSimplified = modalButtons.find((b) => b.textContent?.trim() === 'A4 / PDF');
+      expect(a4BtnInSimplified).toBeUndefined();
+
+      const printBtn = modalButtons.find((b) => b.textContent?.includes('Print'));
+      expect(printBtn).toBeDefined();
+
+      // 3. Click Print in SimplifiedInvoiceModal -> should open ThermalPrintModal
+      await act(async () => {
+        printBtn?.click();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // 4. In ThermalPrintModal, verify receipt preview and A4/PDF action button exist
+      const thermalButtons = Array.from(container.querySelectorAll('button'));
+      const a4BtnInThermal = thermalButtons.find((b) => b.textContent?.includes('A4 / PDF'));
+      expect(a4BtnInThermal).toBeDefined();
+
+      // 5. Click A4 / PDF in ThermalPrintModal -> opens InvoicePreviewModal in A4 mode
+      await act(async () => {
+        a4BtnInThermal?.click();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // 6. InvoicePreviewModal should be open in A4 Sheet mode with Print / PDF button
+      const previewButtons = Array.from(container.querySelectorAll('button'));
+      const printPdfBtn = previewButtons.find((b) => b.textContent?.includes('Print / PDF'));
+      expect(printPdfBtn).toBeDefined();
     });
 
     it('InvoicePreviewModal handlePrint prefers direct PDF path via generatePdfNative', () => {
