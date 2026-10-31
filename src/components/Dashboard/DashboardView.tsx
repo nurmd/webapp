@@ -921,7 +921,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </section>
 
-        {/* Right: Configurable Quick Action Buttons (max 9) */}
+        {/* Right: Configurable Quick Action Buttons (max 8) */}
         <section className="md:col-span-4 bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-3">
           <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
             <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
@@ -931,7 +931,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-outline font-semibold">Fast Shortcuts</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
             {quickActionDefinitions.map((action, index) => {
               const isPrimary = index === 0;
               return (

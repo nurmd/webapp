@@ -443,10 +443,10 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   2. Billing & Invoices (Prefixes, numbering, payment QR, default print format)
   3. Inventory & Items (Negative stock allow toggle, buy price visibility)
   4. Hardware & Printing (Thermal 58mm/80mm, margins, auto-cut)
-  5. App Preferences (Language, theme, app lock, OTA updates, Dashboard Quick Actions — choose 1–9 shortcuts)
+  5. App Preferences (Language, theme, app lock, OTA updates, Dashboard Quick Actions — choose 1–8 shortcuts)
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
-- Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 9, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` as compact cards (`h-[36px] sm:h-10`) in a 3-column responsive matrix using the same navigation/creation handlers as the legacy shortcuts.
+- Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 8, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` as compact cards (`h-[36px] sm:h-10`) in a 4-column responsive matrix using the same navigation/creation handlers as the legacy shortcuts.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:

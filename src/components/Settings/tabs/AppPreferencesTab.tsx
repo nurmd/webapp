@@ -181,7 +181,7 @@ export const AppPreferencesTab: React.FC<AppPreferencesTabProps> = ({
           </span>
         </div>
 
-        <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="p-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {Object.values(DASHBOARD_QUICK_ACTIONS).map((action) => {
             const selected = dashboardQuickActions.includes(action.id);
             const isLastSelected = selected && selectedCount === 1;

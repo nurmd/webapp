@@ -103,7 +103,7 @@ describe('Dashboard Quick Actions configuration', () => {
     container.remove();
   });
 
-  it('normalizes defaults, invalid IDs, duplicates, and the 9-item cap', () => {
+  it('normalizes defaults, invalid IDs, duplicates, and the 8-item cap', () => {
     expect(normalizeDashboardQuickActions(undefined)).toEqual(DEFAULT_DASHBOARD_QUICK_ACTIONS);
     expect(normalizeDashboardQuickActions([])).toEqual(DEFAULT_DASHBOARD_QUICK_ACTIONS);
     expect(normalizeDashboardQuickActions(['SALE_BILL', 'SALE_BILL', 'NOPE', 'PURCHASE'])).toEqual([
@@ -121,7 +121,6 @@ describe('Dashboard Quick Actions configuration', () => {
         'PAYMENT_IN',
         'PAYMENT_OUT',
         'CASH_BANK',
-        'REPORTS',
       ])
     ).toHaveLength(MAX_DASHBOARD_QUICK_ACTIONS);
   });
@@ -179,7 +178,7 @@ describe('Dashboard Quick Actions configuration', () => {
     expect(onNavigateTab).toHaveBeenCalledWith('reports');
   });
 
-  it('shows 9/9 and disables adding a 10th action in settings', () => {
+  it('shows 8/8 and disables adding a 9th action in settings', () => {
     const onToggle = vi.fn();
 
     act(() => {
@@ -202,7 +201,6 @@ describe('Dashboard Quick Actions configuration', () => {
             'EXPENSES',
             'PAYMENT_IN',
             'PAYMENT_OUT',
-            'CASH_BANK',
           ]}
           onToggleDashboardQuickAction={onToggle}
         />
@@ -210,7 +208,7 @@ describe('Dashboard Quick Actions configuration', () => {
     });
 
     expect(container.textContent).toContain('Dashboard Quick Actions');
-    expect(container.textContent).toContain('9/9');
+    expect(container.textContent).toContain('8/8');
 
     const reportsButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Reports')
