@@ -694,6 +694,20 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             <span className="text-[10px] text-on-surface-variant font-medium">Linked to:</span>
                             {linkedVoucher.paymentAllocations.map((alloc) => {
+                              const isOpeningBal = alloc.documentId.startsWith('OPENING-BALANCE-');
+                              if (isOpeningBal) {
+                                return (
+                                  <span
+                                    key={alloc.documentId}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-bold font-mono"
+                                  >
+                                    <span>Opening Balance</span>
+                                    <span className="font-sans font-medium text-[9px] text-on-surface-variant">
+                                      ({formatINR(alloc.amount)})
+                                    </span>
+                                  </span>
+                                );
+                              }
                               const inv = alloc.documentType === 'INVOICE' ? invoiceMap.get(alloc.documentId) : null;
                               const pur = alloc.documentType === 'PURCHASE' ? purchaseMap.get(alloc.documentId) : null;
                               return (

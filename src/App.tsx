@@ -1083,6 +1083,7 @@ export const App: React.FC = () => {
         documentType: isPaymentIn ? 'INVOICE' : 'PURCHASE',
         invoices: db.getInvoices(),
         purchases: db.getPurchases(),
+        parties: db.getParties(),
       });
       resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
       resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';

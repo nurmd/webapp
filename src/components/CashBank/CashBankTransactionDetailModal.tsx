@@ -618,23 +618,29 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                     <span>Linked Documents ({linkedVoucher.paymentAllocations.length})</span>
                   </div>
                   <div className="flex flex-col gap-1.5 divide-y divide-outline-variant/15 text-xs">
-                    {linkedVoucher.paymentAllocations.map((alloc) => (
+                    {linkedVoucher.paymentAllocations.map((alloc) => {
+                      const isOpeningBal = alloc.documentId.startsWith('OPENING-BALANCE-');
+                      return (
                       <div key={alloc.documentId} className="pt-1.5 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
                             className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              alloc.documentType === 'INVOICE'
+                              isOpeningBal
+                                ? 'bg-secondary/10 text-secondary'
+                                : alloc.documentType === 'INVOICE'
                                 ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300'
                                 : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
                             }`}
                           >
-                            {alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
+                            {isOpeningBal ? 'Opening' : alloc.documentType === 'INVOICE' ? 'Invoice' : 'Bill'}
                           </span>
-                          <span className="font-bold text-on-surface truncate">#{alloc.documentNumber}</span>
+                          <span className="font-bold text-on-surface truncate">
+                            {isOpeningBal ? alloc.documentNumber : `#${alloc.documentNumber}`}
+                          </span>
                           <span className="text-secondary font-bold">({formatINR(alloc.amount)})</span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {alloc.documentType === 'INVOICE' && onViewInvoice && (
+                          {!isOpeningBal && alloc.documentType === 'INVOICE' && onViewInvoice && (
                             <button
                               type="button"
                               onClick={() => {
@@ -651,7 +657,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                               <span>View</span>
                             </button>
                           )}
-                          {alloc.documentType === 'PURCHASE' && onViewPurchase && (
+                          {!isOpeningBal && alloc.documentType === 'PURCHASE' && onViewPurchase && (
                             <button
                               type="button"
                               onClick={() => {
@@ -687,7 +693,8 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 </div>
               )}

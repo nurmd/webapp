@@ -231,10 +231,10 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Payment vouchers record allocated documents via `paymentAllocations: PaymentAllocation[]`, detailing `documentType` (`INVOICE` | `PURCHASE`), `documentId`, `documentNumber`, and allocated `amount`.
   - `allocationMode` tracks whether allocations were `MANUAL`, `AUTO_FIFO`, `UNALLOCATED` (advance), or `SOURCE_DOCUMENT`.
   - Pure allocation engine (`paymentAllocation.ts`):
-    - `getOutstandingDocuments()` resolves pending invoices/bills with remaining balances, matching party IDs and names.
-    - `allocateOldestFirst()` automatically applies funds chronologically (FIFO).
-    - `validateAllocations()` strictly checks against over-allocation, party mismatch, negative amounts, wrong document types, and duplicate document links.
-    - `applyAllocations()` and `reverseAllocations()` accurately adjust `paidAmount`, `balanceAmount`, `paymentMode`, and `paymentStatus` while preserving payment split breakdown ratios and actual payment modes (`UPI`, `BANK`, `CASH`, `SPLIT`).
+    - `getOutstandingDocuments()` resolves pending invoices/bills with remaining balances, matching party IDs and names. When `parties` is provided, includes an opening-balance pseudo-document (`OPENING-BALANCE-${partyId}`) placed first in the list if the party has a non-zero opening balance matching the flow (`CUSTOMER` with `TO_RECEIVE` in `INVOICE` flow, `SUPPLIER` with `TO_PAY` in `PURCHASE` flow).
+    - `allocateOldestFirst()` automatically applies funds chronologically (FIFO), prioritizing the party's opening balance as oldest before subsequent documents.
+    - `validateAllocations()` strictly checks against over-allocation, party mismatch, negative amounts, wrong document types, and duplicate document links (supporting pseudo-doc allocations without requiring a real document).
+    - `applyAllocations()` and `reverseAllocations()` accurately adjust `paidAmount`, `balanceAmount`, `paymentMode`, and `paymentStatus` while preserving payment split breakdown ratios and actual payment modes (`UPI`, `BANK`, `CASH`, `SPLIT`), safely skipping opening-balance pseudo-documents.
 - **Persistent Transactions & Atomic Reversals (`db.savePaymentVoucher`, `db.reversePaymentVoucher`)**:
   - `db.savePaymentVoucher` pre-validates allocations on in-memory projections before state mutations, rejecting invalid allocations without touching existing records.
   - Editing a payment voucher seamlessly reverses previous allocations before applying new allocations, preventing double-counting.
@@ -443,10 +443,10 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   2. Billing & Invoices (Prefixes, numbering, payment QR, default print format)
   3. Inventory & Items (Negative stock allow toggle, buy price visibility)
   4. Hardware & Printing (Thermal 58mm/80mm, margins, auto-cut)
-  5. App Preferences (Language, theme, app lock, OTA updates, Dashboard Quick Actions — choose 1–6 shortcuts)
+  5. App Preferences (Language, theme, app lock, OTA updates, Dashboard Quick Actions — choose 1–9 shortcuts)
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
-- Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 6, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` using the same navigation/creation handlers as the legacy shortcuts.
+- Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 9, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` as compact cards (`h-[36px] sm:h-10`) in a 3-column responsive matrix using the same navigation/creation handlers as the legacy shortcuts.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:

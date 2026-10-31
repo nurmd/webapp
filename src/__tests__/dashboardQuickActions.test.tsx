@@ -103,7 +103,7 @@ describe('Dashboard Quick Actions configuration', () => {
     container.remove();
   });
 
-  it('normalizes defaults, invalid IDs, duplicates, and the 6-item cap', () => {
+  it('normalizes defaults, invalid IDs, duplicates, and the 9-item cap', () => {
     expect(normalizeDashboardQuickActions(undefined)).toEqual(DEFAULT_DASHBOARD_QUICK_ACTIONS);
     expect(normalizeDashboardQuickActions([])).toEqual(DEFAULT_DASHBOARD_QUICK_ACTIONS);
     expect(normalizeDashboardQuickActions(['SALE_BILL', 'SALE_BILL', 'NOPE', 'PURCHASE'])).toEqual([
@@ -118,6 +118,9 @@ describe('Dashboard Quick Actions configuration', () => {
         'ADD_PARTY',
         'ITEMS',
         'EXPENSES',
+        'PAYMENT_IN',
+        'PAYMENT_OUT',
+        'CASH_BANK',
         'REPORTS',
       ])
     ).toHaveLength(MAX_DASHBOARD_QUICK_ACTIONS);
@@ -176,7 +179,7 @@ describe('Dashboard Quick Actions configuration', () => {
     expect(onNavigateTab).toHaveBeenCalledWith('reports');
   });
 
-  it('shows 6/6 and disables adding a 7th action in settings', () => {
+  it('shows 9/9 and disables adding a 10th action in settings', () => {
     const onToggle = vi.fn();
 
     act(() => {
@@ -190,14 +193,24 @@ describe('Dashboard Quick Actions configuration', () => {
           updateStatusText={null}
           handleCheckForUpdates={vi.fn()}
           isUpdateChecking={false}
-          dashboardQuickActions={['SALE_BILL', 'QUICK_POS', 'PURCHASE', 'ADD_PARTY', 'ITEMS', 'EXPENSES']}
+          dashboardQuickActions={[
+            'SALE_BILL',
+            'QUICK_POS',
+            'PURCHASE',
+            'ADD_PARTY',
+            'ITEMS',
+            'EXPENSES',
+            'PAYMENT_IN',
+            'PAYMENT_OUT',
+            'CASH_BANK',
+          ]}
           onToggleDashboardQuickAction={onToggle}
         />
       );
     });
 
     expect(container.textContent).toContain('Dashboard Quick Actions');
-    expect(container.textContent).toContain('6/6');
+    expect(container.textContent).toContain('9/9');
 
     const reportsButton = Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Reports')

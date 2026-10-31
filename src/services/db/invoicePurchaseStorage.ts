@@ -713,6 +713,13 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         }
         sumAllocated = Number((sumAllocated + alloc.amount).toFixed(2));
 
+        if (alloc.documentId.startsWith('OPENING-BALANCE-')) {
+          if (voucher.partyId && alloc.documentId !== `OPENING-BALANCE-${voucher.partyId}`) {
+            throw new Error(`Opening balance allocation belongs to a different party.`);
+          }
+          continue;
+        }
+
         if (alloc.documentType === 'INVOICE') {
           const inv = inMemoryInvoices.find((i) => i.id === alloc.documentId);
           if (!inv) {
@@ -1052,6 +1059,9 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
     for (const v of linkedVouchers) {
       for (const alloc of v.paymentAllocations || []) {
+        if (alloc.documentId.startsWith('OPENING-BALANCE-')) {
+          continue;
+        }
         if (alloc.documentType === 'INVOICE' && alloc.documentId !== invoiceId) {
           const otherInv = invoices.find((i) => i.id === alloc.documentId);
           if (otherInv && otherInv.partyId !== newPartyId) {

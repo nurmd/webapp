@@ -5,12 +5,14 @@ interface BottomNavProps {
   activeTab: AppTab;
   onSelectTab: (tab: AppTab) => void;
   onNewInvoice: () => void;
+  restockCount?: number;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = React.memo(({
   activeTab,
   onSelectTab,
   onNewInvoice,
+  restockCount = 0,
 }) => {
   const leftTabs: Array<{ id: AppTab; label: string; icon: string }> = [
     { id: 'dashboard', label: 'Home', icon: 'home' },
@@ -24,10 +26,18 @@ export const BottomNav: React.FC<BottomNavProps> = React.memo(({
 
   const renderTab = (tab: { id: AppTab; label: string; icon: string }) => {
     const isActive = activeTab === tab.id;
+    const isInventoryTab = tab.id === 'inventory';
+    const hasRestockBadge = isInventoryTab && restockCount > 0;
+
     return (
       <button
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
+        aria-label={
+          hasRestockBadge
+            ? `${tab.label}, ${restockCount} item${restockCount > 1 ? 's need' : ' needs'} restocking`
+            : tab.label
+        }
         className={`group relative flex flex-col items-center justify-center flex-1 h-full py-1.5 px-1 transition-all duration-200 cursor-pointer select-none active:scale-90 ${
           isActive
             ? 'text-emerald-700 dark:text-emerald-400 font-bold'
@@ -50,6 +60,15 @@ export const BottomNav: React.FC<BottomNavProps> = React.memo(({
           >
             {tab.icon}
           </span>
+          {hasRestockBadge && (
+            <span
+              data-testid="bottom-nav-restock-badge"
+              aria-hidden="true"
+              className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center leading-none shadow-sm pointer-events-none"
+            >
+              {restockCount > 99 ? '99+' : restockCount}
+            </span>
+          )}
         </div>
         <span className="text-[10px] tracking-tight mt-0.5 leading-none">
           {tab.label}

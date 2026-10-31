@@ -46,10 +46,16 @@ export interface GetOutstandingDocumentsParams {
 export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): OutstandingDocument[] {
   const { partyId, partyName, documentType, invoices = [], purchases = [] } = params;
   let resolvedPartyName = partyName?.trim().toLowerCase();
-  if (!resolvedPartyName && partyId && params.parties) {
-    const p = params.parties.find((x) => x.id === partyId);
-    if (p) {
-      resolvedPartyName = p.name.trim().toLowerCase();
+  let matchedParty: Party | undefined;
+  if (params.parties) {
+    if (partyId) {
+      matchedParty = params.parties.find((x) => x.id === partyId);
+    }
+    if (!matchedParty && resolvedPartyName) {
+      matchedParty = params.parties.find((x) => x.name.trim().toLowerCase() === resolvedPartyName);
+    }
+    if (matchedParty && !resolvedPartyName) {
+      resolvedPartyName = matchedParty.name.trim().toLowerCase();
     }
   }
 
@@ -66,8 +72,60 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
 
   const round2 = (num: number) => Number(Math.round(num * 100) / 100);
 
+  let openingBalanceDoc: OutstandingDocument | undefined;
+  if (matchedParty) {
+    const isCustomer = matchedParty.type === 'CUSTOMER';
+    const isSupplier = matchedParty.type === 'SUPPLIER';
+    const rawOpBal = typeof matchedParty.openingBalance === 'number' ? matchedParty.openingBalance : 0;
+    const absOpBal = round2(Math.abs(rawOpBal));
+
+    let inferredType = matchedParty.openingBalanceType;
+    if (!inferredType && absOpBal > 0.01) {
+      if (rawOpBal > 0) {
+        inferredType = isCustomer ? 'TO_RECEIVE' : 'TO_PAY';
+      } else {
+        inferredType = isCustomer ? 'TO_PAY' : 'TO_RECEIVE';
+      }
+    }
+
+    const resolvedPId = partyId || matchedParty.id;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (documentType === 'INVOICE' && isCustomer && inferredType === 'TO_RECEIVE' && absOpBal > 0.01) {
+      openingBalanceDoc = {
+        id: `OPENING-BALANCE-${resolvedPId}`,
+        documentNumber: 'Opening Balance',
+        number: 'Opening Balance',
+        date: matchedParty.openingBalanceDate || today,
+        grandTotal: absOpBal,
+        paidAmount: 0,
+        balanceAmount: absOpBal,
+        documentType: 'INVOICE',
+        partyId: resolvedPId,
+        partyName: matchedParty.name,
+        rawInvoice: undefined,
+        rawPurchase: undefined,
+      };
+    } else if (documentType === 'PURCHASE' && isSupplier && inferredType === 'TO_PAY' && absOpBal > 0.01) {
+      openingBalanceDoc = {
+        id: `OPENING-BALANCE-${resolvedPId}`,
+        documentNumber: 'Opening Balance',
+        number: 'Opening Balance',
+        date: matchedParty.openingBalanceDate || today,
+        grandTotal: absOpBal,
+        paidAmount: 0,
+        balanceAmount: absOpBal,
+        documentType: 'PURCHASE',
+        partyId: resolvedPId,
+        partyName: matchedParty.name,
+        rawInvoice: undefined,
+        rawPurchase: undefined,
+      };
+    }
+  }
+
   if (documentType === 'INVOICE') {
-    return invoices
+    const invoiceDocs = invoices
       .filter((inv) => {
         if (inv.isCancelled) return false;
         if (
@@ -99,9 +157,11 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
           rawInvoice: inv,
         };
       });
+
+    return openingBalanceDoc ? [openingBalanceDoc, ...invoiceDocs] : invoiceDocs;
   }
 
-  return purchases
+  const purchaseDocs = purchases
     .filter((pur) => {
       if (pur.isCancelled) return false;
       if (
@@ -135,6 +195,8 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
         rawPurchase: pur,
       };
     });
+
+  return openingBalanceDoc ? [openingBalanceDoc, ...purchaseDocs] : purchaseDocs;
 }
 
 /**
@@ -147,8 +209,13 @@ export function allocateOldestFirst(
   let remaining = Number(Math.max(0, amount).toFixed(2));
   if (remaining <= 0.005) return [];
 
-  // Deterministic sort: date ascending, then createdAt, then id
+  // Deterministic sort: opening balance pseudo-documents first, then date ascending, then createdAt, then id
   const sorted = [...documents].sort((a, b) => {
+    const aIsOp = a.id.startsWith('OPENING-BALANCE-');
+    const bIsOp = b.id.startsWith('OPENING-BALANCE-');
+    if (aIsOp && !bIsOp) return -1;
+    if (!aIsOp && bIsOp) return 1;
+
     const dComp = (a.date || '').localeCompare(b.date || '');
     if (dComp !== 0) return dComp;
     const cComp = (a.createdAt || '').localeCompare(b.createdAt || '');
@@ -207,11 +274,15 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
   const normPartyName = partyName?.trim().toLowerCase();
 
   for (const alloc of allocations) {
+    const docLabel = alloc.documentId?.startsWith('OPENING-BALANCE-')
+      ? (alloc.documentNumber || 'Opening Balance')
+      : `#${alloc.documentNumber || alloc.documentId}`;
+
     // 1. Reject duplicate document IDs
     if (seenIds.has(alloc.documentId)) {
       return {
         valid: false,
-        error: `Duplicate document allocation detected for #${alloc.documentNumber || alloc.documentId}.`,
+        error: `Duplicate document allocation detected for ${docLabel}.`,
       };
     }
     seenIds.add(alloc.documentId);
@@ -220,7 +291,7 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     if (typeof alloc.amount !== 'number' || alloc.amount <= 0) {
       return {
         valid: false,
-        error: `Allocation amount for #${alloc.documentNumber || alloc.documentId} must be greater than zero.`,
+        error: `Allocation amount for ${docLabel} must be greater than zero.`,
       };
     }
 
@@ -231,7 +302,7 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     if (!doc) {
       return {
         valid: false,
-        error: `Document #${alloc.documentNumber || alloc.documentId} is not in the list of outstanding documents.`,
+        error: `Document ${docLabel} is not in the list of outstanding documents.`,
       };
     }
 
@@ -239,7 +310,7 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     if (doc.documentType !== alloc.documentType) {
       return {
         valid: false,
-        error: `Document type mismatch for #${alloc.documentNumber || alloc.documentId}: expected ${doc.documentType}, got ${alloc.documentType}.`,
+        error: `Document type mismatch for ${docLabel}: expected ${doc.documentType}, got ${alloc.documentType}.`,
       };
     }
 
@@ -247,13 +318,13 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     if (partyId && doc.partyId && doc.partyId !== partyId) {
       return {
         valid: false,
-        error: `Document #${alloc.documentNumber} belongs to a different party.`,
+        error: `Document ${docLabel} belongs to a different party.`,
       };
     }
     if (normPartyName && doc.partyName && doc.partyName.trim().toLowerCase() !== normPartyName) {
       return {
         valid: false,
-        error: `Document #${alloc.documentNumber} belongs to a different party (${doc.partyName}).`,
+        error: `Document ${docLabel} belongs to a different party (${doc.partyName}).`,
       };
     }
 
@@ -261,7 +332,7 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     if (alloc.amount > doc.balanceAmount + 0.01) {
       return {
         valid: false,
-        error: `Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${doc.balanceAmount.toFixed(2)} on #${alloc.documentNumber}.`,
+        error: `Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${doc.balanceAmount.toFixed(2)} on ${docLabel}.`,
       };
     }
   }
@@ -298,7 +369,14 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
 
   const allocMap = new Map<string, number>();
   for (const a of allocations) {
+    if (a.documentId?.startsWith('OPENING-BALANCE-')) {
+      continue;
+    }
     allocMap.set(a.documentId, Number(((allocMap.get(a.documentId) || 0) + a.amount).toFixed(2)));
+  }
+
+  if (allocMap.size === 0) {
+    return documents;
   }
 
   const effectiveAllocMode: PaymentMode = (options?.paymentMode || 'CASH') as PaymentMode;
@@ -428,7 +506,14 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
 
   const allocMap = new Map<string, number>();
   for (const a of allocations) {
+    if (a.documentId?.startsWith('OPENING-BALANCE-')) {
+      continue;
+    }
     allocMap.set(a.documentId, Number(((allocMap.get(a.documentId) || 0) + a.amount).toFixed(2)));
+  }
+
+  if (allocMap.size === 0) {
+    return documents;
   }
 
   return documents.map((doc) => {

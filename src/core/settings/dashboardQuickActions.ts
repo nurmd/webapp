@@ -99,7 +99,7 @@ export const DASHBOARD_QUICK_ACTIONS: Record<DashboardQuickActionId, DashboardQu
   },
 };
 
-export const MAX_DASHBOARD_QUICK_ACTIONS = 6;
+export const MAX_DASHBOARD_QUICK_ACTIONS = 9;
 
 export const DEFAULT_DASHBOARD_QUICK_ACTIONS: DashboardQuickActionId[] = [
   'SALE_BILL',

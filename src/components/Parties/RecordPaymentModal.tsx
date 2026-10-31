@@ -150,8 +150,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       documentType: paymentType === 'IN' ? 'INVOICE' : 'PURCHASE',
       invoices: invoices || db.getInvoices(),
       purchases: purchases || db.getPurchases(),
+      parties: allParties,
     });
-  }, [activeParty, paymentType, invoices, purchases]);
+  }, [activeParty, paymentType, invoices, purchases, allParties]);
 
   // Calculate settlement totals
   const numPayAmount = parseFloat(paymentAmount) || 0;
@@ -544,7 +545,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                       />
                       <div className="min-w-0 flex flex-col">
                         <span className="font-bold text-on-surface truncate text-[11px]">
-                          #{doc.documentNumber}
+                          {doc.id.startsWith('OPENING-BALANCE-') ? doc.documentNumber : `#${doc.documentNumber}`}
                         </span>
                         <span className="text-[10px] text-on-surface-variant">
                           {formatDate(doc.date)} • Bal: {formatINR(doc.balanceAmount)}

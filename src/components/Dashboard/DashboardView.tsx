@@ -28,7 +28,6 @@ import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils
 import { db } from '../../services/db.ts';
 import { getOverdueDays } from '../../core/accounting/aging.ts';
 import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
-import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import { useSettings } from '../../core/store/useDataStore.ts';
 import {
@@ -234,10 +233,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     () => computePartyDues(activeParties),
     [activeParties]
   );
-
-  const lowStockItems = useMemo(() => {
-    return getItemsNeedingRestock(activeItems);
-  }, [activeItems]);
 
   const bankAccounts = db.getBankAccounts() || [];
   const cashBankTransactions = db.getCashBankTransactions() || [];
@@ -778,26 +773,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 py-3 max-w-7xl mx-auto">
-      {/* 1. Restock Notice (visible when items are low or out of stock) */}
-      {lowStockItems.length > 0 && (
-        <div
-          onClick={() => onNavigateTab('inventory')}
-          className="bg-amber-500/10 border border-amber-500/25 rounded-2xl px-3.5 py-2.5 flex items-center justify-between cursor-pointer active:scale-98 transition-all text-xs"
-        >
-          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium min-w-0">
-            <span className="material-symbols-outlined text-[18px] text-amber-600 flex-shrink-0">warning</span>
-            <span className="truncate">
-              <strong>{lowStockItems.length} item{lowStockItems.length > 1 ? 's' : ''}</strong>{' '}
-              {lowStockItems.length === 1 ? 'needs restocking' : 'need restocking'}
-            </span>
-          </div>
-          <span className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-0.5 flex-shrink-0 ml-2">
-            <span>View Stock</span>
-            <span className="material-symbols-outlined text-[15px]">chevron_right</span>
-          </span>
-        </div>
-      )}
-
       {/* 2 & 3. Unified Financial Snapshot & Quick Actions (Responsive Tablet Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch">
         {/* Left: Financial Overview Card */}
@@ -946,7 +921,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </section>
 
-        {/* Right: Configurable Quick Action Buttons (max 6) */}
+        {/* Right: Configurable Quick Action Buttons (max 9) */}
         <section className="md:col-span-4 bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-3">
           <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
             <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
@@ -956,7 +931,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-outline font-semibold">Fast Shortcuts</span>
           </div>
 
-          <div className="grid grid-cols-3 md:grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {quickActionDefinitions.map((action, index) => {
               const isPrimary = index === 0;
               return (
@@ -965,17 +940,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   data-quick-action={action.id}
                   onClick={() => handleQuickAction(action.id)}
                   type="button"
-                  className={`flex flex-col items-center justify-center gap-1.5 h-[72px] sm:h-20 px-1 rounded-2xl active:scale-95 transition-all cursor-pointer ${
+                  aria-label={action.label}
+                  className={`flex flex-col items-center justify-center gap-0.5 h-[36px] sm:h-10 px-1 rounded-xl active:scale-95 transition-all cursor-pointer ${
                     isPrimary
                       ? 'bg-secondary text-on-secondary shadow-sm'
                       : 'bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs hover:border-secondary'
                   }`}
                   title={action.description}
                 >
-                  <span className={`material-symbols-outlined text-[22px] ${isPrimary ? '' : action.accentClass}`}>
+                  <span
+                    aria-hidden="true"
+                    className={`material-symbols-outlined text-[16px] leading-none ${isPrimary ? '' : action.accentClass}`}
+                  >
                     {action.icon}
                   </span>
-                  <span className="font-bold text-[11px] sm:text-xs truncate w-full text-center">{action.label}</span>
+                  <span className="font-bold text-[9px] sm:text-[10px] leading-tight truncate w-full text-center">
+                    {action.label}
+                  </span>
                 </button>
               );
             })}
