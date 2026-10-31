@@ -107,6 +107,7 @@ export interface Invoice {
   exportType?: 'WPAY' | 'WOPAY';              // Export with payment ('WPAY') or without payment ('WOPAY') of tax (Table 6A)
   shippingBillNumber?: string;                 // Shipping bill / Bill of export number (Table 6A)
   shippingBillDate?: string;                   // Shipping bill date (YYYY-MM-DD or DD-MM-YYYY) (Table 6A)
+  originalInvoiceId?: string;                  // Referenced invoice ID for Credit/Debit notes
   originalInvoiceNumber?: string;              // Referenced invoice number for Credit/Debit notes (Table 9B)
   originalInvoiceDate?: string;                // Referenced invoice date for Credit/Debit notes (Table 9B)
   noteType?: 'C' | 'D';                        // 'C' = Credit Note, 'D' = Debit Note (Table 9B)

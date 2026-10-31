@@ -94,6 +94,7 @@ export interface PurchaseBill {
   receivedDate?: string;                       // Date goods received at warehouse/store
   receivedBy?: string;                         // Person / staff receiving goods
   returnReason?: string;                       // Reason for Return / Debit Note (e.g. Defective Goods, Rate Difference)
+  originalBillId?: string;                     // Referenced purchase bill ID for Debit notes
   originalBillNumber?: string;                 // For Supplier Credit/Debit notes
   originalBillDate?: string;                   // For Supplier Credit/Debit notes
   noteType?: 'C' | 'D';                        // 'C' (Supplier Credit Note) | 'D' (Debit Note)

@@ -327,6 +327,15 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
   const isOverAllocated = totalAllocated > totalSettled + 0.01;
 
+  const isAnyDocOverAllocated = useMemo(() => {
+    return outstandingDocs.some((doc) => {
+      const val = allocationsMap[doc.id] || 0;
+      return val > doc.balanceAmount + 0.01;
+    });
+  }, [outstandingDocs, allocationsMap]);
+
+  const isSubmitDisabled = isOverAllocated || isAnyDocOverAllocated;
+
   useBackNavigation(() => {
     if (isEditing && isPayment) {
       populateForm();
@@ -415,11 +424,24 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   };
 
   const handleAllocationValueChange = (docId: string, valStr: string) => {
-    const val = parseFloat(valStr) || 0;
-    setAllocationsMap((prev) => ({
-      ...prev,
-      [docId]: val,
-    }));
+    const rawVal = parseFloat(valStr);
+    const targetDoc = outstandingDocs.find((d) => d.id === docId);
+    const maxDocBal = targetDoc ? targetDoc.balanceAmount : undefined;
+
+    let val = isNaN(rawVal) ? 0 : rawVal;
+    if (maxDocBal !== undefined && val > maxDocBal) {
+      val = maxDocBal;
+    }
+
+    setAllocationsMap((prev) => {
+      const next = { ...prev };
+      if (!valStr || val <= 0) {
+        delete next[docId];
+      } else {
+        next[docId] = Number(val.toFixed(2));
+      }
+      return next;
+    });
     setIsManualAllocation(true);
     setAllocationModeState('MANUAL');
   };
@@ -483,6 +505,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           if (numAmt > 0) {
             const doc = docMap.get(docId);
             if (doc) {
+              if (numAmt > doc.balanceAmount + 0.01) {
+                const docLabel = doc.id.startsWith('OPENING-BALANCE-') ? doc.documentNumber : `#${doc.documentNumber}`;
+                alert(`Allocation amount ₹${numAmt.toFixed(2)} exceeds available balance ₹${doc.balanceAmount.toFixed(2)} on ${docLabel}.`);
+                return;
+              }
               finalAllocations.push({
                 documentType: doc.documentType,
                 documentId: doc.id,
@@ -1554,9 +1581,15 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                                 <span className="font-bold text-on-surface truncate text-[11px]">
                                   {isOpeningBal ? (doc.documentNumber || 'Opening Balance') : `#${doc.documentNumber}`}
                                 </span>
-                                <span className="text-[10px] text-on-surface-variant">
-                                  {formatDate(doc.date)} • Bal: {formatINR(doc.balanceAmount)}
-                                </span>
+                                <div className="text-[10px] text-on-surface-variant flex flex-wrap items-center gap-x-1">
+                                  <span>{formatDate(doc.date)}</span>
+                                  <span>•</span>
+                                  <span>Bal: {formatINR(doc.balanceAmount)}</span>
+                                  <span>•</span>
+                                  <span className="font-semibold text-secondary">
+                                    Available (Remaining): {formatINR(Math.max(0, Number((doc.balanceAmount - allocVal).toFixed(2))))}
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
@@ -1600,6 +1633,12 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                   {isOverAllocated && (
                     <p className="text-[10px] font-bold text-error">
                       Allocated sum ({formatINR(totalAllocated)}) exceeds payment total ({formatINR(totalSettled)}). Please adjust amounts.
+                    </p>
+                  )}
+
+                  {isAnyDocOverAllocated && !isOverAllocated && (
+                    <p className="text-[10px] font-bold text-error">
+                      One or more allocations exceed the available document balance. Please adjust amounts.
                     </p>
                   )}
                 </div>
@@ -1677,7 +1716,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer hover:bg-secondary/90"
+                  disabled={isSubmitDisabled}
+                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer hover:bg-secondary/90 disabled:opacity-50"
                 >
                   Save
                 </button>

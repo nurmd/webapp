@@ -8,6 +8,7 @@ import { generatePdfNative } from '../../core/utils/printBridge.ts';
 import { PurchaseDocumentModal } from './PurchaseDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
 import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
+import { ReturnItemPickerModal } from '../Returns/ReturnItemPickerModal.tsx';
 
 export interface SimplifiedPurchaseModalProps {
   bill: PurchaseBill | null;
@@ -25,6 +26,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
   onDeletePurchase,
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+  const [isReturnPickerOpen, setIsReturnPickerOpen] = React.useState(false);
 
   if (!bill) return null;
 
@@ -120,6 +122,20 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         >
           <span className="material-symbols-outlined text-[16px]">delete</span>
           <span>Delete</span>
+        </button>
+      )}
+
+      {/* Return Items (Debit Note) */}
+      {!isReturn && !bill.isCancelled && (
+        <button
+          type="button"
+          data-testid="create-purchase-return-btn"
+          onClick={() => setIsReturnPickerOpen(true)}
+          className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          title="Return items from this bill (Debit Note)"
+        >
+          <span className="material-symbols-outlined text-[16px]">assignment_turned_in</span>
+          <span>Return Items</span>
         </button>
       )}
 
@@ -267,6 +283,20 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
             onClose();
           }}
           onClose={() => setIsDeleteModalOpen(false)}
+        />
+      )}
+      {/* Return Item Picker Modal */}
+      {isReturnPickerOpen && (
+        <ReturnItemPickerModal
+          isOpen={isReturnPickerOpen}
+          onClose={() => setIsReturnPickerOpen(false)}
+          sourceDocument={bill}
+          documentType="PURCHASE"
+          company={company}
+          onSuccess={() => {
+            setIsReturnPickerOpen(false);
+            onClose();
+          }}
         />
       )}
     </>

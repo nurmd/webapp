@@ -11,6 +11,8 @@ import {
 } from '../../core/utils/dateFilters.ts';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { BillSelectorModal } from './BillSelectorModal.tsx';
+import { ReturnItemPickerModal } from './ReturnItemPickerModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 
 export interface PurchaseReturnsViewProps {
@@ -42,7 +44,20 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
   const [customEnd, setCustomEnd] = useState<string>('');
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
+  // Bill-linked returns state
+  const [isBillSelectorOpen, setIsBillSelectorOpen] = useState(false);
+  const [selectedBillForReturn, setSelectedBillForReturn] = useState<PurchaseBill | null>(null);
+  const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
+
   useBackNavigation(() => {
+    if (isItemPickerOpen) {
+      setIsItemPickerOpen(false);
+      return true;
+    }
+    if (isBillSelectorOpen) {
+      setIsBillSelectorOpen(false);
+      return true;
+    }
     if (docToDelete) {
       setDocToDelete(null);
       return true;
@@ -52,14 +67,24 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
       return true;
     }
     return false;
-  }, isDateModalOpen || !!docToDelete, 20);
+  }, isDateModalOpen || !!docToDelete || isBillSelectorOpen || isItemPickerOpen, 20);
 
   // 1. Filter only Purchase Returns / Debit Notes
   const debitNotes = useMemo(() => {
     return purchases.filter((p) => p.purchaseType === 'RETURN' || p.noteType === 'D');
   }, [purchases]);
 
-  // 2. Date Filtering
+  // 2. Filter eligible source purchase bills
+  const eligibleBills = useMemo(() => {
+    return purchases.filter(
+      (bill) =>
+        !bill.isCancelled &&
+        (!bill.purchaseType || bill.purchaseType === 'BILL' || bill.purchaseType === 'CHALLAN') &&
+        bill.noteType !== 'D'
+    );
+  }, [purchases]);
+
+  // 3. Date Filtering
   const dateRange = useMemo(() => {
     return getDateFilterBounds(datePreset, customStart, customEnd);
   }, [datePreset, customStart, customEnd]);
@@ -76,7 +101,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
     return sum + (dn.items?.reduce((isum, itm) => isum + (itm.quantity || 0), 0) || 0);
   }, 0);
 
-  // 3. Search Filter
+  // 4. Search Filter
   const searchedNotes = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return dateFiltered;
@@ -90,7 +115,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
     });
   }, [dateFiltered, search]);
 
-  // 4. Sort
+  // 5. Sort
   const sortedNotes = useMemo(() => {
     return [...searchedNotes].sort((a, b) => {
       const tA = new Date(a.date).getTime() || 0;
@@ -100,6 +125,11 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
       return b.grandTotal - a.grandTotal;
     });
   }, [searchedNotes, sortBy]);
+
+  const handleSelectBill = (bill: PurchaseBill) => {
+    setSelectedBillForReturn(bill);
+    setIsItemPickerOpen(true);
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 pb-24">
@@ -117,12 +147,24 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Bill Selector Button */}
+          <button
+            type="button"
+            data-testid="select-bill-return-btn"
+            onClick={() => setIsBillSelectorOpen(true)}
+            className="h-10 px-3.5 sm:px-4 rounded-xl border border-secondary text-secondary bg-surface-container-lowest hover:bg-secondary/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm font-bold shadow-xs"
+            title="Select an original purchase bill to return items from"
+          >
+            <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Select Bill to Return</span>
+          </button>
+
           <button
             type="button"
             data-testid="new-purchase-return-btn"
             onClick={onNewPurchaseReturn}
-            className="h-10 px-4 rounded-xl bg-secondary text-on-secondary text-xs sm:text-sm font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ml-auto"
+            className="h-10 px-4 rounded-xl bg-secondary text-on-secondary text-xs sm:text-sm font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ml-auto sm:ml-0"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             <span>+ New Purchase Return</span>
@@ -163,7 +205,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter and Search */}
+      {/* Filter, Search, and Quick Bill Selector */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         <div className="relative flex-1 sm:max-w-md">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
@@ -178,14 +220,37 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsDateModalOpen(true)}
-          className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-end sm:self-auto"
-        >
-          <span className="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
-          <span>{datePreset === 'ALL_TIME' ? 'All Time' : datePreset.replace('_', ' ')}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Bill Selector Dropdown */}
+          <div className="relative">
+            <select
+              data-testid="bill-selector"
+              aria-label="Select Bill to Return"
+              value=""
+              onChange={(e) => {
+                const b = eligibleBills.find((x) => x.id === e.target.value);
+                if (b) handleSelectBill(b);
+              }}
+              className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-secondary/30 max-w-[240px] truncate cursor-pointer"
+            >
+              <option value="">-- Return from Purchase Bill --</option>
+              {eligibleBills.map((b) => (
+                <option key={b.id} value={b.id}>
+                  #{b.billNumber} - {b.supplierName || 'Vendor'} ({formatINR(b.grandTotal)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
+            <span>{datePreset === 'ALL_TIME' ? 'All Time' : datePreset.replace('_', ' ')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Debit Notes List */}
@@ -195,17 +260,29 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
             <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">assignment_turned_in</span>
             <h3 className="font-bold text-sm text-on-surface">No purchase return debit notes found</h3>
             <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
-              {search ? 'Try clearing your search query or date range.' : 'When returning defective goods or receiving credit from suppliers, issue a Debit Note to deduct stock and reduce vendor liability.'}
+              {search
+                ? 'Try clearing your search query or date range.'
+                : 'When returning defective goods or receiving credit from suppliers, issue a Debit Note to deduct stock and reduce vendor liability.'}
             </p>
             {!search && (
-              <button
-                type="button"
-                onClick={onNewPurchaseReturn}
-                className="mt-2 h-9 px-4 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-xs hover:bg-secondary/90 cursor-pointer inline-flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                <span>+ Create Purchase Return (DN)</span>
-              </button>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBillSelectorOpen(true)}
+                  className="h-9 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary/10 text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                  <span>Select Bill to Return</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onNewPurchaseReturn}
+                  className="h-9 px-4 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-xs hover:bg-secondary/90 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>+ Create Purchase Return (DN)</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -237,9 +314,28 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
                 </span>
 
                 {dn.originalBillNumber && (
-                  <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-low px-1.5 py-0.2 rounded whitespace-nowrap shrink-0">
-                    Against Purchase #{dn.originalBillNumber}
-                  </span>
+                  <button
+                    type="button"
+                    data-testid={`source-bill-link-${dn.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const orig = purchases.find(
+                        (p) =>
+                          (dn.originalBillId && p.id === dn.originalBillId) ||
+                          p.billNumber.toUpperCase() === dn.originalBillNumber?.toUpperCase()
+                      );
+                      if (orig && onViewPurchase) {
+                        onViewPurchase(orig);
+                      } else {
+                        showAppToast(`Original purchase bill #${dn.originalBillNumber} not found`);
+                      }
+                    }}
+                    className="text-[10px] font-semibold text-secondary hover:text-secondary-hover bg-surface-container-low hover:bg-secondary/10 px-1.5 py-0.2 rounded whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1 border border-outline-variant/30 transition-colors"
+                    title="Click to view original purchase bill"
+                  >
+                    <span className="material-symbols-outlined text-[11px]">receipt_long</span>
+                    <span>Against Purchase #{dn.originalBillNumber}</span>
+                  </button>
                 )}
 
                 {dn.returnReason && (
@@ -297,7 +393,17 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
       </div>
 
       {/* Floating Action Button */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsBillSelectorOpen(true)}
+          className="h-11 px-4 rounded-full bg-surface-container-lowest text-secondary border border-secondary font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer"
+          title="Return from Purchase Bill"
+        >
+          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+          <span>From Bill</span>
+        </button>
+
         <button
           type="button"
           onClick={onNewPurchaseReturn}
@@ -308,6 +414,31 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
           <span>+ Purchase Return</span>
         </button>
       </div>
+
+      {/* Bill Selector Modal */}
+      <BillSelectorModal
+        isOpen={isBillSelectorOpen}
+        onClose={() => setIsBillSelectorOpen(false)}
+        purchases={purchases}
+        onSelectBill={handleSelectBill}
+      />
+
+      {/* Return Item Picker Modal */}
+      <ReturnItemPickerModal
+        isOpen={isItemPickerOpen}
+        onClose={() => {
+          setIsItemPickerOpen(false);
+          setSelectedBillForReturn(null);
+        }}
+        sourceDocument={selectedBillForReturn}
+        documentType="PURCHASE"
+        company={company}
+        existingPurchases={purchases}
+        onSuccess={() => {
+          setIsItemPickerOpen(false);
+          setSelectedBillForReturn(null);
+        }}
+      />
 
       {/* Date Filter Modal */}
       <DateFilterModal
@@ -329,7 +460,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
         <ConfirmDeleteModal
           isOpen={!!docToDelete}
           title="Delete Debit Note?"
-          description={`Are you sure you want to delete Debit Note #${docToDelete.billNumber} for ${docToDelete.supplierName}? This action will remove the debit note record.`}
+          description={`Are you sure you want to delete Debit Note #${docToDelete.billNumber} for ${docToDelete.supplierName}? This action will reverse the purchase debit adjustment.`}
           confirmText="Delete Debit Note"
           confirmButtonClass="bg-error text-on-error hover:bg-error/90"
           onConfirm={() => {

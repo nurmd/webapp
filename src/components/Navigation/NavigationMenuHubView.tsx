@@ -305,24 +305,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       keywords: ['payment in', 'receipt', 'money in', 'collection', 'payment register', 'inflow', 'register', 'transactions'],
     },
     {
-      id: 'record_payment_in',
-      title: 'Record Payment In',
-      subtitle: 'Record customer payments, receipts & money-in ledger entries',
-      icon: 'add_circle',
-      category: 'sales',
-      badge: { text: 'Quick Action', type: 'primary' },
-      action: () => {
-        if (onOpenPaymentModal) {
-          onOpenPaymentModal('IN');
-        } else if (paymentModal.isAvailable) {
-          paymentModal.openPaymentModal({ flow: 'IN' });
-        } else {
-          onNavigate('payment_in');
-        }
-      },
-      keywords: ['record payment in', 'collect payment', 'receive money', 'receipt', 'quick action', 'customer payments'],
-    },
-    {
       id: 'sale_quotation',
       title: 'Quotation / Estimate',
       subtitle: 'Convert estimates & proforma bills directly into invoices',
@@ -397,24 +379,6 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
         : { text: 'Register', type: 'neutral' },
       action: () => onNavigate('payment_out'),
       keywords: ['payment out', 'payment', 'money out', 'disbursement', 'payout', 'vendor payment', 'payment register', 'outflow', 'register', 'transactions'],
-    },
-    {
-      id: 'record_payment_out',
-      title: 'Record Payment Out',
-      subtitle: 'Record supplier payments, expenses & money-out ledger entries',
-      icon: 'add_circle',
-      category: 'purchases',
-      badge: { text: 'Quick Action', type: 'primary' },
-      action: () => {
-        if (onOpenPaymentModal) {
-          onOpenPaymentModal('OUT');
-        } else if (paymentModal.isAvailable) {
-          paymentModal.openPaymentModal({ flow: 'OUT' });
-        } else {
-          onNavigate('payment_out');
-        }
-      },
-      keywords: ['record payment out', 'pay supplier', 'vendor disbursement', 'supplier payment', 'quick action', 'supplier payments'],
     },
     {
       id: 'purchase_orders',

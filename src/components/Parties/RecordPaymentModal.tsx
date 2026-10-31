@@ -141,18 +141,32 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     setIsManualAllocation(false);
   }, [paymentType, activeParty?.id]);
 
-  // Outstanding documents for selected party
+  // Outstanding documents for selected party with live DB fallback
+  const effectiveInvoices = useMemo(() => {
+    const fromDb = db.getInvoices();
+    if (!invoices || invoices.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((i) => [i.id, i]));
+    return invoices.map((i) => dbMap.get(i.id) || i);
+  }, [invoices]);
+
+  const effectivePurchases = useMemo(() => {
+    const fromDb = db.getPurchases();
+    if (!purchases || purchases.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((p) => [p.id, p]));
+    return purchases.map((p) => dbMap.get(p.id) || p);
+  }, [purchases]);
+
   const outstandingDocs: OutstandingDocument[] = useMemo(() => {
     if (!activeParty) return [];
     return getOutstandingDocuments({
       partyId: activeParty.id,
       partyName: activeParty.name,
       documentType: paymentType === 'IN' ? 'INVOICE' : 'PURCHASE',
-      invoices: invoices || db.getInvoices(),
-      purchases: purchases || db.getPurchases(),
+      invoices: effectiveInvoices,
+      purchases: effectivePurchases,
       parties: allParties,
     });
-  }, [activeParty, paymentType, invoices, purchases, allParties]);
+  }, [activeParty, paymentType, effectiveInvoices, effectivePurchases, allParties]);
 
   // Calculate settlement totals
   const numPayAmount = parseFloat(paymentAmount) || 0;
@@ -187,6 +201,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   }, [totalSettled, totalAllocated]);
 
   const isOverAllocated = totalAllocated > totalSettled + 0.01;
+
+  const isAnyDocOverAllocated = useMemo(() => {
+    return outstandingDocs.some((doc) => {
+      const val = allocationsMap[doc.id] || 0;
+      return val > doc.balanceAmount + 0.01;
+    });
+  }, [outstandingDocs, allocationsMap]);
+
+  const isSubmitDisabled = isOverAllocated || isAnyDocOverAllocated;
 
   if (!isOpen) return null;
 
@@ -248,11 +271,25 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   };
 
   const handleAllocationValueChange = (docId: string, valStr: string) => {
-    const val = parseFloat(valStr) || 0;
-    setAllocationsMap((prev) => ({
-      ...prev,
-      [docId]: val,
-    }));
+    const rawVal = parseFloat(valStr);
+    const targetDoc = outstandingDocs.find((d) => d.id === docId);
+    const maxDocBal = targetDoc ? targetDoc.balanceAmount : undefined;
+
+    // Requirement 3: Only allow linking up to the available balance for that invoice; clamp over-allocation
+    let val = isNaN(rawVal) ? 0 : rawVal;
+    if (maxDocBal !== undefined && val > maxDocBal) {
+      val = maxDocBal;
+    }
+
+    setAllocationsMap((prev) => {
+      const next = { ...prev };
+      if (!valStr || val <= 0) {
+        delete next[docId];
+      } else {
+        next[docId] = Number(val.toFixed(2));
+      }
+      return next;
+    });
     setIsManualAllocation(true);
   };
 
@@ -547,9 +584,15 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                         <span className="font-bold text-on-surface truncate text-[11px]">
                           {doc.id.startsWith('OPENING-BALANCE-') ? doc.documentNumber : `#${doc.documentNumber}`}
                         </span>
-                        <span className="text-[10px] text-on-surface-variant">
-                          {formatDate(doc.date)} • Bal: {formatINR(doc.balanceAmount)}
-                        </span>
+                        <div className="text-[10px] text-on-surface-variant flex flex-wrap items-center gap-x-1">
+                          <span>{formatDate(doc.date)}</span>
+                          <span>•</span>
+                          <span>Bal: {formatINR(doc.balanceAmount)}</span>
+                          <span>•</span>
+                          <span className="font-semibold text-secondary">
+                            Available (Remaining): {formatINR(Math.max(0, Number((doc.balanceAmount - allocVal).toFixed(2))))}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -595,6 +638,12 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               Allocated sum ({formatINR(totalAllocated)}) exceeds payment total ({formatINR(totalSettled)}). Please adjust amounts.
             </p>
           )}
+
+          {isAnyDocOverAllocated && !isOverAllocated && (
+            <p className="text-[10px] font-bold text-error">
+              One or more allocations exceed the available document balance. Please adjust amounts.
+            </p>
+          )}
         </div>
       )}
 
@@ -609,7 +658,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         />
         <button
           type="submit"
-          disabled={isOverAllocated}
+          disabled={isSubmitDisabled}
           className={`px-4 py-1.5 text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-50 ${
             paymentType === 'IN' ? 'bg-secondary' : 'bg-amber-600'
           }`}

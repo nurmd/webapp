@@ -12,6 +12,8 @@ import {
 } from '../../core/utils/dateFilters.ts';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { InvoiceSelectorModal } from './InvoiceSelectorModal.tsx';
+import { ReturnItemPickerModal } from './ReturnItemPickerModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 
 export interface SalesReturnsViewProps {
@@ -43,7 +45,20 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
   const [customEnd, setCustomEnd] = useState<string>('');
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
 
+  // Invoice-linked returns state
+  const [isInvoiceSelectorOpen, setIsInvoiceSelectorOpen] = useState(false);
+  const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<Invoice | null>(null);
+  const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
+
   useBackNavigation(() => {
+    if (isItemPickerOpen) {
+      setIsItemPickerOpen(false);
+      return true;
+    }
+    if (isInvoiceSelectorOpen) {
+      setIsInvoiceSelectorOpen(false);
+      return true;
+    }
     if (docToDelete) {
       setDocToDelete(null);
       return true;
@@ -53,14 +68,27 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
       return true;
     }
     return false;
-  }, isDateModalOpen || !!docToDelete, 20);
+  }, isDateModalOpen || !!docToDelete || isInvoiceSelectorOpen || isItemPickerOpen, 20);
 
   // 1. Filter only Credit Notes (Sale Returns)
   const creditNotes = useMemo(() => {
     return invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
   }, [invoices]);
 
-  // 2. Date Filtering
+  // 2. Filter eligible source sales invoices
+  const eligibleInvoices = useMemo(() => {
+    return invoices.filter(
+      (inv) =>
+        !inv.isCancelled &&
+        inv.invoiceType !== 'CREDIT_NOTE' &&
+        inv.invoiceType !== 'DEBIT_NOTE' &&
+        inv.invoiceType !== 'ESTIMATE' &&
+        inv.invoiceType !== 'SALES_ORDER' &&
+        inv.invoiceType !== 'DELIVERY_CHALLAN'
+    );
+  }, [invoices]);
+
+  // 3. Date Filtering
   const dateRange = useMemo(() => {
     return getDateFilterBounds(datePreset, customStart, customEnd);
   }, [datePreset, customStart, customEnd]);
@@ -77,7 +105,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
     return sum + (cn.items?.reduce((isum, itm) => isum + (itm.quantity || 0), 0) || 0);
   }, 0);
 
-  // 3. Search Filter
+  // 4. Search Filter
   const searchedNotes = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return dateFiltered;
@@ -91,7 +119,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
     });
   }, [dateFiltered, search]);
 
-  // 4. Sort
+  // 5. Sort
   const sortedNotes = useMemo(() => {
     return [...searchedNotes].sort((a, b) => {
       const tA = new Date(a.date).getTime() || 0;
@@ -101,6 +129,11 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
       return b.grandTotal - a.grandTotal;
     });
   }, [searchedNotes, sortBy]);
+
+  const handleSelectInvoice = (inv: Invoice) => {
+    setSelectedInvoiceForReturn(inv);
+    setIsItemPickerOpen(true);
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 pb-24">
@@ -118,12 +151,24 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Invoice Selector Button */}
+          <button
+            type="button"
+            data-testid="select-invoice-return-btn"
+            onClick={() => setIsInvoiceSelectorOpen(true)}
+            className="h-10 px-3.5 sm:px-4 rounded-xl border border-secondary text-secondary bg-surface-container-lowest hover:bg-secondary/10 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer text-xs sm:text-sm font-bold shadow-xs"
+            title="Select an original sales invoice to return items from"
+          >
+            <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Select Invoice to Return</span>
+          </button>
+
           <button
             type="button"
             data-testid="new-sales-return-btn"
             onClick={onNewSalesReturn}
-            className="h-10 px-4 rounded-xl bg-secondary text-on-secondary text-xs sm:text-sm font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ml-auto"
+            className="h-10 px-4 rounded-xl bg-secondary text-on-secondary text-xs sm:text-sm font-bold shadow-sm hover:bg-secondary/90 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer ml-auto sm:ml-0"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             <span>+ New Sale Return</span>
@@ -164,7 +209,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
         </div>
       </div>
 
-      {/* Filter and Search */}
+      {/* Filter, Search, and Quick Invoice Selector */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         <div className="relative flex-1 sm:max-w-md">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
@@ -179,14 +224,37 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsDateModalOpen(true)}
-          className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-end sm:self-auto"
-        >
-          <span className="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
-          <span>{datePreset === 'ALL_TIME' ? 'All Time' : datePreset.replace('_', ' ')}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Invoice Selector Dropdown */}
+          <div className="relative">
+            <select
+              data-testid="invoice-selector"
+              aria-label="Select Invoice to Return"
+              value=""
+              onChange={(e) => {
+                const inv = eligibleInvoices.find((i) => i.id === e.target.value);
+                if (inv) handleSelectInvoice(inv);
+              }}
+              className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-secondary/30 max-w-[240px] truncate cursor-pointer"
+            >
+              <option value="">-- Return from Invoice --</option>
+              {eligibleInvoices.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  #{inv.invoiceNumber} - {inv.partyName || 'Customer'} ({formatINR(inv.grandTotal)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDateModalOpen(true)}
+            className="h-9 px-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest hover:bg-surface-container-low text-on-surface text-xs font-semibold flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">calendar_today</span>
+            <span>{datePreset === 'ALL_TIME' ? 'All Time' : datePreset.replace('_', ' ')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Credit Notes List */}
@@ -196,17 +264,29 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
             <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">assignment_return</span>
             <h3 className="font-bold text-sm text-on-surface">No sales return credit notes found</h3>
             <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
-              {search ? 'Try clearing your search query or date range.' : 'When a customer returns goods or claims a discount, create a Credit Note to restore stock and adjust customer khata.'}
+              {search
+                ? 'Try clearing your search query or date range.'
+                : 'When a customer returns goods or claims a discount, create a Credit Note to restore stock and adjust customer khata.'}
             </p>
             {!search && (
-              <button
-                type="button"
-                onClick={onNewSalesReturn}
-                className="mt-2 h-9 px-4 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-xs hover:bg-secondary/90 cursor-pointer inline-flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">add</span>
-                <span>+ Create Sale Return (CN)</span>
-              </button>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceSelectorOpen(true)}
+                  className="h-9 px-4 rounded-xl border border-secondary text-secondary hover:bg-secondary/10 text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                  <span>Select Invoice to Return</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onNewSalesReturn}
+                  className="h-9 px-4 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-xs hover:bg-secondary/90 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  <span>+ Create Sale Return (CN)</span>
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -238,9 +318,28 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                 </span>
 
                 {cn.originalInvoiceNumber && (
-                  <span className="text-[10px] font-medium text-on-surface-variant bg-surface-container-low px-1.5 py-0.2 rounded whitespace-nowrap shrink-0">
-                    Against #{cn.originalInvoiceNumber}
-                  </span>
+                  <button
+                    type="button"
+                    data-testid={`source-invoice-link-${cn.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const orig = invoices.find(
+                        (i) =>
+                          (cn.originalInvoiceId && i.id === cn.originalInvoiceId) ||
+                          i.invoiceNumber.toUpperCase() === cn.originalInvoiceNumber?.toUpperCase()
+                      );
+                      if (orig) {
+                        onViewInvoice(orig);
+                      } else {
+                        showAppToast(`Original invoice #${cn.originalInvoiceNumber} not found`);
+                      }
+                    }}
+                    className="text-[10px] font-semibold text-secondary hover:text-secondary-hover bg-surface-container-low hover:bg-secondary/10 px-1.5 py-0.2 rounded whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1 border border-outline-variant/30 transition-colors"
+                    title="Click to view original invoice"
+                  >
+                    <span className="material-symbols-outlined text-[11px]">receipt_long</span>
+                    <span>Against #{cn.originalInvoiceNumber}</span>
+                  </button>
                 )}
 
                 {cn.returnReason && (
@@ -311,7 +410,17 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
       </div>
 
       {/* Floating Action Button */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setIsInvoiceSelectorOpen(true)}
+          className="h-11 px-4 rounded-full bg-surface-container-lowest text-secondary border border-secondary font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer"
+          title="Return from Invoice"
+        >
+          <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+          <span>From Invoice</span>
+        </button>
+
         <button
           type="button"
           onClick={onNewSalesReturn}
@@ -322,6 +431,31 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
           <span>+ Sale Return</span>
         </button>
       </div>
+
+      {/* Invoice Selector Modal */}
+      <InvoiceSelectorModal
+        isOpen={isInvoiceSelectorOpen}
+        onClose={() => setIsInvoiceSelectorOpen(false)}
+        invoices={invoices}
+        onSelectInvoice={handleSelectInvoice}
+      />
+
+      {/* Return Item Picker Modal */}
+      <ReturnItemPickerModal
+        isOpen={isItemPickerOpen}
+        onClose={() => {
+          setIsItemPickerOpen(false);
+          setSelectedInvoiceForReturn(null);
+        }}
+        sourceDocument={selectedInvoiceForReturn}
+        documentType="SALES"
+        company={company}
+        existingInvoices={invoices}
+        onSuccess={() => {
+          setIsItemPickerOpen(false);
+          setSelectedInvoiceForReturn(null);
+        }}
+      />
 
       {/* Date Filter Modal */}
       <DateFilterModal

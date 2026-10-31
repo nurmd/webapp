@@ -393,7 +393,7 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       expect(onNavigate).toHaveBeenCalledWith('payment_out');
     });
 
-    it('NavigationMenuHubView Record Payment In and Out quick action items directly trigger payment modal', async () => {
+    it('NavigationMenuHubView omits redundant Record Payment In/Out shortcuts and retains Payment In/Out registers', async () => {
       const onNavigate = vi.fn();
       const onOpenPaymentModal = vi.fn();
       await act(async () => {
@@ -412,27 +412,20 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
         );
       });
 
+      // Redundant Record Payment shortcuts must not exist in navigation
       const quickPaymentInBtn = Array.from(container.querySelectorAll('button')).find(
         (b) => b.textContent?.includes('Record Payment In')
       );
-      expect(quickPaymentInBtn).toBeDefined();
-
-      await act(async () => {
-        quickPaymentInBtn?.click();
-      });
-      expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
-      expect(onNavigate).not.toHaveBeenCalled();
+      expect(quickPaymentInBtn).toBeUndefined();
 
       const quickPaymentOutBtn = Array.from(container.querySelectorAll('button')).find(
         (b) => b.textContent?.includes('Record Payment Out')
       );
-      expect(quickPaymentOutBtn).toBeDefined();
+      expect(quickPaymentOutBtn).toBeUndefined();
 
-      await act(async () => {
-        quickPaymentOutBtn?.click();
-      });
-      expect(onOpenPaymentModal).toHaveBeenCalledWith('OUT');
-      expect(onNavigate).not.toHaveBeenCalled();
+      // Dedicated transaction registers must be present
+      expect(container.textContent).toContain('Payment In');
+      expect(container.textContent).toContain('Payment Out');
     });
   });
 

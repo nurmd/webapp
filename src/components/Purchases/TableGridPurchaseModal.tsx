@@ -174,6 +174,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   const [isRcm, setIsRcm] = useState<boolean>(() => Boolean(initialBill?.isRcm ?? initialDraft?.isRcm));
 
   // Return / Reference states for Debit Notes
+  const [originalBillId, setOriginalBillId] = useState<string>(
+    () => initialBill?.originalBillId || (initialDraft as any)?.originalBillId || ''
+  );
   const [originalBillNumber, setOriginalBillNumber] = useState<string>(
     () => initialBill?.originalBillNumber || initialDraft?.originalBillNumber || ''
   );
@@ -697,6 +700,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       ewayBillNumber: effectivePurchaseType === 'CHALLAN' ? (ewayBillNumber || undefined) : undefined,
       receivedDate: effectivePurchaseType === 'CHALLAN' ? (receivedDate || billDate) : undefined,
       noteType: effectivePurchaseType === 'RETURN' ? 'D' : undefined,
+      originalBillId: effectivePurchaseType === 'RETURN' ? (originalBillId || undefined) : undefined,
       originalBillNumber: effectivePurchaseType === 'RETURN' ? (originalBillNumber.trim() || undefined) : undefined,
       originalBillDate: effectivePurchaseType === 'RETURN' ? (originalBillDate || undefined) : undefined,
       returnReason: effectivePurchaseType === 'RETURN' ? returnReason : undefined,

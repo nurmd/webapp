@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { BankAccount } from '../../models/bankAccount.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
@@ -17,6 +17,9 @@ import { PartyOrdersTable } from './PartyOrdersTable.tsx';
 import { PartyWhatsAppReminder } from './PartyWhatsAppReminder.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
+import { createPaymentReceiptVoucher, createPaymentOutVoucher } from '../../core/accounting/ledger.ts';
+import { getDocumentSeriesConfig, formatDocumentNumberPreview } from '../../core/utils/invoiceNumber.ts';
+import { getOutstandingDocuments, allocateOldestFirst } from '../../core/accounting/paymentAllocation.ts';
 import {
   useModalPreloadOnMount,
   preloadVoucherEditorModal,
@@ -65,7 +68,10 @@ export interface PartyDetailModalProps {
     paymentType?: 'IN' | 'OUT',
     paymentSplits?: PaymentSplit[],
     discount?: number,
-    bankAccountId?: string
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
   ) => boolean | void;
   onViewInvoice?: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -170,6 +176,40 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
     setActiveTab('TRANSACTIONS');
   }, [party.id]);
 
+  // Subscribe to central database notifications to keep passbook, balances, and allocations live
+  const [dbTick, setDbTick] = useState(0);
+  useEffect(() => {
+    return db.subscribe(() => {
+      setDbTick((t) => t + 1);
+    });
+  }, []);
+
+  const effectiveParty = useMemo(() => {
+    const fromDb = db.getParties().find((p) => p.id === party.id);
+    return fromDb || party;
+  }, [party, dbTick]);
+
+  const effectiveInvoices = useMemo(() => {
+    const fromDb = db.getInvoices();
+    if (!invoices || invoices.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((i) => [i.id, i]));
+    return invoices.map((i) => dbMap.get(i.id) || i);
+  }, [invoices, dbTick]);
+
+  const effectivePurchases = useMemo(() => {
+    const fromDb = db.getPurchases();
+    if (!purchases || purchases.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((p) => [p.id, p]));
+    return purchases.map((p) => dbMap.get(p.id) || p);
+  }, [purchases, dbTick]);
+
+  const effectiveVouchers = useMemo(() => {
+    const fromDb = db.getVouchers();
+    if (!vouchers || vouchers.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((v) => [v.id, v]));
+    return vouchers.map((v) => dbMap.get(v.id) || v);
+  }, [vouchers, dbTick]);
+
   const {
     isCustomer,
     partyOrders,
@@ -190,12 +230,126 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
     filteredPassbook,
     handlePrintStatement,
   } = usePartyPassbook({
-    party,
+    party: effectiveParty,
     company,
-    invoices,
-    purchases,
-    vouchers,
+    invoices: effectiveInvoices,
+    purchases: effectivePurchases,
+    vouchers: effectiveVouchers,
   });
+
+  const handleInternalRecordPayment = useCallback((
+    targetParty: Party,
+    amount: number,
+    paymentMode: string,
+    notes: string,
+    paymentType?: 'IN' | 'OUT',
+    paymentSplits?: PaymentSplit[],
+    discount?: number,
+    bankAccountId?: string,
+    allocations?: PaymentAllocation[],
+    allocationMode?: 'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT',
+    paymentDate?: string
+  ) => {
+    if (onRecordPayment) {
+      const res = onRecordPayment(
+        targetParty,
+        amount,
+        paymentMode,
+        notes,
+        paymentType,
+        paymentSplits,
+        discount,
+        bankAccountId,
+        allocations,
+        allocationMode,
+        paymentDate
+      );
+      if (res !== false) {
+        onRefresh?.();
+        return true;
+      }
+      return false;
+    }
+
+    try {
+      const isPaymentIn = paymentType ? paymentType === 'IN' : targetParty.type === 'CUSTOMER';
+      const disc = Number((discount || 0).toFixed(2));
+      const totalSettled = Number((amount + disc).toFixed(2));
+      const dateStr = paymentDate || new Date().toISOString().split('T')[0];
+      const docId = Date.now().toString().slice(-6);
+      const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
+
+      const receiptConfig = getDocumentSeriesConfig(company, 'PAYMENT_RECEIPT');
+      const paymentConfig = getDocumentSeriesConfig(company, 'PAYMENT_VOUCHER');
+      const voucherDate = new Date(dateStr);
+      const receiptNumber = formatDocumentNumberPreview(receiptConfig, parseInt(docId, 10) || 1, voucherDate);
+      const paymentNumber = formatDocumentNumberPreview(paymentConfig, parseInt(docId, 10) || 1, voucherDate);
+
+      let resolvedAllocations = allocations;
+      let resolvedMode = allocationMode;
+
+      if (resolvedAllocations === undefined && resolvedMode === undefined) {
+        const outstanding = getOutstandingDocuments({
+          partyId: targetParty.id,
+          partyName: targetParty.name,
+          documentType: isPaymentIn ? 'INVOICE' : 'PURCHASE',
+          invoices: effectiveInvoices,
+          purchases: effectivePurchases,
+          parties: db.getParties(),
+        });
+        resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
+        resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';
+      } else if (resolvedMode === 'UNALLOCATED' || (!resolvedAllocations || resolvedAllocations.length === 0)) {
+        resolvedAllocations = [];
+        resolvedMode = 'UNALLOCATED';
+      }
+
+      if (isPaymentIn) {
+        const voucher = createPaymentReceiptVoucher({
+          receiptNumber,
+          date: dateStr,
+          customerName: targetParty.name,
+          customerId: targetParty.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment received from ${targetParty.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+        voucher.partyId = targetParty.id;
+        voucher.partyName = targetParty.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+        db.savePaymentVoucher(voucher);
+      } else {
+        const voucher = createPaymentOutVoucher({
+          voucherNumber: paymentNumber,
+          date: dateStr,
+          supplierName: targetParty.name,
+          supplierId: targetParty.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment disbursed to ${targetParty.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+        voucher.partyId = targetParty.id;
+        voucher.partyName = targetParty.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+        db.savePaymentVoucher(voucher);
+      }
+      onRefresh?.();
+      return true;
+    } catch (err: any) {
+      console.error('Cannot save payment voucher:', err);
+      return false;
+    }
+  }, [onRecordPayment, company, effectiveInvoices, effectivePurchases, onRefresh]);
 
   // Priority 20: Dismiss expanded party detail card before leaving page/modal
   useBackNavigation(() => {
@@ -210,7 +364,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   }, isOpen, 15);
 
   const handleDelete = () => {
-    if (isSystemParty(party)) return;
+    if (isSystemParty(effectiveParty)) return;
     setIsDeletePartyConfirmOpen(true);
   };
 
@@ -262,17 +416,17 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
 
   const handleRecordPaymentClick = useCallback(() => {
     if (onOpenPaymentModal) {
-      onOpenPaymentModal(isCustomer ? 'IN' : 'OUT', party);
+      onOpenPaymentModal(isCustomer ? 'IN' : 'OUT', effectiveParty);
     } else if (paymentModal.isAvailable) {
       paymentModal.openPaymentModal({
         flow: isCustomer ? 'IN' : 'OUT',
-        party,
+        party: effectiveParty,
         onSuccess: onRefresh,
       });
     } else {
       setIsPaymentOpen((prev) => !prev);
     }
-  }, [onOpenPaymentModal, isCustomer, party, paymentModal, onRefresh]);
+  }, [onOpenPaymentModal, isCustomer, effectiveParty, paymentModal, onRefresh]);
 
   if (!isOpen) return null;
 
@@ -469,7 +623,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
         {/* Full Expanded Card on Mobile */}
         <div className="md:hidden">
           <PartyInfoCard
-            party={party}
+            party={effectiveParty}
             company={company}
             liveNetBalance={liveNetBalance}
             isReceivable={isReceivable}
@@ -490,7 +644,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             {/* Desktop / Tablet Full Party Info Card */}
             <div className="hidden md:block">
               <PartyInfoCard
-                party={party}
+                party={effectiveParty}
                 company={company}
                 liveNetBalance={liveNetBalance}
                 isReceivable={isReceivable}
@@ -527,7 +681,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 onCreateInvoice && (
                   <button
                     type="button"
-                    onClick={() => onCreateInvoice(party)}
+                    onClick={() => onCreateInvoice(effectiveParty)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
                     title="Create new sales invoice for this customer"
                   >
@@ -539,7 +693,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 onCreatePurchase ? (
                   <button
                     type="button"
-                    onClick={() => onCreatePurchase(party)}
+                    onClick={() => onCreatePurchase(effectiveParty)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
                     title="Create new purchase bill from this supplier"
                   >
@@ -549,7 +703,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 ) : onCreateInvoice && (
                   <button
                     type="button"
-                    onClick={() => onCreateInvoice(party)}
+                    onClick={() => onCreateInvoice(effectiveParty)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
                     title="Create new sales invoice"
                   >
@@ -575,13 +729,13 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             <RecordPaymentModal
               isOpen={isPaymentOpen}
               onClose={() => setIsPaymentOpen(false)}
-              party={party}
+              party={effectiveParty}
               liveNetBalance={liveNetBalance}
               isCustomer={isCustomer}
               bankAccounts={bankAccounts}
-              invoices={invoices}
-              purchases={purchases}
-              onRecordPayment={onRecordPayment}
+              invoices={effectiveInvoices}
+              purchases={effectivePurchases}
+              onRecordPayment={handleInternalRecordPayment}
               onRefresh={onRefresh}
             />
           </div>

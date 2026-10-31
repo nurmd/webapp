@@ -10,6 +10,7 @@ import { db } from '../../services/db.ts';
 import { InvoiceDocumentModal } from './InvoiceDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
 import { DocumentTaxSummary } from '../Common/Billing/DocumentTaxSummary.tsx';
+import { ReturnItemPickerModal } from '../Returns/ReturnItemPickerModal.tsx';
 
 export interface SimplifiedInvoiceModalProps {
   invoice: Invoice | null;
@@ -33,6 +34,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [showEwayThresholdWarning, setShowEwayThresholdWarning] = React.useState(false);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = React.useState(false);
+  const [isReturnPickerOpen, setIsReturnPickerOpen] = React.useState(false);
 
   const party = React.useMemo(() => {
     if (!invoice || (!invoice.partyName && !invoice.partyId)) return null;
@@ -143,6 +145,20 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         <span className="material-symbols-outlined text-[16px]">send</span>
         <span>WhatsApp</span>
       </button>
+
+      {/* Return Items (Credit Note) */}
+      {invoice.invoiceType !== 'CREDIT_NOTE' && !invoice.isCancelled && (
+        <button
+          type="button"
+          data-testid="create-sales-return-btn"
+          onClick={() => setIsReturnPickerOpen(true)}
+          className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          title="Return items from this invoice"
+        >
+          <span className="material-symbols-outlined text-[16px]">assignment_return</span>
+          <span>Return Items</span>
+        </button>
+      )}
 
       {/* Edit Invoice Button */}
       {onEditInvoice && (
@@ -335,6 +351,20 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           initialPhone={invoice.partyPhone || party?.phone}
           initialBalance={invoice.balanceAmount}
           initialTemplate="INVOICE_DELIVERY"
+        />
+      )}
+      {/* Return Item Picker Modal */}
+      {isReturnPickerOpen && (
+        <ReturnItemPickerModal
+          isOpen={isReturnPickerOpen}
+          onClose={() => setIsReturnPickerOpen(false)}
+          sourceDocument={invoice}
+          documentType="SALES"
+          company={company}
+          onSuccess={() => {
+            setIsReturnPickerOpen(false);
+            onClose();
+          }}
         />
       )}
     </>

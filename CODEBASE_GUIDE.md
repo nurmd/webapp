@@ -132,6 +132,19 @@ gst-billing-app/
 - PBKDF2/SHA-256 salting for 4-digit staff PINs.
 - Roles: `OWNER` (full access), `CASHIER` (sales POS, view items), `ACCOUNTANT` / `CA` (ledgers, reports, audit logs).
 
+### F. Invoice-Linked Returns Engine (`src/core/returns/returnEngine.ts`, `src/components/Returns/`)
+- **Document Linking**: Sales Returns (`CREDIT_NOTE`, Table 9B) link directly to source sales invoices (`originalInvoiceId`, `originalInvoiceNumber`, `originalInvoiceDate`, `noteType: 'C'`). Purchase Returns (`RETURN`, Debit Notes) link directly to source purchase bills (`originalBillId`, `originalBillNumber`, `originalBillDate`, `noteType: 'D'`).
+- **Item-Level Return Tracking**: Computes available return quantities per line item across multiple prior returns against the same source invoice/bill. Returned quantities are strictly clamped to available quantities (`0 <= returnQty <= availableQty`).
+- **Settlement & Value Reversal**: Updates the source document's `balanceAmount`, `paidAmount`, and `paymentStatus`:
+  - Reduces outstanding `balanceAmount` first.
+  - Excess return amounts (or returns on already-paid documents) reduce `paidAmount` to accurately reverse returned payments.
+  - Automatically updates `paymentStatus` (`PAID` if balance is 0, `PARTIAL` if partially paid, `UNPAID` otherwise) using `skipSettlementDerivation` to preserve reverse adjustments.
+- **Centralized Stock Engine Integration**: Saving a sales return Credit Note restores inventory stock (`restoreInvoiceStock`), and saving a purchase return Debit Note decrements inventory stock (`applyPurchaseStockDecrement`).
+- **UI & Modal Flow**:
+  - `SalesReturnsView` and `PurchaseReturnsView` provide dedicated invoice/bill selectors (`select-invoice-return-btn`, `select-bill-return-btn`, and inline `<select>` pickers).
+  - Selecting an invoice or bill opens `ReturnItemPickerModal` displaying line items, quantities, rates, return reasons, and live GST calculations.
+  - Returns can also be initiated directly from document previews via `SimplifiedInvoiceModal` and `SimplifiedPurchaseModal`.
+
 ---
 
 ## 4. Data Persistence & Synchronization (`src/services/`)

@@ -17,6 +17,9 @@ import { getStateList } from '../../core/gst/stateCodes.ts';
 import { isValidGstin, extractStateCodeFromGstin, extractPanFromGstin } from '../../core/gst/gstinUtils.ts';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
+import { createPaymentReceiptVoucher, createPaymentOutVoucher } from '../../core/accounting/ledger.ts';
+import { getDocumentSeriesConfig, formatDocumentNumberPreview } from '../../core/utils/invoiceNumber.ts';
+import { getOutstandingDocuments, allocateOldestFirst } from '../../core/accounting/paymentAllocation.ts';
 
 interface PartiesViewProps {
   parties: Party[];
@@ -345,8 +348,84 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   ) => {
     if (onRecordPartyPayment) {
       return onRecordPartyPayment(party, amount, paymentMode, notes, paymentType, paymentSplits, discount, bankAccountId, allocations, allocationMode, paymentDate);
-    } else {
-      console.warn('Cannot record payment: central onRecordPartyPayment handler is not available.');
+    }
+
+    try {
+      const isPaymentIn = paymentType ? paymentType === 'IN' : party.type === 'CUSTOMER';
+      const disc = Number((discount || 0).toFixed(2));
+      const totalSettled = Number((amount + disc).toFixed(2));
+      const dateStr = paymentDate || new Date().toISOString().split('T')[0];
+      const docId = Date.now().toString().slice(-6);
+      const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
+
+      const receiptConfig = getDocumentSeriesConfig(company, 'PAYMENT_RECEIPT');
+      const paymentConfig = getDocumentSeriesConfig(company, 'PAYMENT_VOUCHER');
+      const voucherDate = new Date(dateStr);
+      const receiptNumber = formatDocumentNumberPreview(receiptConfig, parseInt(docId, 10) || 1, voucherDate);
+      const paymentNumber = formatDocumentNumberPreview(paymentConfig, parseInt(docId, 10) || 1, voucherDate);
+
+      let resolvedAllocations = allocations;
+      let resolvedMode = allocationMode;
+
+      if (resolvedAllocations === undefined && resolvedMode === undefined) {
+        const outstanding = getOutstandingDocuments({
+          partyId: party.id,
+          partyName: party.name,
+          documentType: isPaymentIn ? 'INVOICE' : 'PURCHASE',
+          invoices: invoices && invoices.length > 0 ? invoices : db.getInvoices(),
+          purchases: purchases && purchases.length > 0 ? purchases : db.getPurchases(),
+          parties: db.getParties(),
+        });
+        resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
+        resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';
+      } else if (resolvedMode === 'UNALLOCATED' || (!resolvedAllocations || resolvedAllocations.length === 0)) {
+        resolvedAllocations = [];
+        resolvedMode = 'UNALLOCATED';
+      }
+
+      if (isPaymentIn) {
+        const voucher = createPaymentReceiptVoucher({
+          receiptNumber,
+          date: dateStr,
+          customerName: party.name,
+          customerId: party.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment received from ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+        voucher.partyId = party.id;
+        voucher.partyName = party.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+        db.savePaymentVoucher(voucher);
+      } else {
+        const voucher = createPaymentOutVoucher({
+          voucherNumber: paymentNumber,
+          date: dateStr,
+          supplierName: party.name,
+          supplierId: party.id,
+          amount,
+          discount: disc,
+          paymentMode,
+          bankAccountId,
+          bankAccountName: bankAcc?.accountName,
+          paymentSplits,
+          narration: notes || `Payment disbursed to ${party.name}${disc > 0 ? ` (Discount: ₹${disc.toFixed(2)})` : ''}`,
+        });
+        voucher.partyId = party.id;
+        voucher.partyName = party.name;
+        voucher.paymentAllocations = resolvedAllocations;
+        voucher.allocationMode = resolvedMode;
+        db.savePaymentVoucher(voucher);
+      }
+      onRefresh?.();
+      return true;
+    } catch (err) {
+      console.error('Cannot record payment:', err);
       return false;
     }
   };

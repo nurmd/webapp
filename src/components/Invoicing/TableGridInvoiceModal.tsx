@@ -228,6 +228,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   const [isExtraDiscountModalOpen, setIsExtraDiscountModalOpen] = useState(false);
 
   // Credit Note / Return References
+  const [originalInvoiceId, setOriginalInvoiceId] = useState<string>(
+    () => initialInvoice?.originalInvoiceId || (initialDraft as any)?.originalInvoiceId || ''
+  );
   const [originalInvoiceNumber, setOriginalInvoiceNumber] = useState<string>(
     () => initialInvoice?.originalInvoiceNumber || initialDraft?.originalInvoiceNumber || ''
   );
@@ -723,6 +726,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       balanceAmount: balanceDue,
       paymentSplits: savedSplits,
       notes: finalNotes,
+      originalInvoiceId: (effectiveInvoiceType === 'CREDIT_NOTE' || effectiveInvoiceType === 'DEBIT_NOTE')
+        ? (originalInvoiceId || undefined)
+        : undefined,
       originalInvoiceNumber: (effectiveInvoiceType === 'CREDIT_NOTE' || effectiveInvoiceType === 'DEBIT_NOTE')
         ? (originalInvoiceNumber.trim() || undefined)
         : undefined,

@@ -430,8 +430,8 @@ describe('Payment Modal Global Architecture & Integration Suite', () => {
   });
 
   describe('3. NavigationMenuHubView Integration', () => {
-    it('dispatches onOpenPaymentModal prop from Payment In and Payment Out menu items', async () => {
-      const onOpenPaymentModal = vi.fn();
+    it('NavigationMenuHubView routes Payment In and Payment Out directly to their respective transaction registers', async () => {
+      const onNavigate = vi.fn();
 
       await act(async () => {
         root.render(
@@ -443,66 +443,36 @@ describe('Payment Modal Global Architecture & Integration Suite', () => {
             items={[]}
             expenses={[]}
             vouchers={[]}
-            onNavigate={vi.fn()}
-            onOpenPaymentModal={onOpenPaymentModal}
+            onNavigate={onNavigate}
           />
         );
       });
 
-      // Find Payment In menu item button
+      // Find Payment In transaction register button
       const paymentInBtn = Array.from(container.querySelectorAll('button')).find(
-        (b) => b.textContent?.includes('Payment In') && b.textContent?.includes('customer payments')
+        (b) => b.textContent?.includes('Payment In') && b.textContent?.includes('Customer receipts')
       );
       expect(paymentInBtn).toBeDefined();
 
       await act(async () => {
         paymentInBtn?.click();
       });
-      expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
+      expect(onNavigate).toHaveBeenCalledWith('payment_in');
 
-      // Find Payment Out menu item button
+      // Find Payment Out transaction register button
       const paymentOutBtn = Array.from(container.querySelectorAll('button')).find(
-        (b) => b.textContent?.includes('Payment Out') && b.textContent?.includes('supplier payments')
+        (b) => b.textContent?.includes('Payment Out') && b.textContent?.includes('Supplier disbursements')
       );
       expect(paymentOutBtn).toBeDefined();
 
       await act(async () => {
         paymentOutBtn?.click();
       });
-      expect(onOpenPaymentModal).toHaveBeenCalledWith('OUT');
-    });
+      expect(onNavigate).toHaveBeenCalledWith('payment_out');
 
-    it('opens global payment modal from NavigationMenuHubView within PaymentModalProvider', async () => {
-      await act(async () => {
-        root.render(
-          <PaymentModalProvider
-            parties={[customerParty, supplierParty]}
-            bankAccounts={[cashAccount]}
-          >
-            <NavigationMenuHubView
-              company={mockCompany}
-              invoices={[]}
-              purchases={[]}
-              parties={[customerParty, supplierParty]}
-              items={[]}
-              expenses={[]}
-              vouchers={[]}
-              onNavigate={vi.fn()}
-            />
-          </PaymentModalProvider>
-        );
-      });
-
-      const paymentInBtn = Array.from(container.querySelectorAll('button')).find(
-        (b) => b.textContent?.includes('Payment In') && b.textContent?.includes('customer payments')
-      );
-      expect(paymentInBtn).toBeDefined();
-
-      await act(async () => {
-        paymentInBtn?.click();
-      });
-
-      expect(container.textContent).toContain('Record Payment In (Receipt)');
+      // Redundant Record Payment shortcuts are removed from navigation
+      expect(container.textContent).not.toContain('Record Payment In');
+      expect(container.textContent).not.toContain('Record Payment Out');
     });
   });
 
