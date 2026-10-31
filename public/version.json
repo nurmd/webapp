@@ -1,14 +1,14 @@
 {
-  "version": "1.2.52",
+  "version": "1.2.53",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-31T03:10:08.012Z",
+  "buildTime": "2026-10-31T04:28:55.037Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "opening-balance payment allocation, bottom-nav restock badge, dashboard quick actions (max 9), voucher-type guard, invoice modal fix",
+    "manual payment linking to opening balance and invoices",
+    "show quick actions in 4 columns with max 8",
+    "opening-balance payment allocation, bottom-nav restock badge, dashboard quick actions, voucher-type guard, invoice modal fix",
     "make payment in/out voucher number prefix editable via document series",
-    "keep inline date filter, remove header date pill in timeline",
-    "global payment in/out popup modal usable everywhere",
-    "configurable dashboard quick actions and timeline filter cleanup"
+    "keep inline date filter, remove header date pill in timeline"
   ]
 }
