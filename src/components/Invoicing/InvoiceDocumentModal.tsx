@@ -88,7 +88,7 @@ export const InvoiceDocumentModal: React.FC<InvoiceDocumentModalProps> = ({
   variant = 'modal',
   maxWidth = '5xl',
   maxHeight = 'sm:max-h-[96vh]',
-  viewportClassName = 'p-3 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-2.5 print-preview-viewport',
+  viewportClassName = 'p-3 sm:p-4 overflow-y-auto flex-1 min-h-0 flex flex-col gap-2.5 print-preview-viewport',
   children,
   backNavPriority = 25,
 }) => {

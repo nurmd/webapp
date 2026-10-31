@@ -1,15 +1,14 @@
 {
-  "version": "1.2.51",
+  "version": "1.2.52",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-30T11:38:52.759Z",
+  "buildTime": "2026-10-31T03:10:08.012Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "configurable dashboard quick actions and timeline filter cleanup",
-    "improve invoice preview fit and long item wrapping",
-    "let compact invoice/purchase item grid use full modal height",
-    "bump version to v1.2.50 (Edit Payment voucher-type guard)",
-    "restrict Edit Payment to RECEIPT/PAYMENT vouchers only",
-    "edit party payment-in/out from Payment In/Out sections via VoucherEditorModal (v1.2.49)"
+    "opening-balance payment allocation, bottom-nav restock badge, dashboard quick actions (max 9), voucher-type guard, invoice modal fix",
+    "make payment in/out voucher number prefix editable via document series",
+    "keep inline date filter, remove header date pill in timeline",
+    "global payment in/out popup modal usable everywhere",
+    "configurable dashboard quick actions and timeline filter cleanup"
   ]
 }
