@@ -352,6 +352,88 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       );
       expect(paymentInBtn).toBeDefined();
     });
+
+    it('NavigationMenuHubView Payment In and Payment Out navigation items route directly to transaction registers', async () => {
+      const onNavigate = vi.fn();
+      await act(async () => {
+        root.render(
+          <NavigationMenuHubView
+            company={mockCompany}
+            invoices={[]}
+            purchases={[]}
+            parties={[]}
+            items={[]}
+            expenses={[]}
+            vouchers={[]}
+            onNavigate={onNavigate}
+          />
+        );
+      });
+
+      // Find navigation button for Payment In (transaction register)
+      const navPaymentInBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('Payment In') && b.textContent?.includes('transaction register')
+      );
+      expect(navPaymentInBtn).toBeDefined();
+
+      await act(async () => {
+        navPaymentInBtn?.click();
+      });
+      expect(onNavigate).toHaveBeenCalledWith('payment_in');
+
+      // Find navigation button for Payment Out (transaction register)
+      const navPaymentOutBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('Payment Out') && b.textContent?.includes('transaction register')
+      );
+      expect(navPaymentOutBtn).toBeDefined();
+
+      await act(async () => {
+        navPaymentOutBtn?.click();
+      });
+      expect(onNavigate).toHaveBeenCalledWith('payment_out');
+    });
+
+    it('NavigationMenuHubView Record Payment In and Out quick action items directly trigger payment modal', async () => {
+      const onNavigate = vi.fn();
+      const onOpenPaymentModal = vi.fn();
+      await act(async () => {
+        root.render(
+          <NavigationMenuHubView
+            company={mockCompany}
+            invoices={[]}
+            purchases={[]}
+            parties={[]}
+            items={[]}
+            expenses={[]}
+            vouchers={[]}
+            onNavigate={onNavigate}
+            onOpenPaymentModal={onOpenPaymentModal}
+          />
+        );
+      });
+
+      const quickPaymentInBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('Record Payment In')
+      );
+      expect(quickPaymentInBtn).toBeDefined();
+
+      await act(async () => {
+        quickPaymentInBtn?.click();
+      });
+      expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
+      expect(onNavigate).not.toHaveBeenCalled();
+
+      const quickPaymentOutBtn = Array.from(container.querySelectorAll('button')).find(
+        (b) => b.textContent?.includes('Record Payment Out')
+      );
+      expect(quickPaymentOutBtn).toBeDefined();
+
+      await act(async () => {
+        quickPaymentOutBtn?.click();
+      });
+      expect(onOpenPaymentModal).toHaveBeenCalledWith('OUT');
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
   });
 
   describe('3. Payment In & Payment Out Calculations and Filtering', () => {
@@ -1459,6 +1541,7 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
       // 4. Click Edit Payment
       await act(async () => {
         editPaymentBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 100));
       });
 
       // 5. Assert CashBankTransactionDetailModal closed and VoucherEditorModal opened

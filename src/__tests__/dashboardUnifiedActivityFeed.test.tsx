@@ -444,6 +444,84 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(card?.textContent).not.toContain('Purchase Bill');
   });
 
+  it('labels Sales Returns (Credit Notes) as Sales Return instead of Sale Invoice in the timeline feed', () => {
+    const salesReturn: Invoice = {
+      ...mockInvoices[0],
+      id: 'cn_1',
+      invoiceNumber: 'CN-2026-001',
+      invoiceType: 'CREDIT_NOTE',
+      items: [],
+      grandTotal: 1500,
+      balanceAmount: 0,
+      paymentStatus: 'PAID',
+    };
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[salesReturn]}
+          purchases={[]}
+          vouchers={[]}
+          expenses={[]}
+          items={mockItems}
+          parties={mockParties}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    const identifier = Array.from(container.querySelectorAll('span')).find(
+      (el) => el.textContent?.trim() === 'CN-2026-001'
+    );
+    const card = identifier?.closest('.group');
+
+    expect(card?.textContent).toContain('Sales Return');
+    expect(card?.textContent).not.toContain('Sale Invoice');
+  });
+
+  it('labels Purchase Returns as Purchase Return instead of Purchase Bill in the timeline feed', () => {
+    const purchaseReturn: PurchaseBill = {
+      ...mockPurchases[0],
+      id: 'pr_1',
+      billNumber: 'PR-2026-001',
+      purchaseType: 'RETURN',
+      items: [],
+      grandTotal: 2500,
+      balanceAmount: 0,
+      paymentStatus: 'PAID',
+    };
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[]}
+          purchases={[purchaseReturn]}
+          vouchers={[]}
+          expenses={[]}
+          items={mockItems}
+          parties={mockParties}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={vi.fn()}
+        />
+      );
+    });
+
+    const identifier = Array.from(container.querySelectorAll('span')).find(
+      (el) => el.textContent?.trim() === 'PR-2026-001'
+    );
+    const card = identifier?.closest('.group');
+
+    expect(card?.textContent).toContain('Purchase Return');
+    expect(card?.textContent).not.toContain('Purchase Bill');
+  });
+
   it('prefers the voucher party name over bank and discount entry labels', () => {
     const receipt: Voucher = {
       id: 'vch_rcpt_party_header',

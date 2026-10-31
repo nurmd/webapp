@@ -245,6 +245,14 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     return purchases.filter((p) => p.purchaseType === 'RETURN').length;
   }, [purchases]);
 
+  const paymentInVouchersCount = useMemo(() => {
+    return vouchers.filter((v) => v.voucherType === 'RECEIPT').length;
+  }, [vouchers]);
+
+  const paymentOutVouchersCount = useMemo(() => {
+    return vouchers.filter((v) => v.voucherType === 'PAYMENT').length;
+  }, [vouchers]);
+
   // Format currency helper
   const formatInr = (num: number): string => {
     if (num >= 100000) {
@@ -287,9 +295,22 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'payment_in_hub',
       title: 'Payment In',
-      subtitle: 'Record customer payments, receipts & money-in ledger entries',
+      subtitle: 'Customer receipts, collections & money-in transaction register',
       icon: 'call_received',
       category: 'sales',
+      badge: paymentInVouchersCount > 0
+        ? { text: `${paymentInVouchersCount} Receipts`, type: 'neutral' }
+        : { text: 'Register', type: 'neutral' },
+      action: () => onNavigate('payment_in'),
+      keywords: ['payment in', 'receipt', 'money in', 'collection', 'payment register', 'inflow', 'register', 'transactions'],
+    },
+    {
+      id: 'record_payment_in',
+      title: 'Record Payment In',
+      subtitle: 'Record customer payments, receipts & money-in ledger entries',
+      icon: 'add_circle',
+      category: 'sales',
+      badge: { text: 'Quick Action', type: 'primary' },
       action: () => {
         if (onOpenPaymentModal) {
           onOpenPaymentModal('IN');
@@ -299,7 +320,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
           onNavigate('payment_in');
         }
       },
-      keywords: ['payment in', 'receipt', 'money in', 'collection', 'payment', 'inflow'],
+      keywords: ['record payment in', 'collect payment', 'receive money', 'receipt', 'quick action', 'customer payments'],
     },
     {
       id: 'sale_quotation',
@@ -368,9 +389,22 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     {
       id: 'payment_out_hub',
       title: 'Payment Out',
-      subtitle: 'Record supplier payments, expenses & money-out ledger entries',
+      subtitle: 'Supplier disbursements, payouts & money-out transaction register',
       icon: 'call_made',
       category: 'purchases',
+      badge: paymentOutVouchersCount > 0
+        ? { text: `${paymentOutVouchersCount} Payments`, type: 'neutral' }
+        : { text: 'Register', type: 'neutral' },
+      action: () => onNavigate('payment_out'),
+      keywords: ['payment out', 'payment', 'money out', 'disbursement', 'payout', 'vendor payment', 'payment register', 'outflow', 'register', 'transactions'],
+    },
+    {
+      id: 'record_payment_out',
+      title: 'Record Payment Out',
+      subtitle: 'Record supplier payments, expenses & money-out ledger entries',
+      icon: 'add_circle',
+      category: 'purchases',
+      badge: { text: 'Quick Action', type: 'primary' },
       action: () => {
         if (onOpenPaymentModal) {
           onOpenPaymentModal('OUT');
@@ -380,7 +414,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
           onNavigate('payment_out');
         }
       },
-      keywords: ['payment out', 'payment', 'money out', 'disbursement', 'payout', 'vendor payment', 'outflow'],
+      keywords: ['record payment out', 'pay supplier', 'vendor disbursement', 'supplier payment', 'quick action', 'supplier payments'],
     },
     {
       id: 'purchase_orders',
@@ -709,9 +743,13 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
     unpaidPurchasesTotal,
     expenses,
     vouchers,
+    paymentInVouchersCount,
+    paymentOutVouchersCount,
     syncState,
     onNavigate,
     onOpenRoleSwitch,
+    onOpenPaymentModal,
+    paymentModal,
   ]);
 
   // Filter items by search query and category

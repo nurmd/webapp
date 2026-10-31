@@ -253,7 +253,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Automatically resolves payment flow based on party type (`CUSTOMER` -> `IN`, `SUPPLIER` -> `OUT`) when omitted.
   - Consumed seamlessly by:
     - **Dashboard Quick Actions (`DashboardView`)**: 1-tap `PAYMENT_IN` and `PAYMENT_OUT` buttons trigger the global modal without full-tab navigation context switching.
-    - **Navigation Menu Hub (`NavigationMenuHubView`)**: "Payment In" and "Payment Out" catalog entries open the global modal directly, with fallback to tab navigation if the provider is unavailable.
+    - **Navigation Menu Hub (`NavigationMenuHubView`)**: "Payment In" and "Payment Out" navigation entries route directly to their respective transaction registers (`payment_in` / `payment_out`), while dedicated "Record Payment In" and "Record Payment Out" quick actions trigger the global modal directly.
     - **Payment In/Out Hubs (`PaymentTransactionsView`)**: "+ Record Receipt" and "+ Record Payment" trigger the global payment modal (or standalone `RecordPaymentModal` dialog fallback), leaving transaction ledger lists mounted and interactive in the background. Android hardware back key (priority 20) closes the modal.
     - **Party Detail View (`PartyDetailModal` / `PartyDetailPage`)**: The "Record Payment" button invokes `handleRecordPaymentClick`, routing into the global payment modal with party context pre-selected and invoking `onRefresh` upon successful voucher persistence; falls back to an inline collapsible drawer if rendered outside provider without custom opener.
   - Obsolete direct-settlement fallback blocks in `PartiesView` and `DashboardRecordPaymentModal` were removed to guarantee that all payment recording strictly routes through the central accounting voucher engine.
@@ -447,6 +447,13 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
 - Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 8, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` as compact cards (`h-[36px] sm:h-10`) in a 4-column responsive matrix using the same navigation/creation handlers as the legacy shortcuts.
+- **Business Activity Timeline Feed Tags (`DashboardView.tsx`)**:
+  - Feed items derive their `typeLabel` strictly from the document's specific type:
+    - Sales: `CREDIT_NOTE` -> `Sales Return`, `DEBIT_NOTE` -> `Debit Note`, `DELIVERY_CHALLAN` -> `Delivery Challan`, `ESTIMATE` -> `Quotation / Estimate`, `SALES_ORDER` -> `Sale Order`, standard -> `Sale Invoice`.
+    - Purchases: `CHALLAN` -> `Purchase Challan (GRN)`, `PO` -> `Purchase Order`, `RETURN` / `DEBIT_NOTE` -> `Purchase Return`, standard -> `Purchase Bill`.
+    - Vouchers: `RECEIPT` -> `Receipt Voucher`, `PAYMENT` -> `Payment Voucher`, `CONTRA` -> `Contra Voucher`, `JOURNAL` -> `Journal Voucher`, `DEBIT_NOTE` -> `Debit Note`, `CREDIT_NOTE` -> `Credit Note`.
+    - Expenses: `Expense`.
+  - Return documents (Sales Return, Purchase Return) render with distinctive purple return badges and `assignment_return` icons.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:

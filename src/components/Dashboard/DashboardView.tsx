@@ -291,11 +291,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const status: 'PAID' | 'UNPAID' | 'PARTIAL' = isPaid ? 'PAID' : isPartial ? 'PARTIAL' : 'UNPAID';
       const invItems = inv.items || [];
 
+      const isSalesReturn =
+        inv.invoiceType === 'CREDIT_NOTE' ||
+        (inv.invoiceType as string) === 'RETURN' ||
+        (inv as any).noteType === 'C';
+
+      const saleTypeLabel = isSalesReturn
+        ? 'Sales Return'
+        : inv.invoiceType === 'DEBIT_NOTE'
+        ? 'Debit Note'
+        : inv.invoiceType === 'DELIVERY_CHALLAN'
+        ? 'Delivery Challan'
+        : inv.invoiceType === 'ESTIMATE'
+        ? 'Quotation / Estimate'
+        : inv.invoiceType === 'SALES_ORDER'
+        ? 'Sale Order'
+        : 'Sale Invoice';
+
       feed.push({
         id: `sale-${inv.id}`,
         rawId: inv.id,
         type: 'SALE',
-        typeLabel: 'Sale Invoice',
+        typeLabel: saleTypeLabel,
         flow: 'IN',
         partyName: inv.partyName || 'Cash Customer',
         partyId: inv.partyId,
@@ -310,7 +327,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         paymentStatus: status,
         description: invItems.length > 0
           ? `${invItems.length} item${invItems.length > 1 ? 's' : ''} (${invItems.map((i) => i.name).slice(0, 2).join(', ')})`
-          : 'Sales Invoice',
+          : isSalesReturn
+          ? 'Sales Return (Credit Note)'
+          : inv.invoiceType === 'DELIVERY_CHALLAN'
+          ? 'Delivery Challan'
+          : saleTypeLabel,
         rawInvoice: inv,
       });
     });
@@ -322,12 +343,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const isPartial = !isPaid && (pur.paidAmount || 0) > 0;
       const status: 'PAID' | 'UNPAID' | 'PARTIAL' = isPaid ? 'PAID' : isPartial ? 'PARTIAL' : 'UNPAID';
       const purItems = pur.items || [];
+      const isPurchaseReturn =
+        pur.purchaseType === 'RETURN' ||
+        (pur.purchaseType as string) === 'DEBIT_NOTE' ||
+        (pur as any).noteType === 'D';
+
       const purchaseTypeLabel =
         pur.purchaseType === 'CHALLAN'
           ? 'Purchase Challan (GRN)'
           : pur.purchaseType === 'PO'
           ? 'Purchase Order'
-          : pur.purchaseType === 'RETURN'
+          : isPurchaseReturn
           ? 'Purchase Return'
           : 'Purchase Bill';
 
@@ -352,6 +378,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ? `${purItems.length} item${purItems.length > 1 ? 's' : ''} (${purItems.map((i) => i.name).slice(0, 2).join(', ')})`
           : pur.purchaseType === 'CHALLAN'
           ? 'Goods Received Note'
+          : isPurchaseReturn
+          ? 'Purchase Return (Debit Note)'
           : purchaseTypeLabel,
         rawPurchase: pur,
       });
@@ -1221,9 +1249,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               const isPartial = item.paymentStatus === 'PARTIAL';
               const hasBalance = (item.balanceAmount || 0) > 0;
 
+              const isReturn =
+                item.typeLabel === 'Sales Return' ||
+                item.typeLabel === 'Purchase Return' ||
+                item.typeLabel.includes('Return');
+
               // Type Badge Colors
               const typeBadgeClass =
-                item.type === 'SALE'
+                isReturn
+                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                  : item.type === 'SALE'
                   ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                   : item.type === 'PURCHASE'
                   ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300'
@@ -1312,10 +1347,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         }`}
                       >
                         <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
-                          {item.type === 'SALE'
-                            ? 'receipt_long'
+                          {isReturn
+                            ? 'assignment_return'
+                            : item.type === 'SALE'
+                            ? (item.typeLabel.includes('Challan') ? 'local_shipping' : item.typeLabel.includes('Order') ? 'assignment' : item.typeLabel.includes('Estimate') ? 'request_quote' : 'receipt_long')
                             : item.type === 'PURCHASE'
-                            ? 'shopping_bag'
+                            ? (item.typeLabel.includes('Challan') ? 'move_to_inbox' : item.typeLabel.includes('Order') ? 'add_shopping_cart' : 'shopping_bag')
                             : item.type === 'EXPENSE'
                             ? 'payments'
                             : isMoneyIn
