@@ -1391,6 +1391,7 @@ export const App: React.FC = () => {
             onEditInvoice={handleEditInvoice}
             onEditPurchase={handleEditPurchase}
             onRecordPartyPayment={handleRecordPartyPayment}
+            onSaveParty={handleSaveParty}
             onRefresh={refreshData}
             onNavigateTab={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}

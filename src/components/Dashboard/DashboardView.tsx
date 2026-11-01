@@ -18,6 +18,7 @@ const DashboardVoucherModal = React.lazy(() =>
   import('./DashboardVoucherModal.tsx').then((m) => ({ default: m.DashboardVoucherModal }))
 );
 import { DashboardExpenseModal } from './DashboardExpenseModal.tsx';
+import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import {
   DashboardRecordPaymentModal,
   DashboardPaymentTarget,
@@ -89,6 +90,7 @@ export interface DashboardViewProps {
     paymentSplits?: PaymentSplit[],
     discount?: number
   ) => void;
+  onSaveParty?: (party: Party) => void;
   onRefresh?: () => void;
   onNavigateTab: (tab: AppTab) => void;
   onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
@@ -111,6 +113,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onEditInvoice: _onEditInvoice,
   onEditPurchase,
   onRecordPartyPayment,
+  onSaveParty,
   onRefresh,
   onNavigateTab,
   onNavigateToParties,
@@ -132,6 +135,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .map((id) => DASHBOARD_QUICK_ACTIONS[id])
     .filter(Boolean);
 
+  const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
+
   const handleQuickAction = (id: DashboardQuickActionId) => {
     switch (id) {
       case 'SALE_BILL':
@@ -147,7 +152,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         onNavigateTab('purchases');
         break;
       case 'ADD_PARTY':
-        onNavigateTab('parties');
+        setIsAddPartyOpen(true);
         break;
       case 'ITEMS':
         onNavigateTab('inventory');
@@ -1463,6 +1468,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           setCustomEnd(end || '');
         }}
         accentColor="secondary"
+      />
+
+      {/* 6. Add New Party Modal */}
+      <AddEditPartyModal
+        isOpen={isAddPartyOpen}
+        editingParty={null}
+        parties={activeParties}
+        onClose={() => setIsAddPartyOpen(false)}
+        onSave={(party) => {
+          onSaveParty?.(party);
+          setIsAddPartyOpen(false);
+        }}
       />
     </div>
   );

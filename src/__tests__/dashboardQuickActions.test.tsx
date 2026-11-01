@@ -312,4 +312,66 @@ describe('Dashboard Quick Actions configuration', () => {
     expect(onOpenPaymentModal).toHaveBeenCalledWith('IN');
     expect(onOpenPaymentModal).toHaveBeenCalledWith('OUT');
   });
+
+  it('opens AddEditPartyModal on ADD_PARTY quick action click and saves party', () => {
+    db.setDashboardQuickActions(['ADD_PARTY']);
+    const onNavigateTab = vi.fn();
+    const onSaveParty = vi.fn();
+
+    act(() => {
+      root.render(
+        <DashboardView
+          company={mockCompany}
+          invoices={[]}
+          items={[]}
+          parties={[]}
+          purchases={[]}
+          vouchers={[]}
+          expenses={[]}
+          onNewInvoice={vi.fn()}
+          onQuickPos={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onNavigateTab={onNavigateTab}
+          onSaveParty={onSaveParty}
+        />
+      );
+    });
+
+    const addPartyBtn = container.querySelector('[data-quick-action="ADD_PARTY"]') as HTMLButtonElement | null;
+    expect(addPartyBtn).toBeTruthy();
+
+    act(() => {
+      addPartyBtn?.click();
+    });
+
+    expect(document.body.textContent).toContain('Add New Party');
+    expect(onNavigateTab).not.toHaveBeenCalledWith('parties');
+
+    const nameInput = document.body.querySelector('input[type="text"][required]') as HTMLInputElement | null;
+    const phoneInput = document.body.querySelector('input[type="tel"]') as HTMLInputElement | null;
+    expect(nameInput).toBeTruthy();
+
+    act(() => {
+      const nameSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nameSetter?.call(nameInput, 'Shree Ganesh Traders');
+      nameInput?.dispatchEvent(new Event('input', { bubbles: true }));
+      nameInput?.dispatchEvent(new Event('change', { bubbles: true }));
+
+      if (phoneInput) {
+        nameSetter?.call(phoneInput, '9822001122');
+        phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+        phoneInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+
+    const form = nameInput?.closest('form');
+    expect(form).toBeTruthy();
+
+    act(() => {
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(onSaveParty).toHaveBeenCalledTimes(1);
+    expect(onSaveParty.mock.calls[0][0].name).toBe('Shree Ganesh Traders');
+  });
 });

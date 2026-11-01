@@ -53,7 +53,7 @@ export const DASHBOARD_QUICK_ACTIONS: Record<DashboardQuickActionId, DashboardQu
     label: 'Add Party',
     icon: 'person_add',
     accentClass: 'text-on-surface-variant',
-    description: 'Open customers & suppliers',
+    description: 'Create a new customer or supplier',
   },
   ITEMS: {
     id: 'ITEMS',
