@@ -267,4 +267,102 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(amountEl).not.toBeNull();
     expect(amountEl?.className).toContain('text-blue-700');
   });
+
+  it('PartyInfoCard renders Record Payment and New Invoice right-aligned in sub-metrics bar, and omits opening balance chip and drawer row', () => {
+    const onRecordPayment = vi.fn();
+    const onCreateInvoice = vi.fn();
+    const partyWithOpeningBalance: Party = {
+      ...mockParty,
+      openingBalance: 4500,
+      openingBalanceType: 'TO_RECEIVE',
+      openingBalanceDate: '2026-01-01',
+    };
+
+    act(() => {
+      root.render(
+        <PartyInfoCard
+          party={partyWithOpeningBalance}
+          company={mockCompany}
+          liveNetBalance={4500}
+          isReceivable={true}
+          isPayable={false}
+          totalBilled={10000}
+          totalPaid={5500}
+          showPartyDetails={true}
+          setShowPartyDetails={vi.fn()}
+          onEditParty={vi.fn()}
+          isCustomer={true}
+          isPaymentOpen={false}
+          onRecordPayment={onRecordPayment}
+          onCreateInvoice={onCreateInvoice}
+        />
+      );
+    });
+
+    // 1. Total Bill and Total Paid on the left
+    expect(container.textContent).toContain('Total Bill:');
+    expect(container.textContent).toContain('Total Paid:');
+
+    // 2. Action buttons on the right inside sub-metrics bar
+    const recordPaymentBtn = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Record Payment')
+    );
+    expect(recordPaymentBtn).toBeDefined();
+
+    const newInvoiceBtn = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('New Invoice')
+    );
+    expect(newInvoiceBtn).toBeDefined();
+
+    act(() => {
+      recordPaymentBtn?.click();
+    });
+    expect(onRecordPayment).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      newInvoiceBtn?.click();
+    });
+    expect(onCreateInvoice).toHaveBeenCalledWith(partyWithOpeningBalance);
+
+    // 3. Opening balance info chip is removed
+    expect(container.textContent).not.toContain('Opening Balance:');
+    expect(container.textContent).not.toContain('(To Receive)');
+  });
+
+  it('PartyDetailModal wires action buttons to PartyInfoCard and toggles RecordPaymentModal', async () => {
+    db.saveParty(mockParty);
+    const onCreateInvoice = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <PartyDetailModal
+          party={mockParty}
+          company={mockCompany}
+          invoices={[]}
+          purchases={[]}
+          vouchers={[]}
+          isOpen={true}
+          onEditParty={vi.fn()}
+          onDeleteParty={vi.fn()}
+          onRecordPayment={vi.fn()}
+          onCreateInvoice={onCreateInvoice}
+        />
+      );
+    });
+
+    // Separate "Quick Actions Bar" section is removed, action buttons reside in PartyInfoCard
+    const recordPaymentButtons = Array.from(container.querySelectorAll('button')).filter(
+      (b) => b.textContent?.includes('Record Payment')
+    );
+    // Both mobile and desktop PartyInfoCard have the button
+    expect(recordPaymentButtons.length).toBeGreaterThanOrEqual(1);
+
+    // Clicking Record Payment opens the collapsible RecordPaymentModal drawer
+    await act(async () => {
+      recordPaymentButtons[0].click();
+    });
+
+    expect(container.textContent).toContain('Save Payment In');
+    expect(container.textContent).toContain('Payment Mode');
+  });
 });
