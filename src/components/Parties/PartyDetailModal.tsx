@@ -122,6 +122,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   const [thermalPrintInvoice, setThermalPrintInvoice] = useState<Invoice | null>(null);
   const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [isDeletePartyConfirmOpen, setIsDeletePartyConfirmOpen] = useState(false);
   const [deleteInvoiceTarget, setDeleteInvoiceTarget] = useState<Invoice | null>(null);
@@ -173,6 +174,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
     }
     window.scrollTo(0, 0);
     setIsScrolled(false);
+    setIsActionsOpen(false);
     setActiveTab('TRANSACTIONS');
   }, [party.id]);
 
@@ -486,51 +488,95 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Header Tools (Call, WhatsApp, Edit) */}
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {party.phone && party.phone.trim() !== '00' && party.phone.trim() !== '0' && (
-              <a
-                href={`tel:${party.phone}`}
-                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors"
-                title="Call"
-              >
-                <span className="material-symbols-outlined text-[17px]">call</span>
-              </a>
-            )}
+          {/* Quick Header Tools (Call, Print, WhatsApp, Edit, Delete) in Collapsible Container */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 relative">
+            {/* Collapsible Action Icons (slides out with animation) */}
+            <div
+              className={`flex items-center gap-1 transition-all duration-300 ease-out origin-right overflow-hidden ${
+                isActionsOpen
+                  ? 'max-w-[280px] opacity-100 translate-x-0'
+                  : 'max-w-0 opacity-0 translate-x-4 pointer-events-none'
+              }`}
+            >
+              {/* 1. Call */}
+              {party.phone && party.phone.trim() !== '00' && party.phone.trim() !== '0' && (
+                <a
+                  href={`tel:${party.phone}`}
+                  className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors shrink-0"
+                  title="Call"
+                  aria-label="Call party"
+                >
+                  <span className="material-symbols-outlined text-[17px]">call</span>
+                </a>
+              )}
 
+              {/* 2. Print (Moved next to Call icon!) */}
+              <button
+                type="button"
+                onClick={handlePrintStatement}
+                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Print Ledger Statement"
+                aria-label="Print ledger statement"
+              >
+                <span className="material-symbols-outlined text-[17px]">print</span>
+              </button>
+
+              {/* 3. WhatsApp */}
+              <button
+                type="button"
+                onClick={() => setIsWhatsAppModalOpen(true)}
+                className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                title="WhatsApp Reminder & Statement"
+                aria-label="Send WhatsApp message"
+              >
+                <span className="material-symbols-outlined text-[17px]">chat</span>
+              </button>
+
+              {/* 4. Edit */}
+              {!isSystemParty(party) && (
+                <button
+                  type="button"
+                  onClick={() => onEditParty(party)}
+                  className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Edit Profile"
+                  aria-label="Edit party profile"
+                >
+                  <span className="material-symbols-outlined text-[17px]">edit</span>
+                </button>
+              )}
+
+              {/* 5. Delete */}
+              {!isSystemParty(party) && onDeleteParty && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="w-8 h-8 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  title="Delete Party"
+                  aria-label="Delete party"
+                >
+                  <span className="material-symbols-outlined text-[17px]">delete</span>
+                </button>
+              )}
+            </div>
+
+            {/* Collapsible Container Trigger Button: pressing it slides out the icons with animation */}
             <button
               type="button"
-              onClick={() => setIsWhatsAppModalOpen(true)}
-              className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors"
-              title="WhatsApp Reminder & Statement"
-              aria-label="Send WhatsApp message"
+              onClick={() => setIsActionsOpen((prev) => !prev)}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                isActionsOpen
+                  ? 'bg-secondary text-on-secondary shadow-xs scale-105'
+                  : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface active:scale-95'
+              }`}
+              title={isActionsOpen ? 'Hide actions' : 'More actions'}
+              aria-label={isActionsOpen ? 'Hide actions' : 'More actions'}
+              aria-expanded={isActionsOpen}
+              data-testid="party-actions-toggle"
             >
-              <span className="material-symbols-outlined text-[17px]">chat</span>
+              <span className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${isActionsOpen ? 'rotate-90' : ''}`}>
+                {isActionsOpen ? 'close' : 'more_vert'}
+              </span>
             </button>
-
-            {!isSystemParty(party) && (
-              <button
-                type="button"
-                onClick={() => onEditParty(party)}
-                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-                title="Edit Profile"
-                aria-label="Edit party profile"
-              >
-                <span className="material-symbols-outlined text-[17px]">edit</span>
-              </button>
-            )}
-
-            {!isSystemParty(party) && onDeleteParty && (
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="w-8 h-8 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 flex items-center justify-center transition-colors cursor-pointer"
-                title="Delete Party"
-                aria-label="Delete party"
-              >
-                <span className="material-symbols-outlined text-[17px]">delete</span>
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -548,7 +594,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             isScrolled
               ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
               : '-translate-y-6 opacity-0 scale-95 pointer-events-none'
-          } py-2 px-3 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl border border-secondary/30`}
+          } py-2 px-3 bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md rounded-2xl border border-slate-700/60`}
           title="Tap to scroll to top"
         >
           <div className="flex items-center justify-between gap-2">
@@ -559,7 +605,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                   e.stopPropagation();
                   handleBackOrClose();
                 }}
-                className="p-1 -ml-1 rounded-xl text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
+                className="p-1 -ml-1 rounded-xl text-white hover:bg-slate-800 active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
                 title="Back to Parties"
                 aria-label="Back to parties"
               >
@@ -568,16 +614,16 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
 
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
-                  isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
+                  isCustomer ? 'bg-secondary/25 text-secondary-fixed' : 'bg-primary/25 text-primary-fixed'
                 }`}
               >
                 {party.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <h2 className="text-xs font-bold text-on-surface truncate">
+                <h2 className="text-xs font-bold text-white truncate">
                   {party.name}
                 </h2>
-                <span className="text-[10px] text-on-surface-variant truncate block -mt-0.5">
+                <span className="text-[10px] text-slate-400 truncate block -mt-0.5">
                   {isCustomer ? 'Customer' : 'Supplier'}
                 </span>
               </div>
@@ -587,28 +633,20 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               <span
                 className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
                   isReceivable
-                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                    ? 'bg-emerald-500/20 text-emerald-300'
                     : isPayable
-                    ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
-                    : 'bg-secondary/10 text-secondary'
+                    ? 'bg-rose-500/20 text-rose-300'
+                    : 'bg-slate-800 text-slate-300'
                 }`}
               >
                 {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
               </span>
               <div className="flex flex-col items-end">
-                <span
-                  className={`font-currency-display-mobile text-xs font-black ${
-                    isReceivable
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : isPayable
-                      ? 'text-rose-700 dark:text-rose-400'
-                      : 'text-secondary'
-                  }`}
-                >
+                <span className="font-currency-display-mobile text-xs font-black text-white">
                   {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
                 </span>
                 {!isCustomer && unbilledOrdersTotal > 0 && (
-                  <span className="text-[9px] text-on-surface-variant/80 font-medium leading-none">
+                  <span className="text-[9px] text-slate-400 font-medium leading-none">
                     (Unbilled {formatINR(unbilledOrdersTotal)})
                   </span>
                 )}
@@ -712,17 +750,6 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                   </button>
                 )
               )}
-
-              {/* Print Statement */}
-              <button
-                type="button"
-                onClick={handlePrintStatement}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
-                title="Print Ledger Statement"
-                aria-label="Print ledger statement"
-              >
-                <span className="material-symbols-outlined text-[18px]">print</span>
-              </button>
             </section>
 
             {/* Collapsible Record Payment Drawer */}
