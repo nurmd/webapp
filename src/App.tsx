@@ -1792,9 +1792,6 @@ export const App: React.FC = () => {
             onPrintInvoice={(inv) => {
               setPrintInvoice(inv);
             }}
-            onOpenFullA4Preview={(inv) => {
-              setFullA4Invoice(inv);
-            }}
           />
         </React.Suspense>
       )}

@@ -705,7 +705,7 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       expect(handlePrintA4).toHaveBeenCalledWith(mockInvoice);
     });
 
-    it('SimplifiedInvoiceModal displays A4 / PDF button and calls onOpenFullA4Preview', () => {
+    it('SimplifiedInvoiceModal omits A4 / PDF button even if onOpenFullA4Preview prop is passed', () => {
       const handleOpenA4 = vi.fn();
       act(() => {
         root.render(
@@ -713,7 +713,7 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
-            onOpenFullA4Preview={handleOpenA4}
+            {...({ onOpenFullA4Preview: handleOpenA4 } as any)}
           />
         );
       });
@@ -721,13 +721,7 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       const a4Btn = Array.from(container.querySelectorAll('button')).find((b) =>
         b.textContent?.includes('A4 / PDF')
       );
-      expect(a4Btn).toBeDefined();
-
-      act(() => {
-        a4Btn?.click();
-      });
-
-      expect(handleOpenA4).toHaveBeenCalledWith(mockInvoice);
+      expect(a4Btn).toBeUndefined();
     });
 
     it('SimplifiedInvoiceModal displays Print button and omits A4 / PDF when only onPrintInvoice is provided', () => {

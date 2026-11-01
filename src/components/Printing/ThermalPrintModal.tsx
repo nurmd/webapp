@@ -14,6 +14,11 @@ import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
+import {
+  renderThermalReceiptImage,
+  shareReceiptImage,
+} from '../../core/utils/receiptImageShare.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 export interface ThermalPrintModalProps {
   invoice: Invoice;
@@ -33,15 +38,30 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     return true;
   }, true, 30);
 
-  const [width, setWidth] = useState<32 | 48>(
-    () => (Number(localStorage.getItem('printer_paper_width')) as 32 | 48) || 32
-  );
+  const [width, setWidth] = useState<32 | 48>(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const val = Number(localStorage.getItem('printer_paper_width'));
+        if (val === 32 || val === 48) return val;
+      }
+    } catch {
+      // Fallback
+    }
+    return 32;
+  });
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isSharingImage, setIsSharingImage] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('printer_paper_width', width.toString());
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('printer_paper_width', width.toString());
+      }
+    } catch {
+      // ignore
+    }
   }, [width]);
 
   const thermalSettings = printSettingsService.getSettings().thermal;
@@ -245,6 +265,26 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     printCurrentPage(`Invoice-${invoice.invoiceNumber || 'Thermal'}`, 'default');
   };
 
+  const handleShareImage = async () => {
+    setIsSharingImage(true);
+    try {
+      const blob = await renderThermalReceiptImage(previewText, width);
+      const fileName = `Receipt-${invoice.invoiceNumber || 'Document'}.png`;
+      const res = await shareReceiptImage(blob, fileName, { phone: party?.phone });
+      if (res === 'shared') {
+        showAppToast('Receipt image shared.');
+      } else if (res === 'downloaded') {
+        showAppToast('Receipt image saved. Attach it in the WhatsApp chat.');
+      } else {
+        showAppToast('Could not create the receipt image.');
+      }
+    } catch (_err) {
+      showAppToast('Could not create the receipt image.');
+    } finally {
+      setIsSharingImage(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="bg-surface-container-lowest rounded-2xl shadow-2xl max-w-md w-full max-h-[92vh] flex flex-col border border-outline-variant/30 overflow-hidden">
@@ -384,6 +424,26 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
               <span>A4 / PDF</span>
             </button>
           )}
+          <button
+            type="button"
+            data-testid="share-thermal-image"
+            disabled={isSharingImage}
+            onClick={handleShareImage}
+            className="px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] disabled:opacity-50 text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+            title="Share receipt as image to WhatsApp"
+          >
+            {isSharingImage ? (
+              <>
+                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[16px]">share</span>
+                <span>Share Image</span>
+              </>
+            )}
+          </button>
           <button
             type="button"
             onClick={onClose}

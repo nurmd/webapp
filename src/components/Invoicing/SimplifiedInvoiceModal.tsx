@@ -18,7 +18,6 @@ export interface SimplifiedInvoiceModalProps {
   onClose: () => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onDeleteInvoice?: (id: string) => void;
-  onOpenFullA4Preview?: (invoice: Invoice) => void;
   onPrintInvoice?: (invoice: Invoice) => void;
 }
 
@@ -28,7 +27,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
   onClose,
   onEditInvoice,
   onDeleteInvoice,
-  onOpenFullA4Preview,
   onPrintInvoice,
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
@@ -119,19 +117,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         >
           <span className="material-symbols-outlined text-[16px]">print</span>
           <span>Print</span>
-        </button>
-      )}
-
-      {/* A4 / PDF Button */}
-      {onOpenFullA4Preview && (
-        <button
-          type="button"
-          onClick={() => onOpenFullA4Preview(invoice)}
-          className="flex-1 min-w-[100px] py-2 px-3 rounded-xl bg-surface-container text-on-surface border border-outline-variant/30 font-bold text-xs shadow-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 hover:bg-surface-container-high transition-all"
-          title="View full A4 / PDF layout & print"
-        >
-          <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-          <span>A4 / PDF</span>
         </button>
       )}
 
@@ -247,13 +232,18 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         )}
 
         {/* Purchased Items Table View */}
-        <DocumentLineItemsGrid
-          mode="compact"
-          kind="invoice"
-          rows={invoice.items}
-          isGstActive={isGstActive}
-          isCompositionScheme={company.isCompositionScheme}
-        />
+        <div
+          data-testid="invoice-preview-items-scroll"
+          className="max-h-[45vh] overflow-y-auto overscroll-contain -mx-0.5 px-0.5 [scrollbar-width:thin] border-t border-b border-outline-variant/20"
+        >
+          <DocumentLineItemsGrid
+            mode="compact"
+            kind="invoice"
+            rows={invoice.items}
+            isGstActive={isGstActive}
+            isCompositionScheme={company.isCompositionScheme}
+          />
+        </div>
 
         {/* Financial Breakdown */}
         <DocumentTaxSummary
