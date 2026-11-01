@@ -525,6 +525,15 @@ The `StorageService` class (`db`) is the unified database facade composing focus
     - Unaltered split payment breakdown derivation and `PAID`/`PARTIAL`/`UNPAID` status logic per guardrails.
     - Barcode scanning, camera scanner, held bills manager, dynamic UPI QR modal, and keyboard shortcuts remain intact.
     - Desktop banner and mobile summary cards styled with `border-outline-variant/30 shadow-sm`, `text-slate-900` business titles, and `text-slate-600` status indicators.
+- **Phase 5: Mobile-Only Reports Redesign & Responsive Party Action Buttons (`BusinessReportsView.tsx`, `BusinessPerformanceCard.tsx`, `ReportsNavList.tsx`, `PartyInfoCard.tsx`, `PartyDetailModal.tsx`)**:
+  - **Reports Hub Mobile-Only Redesign (`< md`)**:
+    - `BusinessReportsView.tsx`: Compact container padding (`p-2 sm:p-3.5 md:p-5`) and vertical spacing (`space-y-2.5 sm:space-y-3.5 md:space-y-5`).
+    - `BusinessPerformanceCard.tsx`: Reduced mobile padding (`p-2.5 md:p-4`), tighter header row (`pb-1.5 md:pb-2 mb-1.5 md:mb-2`), compact date and collapse toggles, and compact 2-column collapsed metric cards (`p-2 md:p-3`, `text-base sm:text-xl md:text-2xl`). Secondary details (Revenue, COGS, Operating Expenses, Trade Surplus, Stock Change, and 2-line SVG interactive area chart) remain collapsed by default behind the toggle. Slim carousel tab bar uses `py-1 md:py-1.5 px-1 md:px-2`. Tablet/desktop (`md:`) styling remains completely unchanged.
+    - `ReportsNavList.tsx`: Single-column grid on mobile (`grid-cols-1 md:grid-cols-2`), compact cards (`p-2 md:p-3`), smaller icon tiles (`p-1.5 md:p-2.5`, 16px icon), single-line truncated subtitles (`text-[10px] md:text-xs`), and concise chip padding (`text-[9px] md:text-[11px] px-1.5 md:px-2 py-0.2 md:py-0.5`). Tablet/desktop retains its 2-column layout and full sizing.
+  - **Party Action Buttons Responsive Placement**:
+    - Mobile (`< md`): "Record Payment" and "New Invoice" / "New Bill" buttons reside inside `PartyInfoCard`'s sub-metrics bar, right-aligned (`ml-auto justify-end md:hidden`).
+    - Desktop / Landscape (`md:`+): The buttons are hidden from `PartyInfoCard` via `md:hidden` and rendered in a dedicated quick actions section below `PartyInfoCard` in the left column (`hidden md:flex items-center gap-2`).
+    - `RecordPaymentModal` collapsible drawer remains functional across both mobile and desktop views.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:

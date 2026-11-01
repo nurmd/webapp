@@ -365,4 +365,38 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(container.textContent).toContain('Save Payment In');
     expect(container.textContent).toContain('Payment Mode');
   });
+
+  it('Phase 5: Party action buttons are responsive (in-card on mobile < md, standalone section on desktop md:+)', async () => {
+    db.saveParty(mockParty);
+    const onCreateInvoice = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <PartyDetailModal
+          party={mockParty}
+          company={mockCompany}
+          invoices={[]}
+          purchases={[]}
+          vouchers={[]}
+          isOpen={true}
+          onEditParty={vi.fn()}
+          onDeleteParty={vi.fn()}
+          onRecordPayment={vi.fn()}
+          onCreateInvoice={onCreateInvoice}
+        />
+      );
+    });
+
+    // In PartyInfoCard, the sub-metrics action buttons container has md:hidden
+    const cardActionContainers = Array.from(container.querySelectorAll('.justify-end')).filter(
+      (el) => el.className.includes('md:hidden')
+    );
+    expect(cardActionContainers.length).toBeGreaterThanOrEqual(1);
+
+    // In PartyDetailModal, the desktop action bar below PartyInfoCard has hidden md:flex
+    const desktopActionBar = container.querySelector('section.hidden.md\\:flex');
+    expect(desktopActionBar).not.toBeNull();
+    expect(desktopActionBar?.textContent).toContain('Record Payment');
+    expect(desktopActionBar?.textContent).toContain('New Invoice');
+  });
 });

@@ -183,7 +183,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5" role="list">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 sm:gap-2 md:gap-2.5" role="list">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -199,34 +199,34 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                 }
               }}
               aria-label={`Open ${item.title} report`}
-              className="group flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 hover:border-emerald-600/40 shadow-sm hover:shadow-md transition-all cursor-pointer text-left active:scale-[0.99]"
+              className="group flex items-center justify-between p-2 md:p-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 hover:border-emerald-600/40 shadow-sm hover:shadow-md transition-all cursor-pointer text-left active:scale-[0.99]"
             >
-              <div className="flex items-center sm:items-start gap-2.5 sm:gap-3 min-w-0 pr-1.5 sm:pr-2">
-                <div className={`p-2 sm:p-2.5 rounded-xl ${item.iconBg} ${item.iconColor} shrink-0 transition-transform group-hover:scale-105`}>
-                  <Icon size={18} />
+              <div className="flex items-center md:items-start gap-2 md:gap-3 min-w-0 pr-1.5 md:pr-2">
+                <div className={`p-1.5 md:p-2.5 rounded-xl ${item.iconBg} ${item.iconColor} shrink-0 transition-transform group-hover:scale-105`}>
+                  <Icon size={16} className="md:w-[18px] md:h-[18px]" />
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors m-0 truncate shrink-0">
+                  <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    <h4 className="text-xs md:text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors m-0 truncate shrink-0">
                       {item.title}
                     </h4>
                     {item.badge && (
-                      <span className="text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0">
+                      <span className="text-[8.5px] md:text-[10px] px-1 md:px-1.5 py-0.2 rounded-full font-bold bg-primary/10 text-primary border border-primary/20 whitespace-nowrap shrink-0">
                         {item.badge}
                       </span>
                     )}
                   </div>
 
-                  <p className="text-[11px] sm:text-xs text-slate-600 line-clamp-1 mt-0.5 mb-1 sm:mb-1.5">
+                  <p className="text-[10px] md:text-xs text-slate-600 line-clamp-1 mt-0.5 mb-0.5 md:mb-1.5">
                     {item.subtitle}
                   </p>
 
-                  <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                     {item.chips.map((chip, idx) => (
                       <span
                         key={idx}
-                        className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded bg-surface font-medium text-slate-600 border border-outline-variant/30 whitespace-nowrap shrink-0"
+                        className="text-[9px] md:text-[11px] px-1.5 md:px-2 py-0.2 md:py-0.5 rounded bg-surface font-medium text-slate-600 border border-outline-variant/30 whitespace-nowrap shrink-0"
                       >
                         {chip}
                       </span>
@@ -235,8 +235,8 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                 </div>
               </div>
 
-              <div className="p-1 sm:p-1.5 rounded-lg text-slate-400 group-hover:text-emerald-700 group-hover:bg-emerald-50 transition-all shrink-0">
-                <ChevronRight size={16} />
+              <div className="p-1 md:p-1.5 rounded-lg text-slate-400 group-hover:text-emerald-700 group-hover:bg-emerald-50 transition-all shrink-0">
+                <ChevronRight size={14} className="md:w-4 md:h-4" />
               </div>
             </div>
           );

@@ -615,9 +615,9 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
     };
 
     return (
-      <div className="bg-slate-50 rounded-xl p-2.5 sm:p-3 border border-slate-200/80 shadow-xs mt-2.5">
+      <div className="bg-slate-50 rounded-xl p-2 md:p-3 border border-slate-200/80 shadow-xs mt-2 md:mt-2.5">
         {/* Header with Clean Title, Granularity Badge, and Dynamic Responsive Amounts */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1.5 mb-1.5 border-b border-slate-200 gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-1 md:pb-1.5 mb-1 md:mb-1.5 border-b border-slate-200 gap-1 md:gap-1.5">
           <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar py-0.5">
             <BarChart3 size={13} className="text-emerald-700 shrink-0" />
             <span className="text-[11px] sm:text-xs font-bold text-slate-900 uppercase tracking-wider truncate shrink-0">
@@ -931,7 +931,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
   };
 
   return (
-    <div className="bg-white dark:bg-surface-container-lowest text-slate-900 rounded-2xl p-3 sm:p-4 border border-outline-variant/30 shadow-sm relative overflow-hidden transition-all">
+    <div className="bg-white dark:bg-surface-container-lowest text-slate-900 rounded-xl md:rounded-2xl p-2.5 md:p-4 border border-outline-variant/30 shadow-sm relative overflow-hidden transition-all">
       {/* Background Accent Subtle Glow */}
       <div className="absolute top-0 right-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
 
@@ -941,8 +941,8 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
       </span>
 
       {/* Header Row: Title, Date Filter, and Slide Controls */}
-      <div className="relative flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-200">
-        <div className="flex items-center gap-2 min-w-0 pr-1">
+      <div className="relative flex items-center justify-between gap-1.5 md:gap-2 pb-1.5 md:pb-2 mb-1.5 md:mb-2 border-b border-slate-200">
+        <div className="flex items-center gap-1.5 md:gap-2 min-w-0 pr-1">
           <span className="p-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 shrink-0">
             <Sparkles size={13} />
           </span>
@@ -951,12 +951,12 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
           </h2>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
           {/* Date Filter Pill Button */}
           <button
             type="button"
             onClick={() => setIsDateModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] sm:text-xs border border-slate-200 shadow-xs transition-all cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1 md:gap-1.5 px-1.5 py-0.5 sm:px-2 md:px-2.5 md:py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[10px] sm:text-[11px] md:text-xs border border-slate-200 shadow-xs transition-all cursor-pointer active:scale-95"
             aria-label="Change report time period"
           >
             <Calendar size={11} className="text-emerald-700" />
@@ -968,7 +968,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] sm:text-xs border border-slate-200 shadow-xs transition-all cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 sm:px-2 md:px-2.5 md:py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-[10px] sm:text-[11px] md:text-xs border border-slate-200 shadow-xs transition-all cursor-pointer active:scale-95"
             aria-label={isCollapsed ? 'Expand performance details' : 'Collapse performance details'}
           >
             <span>{isCollapsed ? 'Expand' : 'Collapse'}</span>
@@ -1013,21 +1013,21 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
         {/* ============================================================ */}
         {/* SLIDE 1: PROFITS & MARGINS */}
         {/* ============================================================ */}
-        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
+        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2 md:gap-2.5">
           {isCollapsed ? (
             /* Collapsed Two-Column View: Just Gross Profit & Net Profit */
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:gap-3">
               {/* Gross Profit Card */}
-              <div className="bg-emerald-50/70 rounded-xl p-2.5 sm:p-3 border border-emerald-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-emerald-50/70 rounded-xl p-2 md:p-3 border border-emerald-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-600 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Gross Profit
                     </span>
                   </div>
                   <div
-                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-bold shrink-0 ${
                       isGrossProfitPositive
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         : 'bg-rose-100 text-rose-800 border border-rose-200'
@@ -1038,9 +1038,9 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                   </div>
                 </div>
 
-                <div className="my-1">
+                <div className="my-0.5 md:my-1">
                   <div
-                    className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                    className={`text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight truncate ${
                       isGrossProfitPositive ? 'text-emerald-700' : 'text-rose-700'
                     }`}
                   >
@@ -1050,16 +1050,16 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
               </div>
 
               {/* Net Profit Card */}
-              <div className="bg-teal-50/70 rounded-xl p-2.5 sm:p-3 border border-teal-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-600' : 'bg-rose-600'}`} />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-teal-50/70 rounded-xl p-2 md:p-3 border border-teal-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-600' : 'bg-rose-600'}`} />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Net Profit
                     </span>
                   </div>
                   <div
-                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-bold shrink-0 ${
+                    className={`inline-flex items-center gap-0.5 sm:gap-1 px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-bold shrink-0 ${
                       isNetProfitPositive
                         ? 'bg-teal-100 text-teal-800 border border-teal-200'
                         : 'bg-rose-100 text-rose-800 border border-rose-200'
@@ -1070,9 +1070,9 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                   </div>
                 </div>
 
-                <div className="my-1">
+                <div className="my-0.5 md:my-1">
                   <div
-                    className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
+                    className={`text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight truncate ${
                       isNetProfitPositive ? 'text-teal-700' : 'text-rose-700'
                     }`}
                   >
@@ -1086,7 +1086,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
             <>
               <div className="flex flex-col gap-2 sm:gap-2.5">
                 {/* Gross Profit Card (Full Width) */}
-                <div className="w-full bg-emerald-50/70 rounded-xl p-2.5 sm:p-3 border border-emerald-200 shadow-xs transition-all">
+                <div className="w-full bg-emerald-50/70 rounded-xl p-2 md:p-3 border border-emerald-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
@@ -1106,9 +1106,9 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </div>
                   </div>
 
-                  <div className="my-1">
+                  <div className="my-0.5 md:my-1">
                     <div
-                      className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
+                      className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
                         isGrossProfitPositive ? 'text-emerald-700' : 'text-rose-700'
                       }`}
                     >
@@ -1116,14 +1116,14 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-emerald-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-emerald-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Total Revenue: <strong className="text-slate-900 font-mono font-bold">{formatINR(summary.totalSales)}</strong></span>
                     <span className="text-slate-600">COGS: <strong className="text-slate-900 font-mono font-bold">{formatINR(summary.totalCogs)}</strong></span>
                   </div>
                 </div>
 
                 {/* Net Profit Card (Full Width) */}
-                <div className="w-full bg-teal-50/70 rounded-xl p-2.5 sm:p-3 border border-teal-200 shadow-xs transition-all">
+                <div className="w-full bg-teal-50/70 rounded-xl p-2 md:p-3 border border-teal-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={`w-2 h-2 rounded-full shrink-0 ${isNetProfitPositive ? 'bg-teal-600' : 'bg-rose-600'}`} />
@@ -1143,9 +1143,9 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </div>
                   </div>
 
-                  <div className="my-1">
+                  <div className="my-0.5 md:my-1">
                     <div
-                      className={`text-xl sm:text-2xl font-black font-mono tracking-tight truncate ${
+                      className={`text-lg sm:text-2xl font-black font-mono tracking-tight truncate ${
                         isNetProfitPositive ? 'text-teal-700' : 'text-rose-700'
                       }`}
                     >
@@ -1153,7 +1153,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-teal-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-teal-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Gross Profit: <strong className="text-slate-900 font-mono font-bold">{formatINR(summary.grossProfit)}</strong></span>
                     <span className="text-rose-700">Operating Exp: <strong className="font-mono font-bold">-{formatINR(summary.totalExpenses)}</strong></span>
                   </div>
@@ -1168,47 +1168,47 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
         {/* ============================================================ */}
         {/* SLIDE 2: SALES & PURCHASES */}
         {/* ============================================================ */}
-        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
+        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2 md:gap-2.5">
           {isCollapsed ? (
             /* Collapsed Two-Column View: Just Total Sales & Total Purchases */
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:gap-3">
               {/* Total Sales */}
-              <div className="bg-blue-50/70 rounded-xl p-2.5 sm:p-3 border border-blue-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-blue-50/70 rounded-xl p-2 md:p-3 border border-blue-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-600 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Total Sales
                     </span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                  <span className="px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-semibold bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
                     {summary.salesBillCount} Invoices
                   </span>
                 </div>
 
-                <div className="my-1">
-                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-blue-700 truncate">
+                <div className="my-0.5 md:my-1">
+                  <div className="text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight text-blue-700 truncate">
                     {formatINR(summary.totalSales)}
                   </div>
                 </div>
               </div>
 
               {/* Total Purchases */}
-              <div className="bg-amber-50/70 rounded-xl p-2.5 sm:p-3 border border-amber-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-amber-600 shrink-0" />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-amber-50/70 rounded-xl p-2 md:p-3 border border-amber-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-amber-600 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Total Purchases
                     </span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                  <span className="px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
                     {summary.purchasesBillCount} Bills
                   </span>
                 </div>
 
-                <div className="my-1">
-                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-amber-700 truncate">
+                <div className="my-0.5 md:my-1">
+                  <div className="text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight text-amber-700 truncate">
                     {formatINR(summary.totalPurchases)}
                   </div>
                 </div>
@@ -1219,7 +1219,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
             <>
               <div className="flex flex-col gap-2 sm:gap-2.5">
                 {/* Total Sales (Full Width) */}
-                <div className="w-full bg-blue-50/70 rounded-xl p-2.5 sm:p-3 border border-blue-200 shadow-xs transition-all">
+                <div className="w-full bg-blue-50/70 rounded-xl p-2 md:p-3 border border-blue-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
@@ -1232,20 +1232,20 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </span>
                   </div>
 
-                  <div className="my-1">
-                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-blue-700 truncate">
+                  <div className="my-0.5 md:my-1">
+                    <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-blue-700 truncate">
                       {formatINR(summary.totalSales)}
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-blue-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-blue-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Avg Bill: <strong className="text-slate-900 font-mono font-bold">{formatINR(avgSalesBill)}</strong></span>
                     <span className="text-slate-500 truncate">Outward Supply Turnover</span>
                   </div>
                 </div>
 
                 {/* Total Purchases (Full Width) */}
-                <div className="w-full bg-amber-50/70 rounded-xl p-2.5 sm:p-3 border border-amber-200 shadow-xs transition-all">
+                <div className="w-full bg-amber-50/70 rounded-xl p-2 md:p-3 border border-amber-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full bg-amber-600 shrink-0" />
@@ -1258,13 +1258,13 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </span>
                   </div>
 
-                  <div className="my-1">
-                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-700 truncate">
+                  <div className="my-0.5 md:my-1">
+                    <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-amber-700 truncate">
                       {formatINR(summary.totalPurchases)}
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-amber-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-amber-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Trade Surplus: <strong className={`font-mono font-bold ${tradeNetSurplus >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatINR(tradeNetSurplus)}</strong></span>
                     <span className="text-slate-500 truncate">Inward Inventory Inflow</span>
                   </div>
@@ -1279,47 +1279,47 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
         {/* ============================================================ */}
         {/* SLIDE 3: STOCK VALUATION */}
         {/* ============================================================ */}
-        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2.5">
+        <div className="w-full flex-shrink-0 snap-start flex flex-col gap-2 md:gap-2.5">
           {isCollapsed ? (
             /* Collapsed Two-Column View: Just Opening Stock & Closing Stock */
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 md:gap-3">
               {/* Opening Stock */}
-              <div className="bg-purple-50/70 rounded-xl p-2.5 sm:p-3 border border-purple-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-purple-50/70 rounded-xl p-2 md:p-3 border border-purple-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-purple-600 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Opening Stock
                     </span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
+                  <span className="px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-semibold bg-purple-100 text-purple-800 border border-purple-200 shrink-0">
                     {summary.openingStockQuantity} Units
                   </span>
                 </div>
 
-                <div className="my-1">
-                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-purple-700 truncate">
+                <div className="my-0.5 md:my-1">
+                  <div className="text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight text-purple-700 truncate">
                     {formatINR(summary.openingStockValue)}
                   </div>
                 </div>
               </div>
 
               {/* Closing Stock */}
-              <div className="bg-teal-50/70 rounded-xl p-2.5 sm:p-3 border border-teal-200 shadow-xs flex flex-col justify-between">
-                <div className="flex items-center justify-between gap-1 mb-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+              <div className="bg-teal-50/70 rounded-xl p-2 md:p-3 border border-teal-200 shadow-xs flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-0.5 md:mb-1">
+                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-teal-600 shrink-0" />
+                    <span className="text-[10px] sm:text-[11px] md:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                       Closing Stock
                     </span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded-full text-[10px] sm:text-[10.5px] font-semibold bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
+                  <span className="px-1 md:px-1.5 py-0.2 md:py-0.5 rounded-full text-[9px] sm:text-[10px] md:text-[10.5px] font-semibold bg-teal-100 text-teal-800 border border-teal-200 shrink-0">
                     {summary.closingStockQuantity} Units
                   </span>
                 </div>
 
-                <div className="my-1">
-                  <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-teal-700 truncate">
+                <div className="my-0.5 md:my-1">
+                  <div className="text-base sm:text-xl md:text-2xl font-black font-mono tracking-tight text-teal-700 truncate">
                     {formatINR(summary.closingStockValue)}
                   </div>
                 </div>
@@ -1330,7 +1330,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
             <>
               <div className="flex flex-col gap-2 sm:gap-2.5">
                 {/* Opening Stock (Full Width) */}
-                <div className="w-full bg-purple-50/70 rounded-xl p-2.5 sm:p-3 border border-purple-200 shadow-xs transition-all">
+                <div className="w-full bg-purple-50/70 rounded-xl p-2 md:p-3 border border-purple-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
@@ -1343,20 +1343,20 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </span>
                   </div>
 
-                  <div className="my-1">
-                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-700 truncate">
+                  <div className="my-0.5 md:my-1">
+                    <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-purple-700 truncate">
                       {formatINR(summary.openingStockValue)}
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-purple-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-purple-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Valuation Basis: <strong className="text-slate-900 font-medium">Cost basis</strong></span>
                     <span className="text-slate-500 font-medium truncate">Period Start Asset</span>
                   </div>
                 </div>
 
                 {/* Closing Stock (Full Width) */}
-                <div className="w-full bg-teal-50/70 rounded-xl p-2.5 sm:p-3 border border-teal-200 shadow-xs transition-all">
+                <div className="w-full bg-teal-50/70 rounded-xl p-2 md:p-3 border border-teal-200 shadow-xs transition-all">
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
@@ -1369,13 +1369,13 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
                     </span>
                   </div>
 
-                  <div className="my-1">
-                    <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-teal-700 truncate">
+                  <div className="my-0.5 md:my-1">
+                    <div className="text-lg sm:text-2xl font-black font-mono tracking-tight text-teal-700 truncate">
                       {formatINR(summary.closingStockValue)}
                     </div>
                   </div>
 
-                  <div className="text-[10.5px] text-slate-600 pt-1.5 border-t border-teal-200/80 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-[9.5px] md:text-[10.5px] text-slate-600 pt-1 md:pt-1.5 border-t border-teal-200/80 flex items-center justify-between gap-2 flex-wrap">
                     <span>Stock Change: <strong className={`font-mono font-bold ${stockDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{stockDelta >= 0 ? '+' : ''}{formatINR(stockDelta)}</strong></span>
                     <span className="text-slate-500 font-medium truncate">Current On-Hand Asset</span>
                   </div>
@@ -1389,7 +1389,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
       </div>
 
       {/* Square-like Slim Tab Bar (Profits & Margins, Sales & Purchases, Stock Valuation) Below Graph */}
-      <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-100 border border-slate-200 mt-2.5">
+      <div className="grid grid-cols-3 gap-1 p-0.5 sm:p-1 rounded-lg bg-slate-100 border border-slate-200 mt-2 md:mt-2.5">
         {SLIDES.map((slide, idx) => {
           const Icon = slide.icon;
           const isActive = activeSlide === idx;
@@ -1398,7 +1398,7 @@ export const BusinessPerformanceCard: React.FC<BusinessPerformanceCardProps> = (
               key={slide.id}
               type="button"
               onClick={() => scrollToSlide(idx)}
-              className={`py-1.5 px-2 rounded-md text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`py-1 md:py-1.5 px-1 md:px-2 rounded-md text-[10px] sm:text-[11px] md:text-xs font-bold transition-all flex items-center justify-center gap-1 md:gap-1.5 cursor-pointer ${
                 isActive
                   ? 'bg-white text-slate-900 shadow-xs border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 border border-transparent'
