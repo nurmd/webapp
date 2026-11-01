@@ -901,7 +901,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       </div>
 
       {/* Floating Action Button for New Bill */}
-      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+      <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40">
         <button
           onClick={onOpenTableGridInvoice}
           className="h-11 px-4 rounded-full bg-secondary text-on-secondary font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"

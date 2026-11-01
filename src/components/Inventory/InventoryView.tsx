@@ -751,7 +751,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Sticky Bottom Floating Action Center */}
-        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+        <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40">
           <button
             onClick={handleOpenAdd}
             aria-label="Add New Item"
