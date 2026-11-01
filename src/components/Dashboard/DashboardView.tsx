@@ -683,21 +683,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const PAGE_SIZE = 50;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  // Expand / collapse action icons on smaller screens
-  const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
-
-  const toggleExpandCard = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setExpandedCardIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+  // Collapsible Filters State
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const activeFiltersCount = useMemo(() => {
+    return (
+      (txTypeFilter !== 'ALL' ? 1 : 0) +
+      (txStatusFilter !== 'ALL' ? 1 : 0) +
+      (datePreset !== 'ALL_TIME' ? 1 : 0)
+    );
+  }, [txTypeFilter, txStatusFilter, datePreset]);
 
   React.useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -803,18 +797,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 py-3 max-w-7xl mx-auto">
       {/* 2 & 3. Unified Financial Snapshot & Quick Actions (Responsive Tablet Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch">
-        {/* Left: Financial Overview Card */}
-        <section className="md:col-span-8 bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
-            <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-secondary"></span>
+        {/* Left: Financial Overview Card - Dark Hero Card (bg-slate-900, white text, slate-300 labels) */}
+        <section className="md:col-span-8 bg-slate-900 text-white rounded-2xl p-3.5 sm:p-4 shadow-md border border-slate-800 flex flex-col justify-between gap-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span className="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
               Financial Overview
             </span>
 
             <button
               type="button"
               onClick={() => onNavigateTab('reports')}
-              className="text-secondary text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
+              className="text-slate-300 hover:text-white text-xs font-bold flex items-center gap-0.5 cursor-pointer transition-colors"
             >
               <span>Reports</span>
               <span className="material-symbols-outlined text-[15px]">chevron_right</span>
@@ -824,21 +818,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Primary Metric: Total Sales Hero Banner */}
           <div
             onClick={() => onNavigateTab('sales')}
-            className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-low transition-colors cursor-pointer group"
+            className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer group"
           >
             <div className="flex flex-col min-w-0">
-              <span className="text-[11px] sm:text-xs text-on-surface-variant uppercase font-bold tracking-wider">
+              <span className="text-[11px] sm:text-xs text-slate-300 uppercase font-bold tracking-wider">
                 Total Sales
               </span>
-              <span className="font-tabular-data text-xl sm:text-2xl font-black text-on-surface tracking-tight mt-0.5 group-hover:text-secondary transition-colors">
+              <span className="font-tabular-data text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5 group-hover:text-emerald-400 transition-colors">
                 {formatINR(totalSales)}
-              </span>
-              <span className="text-[11px] text-on-surface-variant font-medium mt-0.5">
-                {activeInvoices.length} bill{activeInvoices.length === 1 ? '' : 's'} recorded
               </span>
             </div>
 
-            <div className="flex items-center gap-1 text-secondary text-xs font-bold bg-secondary/10 px-2.5 py-1.5 rounded-xl group-hover:bg-secondary group-hover:text-on-secondary transition-all flex-shrink-0 ml-2">
+            <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl group-hover:bg-emerald-500/20 transition-all flex-shrink-0 ml-2">
               <span>Sales Hub</span>
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </div>
@@ -846,7 +837,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Cash Flow Balance: 2-Column Split (To Collect vs To Pay) */}
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            {/* To Collect (Receivables) */}
+            {/* To Collect (Receivables) - Money In (Emerald) */}
             <div
               onClick={() => {
                 if (onNavigateToParties) {
@@ -855,27 +846,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onNavigateTab('parties');
                 }
               }}
-              className="p-3 sm:p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
+              className="p-3 sm:p-3.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-800/50 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] sm:text-xs text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
+                <span className="text-[10px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[14px] flex-shrink-0">south_west</span>
                   <span className="truncate">To Collect</span>
                 </span>
-                <span className="text-[10px] font-bold text-secondary bg-emerald-100/80 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/80 border border-emerald-700/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
                   {debtorParties.length}
                 </span>
               </div>
 
-              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-emerald-700 dark:text-emerald-400 mt-1.5 truncate">
+              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-emerald-400 mt-1.5 truncate">
                 {formatINR(totalReceivables)}
-              </span>
-              <span className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium mt-0.5 truncate">
-                from {debtorParties.length} {debtorParties.length === 1 ? 'party' : 'parties'}
               </span>
             </div>
 
-            {/* To Pay (Payables) */}
+            {/* To Pay (Payables) - Money Out (Rose) */}
             <div
               onClick={() => {
                 if (onNavigateToParties) {
@@ -884,23 +872,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onNavigateTab('parties');
                 }
               }}
-              className="p-3 sm:p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/50 dark:border-rose-800/30 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
+              className="p-3 sm:p-3.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/60 border border-rose-800/50 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
+                <span className="text-[10px] sm:text-xs text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[14px] flex-shrink-0">north_east</span>
                   <span className="truncate">To Pay</span>
                 </span>
-                <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-100/80 dark:bg-rose-900/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                <span className="text-[10px] font-bold text-rose-300 bg-rose-900/80 border border-rose-700/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
                   {creditorParties.length}
                 </span>
               </div>
 
-              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-rose-600 dark:text-rose-400 mt-1.5 truncate">
+              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-rose-400 mt-1.5 truncate">
                 {formatINR(totalPayables)}
-              </span>
-              <span className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium mt-0.5 truncate">
-                to {creditorParties.length} supplier{creditorParties.length === 1 ? '' : 's'}
               </span>
             </div>
           </div>
@@ -908,17 +893,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Cash & Bank Quick Strip */}
           <div
             onClick={() => onNavigateTab('cash_bank')}
-            className="flex items-center justify-between p-2.5 rounded-xl bg-surface-container-low/70 hover:bg-surface-container transition-colors cursor-pointer group border border-outline-variant/20"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
                 <span className="material-symbols-outlined text-[17px]">account_balance</span>
               </div>
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-bold text-on-surface truncate">Cash & Bank Balance</span>
-                <span className="text-[11px] text-on-surface-variant font-medium hidden sm:inline">
-                  • Cash in hand & bank accounts
-                </span>
+                <span className="text-xs font-bold text-white truncate">Cash & Bank Balance</span>
               </div>
             </div>
 
@@ -926,7 +908,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex flex-col items-end">
                 <span
                   data-testid="dashboard-cash-bank-balance"
-                  className="font-tabular-data text-xs sm:text-sm font-bold text-on-surface"
+                  className="font-tabular-data text-xs sm:text-sm font-bold text-white"
                 >
                   {formatINR(totalCashBankBalance || 0)}
                 </span>
@@ -935,13 +917,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     data-testid="dashboard-cash-bank-negative-note"
                     title="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
                     aria-label="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
-                    className="text-[10px] text-amber-700 dark:text-amber-400 font-medium"
+                    className="text-[10px] text-amber-400 font-medium"
                   >
                     Negative ledger balance
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1 text-secondary font-bold text-xs group-hover:underline">
+              <div className="flex items-center gap-1 text-slate-300 group-hover:text-emerald-400 font-bold text-xs group-hover:underline">
                 <span>Passbook</span>
                 <span className="material-symbols-outlined text-[15px]">chevron_right</span>
               </div>
@@ -956,7 +938,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="w-2 h-2 rounded-full bg-secondary"></span>
               Quick Actions
             </span>
-            <span className="text-[10px] text-outline font-semibold">Fast Shortcuts</span>
           </div>
 
           <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
@@ -1009,33 +990,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           </div>
 
-          {/* Real-Time Live Search Input (R2) */}
-          <div className="relative w-full">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant/70">
-              search
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search reference #, party / vendor name, or amount..."
-              className="w-full pl-9 pr-9 min-h-[44px] rounded-xl bg-surface-container-low/70 border border-outline-variant/30 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:outline-hidden focus:border-secondary focus:bg-surface-container-lowest transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl"
-                title="Clear search"
-                aria-label="Clear search"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
+          {/* Real-Time Live Search Input & Expandable Filter Button */}
+          <div className="flex items-center gap-2 w-full">
+            <div className="relative flex-1 min-w-0">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant/70">
+                search
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search reference #, party / vendor name, or amount..."
+                className="w-full pl-9 pr-9 min-h-[44px] rounded-xl bg-surface-container-low/70 border border-outline-variant/30 text-xs text-on-surface placeholder:text-on-surface-variant/60 focus:outline-hidden focus:border-secondary focus:bg-surface-container-lowest transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl"
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Compact Expandable Filter Button */}
+            <button
+              type="button"
+              onClick={() => setIsFilterExpanded((prev) => !prev)}
+              aria-expanded={isFilterExpanded}
+              aria-label="Filter"
+              className={`min-h-[44px] px-3 sm:px-3.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0 active:scale-95 ${
+                activeFiltersCount > 0
+                  ? 'bg-secondary/15 border-secondary text-secondary'
+                  : isFilterExpanded
+                  ? 'bg-surface-container border-outline-variant/60 text-on-surface'
+                  : 'bg-surface-container-low/80 border-outline-variant/30 text-on-surface hover:bg-surface-container'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">tune</span>
+              <span>Filter</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-5 h-5 rounded-full bg-secondary text-on-secondary text-[10px] flex items-center justify-center font-bold">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
           </div>
 
-          {/* Single-Line Filter Dropdowns Bar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 w-full">
+          {/* Collapsible Filter Dropdowns Bar */}
+          <div className={`${isFilterExpanded ? 'flex' : 'hidden'} items-center gap-1.5 sm:gap-2 w-full pt-1 transition-all`}>
             {/* Entity Type Dropdown */}
             <div className="relative flex-1 min-w-0">
               <select
@@ -1191,8 +1197,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Transactions Feed List (R1, R2, R3) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:gap-3 md:p-3.5">
+        {/* Transactions Feed List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5 p-3 sm:p-3.5">
           {filteredActivities.length === 0 ? (
             <div className="py-12 px-4 text-center flex flex-col items-center justify-center gap-2 md:col-span-2">
               <div className="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-outline">
@@ -1254,19 +1260,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 item.typeLabel === 'Purchase Return' ||
                 item.typeLabel.includes('Return');
 
-              // Type Badge Colors
+              // Type Badge Colors for Dark Card
               const typeBadgeClass =
                 isReturn
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                  ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
                   : item.type === 'SALE'
-                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                  ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60'
                   : item.type === 'PURCHASE'
-                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300'
+                  ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
                   : item.type === 'VOUCHER'
-                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300'
-                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
+                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/60'
+                  : 'bg-rose-950/80 text-rose-300 border border-rose-800/60';
 
-              const isExpanded = expandedCardIds.has(item.id);
+              const overdueDays =
+                item.dueDate && (item.balanceAmount || 0) > 0.01 && item.paymentStatus !== 'PAID'
+                  ? getOverdueDays(item.dueDate)
+                  : 0;
 
               return (
                 <div
@@ -1274,219 +1283,85 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onClick={() => handleCardClick(item)}
                   style={{
                     contentVisibility: 'auto',
-                    containIntrinsicSize: isExpanded ? '1px 115px' : '1px 68px',
+                    containIntrinsicSize: '1px 72px',
                   }}
-                  className="p-2.5 sm:p-3 md:p-3.5 flex flex-col justify-between gap-2 sm:gap-2.5 hover:bg-surface-container-low/40 active:bg-surface-container-low cursor-pointer transition-all md:rounded-2xl md:border md:border-outline-variant/20 md:hover:border-secondary/40 shadow-xs group"
+                  className="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800/90 active:bg-slate-800 border border-slate-700/50 flex flex-col justify-between gap-2 cursor-pointer transition-all shadow-xs group"
                 >
-                  {/* Top Header: Entity Type Badge & Date + Expand Chevron */}
+                  {/* Top line: Badges on left, Date on right */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar py-0.5">
-                      {/* Entity Type Badge */}
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${typeBadgeClass} whitespace-nowrap shrink-0`}>
                         {item.typeLabel}
                       </span>
 
-                      {/* Overdue Badge when dueDate is in the past and balanceAmount > 0 */}
-                      {(() => {
-                        const overdueDays =
-                          item.dueDate && (item.balanceAmount || 0) > 0.01 && item.paymentStatus !== 'PAID'
-                            ? getOverdueDays(item.dueDate)
-                            : 0;
-                        if (overdueDays <= 0) return null;
-                        return (
-                          <span
-                            data-testid="overdue-badge"
-                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800 whitespace-nowrap shrink-0"
-                          >
-                            <span className="material-symbols-outlined text-[11px]">schedule</span>
-                            <span>{overdueDays} days overdue</span>
-                          </span>
-                        );
-                      })()}
+                      {overdueDays > 0 && (
+                        <span
+                          data-testid="overdue-badge"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800 whitespace-nowrap shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-[11px]">schedule</span>
+                          <span>{overdueDays} days overdue</span>
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-[11px] text-on-surface-variant font-medium">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] text-slate-400 font-medium">
                         {formatDate(item.date) || '—'}
                       </span>
-
-                      {/* Expand / Collapse Chevron Toggle for smaller screens (hidden on md+) */}
                       <button
                         type="button"
-                        onClick={(e) => toggleExpandCard(e, item.id)}
-                        data-testid={`expand-actions-${item.id}`}
-                        className={`md:hidden min-w-[36px] min-h-[36px] w-9 h-9 rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-90 ${
-                          isExpanded
-                            ? 'bg-secondary/15 text-secondary'
-                            : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface'
-                        }`}
-                        aria-expanded={isExpanded}
-                        aria-label={isExpanded ? 'Collapse action icons' : 'Expand action icons'}
-                        title={isExpanded ? 'Collapse action icons' : 'Expand action icons'}
+                        title="Share Receipt"
+                        aria-label="Share receipt"
+                        onClick={(e) => handleShareClick(e, item)}
+                        className="min-h-[44px] min-w-[44px] -my-2 flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-700/60 rounded-lg active:scale-95 transition-all cursor-pointer"
                       >
-                        <span
-                          className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
-                            isExpanded ? 'rotate-180 text-secondary font-bold' : ''
-                          }`}
-                        >
-                          expand_more
-                        </span>
+                        <span className="material-symbols-outlined text-[16px]">share</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* Main Details Row */}
+                  {/* Main Details Line: Left (Party & Doc #), Right (Amount & Status/Due) */}
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    {/* Left: Icon & Title/Party/Doc info */}
-                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-                      <div
-                        className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                          isMoneyIn
-                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                            : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
-                          {isReturn
-                            ? 'assignment_return'
-                            : item.type === 'SALE'
-                            ? (item.typeLabel.includes('Challan') ? 'local_shipping' : item.typeLabel.includes('Order') ? 'assignment' : item.typeLabel.includes('Estimate') ? 'request_quote' : 'receipt_long')
-                            : item.type === 'PURCHASE'
-                            ? (item.typeLabel.includes('Challan') ? 'move_to_inbox' : item.typeLabel.includes('Order') ? 'add_shopping_cart' : 'shopping_bag')
-                            : item.type === 'EXPENSE'
-                            ? 'payments'
-                            : isMoneyIn
-                            ? 'account_balance_wallet'
-                            : 'send_money'}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-secondary transition-colors">
-                          {item.partyName}
-                        </span>
-                        <div className="flex items-center gap-1.5 text-[11px] text-on-surface-variant truncate mt-0.5">
-                          <span className="font-mono font-bold text-on-surface">{item.identifier}</span>
-                          {item.paymentMode && (
-                            <>
-                              <span>•</span>
-                              <span className="uppercase text-[10px] font-semibold">{item.paymentMode}</span>
-                            </>
-                          )}
-                          {item.description && (
-                            <>
-                              <span className="hidden sm:inline">•</span>
-                              <span className="truncate hidden sm:inline">{item.description}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                    {/* Left: Party Name & Doc Number */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-xs sm:text-sm text-white truncate group-hover:text-emerald-400 transition-colors">
+                        {item.partyName}
+                      </span>
+                      <span className="font-mono font-bold text-[11px] text-slate-300 truncate mt-0.5">
+                        {item.identifier}
+                      </span>
                     </div>
 
-                    {/* Right: Amount & Settlement Status Pill */}
+                    {/* Right: Amount & Status / Due */}
                     <div className="flex flex-col items-end flex-shrink-0 text-right">
                       <span
                         className={`font-tabular-data text-xs sm:text-sm font-black whitespace-nowrap ${
-                          isMoneyIn
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-rose-700 dark:text-rose-400'
+                          isMoneyIn ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
                         {isMoneyIn ? '+' : '-'} {formatINR(item.amount)}
                       </span>
 
-                      <div className="flex items-center gap-1.5 mt-0.5 overflow-x-auto no-scrollbar justify-end py-0.5">
-                        {/* Settlement Status Pill */}
+                      <div className="flex items-center gap-1.5 mt-0.5 justify-end">
                         <span
                           className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap shrink-0 ${
                             isPaid
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-800/60'
                               : isPartial
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                              ? 'bg-amber-950/90 text-amber-300 border border-amber-800/60'
+                              : 'bg-rose-950/90 text-rose-300 border border-rose-800/60'
                           }`}
                         >
                           <span className="leading-none">{item.paymentStatus}</span>
                         </span>
 
                         {hasBalance && item.balanceAmount && (
-                          <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap shrink-0 leading-none">
+                          <span className="text-[10px] font-semibold text-rose-400 whitespace-nowrap shrink-0 leading-none">
                             Due: {formatINR(item.balanceAmount)}
                           </span>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom: 1-Tap Inline Fast Action Controls (R3) - Collapsible on smaller screens */}
-                  <div
-                    className={`${
-                      isExpanded ? 'flex' : 'hidden md:flex'
-                    } items-center justify-between pt-2 border-t border-outline-variant/15 text-xs transition-all gap-1.5 flex-wrap sm:flex-nowrap`}
-                  >
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      {/* 1-Tap View Details */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCardClick(item);
-                        }}
-                        className="min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer text-xs"
-                        title="View Details"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">visibility</span>
-                        <span>View</span>
-                      </button>
-
-                      {/* 1-Tap Share / Print */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleShareClick(e, item)}
-                        className="min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer text-xs"
-                        title="Share Receipt"
-                        aria-label="Share receipt"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">share</span>
-                        <span className="hidden sm:inline">Share</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={(e) => handlePrintClick(e, item)}
-                        className="min-h-[44px] px-2.5 sm:px-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer text-xs"
-                        title="Print Receipt"
-                        aria-label="Print receipt"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">print</span>
-                        <span className="hidden sm:inline">Print</span>
-                      </button>
-                    </div>
-
-                    {/* 1-Tap Fast Record Payment Action (for Unpaid / Partial items) */}
-                    <div>
-                      {hasBalance && (item.type === 'SALE' || item.type === 'PURCHASE') ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenRecordPayment(e, item)}
-                          className={`min-h-[44px] px-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer ${
-                            item.type === 'SALE'
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              : 'bg-rose-600 hover:bg-rose-700 text-white'
-                          }`}
-                          title={item.type === 'SALE' ? 'Collect Customer Payment' : 'Pay Supplier Bill'}
-                        >
-                          <span className="material-symbols-outlined text-[16px]">payments</span>
-                          <span>{item.type === 'SALE' ? 'Collect' : 'Pay'}</span>
-                        </button>
-                      ) : (
-                        <span className="min-h-[44px] px-2 text-xs font-bold text-on-surface-variant flex items-center justify-center gap-1">
-                          <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">
-                            check_circle
-                          </span>
-                          <span>Settled</span>
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>

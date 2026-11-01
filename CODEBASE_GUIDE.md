@@ -466,6 +466,14 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   6. Data & Sync (Cloud sync, multi-device pairing, import/export)
   7. Security & Audit (Immutable SHA-256 MCA audit trail)
 - Dashboard Quick Actions are stored in `SyncedSettings.dashboardQuickActions` (max 8, normalized by `src/core/settings/dashboardQuickActions.ts`) and rendered by `DashboardView` as compact cards (`h-[36px] sm:h-10`) in a 4-column responsive matrix using the same navigation/creation handlers as the legacy shortcuts.
+- **Dashboard Phase 1 Contrast Redesign & Declutter (`DashboardView.tsx`)**:
+  - **Financial Overview Dark Hero Card**: High-contrast `bg-slate-900` card with `text-white` primary metrics, `text-slate-300` labels, emerald accents for money in (`Total Sales`, `To Collect`), and rose accents for money out (`To Pay`). Decluttered redundant helper text ("X bills recorded", "from X parties", "to X suppliers", "• Cash in hand & bank accounts", "Fast Shortcuts") while retaining count badges.
+  - **Business Activity Timeline Feed**:
+    - Transaction rows rendered as compact dark cards (`bg-slate-800/60`, white primary text, `slate-300/400` secondary text) within the white surface container for crisp contrast.
+    - Decluttered per-row payment mode, multi-line descriptions, and full inline action bars. Retains type badge, overdue badge, date, party name, document identifier, amount, and payment status / balance due.
+    - Preserves 1-tap WhatsApp sharing via a single compact share icon (`button[title="Share Receipt"]`, `aria-label="Share receipt"`) on each row with `stopPropagation`.
+    - Row tap opens contextual document details (`onViewInvoice`, `onViewPurchase`, `DashboardVoucherModal`, `SimplifiedExpenseModal`).
+    - Search input remains sticky and instantly accessible; transaction type, payment status, and date range filters are collapsed behind a compact expandable "Filter" toggle button with an active filter count badge.
 - **Business Activity Timeline Feed Tags (`DashboardView.tsx`)**:
   - Feed items derive their `typeLabel` strictly from the document's specific type:
     - Sales: `CREDIT_NOTE` -> `Sales Return`, `DEBIT_NOTE` -> `Debit Note`, `DELIVERY_CHALLAN` -> `Delivery Challan`, `ESTIMATE` -> `Quotation / Estimate`, `SALES_ORDER` -> `Sale Order`, standard -> `Sale Invoice`.

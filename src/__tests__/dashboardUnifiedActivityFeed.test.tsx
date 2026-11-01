@@ -35,6 +35,7 @@ vi.mock('../services/pouchdb.ts', () => ({
 }));
 
 import { DashboardView } from '../components/Dashboard/DashboardView.tsx';
+import { DashboardRecordPaymentModal } from '../components/Dashboard/DashboardRecordPaymentModal.tsx';
 import { CompanyProfile } from '../models/company.ts';
 import { Invoice } from '../models/invoice.ts';
 import { PurchaseBill } from '../models/purchase.ts';
@@ -317,20 +318,21 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('Business Activity Timeline');
     expect(container.textContent).toContain('5 of 5');
 
-    // Verify identifiers exist
+    // Verify party names and document identifiers exist
     expect(container.textContent).toContain('INV-2026-002'); // Date: 2026-10-14
     expect(container.textContent).toContain('RCPT-2026-005'); // Date: 2026-10-13
     expect(container.textContent).toContain('PUR-2026-088');  // Date: 2026-10-12
-    expect(container.textContent).toContain('Shop Monthly Rent'); // Date: 2026-10-11
+    expect(container.textContent).toContain('Property Landlord'); // partyName (vendorName/title/category)
+    expect(container.textContent).toContain('EXP-101'); // document identifier
     expect(container.textContent).toContain('INV-2026-001'); // Date: 2026-10-10
 
     // Chronological order verification:
-    // INV-2026-002 (Oct 14) -> RCPT-2026-005 (Oct 13) -> PUR-2026-088 (Oct 12) -> Shop Monthly Rent (Oct 11) -> INV-2026-001 (Oct 10)
+    // INV-2026-002 (Oct 14) -> RCPT-2026-005 (Oct 13) -> PUR-2026-088 (Oct 12) -> EXP-101 (Oct 11) -> INV-2026-001 (Oct 10)
     const text = container.textContent || '';
     const idxOct14 = text.indexOf('INV-2026-002');
     const idxOct13 = text.indexOf('RCPT-2026-005');
     const idxOct12 = text.indexOf('PUR-2026-088');
-    const idxOct11 = text.indexOf('Shop Monthly Rent');
+    const idxOct11 = text.indexOf('EXP-101');
     const idxOct10 = text.indexOf('INV-2026-001');
 
     expect(idxOct14).toBeLessThan(idxOct13);
@@ -359,10 +361,10 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
 
     const moneyInAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
-      (el) => el.textContent?.trim().startsWith('+') && el.className.includes('text-emerald-700')
+      (el) => el.textContent?.trim().startsWith('+') && el.className.includes('text-emerald-400')
     );
     const moneyOutAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
-      (el) => el.textContent?.trim().startsWith('-') && el.className.includes('text-rose-700')
+      (el) => el.textContent?.trim().startsWith('-') && el.className.includes('text-rose-400')
     );
 
     // Sales (2) + Receipt Voucher (1) = 3 Money In (+)
@@ -371,7 +373,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(moneyOutAmounts.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('R1: displays party/vendor name, payment mode, and settlement status on transaction cards', () => {
+  it('R1: displays party/vendor name, document number, and settlement status on compact transaction cards (payment mode decluttered)', () => {
     act(() => {
       root.render(
         <DashboardView
@@ -394,13 +396,17 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('Sharma Electronics');
     expect(container.textContent).toContain('Alpha Wholesale Supplies');
 
+    // Document numbers
+    expect(container.textContent).toContain('INV-2026-001');
+    expect(container.textContent).toContain('PUR-2026-088');
+
     // Settlement statuses
     expect(container.textContent).toContain('PAID');
     expect(container.textContent).toContain('UNPAID');
 
-    // Payment modes
-    expect(container.textContent).toContain('CASH');
-    expect(container.textContent).toContain('CREDIT');
+    // Per-row payment modes and descriptions removed for decluttering; cards render with dark card styling
+    const cards = container.querySelectorAll('.bg-slate-800\\/60');
+    expect(cards.length).toBeGreaterThan(0);
   });
 
   it('labels inward GRN challans as Purchase Challan instead of Purchase Bill', () => {
@@ -440,7 +446,6 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     const card = identifier?.closest('.group');
 
     expect(card?.textContent).toContain('Purchase Challan (GRN)');
-    expect(card?.textContent).toContain('Goods Received Note');
     expect(card?.textContent).not.toContain('Purchase Bill');
   });
 
@@ -666,7 +671,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
 
     expect(container.textContent).toContain('1 of 5');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
   });
 
   it('R2: switches visible transactions using quick type filter pills (Sales, Purchases, Vouchers, Expenses)', () => {
@@ -731,7 +736,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
 
     expect(container.textContent).toContain('1 of 5');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
 
     // Tap "All"
     const allBtn = buttons.find((b) => b.textContent?.includes('All (5)'));
@@ -786,7 +791,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('3 of 5');
     expect(container.textContent).toContain('INV-2026-001');
     expect(container.textContent).toContain('RCPT-2026-005');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
     expect(container.textContent).not.toContain('INV-2026-002');
   });
 
@@ -826,7 +831,9 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(handleViewInvoice).toHaveBeenCalledWith(mockInvoices[0]);
   });
 
-  it('R3: 1-tap "Collect" button opens inline record payment modal prefilled with bill balance', () => {
+  it('R3: tapping a purchase transaction card triggers onViewPurchase', () => {
+    const handleViewPurchase = vi.fn();
+
     act(() => {
       root.render(
         <DashboardView
@@ -840,22 +847,46 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
           onNewInvoice={vi.fn()}
           onQuickPos={vi.fn()}
           onViewInvoice={vi.fn()}
+          onViewPurchase={handleViewPurchase}
           onNavigateTab={vi.fn()}
         />
       );
     });
 
-    // Look for the "Collect" 1-tap button on unpaid invoice card
-    const collectBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.trim() === 'paymentsCollect'
+    const purCard = Array.from(container.querySelectorAll('div')).find(
+      (d) => d.textContent?.includes('PUR-2026-088') && d.classList.contains('group')
     );
-    expect(collectBtn).toBeDefined();
+    expect(purCard).toBeDefined();
 
     act(() => {
-      collectBtn?.click();
+      purCard?.click();
     });
 
-    // Should open the modal inline
+    expect(handleViewPurchase).toHaveBeenCalledWith(mockPurchases[0]);
+  });
+
+  it('R3: DashboardRecordPaymentModal prefilled with bill balance renders customer and balance details', () => {
+    act(() => {
+      root.render(
+        <DashboardRecordPaymentModal
+          isOpen={true}
+          onClose={vi.fn()}
+          target={{
+            type: 'SALE',
+            rawId: mockInvoices[1].id,
+            docNumber: mockInvoices[1].invoiceNumber,
+            partyName: mockInvoices[1].partyName,
+            partyId: mockInvoices[1].partyId,
+            balanceAmount: mockInvoices[1].balanceAmount || 3000,
+            grandTotal: mockInvoices[1].grandTotal,
+            rawInvoice: mockInvoices[1],
+          }}
+          parties={mockParties}
+          onRecordPartyPayment={vi.fn()}
+        />
+      );
+    });
+
     expect(container.textContent).toContain('Collect Customer Payment');
     expect(container.textContent).toContain('Sharma Electronics');
     expect(container.textContent).toContain('Ref: #INV-2026-002');
@@ -863,39 +894,33 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('Confirm Payment');
   });
 
-  it('R3: submitting inline payment modal calls onRecordPartyPayment and closes without navigation', () => {
+  it('R3: submitting DashboardRecordPaymentModal calls onRecordPartyPayment and closes without navigation', () => {
     const handleRecordPayment = vi.fn();
     const handleRefresh = vi.fn();
+    const handleClose = vi.fn();
 
     act(() => {
       root.render(
-        <DashboardView
-          company={mockCompany}
-          invoices={mockInvoices}
-          purchases={mockPurchases}
-          vouchers={mockVouchers}
-          expenses={mockExpenses}
-          items={mockItems}
+        <DashboardRecordPaymentModal
+          isOpen={true}
+          onClose={handleClose}
+          target={{
+            type: 'SALE',
+            rawId: mockInvoices[1].id,
+            docNumber: mockInvoices[1].invoiceNumber,
+            partyName: mockInvoices[1].partyName,
+            partyId: mockInvoices[1].partyId,
+            balanceAmount: mockInvoices[1].balanceAmount || 3000,
+            grandTotal: mockInvoices[1].grandTotal,
+            rawInvoice: mockInvoices[1],
+          }}
           parties={mockParties}
-          onNewInvoice={vi.fn()}
-          onQuickPos={vi.fn()}
-          onViewInvoice={vi.fn()}
           onRecordPartyPayment={handleRecordPayment}
           onRefresh={handleRefresh}
-          onNavigateTab={vi.fn()}
         />
       );
     });
 
-    // Click "Collect"
-    const collectBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.trim() === 'paymentsCollect'
-    );
-    act(() => {
-      collectBtn?.click();
-    });
-
-    // Modal is open; click Confirm Payment
     const confirmBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Confirm Payment')
     );
@@ -907,9 +932,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
 
     expect(handleRecordPayment).toHaveBeenCalled();
     expect(handleRefresh).toHaveBeenCalled();
-
-    // Modal closes
-    expect(container.textContent).not.toContain('Collect Customer Payment');
+    expect(handleClose).toHaveBeenCalled();
   });
 
   it('R2 Edge Case: searches dynamically across formatted currency, decimals, currency symbols, and balance due without regex errors', () => {
@@ -967,7 +990,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       changeInput(searchInput, 'expense');
     });
     expect(container.textContent).toContain('1 of 5');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
 
     // 6. Search with regex special characters like brackets and parentheses: "[test]"
     act(() => {
@@ -1006,7 +1029,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
 
     expect(container.textContent).toContain('2 of 5');
     expect(container.textContent).toContain('RCPT-2026-005');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
     expect(container.textContent).not.toContain('INV-2026-001');
     expect(container.textContent).not.toContain('PUR-2026-088');
   });
@@ -1073,15 +1096,13 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       );
     });
 
-    // Share on Expense card
+    // Share on Expense card directly via compact share icon
     const expenseCard = Array.from(container.querySelectorAll('div')).find(
-      (d) => d.textContent?.includes('Shop Monthly Rent') && d.classList.contains('group')
+      (d) => (d.textContent?.includes('Property Landlord') || d.textContent?.includes('EXP-101')) && d.classList.contains('group')
     );
     expect(expenseCard).toBeDefined();
 
-    const expShareBtn = Array.from(expenseCard!.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Share')
-    );
+    const expShareBtn = expenseCard?.querySelector('button[title="Share Receipt"]') as HTMLButtonElement;
     expect(expShareBtn).toBeDefined();
 
     act(() => {
@@ -1111,34 +1132,28 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       paidAmount: 0,
     };
 
+    const targetPayload = {
+      type: 'SALE' as const,
+      rawId: walkInInvoice.id,
+      docNumber: walkInInvoice.invoiceNumber,
+      partyName: walkInInvoice.partyName,
+      partyId: walkInInvoice.partyId,
+      balanceAmount: 1500,
+      grandTotal: 1500,
+      rawInvoice: walkInInvoice,
+    };
+
     // First: render without onRecordPartyPayment to verify safe rejection without direct mutations
     act(() => {
       root.render(
-        <DashboardView
-          company={mockCompany}
-          invoices={[walkInInvoice]}
-          purchases={[]}
-          vouchers={[]}
-          expenses={[]}
-          items={mockItems}
-          parties={[]} // Empty parties list
-          onNewInvoice={vi.fn()}
-          onQuickPos={vi.fn()}
-          onViewInvoice={vi.fn()}
+        <DashboardRecordPaymentModal
+          isOpen={true}
+          onClose={vi.fn()}
+          target={targetPayload}
+          parties={[]}
           onRefresh={handleRefresh}
-          onNavigateTab={vi.fn()}
         />
       );
-    });
-
-    // Click Collect
-    const collectBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.trim() === 'paymentsCollect'
-    );
-    expect(collectBtn).toBeDefined();
-
-    act(() => {
-      collectBtn?.click();
     });
 
     expect(container.textContent).toContain('Collect Customer Payment');
@@ -1175,30 +1190,15 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     // 3. Now re-render with central onRecordPartyPayment provided
     act(() => {
       root.render(
-        <DashboardView
-          company={mockCompany}
-          invoices={[walkInInvoice]}
-          purchases={[]}
-          vouchers={[]}
-          expenses={[]}
-          items={mockItems}
+        <DashboardRecordPaymentModal
+          isOpen={true}
+          onClose={vi.fn()}
+          target={targetPayload}
           parties={[]}
-          onNewInvoice={vi.fn()}
-          onQuickPos={vi.fn()}
-          onViewInvoice={vi.fn()}
           onRefresh={handleRefresh}
-          onNavigateTab={vi.fn()}
           onRecordPartyPayment={onRecordPartyPaymentMock}
         />
       );
-    });
-
-    // Click Collect again
-    const collectBtn2 = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.trim() === 'paymentsCollect'
-    );
-    act(() => {
-      collectBtn2?.click();
     });
 
     const amtInput2 = container.querySelector('input[type="number"]') as HTMLInputElement;
@@ -1345,7 +1345,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
     expect(container.textContent).toContain('2 of 5');
     expect(container.textContent).toContain('PUR-2026-088');
-    expect(container.textContent).toContain('Shop Monthly Rent');
+    expect(container.textContent).toContain('EXP-101');
     expect(container.textContent).not.toContain('INV-2026-001');
 
     // 5. Solitary dot '.' must not match all items
@@ -1429,11 +1429,15 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
 
     const expenseCard = Array.from(container.querySelectorAll('div')).find(
-      (d) => d.textContent?.includes('Shop Monthly Rent') && d.classList.contains('group')
+      (d) => d.textContent?.includes('EXP-101') && d.classList.contains('group')
     );
     expect(expenseCard).toBeDefined();
 
-    const expShareBtn = Array.from(expenseCard!.querySelectorAll('button')).find((b) =>
+    act(() => {
+      expenseCard?.click();
+    });
+
+    const expShareBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Share')
     );
     expect(expShareBtn).toBeDefined();
@@ -1462,29 +1466,22 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
 
     act(() => {
       root.render(
-        <DashboardView
-          company={mockCompany}
-          invoices={[walkInInvoice]}
-          purchases={[]}
-          vouchers={[]}
-          expenses={[]}
-          items={mockItems}
+        <DashboardRecordPaymentModal
+          isOpen={true}
+          onClose={vi.fn()}
+          target={{
+            type: 'SALE',
+            rawId: walkInInvoice.id,
+            docNumber: walkInInvoice.invoiceNumber,
+            partyName: walkInInvoice.partyName,
+            partyId: walkInInvoice.partyId,
+            balanceAmount: 1200,
+            grandTotal: 1200,
+            rawInvoice: walkInInvoice,
+          }}
           parties={[]}
-          onNewInvoice={vi.fn()}
-          onQuickPos={vi.fn()}
-          onViewInvoice={vi.fn()}
-          onNavigateTab={vi.fn()}
         />
       );
-    });
-
-    const collectBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.trim() === 'paymentsCollect'
-    );
-    expect(collectBtn).toBeDefined();
-
-    act(() => {
-      collectBtn?.click();
     });
 
     const amtInput = container.querySelector('input[type="number"]') as HTMLInputElement;
@@ -1534,14 +1531,14 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       expect(btn.className).toContain('rounded-full');
     });
 
-    const viewButtons = Array.from(container.querySelectorAll('button')).filter((b) =>
-      b.getAttribute('title') === 'View Details'
+    // Verify compact Filter button meets touch target
+    const filterBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.getAttribute('aria-label') === 'Filter' || b.textContent?.includes('Filter')
     );
-    expect(viewButtons.length).toBeGreaterThan(0);
-    viewButtons.forEach((btn) => {
-      expect(btn.className).toContain('min-h-[44px]');
-    });
+    expect(filterBtn).toBeDefined();
+    expect(filterBtn?.className).toContain('min-h-[44px]');
 
+    // Verify compact row share buttons meet touch target
     const shareButtons = Array.from(container.querySelectorAll('button')).filter((b) =>
       b.getAttribute('title') === 'Share Receipt'
     );
@@ -1550,19 +1547,10 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       expect(btn.className).toContain('min-h-[44px]');
     });
 
-    const printButtons = Array.from(container.querySelectorAll('button')).filter((b) =>
-      b.getAttribute('title') === 'Print Receipt'
-    );
-    expect(printButtons.length).toBeGreaterThan(0);
-    printButtons.forEach((btn) => {
-      expect(btn.className).toContain('min-h-[44px]');
-    });
-
-    const collectButton = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.getAttribute('title') === 'Collect Customer Payment'
-    );
-    expect(collectButton).toBeDefined();
-    expect(collectButton?.className).toContain('min-h-[44px]');
+    // Verify search input meets touch target
+    const searchInput = container.querySelector('input[placeholder*="Search reference"]') as HTMLInputElement;
+    expect(searchInput).not.toBeNull();
+    expect(searchInput.className).toContain('min-h-[44px]');
   });
 
   it('Adversarial Stress R1/R2: handles large dataset (120+ multi-entity transactions) with progressive batching and full-dataset live search', () => {
@@ -1822,7 +1810,8 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       });
     }).not.toThrow();
 
-    expect(container.textContent).toContain('0 bills recorded');
+    expect(container.textContent).toContain('Total Sales');
+    expect(container.textContent).toContain('₹ 0.00');
 
     act(() => {
       root.render(
@@ -1879,9 +1868,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(searchInput.className).toContain('min-h-[44px]');
   });
 
-  it('smaller screen UX: provides \\/ chevron button to expand action icons per transaction card and toggles expanded state', () => {
-    const handleViewInvoice = vi.fn();
-
+  it('smaller screen UX: provides compact expandable Filter button to toggle filters', () => {
     act(() => {
       root.render(
         <DashboardView
@@ -1894,44 +1881,32 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
           parties={mockParties}
           onNewInvoice={vi.fn()}
           onQuickPos={vi.fn()}
-          onViewInvoice={handleViewInvoice}
+          onViewInvoice={vi.fn()}
           onNavigateTab={vi.fn()}
         />
       );
     });
 
-    // Find all expand chevron buttons
-    const expandButtons = Array.from(
-      container.querySelectorAll('button[data-testid^="expand-actions-"]')
-    ) as HTMLButtonElement[];
+    const filterBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.getAttribute('aria-label') === 'Filter' || b.textContent?.includes('Filter')
+    ) as HTMLButtonElement;
 
-    expect(expandButtons.length).toBeGreaterThan(0);
+    expect(filterBtn).toBeDefined();
+    expect(filterBtn.getAttribute('aria-expanded')).toBe('false');
 
-    const firstExpandBtn = expandButtons[0];
-    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('false');
-    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Expand action icons');
-    expect(firstExpandBtn.textContent).toContain('expand_more');
-
-    // Click to expand
+    // Click to expand filters
     act(() => {
-      firstExpandBtn.click();
+      filterBtn.click();
     });
 
-    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('true');
-    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Collapse action icons');
-    expect(firstExpandBtn.querySelector('span')?.className).toContain('rotate-180');
-
-    // Ensure clicking the expand toggle does not inadvertently trigger onViewInvoice (stopPropagation)
-    expect(handleViewInvoice).not.toHaveBeenCalled();
+    expect(filterBtn.getAttribute('aria-expanded')).toBe('true');
 
     // Click again to collapse
     act(() => {
-      firstExpandBtn.click();
+      filterBtn.click();
     });
 
-    expect(firstExpandBtn.getAttribute('aria-expanded')).toBe('false');
-    expect(firstExpandBtn.getAttribute('aria-label')).toBe('Expand action icons');
-    expect(firstExpandBtn.querySelector('span')?.className).not.toContain('rotate-180');
+    expect(filterBtn.getAttribute('aria-expanded')).toBe('false');
   });
 });
 
