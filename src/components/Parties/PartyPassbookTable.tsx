@@ -24,19 +24,19 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
   onTransactionClick,
 }) => {
   return (
-    <section className="bg-slate-900 dark:bg-slate-950 text-white rounded-2xl border border-slate-800 p-3 sm:p-4 shadow-md flex flex-col gap-2.5">
+    <section className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
       {/* Header & Filter Controls */}
       <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-0.5">
         <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
-          <span className="text-xs font-bold text-white">Transactions</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700/50">
+          <span className="text-xs font-bold text-on-surface">Transactions</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container font-bold text-on-surface-variant">
             {filteredPassbook.length}
           </span>
         </div>
 
         {/* Segmented Filter Pills & Sort Toggle */}
         <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
-          <div className="inline-flex rounded-lg bg-slate-800 p-0.5 text-[11px] font-semibold border border-slate-700/50">
+          <div className="inline-flex rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
             {(['ALL', 'BILLS', 'PAYMENTS'] as const).map((tab) => (
               <button
                 key={tab}
@@ -44,8 +44,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 onClick={() => setTxnFilter(tab)}
                 className={`px-2 py-0.5 rounded-md transition-all cursor-pointer capitalize ${
                   txnFilter === tab
-                    ? 'bg-slate-700 text-white shadow-xs font-bold'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-surface-container-lowest text-on-surface shadow-xs font-bold'
+                    : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
                 {tab === 'ALL' ? 'All' : tab.toLowerCase()}
@@ -56,10 +56,10 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
           <button
             type="button"
             onClick={() => setTxnSortOrder((prev) => (prev === 'NEWEST' ? 'OLDEST' : 'NEWEST'))}
-            className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700/80 border border-slate-700/50 cursor-pointer transition-colors"
+            className="flex items-center gap-0.5 px-2 py-1 rounded-lg text-[11px] font-bold text-on-surface-variant hover:text-on-surface bg-surface-container hover:bg-surface-container-high cursor-pointer transition-colors"
             title={txnSortOrder === 'NEWEST' ? 'Sorted: Newest First (Click for Oldest)' : 'Sorted: Oldest First (Click for Newest)'}
           >
-            <span className="material-symbols-outlined text-[13px] text-emerald-400">
+            <span className="material-symbols-outlined text-[13px] text-primary">
               {txnSortOrder === 'NEWEST' ? 'south' : 'north'}
             </span>
             <span>{txnSortOrder === 'NEWEST' ? 'Newest' : 'Oldest'}</span>
@@ -69,7 +69,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
 
       {/* Search bar inside ledger */}
       <div className="relative flex items-center">
-        <span className="material-symbols-outlined absolute left-2.5 text-slate-400 text-[15px]">
+        <span className="material-symbols-outlined absolute left-2.5 text-on-surface-variant text-[15px]">
           search
         </span>
         <input
@@ -77,14 +77,14 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
           placeholder="Search by invoice #, note, amount..."
           value={searchTxn}
           onChange={(e) => setSearchTxn(e.target.value)}
-          className="w-full bg-slate-800/80 pl-8 pr-7 py-1.5 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-600 border border-slate-700/60"
+          className="w-full bg-surface-container-low pl-8 pr-7 py-1 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none border border-outline-variant/20"
         />
         {searchTxn && (
           <button
             type="button"
             onClick={() => setSearchTxn('')}
             aria-label="Clear search"
-            className="absolute right-2 text-slate-400 hover:text-white cursor-pointer"
+            className="absolute right-2 text-on-surface-variant hover:text-on-surface cursor-pointer"
           >
             <span className="material-symbols-outlined text-[13px]">close</span>
           </button>
@@ -94,8 +94,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
       {/* Passbook Item Cards Feed */}
       <div className="space-y-2">
         {filteredPassbook.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 flex flex-col items-center gap-1">
-            <span className="material-symbols-outlined text-[24px] text-slate-500">receipt_long</span>
+          <div className="py-8 text-center text-on-surface-variant flex flex-col items-center gap-1">
+            <span className="material-symbols-outlined text-[24px] text-outline">receipt_long</span>
             <p className="text-xs">No transactions in this filter</p>
           </div>
         ) : (

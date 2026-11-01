@@ -190,7 +190,7 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(collapsibleContainer.className).toContain('pointer-events-none');
   });
 
-  it('Requirement 1-5: PartyPassbookTable has dark card, white primary text, slate-300/400 secondary text, darkened filter pills, sort button, and search input', () => {
+  it('Requirement: PartyPassbookTable outer section is light, while individual transaction cards stay dark', () => {
     const mockEntries: any[] = [
       {
         id: 'sale-inv-1',
@@ -228,34 +228,32 @@ describe('Party Details Transaction Card UI Enhancements', () => {
       );
     });
 
-    // 1. Transaction list card is dark
+    // 1. Outer transaction list section is light surface
     const tableSection = container.querySelector('section');
     expect(tableSection).not.toBeNull();
-    expect(tableSection?.className).toContain('bg-slate-900');
-    expect(tableSection?.className).toContain('text-white');
-    expect(tableSection?.className).toContain('border-slate-800');
+    expect(tableSection?.className).toContain('bg-surface-container-lowest');
+    expect(tableSection?.className).toContain('border-outline-variant/20');
 
-    // 2. Filter pills container & buttons darkened
+    // 2. Filter pills & search input are light theme
     const filterContainer = container.querySelector('.inline-flex.rounded-lg');
-    expect(filterContainer?.className).toContain('bg-slate-800');
+    expect(filterContainer?.className).toContain('bg-surface-container');
     const allPill = Array.from(filterContainer?.querySelectorAll('button') || []).find(
       (b) => b.textContent?.trim() === 'All'
     );
-    expect(allPill?.className).toContain('bg-slate-700');
-    expect(allPill?.className).toContain('text-white');
+    expect(allPill?.className).toContain('bg-surface-container-lowest');
+    expect(allPill?.className).toContain('text-on-surface');
 
-    // 3. Search input is darkened
     const searchInput = container.querySelector('input[type="text"]') as HTMLInputElement;
     expect(searchInput).not.toBeNull();
-    expect(searchInput.className).toContain('bg-slate-800');
-    expect(searchInput.className).toContain('text-white');
+    expect(searchInput.className).toContain('bg-surface-container-low');
+    expect(searchInput.className).toContain('text-on-surface');
 
-    // 4. Transaction row card is dark
+    // 3. Individual transaction row card STAYS DARK and stands out against the light section
     const rowCard = container.querySelector('[data-testid="passbook-entry-sale-inv-1"]');
     expect(rowCard).not.toBeNull();
     expect(rowCard?.className).toContain('bg-slate-800');
 
-    // 5. Primary text is white and secondary text is slate-400
+    // 4. Primary text is white and secondary text is slate-400
     const primaryLabel = rowCard?.querySelector('.font-bold.text-white');
     expect(primaryLabel).not.toBeNull();
     expect(primaryLabel?.textContent).toContain('Invoice');
