@@ -490,12 +490,12 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
 
           {/* Quick Header Tools (Call, Print, WhatsApp, Edit, Delete) in Collapsible Container */}
           <div className="flex items-center gap-1.5 flex-shrink-0 relative">
-            {/* Collapsible Action Icons (slides out with animation) */}
+            {/* Collapsible Action Icons (slides out with animation, fully hidden when closed) */}
             <div
               className={`flex items-center gap-1 transition-all duration-300 ease-out origin-right overflow-hidden ${
                 isActionsOpen
-                  ? 'max-w-[280px] opacity-100 translate-x-0'
-                  : 'max-w-0 opacity-0 translate-x-4 pointer-events-none'
+                  ? 'w-auto max-w-[280px] opacity-100 translate-x-0 pointer-events-auto visible'
+                  : 'w-0 max-w-0 opacity-0 translate-x-4 pointer-events-none invisible p-0 m-0'
               }`}
             >
               {/* 1. Call */}

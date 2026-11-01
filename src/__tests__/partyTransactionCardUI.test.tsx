@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PartyInfoCard } from '../components/Parties/PartyInfoCard.tsx';
 import { PartyDetailModal } from '../components/Parties/PartyDetailModal.tsx';
+import { PartyPassbookTable } from '../components/Parties/PartyPassbookTable.tsx';
 import { Party } from '../models/party.ts';
 import { CompanyProfile } from '../models/company.ts';
 import { db } from '../services/db.ts';
@@ -135,12 +136,17 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(toggleBtn).not.toBeNull();
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
 
-    // The collapsible container starts closed (collapsed with max-w-0 pointer-events-none)
+    // The collapsible container starts closed (collapsed with max-w-0, invisible, pointer-events-none - no icon peeking)
     const collapsibleContainer = toggleBtn.previousElementSibling as HTMLElement;
     expect(collapsibleContainer).not.toBeNull();
     expect(collapsibleContainer.className).toContain('max-w-0');
     expect(collapsibleContainer.className).toContain('pointer-events-none');
+    expect(collapsibleContainer.className).toContain('invisible');
     expect(collapsibleContainer.className).toContain('transition-all');
+
+    // Trigger button remains visible at all times
+    expect(toggleBtn.className).not.toContain('invisible');
+    expect(toggleBtn.className).not.toContain('max-w-0');
 
     // Inside the collapsible container: Call icon is followed immediately by Print icon
     const callLink = collapsibleContainer.querySelector('a[title="Call"]');
@@ -162,7 +168,7 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     const deleteBtn = collapsibleContainer.querySelector('button[title="Delete Party"]');
     expect(deleteBtn).not.toBeNull();
 
-    // When toggle button is clicked: container slides out (expands to max-w-[280px], opacity-100, aria-expanded=true)
+    // When toggle button is clicked: container slides out (expands to max-w-[280px], opacity-100, aria-expanded=true, visible)
     await act(async () => {
       toggleBtn.click();
     });
@@ -170,15 +176,97 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
     expect(collapsibleContainer.className).toContain('max-w-[280px]');
     expect(collapsibleContainer.className).toContain('opacity-100');
+    expect(collapsibleContainer.className).toContain('visible');
     expect(collapsibleContainer.className).not.toContain('pointer-events-none');
 
-    // When clicked again: collapses back
+    // When clicked again: collapses back completely (invisible)
     await act(async () => {
       toggleBtn.click();
     });
 
     expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
     expect(collapsibleContainer.className).toContain('max-w-0');
+    expect(collapsibleContainer.className).toContain('invisible');
     expect(collapsibleContainer.className).toContain('pointer-events-none');
+  });
+
+  it('Requirement 1-5: PartyPassbookTable has dark card, white primary text, slate-300/400 secondary text, darkened filter pills, sort button, and search input', () => {
+    const mockEntries: any[] = [
+      {
+        id: 'sale-inv-1',
+        date: '2026-10-30',
+        type: 'SALE',
+        billAmount: 5000,
+        debit: 5000,
+        credit: 0,
+        runningBalance: 5000,
+        docNumber: 'INV-1001',
+        rawInvoice: {
+          id: 'inv-1',
+          invoiceNumber: 'INV-1001',
+          grandTotal: 5000,
+          balanceAmount: 2000,
+          paidAmount: 3000,
+          invoiceType: 'TAX_INVOICE',
+        },
+        status: 'PARTIAL',
+      },
+    ];
+
+    act(() => {
+      root.render(
+        <PartyPassbookTable
+          filteredPassbook={mockEntries}
+          txnFilter="ALL"
+          setTxnFilter={vi.fn()}
+          txnSortOrder="NEWEST"
+          setTxnSortOrder={vi.fn()}
+          searchTxn=""
+          setSearchTxn={vi.fn()}
+          onTransactionClick={vi.fn()}
+        />
+      );
+    });
+
+    // 1. Transaction list card is dark
+    const tableSection = container.querySelector('section');
+    expect(tableSection).not.toBeNull();
+    expect(tableSection?.className).toContain('bg-slate-900');
+    expect(tableSection?.className).toContain('text-white');
+    expect(tableSection?.className).toContain('border-slate-800');
+
+    // 2. Filter pills container & buttons darkened
+    const filterContainer = container.querySelector('.inline-flex.rounded-lg');
+    expect(filterContainer?.className).toContain('bg-slate-800');
+    const allPill = Array.from(filterContainer?.querySelectorAll('button') || []).find(
+      (b) => b.textContent?.trim() === 'All'
+    );
+    expect(allPill?.className).toContain('bg-slate-700');
+    expect(allPill?.className).toContain('text-white');
+
+    // 3. Search input is darkened
+    const searchInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+    expect(searchInput).not.toBeNull();
+    expect(searchInput.className).toContain('bg-slate-800');
+    expect(searchInput.className).toContain('text-white');
+
+    // 4. Transaction row card is dark
+    const rowCard = container.querySelector('[data-testid="passbook-entry-sale-inv-1"]');
+    expect(rowCard).not.toBeNull();
+    expect(rowCard?.className).toContain('bg-slate-800');
+
+    // 5. Primary text is white and secondary text is slate-400
+    const primaryLabel = rowCard?.querySelector('.font-bold.text-white');
+    expect(primaryLabel).not.toBeNull();
+    expect(primaryLabel?.textContent).toContain('Invoice');
+
+    const voucherDocNo = rowCard?.querySelector('.text-slate-400.font-mono');
+    expect(voucherDocNo).not.toBeNull();
+    expect(voucherDocNo?.textContent).toContain('#INV-1001');
+
+    // Amount colored readability
+    const amountEl = rowCard?.querySelector('.font-currency-display-mobile');
+    expect(amountEl).not.toBeNull();
+    expect(amountEl?.className).toContain('text-blue-400');
   });
 });
