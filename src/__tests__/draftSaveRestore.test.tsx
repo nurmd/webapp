@@ -483,7 +483,7 @@ describe('Draft Auto-Save & Restoration Service & Modals', () => {
       });
 
       const saveBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-        b.textContent?.includes('Save Purchase Bill')
+        b.textContent?.includes('Save Bill')
       );
       expect(saveBtn).toBeDefined();
       act(() => {

@@ -196,7 +196,7 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     const saveBtn =
       (container?.querySelector('[data-testid="purchase-save-btn"]') as HTMLButtonElement) ||
       Array.from(container?.querySelectorAll('button') || []).find((b) =>
-        b.textContent?.includes('Save Purchase Bill')
+        b.textContent?.includes('Save Bill')
       );
     expect(saveBtn).toBeDefined();
     await act(async () => {
@@ -1044,7 +1044,7 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
     const saveBtn =
       (container?.querySelector('[data-testid="purchase-save-btn"]') as HTMLButtonElement) ||
       Array.from(container?.querySelectorAll('button') || []).find((b) =>
-        b.textContent?.includes('Save Purchase Bill')
+        b.textContent?.includes('Save Bill')
       );
     expect(saveBtn).toBeDefined();
     await act(async () => {

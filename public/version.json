@@ -1,15 +1,15 @@
 {
-  "version": "1.2.58",
+  "version": "1.2.59",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-01T07:32:21.297Z",
+  "buildTime": "2026-11-01T08:27:02.356Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "add Agy efficiency guidelines",
+    "small-screen layout audit and fixes across views",
+    "mobile-only reports redesign + responsive party action buttons",
+    "v1.2.58 light-theme redesign, party detail, hubs, POS, payments/reports/settings",
     "move record/new invoice into summary metrics; remove opening balance from details",
-    "light contrast and declutter pass on QuickBillingView",
-    "light contrast pass on payments, cash & bank, reports, settings",
-    "raise floating action buttons above bottom nav",
-    "increase contrast and declutter inventory/purchases/sales hubs",
-    "remove opening balance summary chip from party card"
+    "light contrast and declutter pass on QuickBillingView"
   ]
 }
