@@ -140,6 +140,17 @@ gst-billing-app/
 
 ### F. Invoice-Linked Returns Engine (`src/core/returns/returnEngine.ts`, `src/components/Returns/`)
 - **Document Linking**: Sales Returns (`CREDIT_NOTE`, Table 9B) link directly to source sales invoices (`originalInvoiceId`, `originalInvoiceNumber`, `originalInvoiceDate`, `noteType: 'C'`). Purchase Returns (`RETURN`, Debit Notes) link directly to source purchase bills (`originalBillId`, `originalBillNumber`, `originalBillDate`, `noteType: 'D'`).
+- **Parent Invoice Linking & Delta Reconciliation**:
+  - In `TableGridInvoiceModal` and `InvoiceHeaderMeta`, creating or editing a Credit Note allows picking an eligible parent sales invoice from a `<select>` dropdown (`parent-invoice-select`), dynamically filtered to matching party, non-cancelled sales invoices.
+  - **Single Counting Accounting Invariant**:
+    - *Linked Credit Note*: Applied to parent invoice balance. The credit note is stored fully settled (`paidAmount = grandTotal`, `balanceAmount = 0`, `paymentStatus = 'PAID'`, `paymentMode = 'CASH'`). Since `recalculatePartyBalance` subtracts unpaid credit note balance (0), the reduced parent invoice carries the return once.
+    - *Unlinked Credit Note*: Carries the return itself (`paidAmount = 0`, `balanceAmount = grandTotal`, `paymentStatus = 'UNPAID'`, `paymentMode = 'CREDIT'`), leaving parent invoices untouched.
+  - **Delta Reconciliation (`reconcileCreditNoteParent`)**:
+    Updates compute delta per parent: `delta = (newGrandTotal if linked to parent X) - (oldGrandTotal if previously linked to parent X)`.
+    - `delta > 0` → `applyReturnToInvoice(parent, delta)`
+    - `delta < 0` → `revertReturnFromInvoice(parent, -delta)`
+    Adjusted parents are saved with `{ skipSettlementDerivation: true }` to preserve balance adjustments.
+  - **Document Deletion**: Deleting a linked credit note in `deleteInvoice` restores the parent invoice via `revertReturnFromInvoice(parent, inv.grandTotal)`.
 - **Item-Level Return Tracking**: Computes available return quantities per line item across multiple prior returns against the same source invoice/bill. Returned quantities are strictly clamped to available quantities (`0 <= returnQty <= availableQty`).
 - **Settlement & Value Reversal**: Updates the source document's `balanceAmount`, `paidAmount`, and `paymentStatus`:
   - Reduces outstanding `balanceAmount` first.

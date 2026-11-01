@@ -40,6 +40,9 @@ export interface InvoiceHeaderMetaProps {
   onShippingPincodeChange?: (pincode: string) => void;
 
   // Credit Note / Return Reference fields
+  parentInvoiceOptions?: Array<{ id: string; invoiceNumber: string; partyName: string; date: string; balanceAmount: number }>;
+  originalInvoiceId?: string;
+  onParentInvoiceChange?: (invoiceId: string) => void;
   originalInvoiceNumber?: string;
   onOriginalInvoiceNumberChange?: (val: string) => void;
   originalInvoiceDate?: string;
@@ -114,6 +117,9 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
   shippingPincode,
   onShippingAddressChange,
   onShippingPincodeChange,
+  parentInvoiceOptions,
+  originalInvoiceId,
+  onParentInvoiceChange,
   originalInvoiceNumber,
   onOriginalInvoiceNumberChange,
   originalInvoiceDate,
@@ -507,27 +513,67 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
           {/* Credit / Debit Note Return Reference Fields */}
           {(isCreditNote || isDebitNote) && (
             <>
-              <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
-                <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Inv #:</span>
-                <input
-                  type="text"
-                  value={originalInvoiceNumber || ''}
-                  onChange={(e) => onOriginalInvoiceNumberChange?.(e.target.value)}
-                  placeholder="e.g. INV-001"
-                  className="bg-transparent font-bold text-xs text-rose-800 dark:text-rose-200 outline-none w-20 sm:w-24 placeholder:text-rose-400/60"
-                  title="Original Invoice Number for GSTR Table 9B"
-                />
-              </div>
-              <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
-                <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Date:</span>
-                <input
-                  type="date"
-                  value={originalInvoiceDate || ''}
-                  onChange={(e) => onOriginalInvoiceDateChange?.(e.target.value)}
-                  className="bg-transparent font-medium text-xs text-rose-800 dark:text-rose-200 outline-none cursor-pointer"
-                  title="Original Invoice Date"
-                />
-              </div>
+              {isCreditNote ? (
+                <>
+                  <div
+                    className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30 shrink-0"
+                    title={
+                      originalInvoiceId
+                        ? "Parent invoice outstanding balance will be reduced by this credit note's total"
+                        : 'Select parent sales invoice to link'
+                    }
+                  >
+                    <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400 shrink-0">Orig Inv #:</span>
+                    <select
+                      aria-label="Parent Invoice"
+                      data-testid="parent-invoice-select"
+                      value={originalInvoiceId || ''}
+                      onChange={(e) => onParentInvoiceChange?.(e.target.value)}
+                      className="bg-transparent font-bold text-xs text-rose-800 dark:text-rose-200 outline-none max-w-[190px] truncate cursor-pointer"
+                    >
+                      <option value="" className="bg-surface text-on-surface">No parent invoice</option>
+                      {(parentInvoiceOptions || []).map((opt) => (
+                        <option key={opt.id} value={opt.id} className="bg-surface text-on-surface">
+                          #{opt.invoiceNumber} · {opt.partyName} · ₹{opt.balanceAmount}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div
+                    className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30 shrink-0"
+                    title="Original Invoice Date"
+                  >
+                    <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Date:</span>
+                    <span className="font-bold text-xs text-rose-800 dark:text-rose-200">
+                      {originalInvoiceDate ? formatDateDisplay(originalInvoiceDate) : '—'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
+                    <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Inv #:</span>
+                    <input
+                      type="text"
+                      value={originalInvoiceNumber || ''}
+                      onChange={(e) => onOriginalInvoiceNumberChange?.(e.target.value)}
+                      placeholder="e.g. INV-001"
+                      className="bg-transparent font-bold text-xs text-rose-800 dark:text-rose-200 outline-none w-20 sm:w-24 placeholder:text-rose-400/60"
+                      title="Original Invoice Number for GSTR Table 9B"
+                    />
+                  </div>
+                  <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
+                    <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Orig Date:</span>
+                    <input
+                      type="date"
+                      value={originalInvoiceDate || ''}
+                      onChange={(e) => onOriginalInvoiceDateChange?.(e.target.value)}
+                      className="bg-transparent font-medium text-xs text-rose-800 dark:text-rose-200 outline-none cursor-pointer"
+                      title="Original Invoice Date"
+                    />
+                  </div>
+                </>
+              )}
               <div className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30">
                 <span className="text-[9px] uppercase font-bold text-rose-600 dark:text-rose-400">Reason:</span>
                 <select

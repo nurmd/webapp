@@ -18,6 +18,7 @@ export interface InvoiceDraft {
   shippingPincode?: string;
   rows: GridRow[];
   updatedAt: string;
+  originalInvoiceId?: string;
   originalInvoiceNumber?: string;
   originalInvoiceDate?: string;
   returnReason?: string;

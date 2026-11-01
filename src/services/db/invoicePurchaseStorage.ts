@@ -18,6 +18,10 @@ import {
   applyStockAdjustmentRecord,
   findMatchingItem,
 } from '../../core/inventory/stockEngine.ts';
+import {
+  applyReturnToInvoice,
+  revertReturnFromInvoice,
+} from '../../core/returns/returnEngine.ts';
 import { STORAGE_KEYS, DEFAULT_INVOICES } from './storageEngine.ts';
 import { FinancialStorage } from './financialStorage.ts';
 
@@ -50,6 +54,54 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     }
 
     if (!options?.skipSettlementDerivation) {
+      if (invoice.invoiceType === 'CREDIT_NOTE') {
+        const parent = invoice.originalInvoiceId
+          ? list.find((i) => i.id === invoice.originalInvoiceId)
+          : null;
+
+        // If the link points to a different party, clear link fields so the document is honestly unlinked
+        if (
+          invoice.originalInvoiceId &&
+          parent &&
+          parent.partyId &&
+          invoice.partyId &&
+          parent.partyId !== invoice.partyId
+        ) {
+          invoice = {
+            ...invoice,
+            originalInvoiceId: undefined,
+            originalInvoiceNumber: undefined,
+            originalInvoiceDate: undefined,
+          };
+        }
+
+        const isSameParty =
+          parent && (!invoice.partyId || parent.partyId === invoice.partyId);
+        const isEligibleLinked = Boolean(parent && isSameParty);
+
+        if (isEligibleLinked) {
+          invoice = {
+            ...invoice,
+            paidAmount: invoice.grandTotal,
+            balanceAmount: 0,
+            paymentStatus: 'PAID',
+            paymentMode: 'CASH',
+            paymentSplits: undefined,
+          };
+        } else {
+          invoice = {
+            ...invoice,
+            paidAmount: 0,
+            balanceAmount: invoice.grandTotal,
+            paymentStatus: 'UNPAID',
+            paymentMode: 'CREDIT',
+            paymentSplits: [
+              { id: 'split-credit', mode: 'CREDIT', amount: invoice.grandTotal },
+            ],
+          };
+        }
+      }
+
       // Centralize payment status & tender breakdown derivation (invariant enforcement)
       const settlement = derivePaymentSettlement({
         grandTotal: invoice.grandTotal,
@@ -131,6 +183,10 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       this.recalculatePartyBalance(prevPartyId);
     }
 
+    if (invoice.invoiceType === 'CREDIT_NOTE') {
+      this.reconcileCreditNoteParent(prevInvoice, invoice);
+    }
+
     // MCA Audit Trail Hook
     const auditUser = this.getAuditUser();
     let actionType: 'INVOICE_CREATE' | 'INVOICE_UPDATE' | 'INVOICE_CANCEL' = 'INVOICE_CREATE';
@@ -161,6 +217,52 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       .catch((err) => console.error('Audit log failed for saveInvoice:', err));
 
     this.notifyListeners();
+  }
+
+  private reconcileCreditNoteParent(prevCreditNote: Invoice | null, creditNote: Invoice): void {
+    const deltas = new Map<string, number>();
+
+    const prevParentId =
+      prevCreditNote && !prevCreditNote.isCancelled
+        ? prevCreditNote.originalInvoiceId
+        : undefined;
+    const prevAmt =
+      prevCreditNote && !prevCreditNote.isCancelled
+        ? prevCreditNote.grandTotal || 0
+        : 0;
+
+    const currParentId =
+      !creditNote.isCancelled
+        ? creditNote.originalInvoiceId
+        : undefined;
+    const currAmt =
+      !creditNote.isCancelled
+        ? creditNote.grandTotal || 0
+        : 0;
+
+    if (prevParentId) {
+      deltas.set(prevParentId, (deltas.get(prevParentId) || 0) - prevAmt);
+    }
+    if (currParentId) {
+      deltas.set(currParentId, (deltas.get(currParentId) || 0) + currAmt);
+    }
+
+    for (const [parentId, delta] of deltas.entries()) {
+      if (Math.abs(delta) <= 0.005) continue;
+      const parent = this.getInvoices().find((i) => i.id === parentId);
+      if (!parent || parent.isCancelled) continue;
+      const effectivePartyId =
+        (parentId === currParentId ? creditNote.partyId : prevCreditNote?.partyId) ||
+        creditNote.partyId;
+      if (effectivePartyId && parent.partyId && parent.partyId !== effectivePartyId) continue;
+
+      const adjusted =
+        delta > 0
+          ? applyReturnToInvoice(parent, delta)
+          : revertReturnFromInvoice(parent, -delta);
+
+      this.saveInvoice(adjusted, { skipSettlementDerivation: true });
+    }
   }
 
   deleteInvoice(id: string): void {
@@ -229,6 +331,25 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         ? applyInvoiceStockDecrement(currentItems, inv.items, allowNegativeStock)
         : restoreInvoiceStock(currentItems, inv.items);
       this.persistStockUpdates(currentItems, updatedItems);
+    }
+
+    // If deleted invoice is a linked credit note, restore parent invoice balance
+    if (
+      inv &&
+      inv.invoiceType === 'CREDIT_NOTE' &&
+      inv.originalInvoiceId &&
+      (inv.grandTotal || 0) > 0 &&
+      !inv.isCancelled
+    ) {
+      const parent = this.getInvoices().find((i) => i.id === inv.originalInvoiceId);
+      if (
+        parent &&
+        !parent.isCancelled &&
+        (!inv.partyId || !parent.partyId || parent.partyId === inv.partyId)
+      ) {
+        const adjusted = revertReturnFromInvoice(parent, inv.grandTotal);
+        this.saveInvoice(adjusted, { skipSettlementDerivation: true });
+      }
     }
 
     const partyIdToRecalc =

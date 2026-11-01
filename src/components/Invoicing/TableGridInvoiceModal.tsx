@@ -241,6 +241,72 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     () => initialInvoice?.returnReason || initialDraft?.returnReason || '01-Sales Return'
   );
 
+  // Eligible parent sales invoices for credit notes (excluding non-sales docs, cancelled, and different parties)
+  const parentInvoiceOptions = useMemo(() => {
+    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    return invs
+      .filter((inv) => {
+        if (initialInvoice && inv.id === initialInvoice.id) return false;
+        if (inv.isCancelled) return false;
+        const nonSalesTypes = ['CREDIT_NOTE', 'DEBIT_NOTE', 'ESTIMATE', 'SALES_ORDER', 'DELIVERY_CHALLAN'];
+        if (inv.invoiceType && nonSalesTypes.includes(inv.invoiceType)) return false;
+        if (selectedParty && inv.partyId !== selectedParty.id) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        partyName: inv.partyName,
+        date: inv.date,
+        balanceAmount: typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal,
+      }));
+  }, [existingInvoices, initialInvoice, selectedParty]);
+
+  const handleParentInvoiceChange = (invoiceId: string) => {
+    if (!invoiceId) {
+      setOriginalInvoiceId('');
+      setOriginalInvoiceNumber('');
+      setOriginalInvoiceDate('');
+      return;
+    }
+    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    const chosen = invs.find((i) => i.id === invoiceId);
+    if (!chosen) return;
+
+    setOriginalInvoiceId(chosen.id);
+    setOriginalInvoiceNumber(chosen.invoiceNumber);
+    setOriginalInvoiceDate(chosen.date);
+
+    if (!selectedParty && chosen.partyId) {
+      const allKnownParties = [...parties, ...localParties, ...db.getParties()];
+      const partyMatch = allKnownParties.find((p) => p.id === chosen.partyId);
+      if (partyMatch) {
+        setSelectedParty(partyMatch);
+        setPosStateCode(partyMatch.stateCode);
+        if (!shippingAddress && partyMatch.shippingAddress) {
+          setShippingAddress(partyMatch.shippingAddress);
+        }
+        if (!shippingPincode && partyMatch.pincode) {
+          setShippingPincode(partyMatch.pincode);
+        }
+      }
+    }
+  };
+
+  // Clear parent link if selected party changes to a different party
+  useEffect(() => {
+    if (originalInvoiceId && selectedParty?.id) {
+      const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+      const linked = invs.find((i) => i.id === originalInvoiceId);
+      if (linked && linked.partyId && linked.partyId !== selectedParty.id) {
+        setOriginalInvoiceId('');
+        setOriginalInvoiceNumber('');
+        setOriginalInvoiceDate('');
+      }
+    }
+  }, [selectedParty?.id, originalInvoiceId, existingInvoices]);
+
   // Delivery Challan & Transportation fields
   const [consigneeName, setConsigneeName] = useState<string>(
     () => initialInvoice?.consigneeName || (initialDraft as any)?.consigneeName || ''
@@ -811,6 +877,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       shippingAddress,
       shippingPincode,
       rows,
+      originalInvoiceId,
       originalInvoiceNumber,
       originalInvoiceDate,
       returnReason,
@@ -837,6 +904,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceId,
     originalInvoiceNumber,
     originalInvoiceDate,
     returnReason,
@@ -866,6 +934,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         shippingAddress,
         shippingPincode,
         rows,
+        originalInvoiceId,
         originalInvoiceNumber,
         originalInvoiceDate,
         returnReason,
@@ -898,6 +967,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceId,
     originalInvoiceNumber,
     originalInvoiceDate,
     returnReason,
@@ -920,6 +990,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       shippingAddress,
       shippingPincode,
       rows,
+      originalInvoiceId,
       originalInvoiceNumber,
       originalInvoiceDate,
       returnReason,
@@ -947,6 +1018,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     shippingAddress,
     shippingPincode,
     rows,
+    originalInvoiceId,
     originalInvoiceNumber,
     originalInvoiceDate,
     returnReason,
@@ -1007,6 +1079,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     if (draft.ewayBillNumber) setEwayBillNumber(draft.ewayBillNumber);
     if (draft.challanStatus) setChallanStatus(draft.challanStatus);
     if (draft.challanType) setChallanType(draft.challanType);
+    if (draft.originalInvoiceId) setOriginalInvoiceId(draft.originalInvoiceId);
     if (draft.originalInvoiceNumber) setOriginalInvoiceNumber(draft.originalInvoiceNumber);
     if (draft.originalInvoiceDate) setOriginalInvoiceDate(draft.originalInvoiceDate);
     if (draft.returnReason) setReturnReason(draft.returnReason);
@@ -1176,6 +1249,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
               setInvoiceNumber(newNum);
               setInvoiceConflictError(null);
             }}
+            parentInvoiceOptions={parentInvoiceOptions}
+            originalInvoiceId={originalInvoiceId}
+            onParentInvoiceChange={handleParentInvoiceChange}
             originalInvoiceNumber={originalInvoiceNumber}
             onOriginalInvoiceNumberChange={setOriginalInvoiceNumber}
             originalInvoiceDate={originalInvoiceDate}

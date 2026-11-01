@@ -41,4 +41,8 @@ lineage.proof
 .env.*
 !.env.example
 
+# Markdown docs: ignore everything except README
+*.md
+!README.md
+
 

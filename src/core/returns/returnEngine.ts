@@ -294,6 +294,55 @@ export function applyReturnToInvoice(invoice: Invoice, returnTotal: number): Inv
 }
 
 /**
+ * Inverts applyReturnToInvoice: restores balance and/or paid amount on a source Sales Invoice
+ * when a return is unlinked, deleted, or reduced.
+ * 1. remaining = max(0, returnTotal)
+ * 2. If the invoice is fully settled (balanceAmount <= 0.005) and paidAmount > 0: restore paid first, min(remaining, grandTotal - paidAmount)
+ * 3. Then restore open balance: min(remaining, grandTotal - paidAmount - balanceAmount)
+ * 4. Round to 2 decimals, recompute paymentStatus, set updatedAt.
+ */
+export function revertReturnFromInvoice(invoice: Invoice, returnTotal: number): Invoice {
+  let remaining = Math.max(0, returnTotal);
+  const grandTotal = Math.max(0, invoice.grandTotal || 0);
+  let newBalance = Math.max(0, invoice.balanceAmount || 0);
+  let newPaid = Math.max(0, invoice.paidAmount || 0);
+
+  // 2. If the invoice is fully settled (balanceAmount <= 0.005) and paidAmount > 0: restore paid first
+  if (newBalance <= 0.005 && newPaid > 0) {
+    const paidRestoration = Math.min(remaining, Math.max(0, grandTotal - newPaid));
+    newPaid += paidRestoration;
+    remaining -= paidRestoration;
+  }
+
+  // 3. Then restore open balance
+  if (remaining > 0) {
+    const balanceRestoration = Math.min(remaining, Math.max(0, grandTotal - newPaid - newBalance));
+    newBalance += balanceRestoration;
+    remaining -= balanceRestoration;
+  }
+
+  newBalance = Math.round(newBalance * 100) / 100;
+  newPaid = Math.round(newPaid * 100) / 100;
+
+  let newStatus: PaymentStatus = invoice.paymentStatus;
+  if (newBalance <= 0) {
+    newStatus = 'PAID';
+  } else if (newPaid > 0) {
+    newStatus = 'PARTIAL';
+  } else {
+    newStatus = 'UNPAID';
+  }
+
+  return {
+    ...invoice,
+    balanceAmount: newBalance,
+    paidAmount: newPaid,
+    paymentStatus: newStatus,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Updates a source Purchase Bill's balance and paid amounts to reflect the return (reversing returned values).
  */
 export function applyReturnToPurchaseBill(bill: PurchaseBill, returnTotal: number): PurchaseBill {
@@ -402,13 +451,11 @@ export function executeSalesReturn(params: {
     updatedAt: now,
   };
 
-  const updatedSourceInvoice = applyReturnToInvoice(sourceInvoice, summary.grandTotal);
-
-  // 1. Save Credit Note (restores item stock in stockEngine!)
+  // 1. Save Credit Note once (restores item stock in stockEngine and reconciles parent invoice balance)
   db.saveInvoice(creditNote);
 
-  // 2. Save Updated Source Invoice with skipSettlementDerivation so reversed balance is preserved
-  db.saveInvoice(updatedSourceInvoice, { skipSettlementDerivation: true });
+  // 2. Read updated source invoice back from DB
+  const updatedSourceInvoice = db.getInvoices().find((i) => i.id === sourceInvoice.id) || sourceInvoice;
 
   // 3. Recalculate party balance
   if (sourceInvoice.partyId) {
