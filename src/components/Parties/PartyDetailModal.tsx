@@ -672,6 +672,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             showPartyDetails={showPartyDetails}
             setShowPartyDetails={setShowPartyDetails}
             onEditParty={onEditParty}
+            isCustomer={isCustomer}
+            isPaymentOpen={isPaymentOpen}
+            onRecordPayment={handleRecordPaymentClick}
+            onCreateInvoice={onCreateInvoice}
+            onCreatePurchase={onCreatePurchase}
           />
         </div>
 
@@ -695,62 +700,6 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 onEditParty={onEditParty}
               />
             </div>
-
-            {/* Quick Actions Bar (Payment & New Invoice / Bill) */}
-            <section className="flex items-center gap-2">
-              {/* Record Payment */}
-              <button
-                type="button"
-                onClick={handleRecordPaymentClick}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs ${
-                  isPaymentOpen
-                    ? 'bg-secondary text-on-secondary'
-                    : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[17px]">
-                  {isPaymentOpen ? 'close' : 'payments'}
-                </span>
-                <span>{isPaymentOpen ? 'Close Payment' : 'Record Payment'}</span>
-              </button>
-
-              {/* Action: New Invoice for Customer, New Bill for Supplier */}
-              {isCustomer ? (
-                onCreateInvoice && (
-                  <button
-                    type="button"
-                    onClick={() => onCreateInvoice(effectiveParty)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                    title="Create new sales invoice for this customer"
-                  >
-                    <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-                    <span>New Invoice</span>
-                  </button>
-                )
-              ) : (
-                onCreatePurchase ? (
-                  <button
-                    type="button"
-                    onClick={() => onCreatePurchase(effectiveParty)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                    title="Create new purchase bill from this supplier"
-                  >
-                    <span className="material-symbols-outlined text-[17px]">shopping_bag</span>
-                    <span>New Bill</span>
-                  </button>
-                ) : onCreateInvoice && (
-                  <button
-                    type="button"
-                    onClick={() => onCreateInvoice(effectiveParty)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                    title="Create new sales invoice"
-                  >
-                    <span className="material-symbols-outlined text-[17px]">receipt_long</span>
-                    <span>New Invoice</span>
-                  </button>
-                )
-              )}
-            </section>
 
             {/* Collapsible Record Payment Drawer */}
             <RecordPaymentModal
