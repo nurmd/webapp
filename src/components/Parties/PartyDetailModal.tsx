@@ -594,7 +594,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
             isScrolled
               ? 'translate-y-0 opacity-100 scale-100 pointer-events-auto shadow-md'
               : '-translate-y-6 opacity-0 scale-95 pointer-events-none'
-          } py-2 px-3 bg-slate-900/95 dark:bg-slate-950/95 text-white backdrop-blur-md rounded-2xl border border-slate-700/60`}
+          } py-2 px-3 bg-white/95 dark:bg-surface-container-lowest/95 text-slate-900 backdrop-blur-md rounded-2xl border border-slate-200`}
           title="Tap to scroll to top"
         >
           <div className="flex items-center justify-between gap-2">
@@ -605,7 +605,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                   e.stopPropagation();
                   handleBackOrClose();
                 }}
-                className="p-1 -ml-1 rounded-xl text-white hover:bg-slate-800 active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
+                className="p-1 -ml-1 rounded-xl text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
                 title="Back to Parties"
                 aria-label="Back to parties"
               >
@@ -614,16 +614,16 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
 
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 ${
-                  isCustomer ? 'bg-secondary/25 text-secondary-fixed' : 'bg-primary/25 text-primary-fixed'
+                  isCustomer ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
                 }`}
               >
                 {party.name.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <h2 className="text-xs font-bold text-white truncate">
+                <h2 className="text-xs font-bold text-slate-900 truncate">
                   {party.name}
                 </h2>
-                <span className="text-[10px] text-slate-400 truncate block -mt-0.5">
+                <span className="text-[10px] text-slate-500 truncate block -mt-0.5">
                   {isCustomer ? 'Customer' : 'Supplier'}
                 </span>
               </div>
@@ -633,20 +633,20 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               <span
                 className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
                   isReceivable
-                    ? 'bg-emerald-500/20 text-emerald-300'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : isPayable
-                    ? 'bg-rose-500/20 text-rose-300'
-                    : 'bg-slate-800 text-slate-300'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200'
                 }`}
               >
                 {isReceivable ? 'Due' : isPayable ? 'To Pay' : 'Settled'}
               </span>
               <div className="flex flex-col items-end">
-                <span className="font-currency-display-mobile text-xs font-black text-white">
+                <span className="font-currency-display-mobile text-xs font-black text-slate-900">
                   {liveNetBalance === 0 ? '₹0' : formatINR(Math.abs(liveNetBalance))}
                 </span>
                 {!isCustomer && unbilledOrdersTotal > 0 && (
-                  <span className="text-[9px] text-slate-400 font-medium leading-none">
+                  <span className="text-[9px] text-slate-500 font-medium leading-none">
                     (Unbilled {formatINR(unbilledOrdersTotal)})
                   </span>
                 )}

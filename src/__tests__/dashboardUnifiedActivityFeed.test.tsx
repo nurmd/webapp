@@ -361,10 +361,10 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     });
 
     const moneyInAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
-      (el) => el.textContent?.trim().startsWith('+') && el.className.includes('text-emerald-400')
+      (el) => el.textContent?.trim().startsWith('+') && el.className.includes('text-emerald-700')
     );
     const moneyOutAmounts = Array.from(container.querySelectorAll('.font-tabular-data')).filter(
-      (el) => el.textContent?.trim().startsWith('-') && el.className.includes('text-rose-400')
+      (el) => el.textContent?.trim().startsWith('-') && el.className.includes('text-rose-700')
     );
 
     // Sales (2) + Receipt Voucher (1) = 3 Money In (+)
@@ -404,8 +404,8 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
     expect(container.textContent).toContain('PAID');
     expect(container.textContent).toContain('UNPAID');
 
-    // Per-row payment modes and descriptions removed for decluttering; cards render with dark card styling
-    const cards = container.querySelectorAll('.bg-slate-800\\/60');
+    // Per-row payment modes and descriptions removed for decluttering; cards render with white card styling
+    const cards = container.querySelectorAll('.bg-white');
     expect(cards.length).toBeGreaterThan(0);
   });
 

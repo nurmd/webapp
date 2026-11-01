@@ -52,7 +52,7 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     container.remove();
   });
 
-  it('Requirement 1 & 4: PartyInfoCard has darker background, white transaction text, and sticky non-wrapping Total Bill/Paid metrics', () => {
+  it('Requirement 1 & 4: PartyInfoCard has light high-contrast background and sticky non-wrapping Total Bill/Paid metrics', () => {
     act(() => {
       root.render(
         <PartyInfoCard
@@ -72,14 +72,14 @@ describe('Party Details Transaction Card UI Enhancements', () => {
 
     const card = container.querySelector('section');
     expect(card).not.toBeNull();
-    // 1. Darker background and white text
-    expect(card?.className).toContain('bg-slate-900');
-    expect(card?.className).toContain('text-white');
+    // 1. Light surface background and on-surface text
+    expect(card?.className).toContain('bg-white');
+    expect(card?.className).toContain('text-on-surface');
 
-    // Balance amount has white contrast
+    // Balance amount has high-contrast slate-900 text
     const balanceAmount = container.querySelector('.font-currency-display-mobile');
     expect(balanceAmount).not.toBeNull();
-    expect(balanceAmount?.className).toContain('text-white');
+    expect(balanceAmount?.className).toContain('text-slate-900');
 
     // 4. Total Bill and Total Paid sticky next to their labels without wrapping
     const totalBillLabel = Array.from(container.querySelectorAll('span')).find(
@@ -190,7 +190,7 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(collapsibleContainer.className).toContain('pointer-events-none');
   });
 
-  it('Requirement: PartyPassbookTable outer section is light, while individual transaction cards stay dark', () => {
+  it('Requirement: PartyPassbookTable outer section is light slate-50, while individual transaction cards are white surfaces', () => {
     const mockEntries: any[] = [
       {
         id: 'sale-inv-1',
@@ -231,7 +231,7 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     // 1. Outer transaction list section is light surface
     const tableSection = container.querySelector('section');
     expect(tableSection).not.toBeNull();
-    expect(tableSection?.className).toContain('bg-surface-container-lowest');
+    expect(tableSection?.className).toContain('bg-slate-50');
     expect(tableSection?.className).toContain('border-outline-variant/20');
 
     // 2. Filter pills & search input are light theme
@@ -248,23 +248,23 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(searchInput.className).toContain('bg-surface-container-low');
     expect(searchInput.className).toContain('text-on-surface');
 
-    // 3. Individual transaction row card STAYS DARK and stands out against the light section
+    // 3. Individual transaction row card is white surface and stands out against the light section
     const rowCard = container.querySelector('[data-testid="passbook-entry-sale-inv-1"]');
     expect(rowCard).not.toBeNull();
-    expect(rowCard?.className).toContain('bg-slate-800');
+    expect(rowCard?.className).toContain('bg-white');
 
-    // 4. Primary text is white and secondary text is slate-400
-    const primaryLabel = rowCard?.querySelector('.font-bold.text-white');
+    // 4. Primary text is slate-900 and secondary text is slate-600/slate-500
+    const primaryLabel = rowCard?.querySelector('.font-bold.text-slate-900');
     expect(primaryLabel).not.toBeNull();
     expect(primaryLabel?.textContent).toContain('Invoice');
 
-    const voucherDocNo = rowCard?.querySelector('.text-slate-400.font-mono');
+    const voucherDocNo = rowCard?.querySelector('.text-slate-600.font-mono');
     expect(voucherDocNo).not.toBeNull();
     expect(voucherDocNo?.textContent).toContain('#INV-1001');
 
     // Amount colored readability
     const amountEl = rowCard?.querySelector('.font-currency-display-mobile');
     expect(amountEl).not.toBeNull();
-    expect(amountEl?.className).toContain('text-blue-400');
+    expect(amountEl?.className).toContain('text-blue-700');
   });
 });

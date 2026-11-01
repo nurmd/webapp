@@ -794,42 +794,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 py-3 max-w-7xl mx-auto">
+    <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 pt-3 pb-28 sm:pb-6 max-w-7xl mx-auto">
       {/* 2 & 3. Unified Financial Snapshot & Quick Actions (Responsive Tablet Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch">
-        {/* Left: Financial Overview Card - Dark Hero Card (bg-slate-900, white text, slate-300 labels) */}
-        <section className="md:col-span-8 bg-slate-900 text-white rounded-2xl p-3.5 sm:p-4 shadow-md border border-slate-800 flex flex-col justify-between gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <span className="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+        {/* Left: Financial Overview Card - Light High-Contrast Card */}
+        <section className="md:col-span-8 bg-white dark:bg-surface-container-lowest text-on-surface rounded-2xl p-3 sm:p-3.5 shadow-sm border border-outline-variant/40 flex flex-col justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/20">
+            <span className="font-bold text-xs uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               Financial Overview
             </span>
 
             <button
               type="button"
               onClick={() => onNavigateTab('reports')}
-              className="text-slate-300 hover:text-white text-xs font-bold flex items-center gap-0.5 cursor-pointer transition-colors"
+              className="text-slate-600 hover:text-emerald-700 text-xs font-bold flex items-center gap-0.5 cursor-pointer transition-colors"
             >
               <span>Reports</span>
               <span className="material-symbols-outlined text-[15px]">chevron_right</span>
             </button>
           </div>
 
-          {/* Primary Metric: Total Sales Hero Banner */}
+          {/* Primary Metric: Total Sales Panel */}
           <div
             onClick={() => onNavigateTab('sales')}
-            className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer group"
+            className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer group"
           >
             <div className="flex flex-col min-w-0">
-              <span className="text-[11px] sm:text-xs text-slate-300 uppercase font-bold tracking-wider">
+              <span className="text-[11px] sm:text-xs text-slate-600 uppercase font-bold tracking-wider">
                 Total Sales
               </span>
-              <span className="font-tabular-data text-xl sm:text-2xl font-black text-white tracking-tight mt-0.5 group-hover:text-emerald-400 transition-colors">
+              <span className="font-tabular-data text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5 group-hover:text-emerald-700 transition-colors">
                 {formatINR(totalSales)}
               </span>
             </div>
 
-            <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl group-hover:bg-emerald-500/20 transition-all flex-shrink-0 ml-2">
+            <div className="flex items-center gap-1 text-emerald-700 text-xs font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl group-hover:bg-emerald-100 transition-all flex-shrink-0 ml-2">
               <span>Sales Hub</span>
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </div>
@@ -846,19 +846,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onNavigateTab('parties');
                 }
               }}
-              className="p-3 sm:p-3.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-800/50 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
+              className="p-2.5 sm:p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-50 border border-emerald-200 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] sm:text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
+                <span className="text-[10px] sm:text-xs text-emerald-700 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[14px] flex-shrink-0">south_west</span>
                   <span className="truncate">To Collect</span>
                 </span>
-                <span className="text-[10px] font-bold text-emerald-300 bg-emerald-900/80 border border-emerald-700/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded-md flex-shrink-0">
                   {debtorParties.length}
                 </span>
               </div>
 
-              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-emerald-400 mt-1.5 truncate">
+              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-emerald-700 mt-1.5 truncate">
                 {formatINR(totalReceivables)}
               </span>
             </div>
@@ -872,19 +872,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onNavigateTab('parties');
                 }
               }}
-              className="p-3 sm:p-3.5 rounded-xl bg-rose-950/40 hover:bg-rose-950/60 border border-rose-800/50 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
+              className="p-2.5 sm:p-3 rounded-xl bg-rose-50/70 hover:bg-rose-50 border border-rose-200 flex flex-col cursor-pointer active:scale-98 transition-all group min-w-0"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] sm:text-xs text-rose-400 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
+                <span className="text-[10px] sm:text-xs text-rose-700 font-bold uppercase tracking-wider flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[14px] flex-shrink-0">north_east</span>
                   <span className="truncate">To Pay</span>
                 </span>
-                <span className="text-[10px] font-bold text-rose-300 bg-rose-900/80 border border-rose-700/60 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-200 px-1.5 py-0.5 rounded-md flex-shrink-0">
                   {creditorParties.length}
                 </span>
               </div>
 
-              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-rose-400 mt-1.5 truncate">
+              <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-rose-700 mt-1.5 truncate">
                 {formatINR(totalPayables)}
               </span>
             </div>
@@ -893,14 +893,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Cash & Bank Quick Strip */}
           <div
             onClick={() => onNavigateTab('cash_bank')}
-            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 transition-colors cursor-pointer group"
+            className="flex items-center justify-between p-2 sm:p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
                 <span className="material-symbols-outlined text-[17px]">account_balance</span>
               </div>
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-bold text-white truncate">Cash & Bank Balance</span>
+                <span className="text-xs font-bold text-slate-900 truncate">Cash & Bank Balance</span>
               </div>
             </div>
 
@@ -908,7 +908,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex flex-col items-end">
                 <span
                   data-testid="dashboard-cash-bank-balance"
-                  className="font-tabular-data text-xs sm:text-sm font-bold text-white"
+                  className="font-tabular-data text-xs sm:text-sm font-bold text-slate-900"
                 >
                   {formatINR(totalCashBankBalance || 0)}
                 </span>
@@ -917,13 +917,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     data-testid="dashboard-cash-bank-negative-note"
                     title="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
                     aria-label="Recorded entries, not a calculation error. Open Cash & Bank → Reconcile."
-                    className="text-[10px] text-amber-400 font-medium"
+                    className="text-[10px] text-amber-700 font-medium"
                   >
                     Negative ledger balance
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1 text-slate-300 group-hover:text-emerald-400 font-bold text-xs group-hover:underline">
+              <div className="flex items-center gap-1 text-slate-600 group-hover:text-emerald-700 font-bold text-xs group-hover:underline">
                 <span>Passbook</span>
                 <span className="material-symbols-outlined text-[15px]">chevron_right</span>
               </div>
@@ -932,8 +932,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </section>
 
         {/* Right: Configurable Quick Action Buttons (max 8) */}
-        <section className="md:col-span-4 bg-surface-container-lowest rounded-2xl p-3.5 sm:p-4 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/20">
+        <section className="md:col-span-4 bg-surface-container-lowest rounded-2xl p-3 sm:p-3.5 shadow-sm border border-outline-variant/30 flex flex-col justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/20">
             <span className="font-bold text-xs uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-secondary"></span>
               Quick Actions
@@ -950,7 +950,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onClick={() => handleQuickAction(action.id)}
                   type="button"
                   aria-label={action.label}
-                  className={`flex flex-col items-center justify-center gap-1 aspect-square p-1 sm:p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-0.5 sm:gap-1 h-14 sm:h-16 p-1 sm:p-1.5 rounded-xl active:scale-95 transition-all cursor-pointer ${
                     isPrimary
                       ? 'bg-secondary text-on-secondary shadow-sm'
                       : 'bg-surface-container-lowest text-on-surface border border-outline-variant/30 shadow-xs hover:border-secondary'
@@ -974,9 +974,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 4. Unified Multi-Entity Business Activity Timeline (R1, R2, R3) */}
-      <section className="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/30 flex flex-col">
+      <section className="bg-slate-50 dark:bg-surface-container-low rounded-2xl shadow-sm border border-outline-variant/30 flex flex-col">
         {/* Sticky Timeline Filter Header */}
-        <div className="sticky top-0 z-10 bg-surface/95 dark:bg-surface/95 backdrop-blur-md p-3.5 sm:p-4 border-b border-outline-variant/20 rounded-t-2xl flex flex-col gap-2.5 sm:gap-3 shadow-xs">
+        <div className="sticky top-0 z-10 bg-slate-50/95 dark:bg-surface-container-low/95 backdrop-blur-md p-3.5 sm:p-4 border-b border-outline-variant/20 rounded-t-2xl flex flex-col gap-2.5 sm:gap-3 shadow-xs">
           <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[20px] text-secondary">history</span>
@@ -1260,17 +1260,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 item.typeLabel === 'Purchase Return' ||
                 item.typeLabel.includes('Return');
 
-              // Type Badge Colors for Dark Card
+              // Type Badge Colors for Light Card
               const typeBadgeClass =
                 isReturn
-                  ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60'
+                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
                   : item.type === 'SALE'
-                  ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60'
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
                   : item.type === 'PURCHASE'
-                  ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
                   : item.type === 'VOUCHER'
-                  ? 'bg-indigo-950/80 text-indigo-300 border border-indigo-800/60'
-                  : 'bg-rose-950/80 text-rose-300 border border-rose-800/60';
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                  : 'bg-rose-50 text-rose-700 border border-rose-200';
 
               const overdueDays =
                 item.dueDate && (item.balanceAmount || 0) > 0.01 && item.paymentStatus !== 'PAID'
@@ -1285,7 +1285,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     contentVisibility: 'auto',
                     containIntrinsicSize: '1px 72px',
                   }}
-                  className="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800/90 active:bg-slate-800 border border-slate-700/50 flex flex-col justify-between gap-2 cursor-pointer transition-all shadow-xs group"
+                  className="p-3 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 active:bg-slate-200/60 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm flex flex-col justify-between gap-2 cursor-pointer transition-all group"
                 >
                   {/* Top line: Badges on left, Date on right */}
                   <div className="flex items-center justify-between gap-2">
@@ -1297,7 +1297,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {overdueDays > 0 && (
                         <span
                           data-testid="overdue-badge"
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-950/80 text-rose-300 border border-rose-800 whitespace-nowrap shrink-0"
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap shrink-0"
                         >
                           <span className="material-symbols-outlined text-[11px]">schedule</span>
                           <span>{overdueDays} days overdue</span>
@@ -1306,7 +1306,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] text-slate-400 font-medium">
+                      <span className="text-[11px] text-slate-500 font-medium">
                         {formatDate(item.date) || '—'}
                       </span>
                       <button
@@ -1314,7 +1314,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         title="Share Receipt"
                         aria-label="Share receipt"
                         onClick={(e) => handleShareClick(e, item)}
-                        className="min-h-[44px] min-w-[44px] -my-2 flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-700/60 rounded-lg active:scale-95 transition-all cursor-pointer"
+                        className="min-h-[44px] min-w-[44px] -my-2 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-slate-100 rounded-lg active:scale-95 transition-all cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[16px]">share</span>
                       </button>
@@ -1325,10 +1325,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     {/* Left: Party Name & Doc Number */}
                     <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-xs sm:text-sm text-white truncate group-hover:text-emerald-400 transition-colors">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-on-surface truncate group-hover:text-emerald-700 transition-colors">
                         {item.partyName}
                       </span>
-                      <span className="font-mono font-bold text-[11px] text-slate-300 truncate mt-0.5">
+                      <span className="font-mono font-medium text-[11px] text-slate-600 truncate mt-0.5">
                         {item.identifier}
                       </span>
                     </div>
@@ -1337,7 +1337,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <div className="flex flex-col items-end flex-shrink-0 text-right">
                       <span
                         className={`font-tabular-data text-xs sm:text-sm font-black whitespace-nowrap ${
-                          isMoneyIn ? 'text-emerald-400' : 'text-rose-400'
+                          isMoneyIn ? 'text-emerald-700' : 'text-rose-700'
                         }`}
                       >
                         {isMoneyIn ? '+' : '-'} {formatINR(item.amount)}
@@ -1347,17 +1347,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span
                           className={`h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[10px] font-bold leading-none whitespace-nowrap shrink-0 ${
                             isPaid
-                              ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-800/60'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : isPartial
-                              ? 'bg-amber-950/90 text-amber-300 border border-amber-800/60'
-                              : 'bg-rose-950/90 text-rose-300 border border-rose-800/60'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}
                         >
                           <span className="leading-none">{item.paymentStatus}</span>
                         </span>
 
                         {hasBalance && item.balanceAmount && (
-                          <span className="text-[10px] font-semibold text-rose-400 whitespace-nowrap shrink-0 leading-none">
+                          <span className="text-[10px] font-semibold text-rose-700 whitespace-nowrap shrink-0 leading-none">
                             Due: {formatINR(item.balanceAmount)}
                           </span>
                         )}

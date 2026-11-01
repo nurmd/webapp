@@ -24,7 +24,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
   onTransactionClick,
 }) => {
   return (
-    <section className="bg-surface-container-lowest rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
+    <section className="bg-slate-50 dark:bg-surface-container-low rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
       {/* Header & Filter Controls */}
       <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-0.5">
         <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
@@ -106,40 +106,40 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
             // 1. Voucher Type Label & Icon
             let voucherTypeLabel = 'Transaction';
             let iconName = 'receipt';
-            let iconColorClasses = 'bg-slate-700/60 text-slate-300';
+            let iconColorClasses = 'bg-slate-100 text-slate-600';
 
             if (entry.type === 'SALE') {
               if (entry.rawInvoice?.invoiceType === 'CREDIT_NOTE') {
                 voucherTypeLabel = 'Return';
                 iconName = 'assignment_return';
-                iconColorClasses = 'bg-rose-500/20 text-rose-400';
+                iconColorClasses = 'bg-rose-50 text-rose-700';
               } else {
                 voucherTypeLabel = 'Invoice';
                 iconName = 'point_of_sale';
-                iconColorClasses = 'bg-blue-500/20 text-blue-400';
+                iconColorClasses = 'bg-blue-50 text-blue-700';
               }
             } else if (entry.type === 'PURCHASE') {
               if (entry.rawPurchase?.purchaseType === 'RETURN' || entry.rawPurchase?.noteType === 'D') {
                 voucherTypeLabel = 'Return';
                 iconName = 'assignment_return';
-                iconColorClasses = 'bg-emerald-500/20 text-emerald-400';
+                iconColorClasses = 'bg-emerald-50 text-emerald-700';
               } else {
                 voucherTypeLabel = 'Purchase Bill';
                 iconName = 'shopping_bag';
-                iconColorClasses = 'bg-orange-500/20 text-orange-400';
+                iconColorClasses = 'bg-amber-50 text-amber-700';
               }
             } else if (entry.type === 'PAYMENT_IN') {
               voucherTypeLabel = 'Payment In';
               iconName = 'arrow_downward';
-              iconColorClasses = 'bg-emerald-500/20 text-emerald-400';
+              iconColorClasses = 'bg-emerald-50 text-emerald-700';
             } else if (entry.type === 'PAYMENT_OUT') {
               voucherTypeLabel = 'Payment Out';
               iconName = 'arrow_upward';
-              iconColorClasses = 'bg-amber-500/20 text-amber-400';
+              iconColorClasses = 'bg-amber-50 text-amber-700';
             } else if (entry.type === 'OPENING') {
               voucherTypeLabel = 'Opening Balance';
               iconName = 'account_balance';
-              iconColorClasses = 'bg-slate-700/60 text-slate-300';
+              iconColorClasses = 'bg-slate-100 text-slate-700';
             }
 
             // 2. Voucher Number (Line 2: gray/slate text)
@@ -166,19 +166,19 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 const bal = entry.rawInvoice?.balanceAmount;
                 if (origInv) {
                   line3Node = (
-                    <div className="text-[11px] text-slate-300 font-medium truncate">
+                    <div className="text-[11px] text-slate-600 font-medium truncate">
                       Linked: #{origInv.replace(/^#/, '')}
                       {typeof bal === 'number' && (
-                        <span className="ml-1 text-slate-400">• Balance: {formatINR(bal)}</span>
+                        <span className="ml-1 text-slate-500">• Balance: {formatINR(bal)}</span>
                       )}
                     </div>
                   );
                 } else {
                   line3Node = (
-                    <div className="text-[11px] text-slate-300 font-medium truncate">
+                    <div className="text-[11px] text-slate-600 font-medium truncate">
                       Balance: {formatINR(entry.rawInvoice?.balanceAmount ?? entry.rawInvoice?.grandTotal ?? entry.billAmount ?? 0)}
                       {entry.rawInvoice?.returnReason && (
-                        <span className="ml-1 text-slate-400">• {entry.rawInvoice.returnReason}</span>
+                        <span className="ml-1 text-slate-500">• {entry.rawInvoice.returnReason}</span>
                       )}
                     </div>
                   );
@@ -187,10 +187,10 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 const bal = entry.rawInvoice ? entry.rawInvoice.balanceAmount : (entry.billAmount ?? entry.debit ?? 0);
                 const paid = entry.rawInvoice?.paidAmount ?? 0;
                 line3Node = (
-                  <div className="text-[11px] text-slate-300 font-medium truncate">
+                    <div className="text-[11px] text-slate-600 font-medium truncate">
                     Balance: {formatINR(bal)}
                     {paid > 0 && bal > 0 ? (
-                      <span className="ml-1 text-slate-400 font-normal">
+                      <span className="ml-1 text-slate-500 font-normal">
                         (Paid: {formatINR(paid)} • Due: {formatINR(bal)})
                       </span>
                     ) : null}
@@ -204,19 +204,19 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 const bal = entry.rawPurchase?.balanceAmount;
                 if (origBill) {
                   line3Node = (
-                    <div className="text-[11px] text-slate-300 font-medium truncate">
+                    <div className="text-[11px] text-slate-600 font-medium truncate">
                       Linked: #{origBill.replace(/^#/, '')}
                       {typeof bal === 'number' && (
-                        <span className="ml-1 text-slate-400">• Balance: {formatINR(bal)}</span>
+                        <span className="ml-1 text-slate-500">• Balance: {formatINR(bal)}</span>
                       )}
                     </div>
                   );
                 } else {
                   line3Node = (
-                    <div className="text-[11px] text-slate-300 font-medium truncate">
+                    <div className="text-[11px] text-slate-600 font-medium truncate">
                       Balance: {formatINR(entry.rawPurchase?.balanceAmount ?? entry.rawPurchase?.grandTotal ?? entry.billAmount ?? 0)}
                       {entry.rawPurchase?.returnReason && (
-                        <span className="ml-1 text-slate-400">• {entry.rawPurchase.returnReason}</span>
+                        <span className="ml-1 text-slate-500">• {entry.rawPurchase.returnReason}</span>
                       )}
                     </div>
                   );
@@ -225,10 +225,10 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 const bal = entry.rawPurchase ? entry.rawPurchase.balanceAmount : (entry.billAmount ?? entry.credit ?? 0);
                 const paid = entry.rawPurchase?.paidAmount ?? 0;
                 line3Node = (
-                  <div className="text-[11px] text-slate-300 font-medium truncate">
+                  <div className="text-[11px] text-slate-600 font-medium truncate">
                     Balance: {formatINR(bal)}
                     {paid > 0 && bal > 0 ? (
-                      <span className="ml-1 text-slate-400 font-normal">
+                      <span className="ml-1 text-slate-500 font-normal">
                         (Paid: {formatINR(paid)} • Due: {formatINR(bal)})
                       </span>
                     ) : null}
@@ -260,10 +260,10 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
 
               if (linkedVouchersStr) {
                 line3Node = (
-                  <div className="text-[11px] text-slate-300 font-medium truncate flex items-center gap-1.5">
+                  <div className="text-[11px] text-slate-600 font-medium truncate flex items-center gap-1.5">
                     <span className="truncate">Linked: {linkedVouchersStr}</span>
                     {unallocatedAmt > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-medium whitespace-nowrap">
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
                         Advance: {formatINR(unallocatedAmt)}
                       </span>
                     )}
@@ -271,7 +271,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 );
               } else {
                 line3Node = (
-                  <div className="text-[11px] text-slate-300 font-medium truncate">
+                  <div className="text-[11px] text-slate-600 font-medium truncate">
                     {entry.description || 'Direct Payment (Unlinked)'}
                   </div>
                 );
@@ -279,7 +279,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
             } else {
               // Opening Balance
               line3Node = (
-                <div className="text-[11px] text-slate-400 font-medium truncate">
+                <div className="text-[11px] text-slate-500 font-medium truncate">
                   Opening Baseline
                 </div>
               );
@@ -290,7 +290,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 key={entry.id}
                 data-testid={`passbook-entry-${entry.id}`}
                 onClick={() => onTransactionClick(entry)}
-                className="p-3 sm:p-3.5 rounded-2xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-3 cursor-pointer"
+                className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-3 cursor-pointer"
               >
                 {/* Left Icon and 3-Line Details */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -305,20 +305,20 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
                     {/* Line 1: Voucher type (invoice, return, payment) and date */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-white text-xs sm:text-sm">
+                      <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm">
                         {voucherTypeLabel}
                       </span>
-                      <span className="text-slate-400 text-[11px] sm:text-xs">
+                      <span className="text-slate-500 text-[11px] sm:text-xs">
                         • {entry.date}
                       </span>
                       {entry.status && entry.status !== 'OPENING' && (
                         <span
                           className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
                             entry.status === 'PAID'
-                              ? 'bg-emerald-500/20 text-emerald-300'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : entry.status === 'PARTIAL'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-rose-500/20 text-rose-300'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
                           }`}
                         >
                           {entry.status}
@@ -326,8 +326,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                       )}
                     </div>
 
-                    {/* Line 2: Voucher number in slate-400 text */}
-                    <div className="text-xs text-slate-400 font-mono font-medium truncate tracking-tight">
+                    {/* Line 2: Voucher number in slate-600 text */}
+                    <div className="text-xs text-slate-600 font-mono font-medium truncate tracking-tight">
                       {voucherNumber}
                     </div>
 
@@ -345,17 +345,17 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                       className={`font-currency-display-mobile text-xs sm:text-sm font-black block ${
                         entry.type === 'PURCHASE'
                           ? (entry.rawPurchase?.purchaseType === 'RETURN' || entry.rawPurchase?.noteType === 'D')
-                            ? 'text-emerald-400'
-                            : 'text-orange-400'
+                            ? 'text-emerald-700'
+                            : 'text-amber-700'
                           : entry.type === 'SALE'
                           ? entry.rawInvoice?.invoiceType === 'CREDIT_NOTE'
-                            ? 'text-rose-400'
-                            : 'text-blue-400'
+                            ? 'text-rose-700'
+                            : 'text-blue-700'
                           : isCredit
-                          ? 'text-emerald-400'
+                          ? 'text-emerald-700'
                           : isDebit
-                          ? 'text-rose-400'
-                          : 'text-white'
+                          ? 'text-rose-700'
+                          : 'text-slate-900'
                       }`}
                     >
                       {entry.type === 'PURCHASE'
@@ -372,12 +372,12 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                         ? `- ${formatINR(entry.debit)}`
                         : '₹0'}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                    <span className="text-[10px] font-mono text-slate-500 block mt-0.5">
                       Bal: {formatINR(Math.abs(entry.runningBalance))}
                     </span>
                   </div>
 
-                  <span className="material-symbols-outlined text-[18px] text-slate-500 ml-0.5">
+                  <span className="material-symbols-outlined text-[18px] text-slate-400 ml-0.5">
                     chevron_right
                   </span>
                 </div>
