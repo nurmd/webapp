@@ -162,16 +162,16 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
           <button
             type="button"
             onClick={() => onNavigateTab('dashboard')}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer flex-shrink-0"
             title="Back to Dashboard"
           >
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           </button>
           <div className="flex flex-col min-w-0">
-            <h1 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
+            <h1 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900 truncate">
               Cash & Bank
             </h1>
-            <span className="text-[11px] text-on-surface-variant truncate">
+            <span className="text-[11px] text-slate-600 truncate">
               Live balances, passbook ledger & bank transfers
             </span>
           </div>
@@ -183,7 +183,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             type="button"
             data-testid="cash-bank-reconcile-button"
             onClick={() => setIsReconciliationOpen(true)}
-            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-xs font-bold active:scale-95 transition-all flex items-center gap-1 cursor-pointer shrink-0"
+            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 font-label-md text-xs font-bold active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
             title="Reconcile Cash & Bank Balances"
             aria-label="Reconcile Cash & Bank Balances"
           >
@@ -211,7 +211,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               setDirectPreselectedAccount('ACC_CASH');
               setIsDirectModalOpen(true);
             }}
-            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high font-label-md text-xs font-bold active:scale-95 transition-all flex items-center gap-1 cursor-pointer shrink-0"
+            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 font-label-md text-xs font-bold active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
             title="Add Cash or Direct Money In"
           >
             <span className="material-symbols-outlined text-[16px] text-emerald-600">add</span>
@@ -224,7 +224,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               setEditingAccount(null);
               setIsAddAccountModalOpen(true);
             }}
-            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high flex items-center justify-center gap-1 text-xs font-bold active:scale-95 transition-all cursor-pointer shrink-0"
+            className="h-8 sm:h-9 px-2.5 rounded-xl bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 flex items-center justify-center gap-1 text-xs font-bold active:scale-95 transition-all cursor-pointer shadow-xs shrink-0"
             title="Add New Bank Account"
             aria-label="Add Bank Account"
           >
@@ -262,14 +262,14 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
       )}
 
       {/* 2. Compact Financial Summary Strip (3 Metrics on Single Row) */}
-      <section className="grid grid-cols-3 gap-2 p-2.5 sm:p-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
+      <section className="grid grid-cols-3 gap-2 p-2.5 sm:p-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
         {/* Metric 1: Total Liquid Balance */}
         <div className="flex flex-col min-w-0 px-1 border-r border-outline-variant/20">
-          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1 truncate">
+          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1 truncate">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
             <span className="truncate">Total Balance</span>
           </span>
-          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-on-surface mt-0.5 truncate">
+          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-slate-900 mt-0.5 truncate">
             {formatINR(summary.totalLiquidBalance)}
           </span>
           <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold truncate">
@@ -299,7 +299,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
           <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-emerald-700 dark:text-emerald-400 mt-0.5 truncate">
             {formatINR(cashBal)}
           </span>
-          <span className="text-[10px] text-on-surface-variant font-medium truncate">
+          <span className="text-[10px] text-slate-500 font-medium truncate">
             Physical register
           </span>
         </div>
@@ -326,7 +326,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
           <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-blue-700 dark:text-blue-400 mt-0.5 truncate">
             {formatINR(summary.totalBankBalance)}
           </span>
-          <span className="text-[10px] text-on-surface-variant font-medium truncate">
+          <span className="text-[10px] text-slate-500 font-medium truncate">
             {bankAccounts.length} linked bank{bankAccounts.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -335,9 +335,9 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
       {/* 3. Account Cards (Clean Horizontal Slider) */}
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-bold text-on-surface flex items-center gap-1.5 uppercase tracking-wider">
+          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
             <span>Accounts & Registers</span>
-            <span className="text-[10px] font-semibold text-on-surface-variant">
+            <span className="text-[10px] font-semibold text-slate-500">
               ({accounts.length})
             </span>
           </span>
@@ -363,31 +363,31 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               setSelectedAccountId(selectedAccountId === 'ACC_CASH' ? null : 'ACC_CASH');
               setAccountFilter(selectedAccountId === 'ACC_CASH' ? 'ALL' : 'CASH');
             }}
-            className={`w-[175px] min-w-[175px] shrink-0 sm:w-auto sm:min-w-0 p-3 rounded-2xl bg-surface-container-lowest border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+            className={`w-[175px] min-w-[175px] shrink-0 sm:w-auto sm:min-w-0 p-3 rounded-2xl bg-surface-container-lowest border transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-sm ${
               selectedAccountId === 'ACC_CASH'
-                ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
-                : 'border-outline-variant/30 hover:border-emerald-500/50 shadow-xs'
+                ? 'border-emerald-500 ring-2 ring-emerald-500/20'
+                : 'border-outline-variant/30 hover:border-emerald-500/50'
             }`}
           >
             <div className="flex items-start justify-between gap-1.5">
               <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-[18px]">payments</span>
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold text-on-surface truncate">Cash in Hand</span>
-                  <span className="text-[10px] text-on-surface-variant truncate">Counter Cash</span>
+                  <span className="text-xs font-bold text-slate-900 truncate">Cash in Hand</span>
+                  <span className="text-[10px] text-slate-500 truncate">Counter Cash</span>
                 </div>
               </div>
 
-              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 shrink-0">
+              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
                 Cash
               </span>
             </div>
 
             <div className="flex items-end justify-between pt-1 border-t border-outline-variant/15 gap-1">
               <div className="min-w-0">
-                <span className="text-[9px] text-on-surface-variant block">Balance</span>
+                <span className="text-[9px] text-slate-500 block">Balance</span>
                 <span className="font-tabular-data text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-400 truncate block">
                   {formatINR(cashBal)}
                 </span>
@@ -401,7 +401,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                     e.stopPropagation();
                     onOpenAccountStatement?.('ACC_CASH');
                   }}
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-on-surface-variant hover:text-emerald-700 dark:hover:text-emerald-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-slate-500 hover:text-emerald-700 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                   title="View Account Statement"
                   aria-label="View statement for Cash in Hand"
                 >
@@ -437,20 +437,20 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                   setSelectedAccountId(isSelected ? null : acc.id);
                   setAccountFilter(isSelected ? 'ALL' : 'BANK');
                 }}
-                className={`w-[175px] min-w-[175px] shrink-0 sm:w-auto sm:min-w-0 p-3 rounded-2xl bg-surface-container-lowest border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                className={`w-[175px] min-w-[175px] shrink-0 sm:w-auto sm:min-w-0 p-3 rounded-2xl bg-surface-container-lowest border transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-sm ${
                   isSelected
-                    ? 'border-secondary ring-2 ring-secondary/20 shadow-sm'
-                    : 'border-outline-variant/30 hover:border-secondary/50 shadow-xs'
+                    ? 'border-secondary ring-2 ring-secondary/20'
+                    : 'border-outline-variant/30 hover:border-secondary/50'
                 }`}
               >
                 <div className="flex items-start justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-700 dark:text-blue-400 shrink-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-[18px]">account_balance</span>
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-bold text-on-surface truncate">{acc.accountName}</span>
-                      <span className="text-[10px] text-on-surface-variant truncate font-mono">
+                      <span className="text-xs font-bold text-slate-900 truncate">{acc.accountName}</span>
+                      <span className="text-[10px] text-slate-500 truncate font-mono">
                         {acc.accountNumber ? `•••• ${acc.accountNumber.slice(-4)}` : acc.bankName || 'Bank A/C'}
                       </span>
                     </div>
@@ -461,7 +461,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       Primary
                     </span>
                   ) : (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-surface-container text-on-surface-variant shrink-0">
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                       Bank
                     </span>
                   )}
@@ -469,8 +469,8 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
 
                 <div className="flex items-end justify-between pt-1 border-t border-outline-variant/15 gap-1">
                   <div className="min-w-0">
-                    <span className="text-[9px] text-on-surface-variant block">Balance</span>
-                    <span className="font-tabular-data text-sm sm:text-base font-black text-on-surface truncate block">
+                    <span className="text-[9px] text-slate-500 block">Balance</span>
+                    <span className="font-tabular-data text-sm sm:text-base font-black text-slate-900 truncate block">
                       {formatINR(bal)}
                     </span>
                   </div>
@@ -483,7 +483,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                         e.stopPropagation();
                         onOpenAccountStatement?.(acc.id);
                       }}
-                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-on-surface-variant hover:text-blue-700 dark:hover:text-blue-400 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-slate-500 hover:text-blue-700 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                       title="View Account Statement"
                       aria-label={`View statement for ${acc.accountName}`}
                     >
@@ -497,7 +497,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                         setEditingAccount(acc);
                         setIsAddAccountModalOpen(true);
                       }}
-                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-on-surface-variant hover:text-on-surface flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+                      className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-slate-500 hover:text-slate-900 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                       title="Edit bank account details"
                     >
                       <span className="material-symbols-outlined text-[14px]">edit</span>
@@ -530,11 +530,11 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               }}
               className="w-[150px] min-w-[150px] shrink-0 sm:w-auto sm:min-w-0 p-3 rounded-2xl border border-dashed border-outline-variant/50 hover:border-secondary hover:bg-secondary/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-center min-h-[80px]"
             >
-              <div className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+              <div className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-slate-600">
                 <span className="material-symbols-outlined text-[16px]">add</span>
               </div>
-              <span className="text-xs font-bold text-on-surface">Add Bank</span>
-              <span className="text-[10px] text-on-surface-variant">Multiple banks & UPI</span>
+              <span className="text-xs font-bold text-slate-900">Add Bank</span>
+              <span className="text-[10px] text-slate-500">Multiple banks & UPI</span>
             </div>
           )}
         </div>
@@ -545,17 +545,17 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         {/* Passbook Title & Filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Cash & Bank Passbook
             </span>
-            <span className="text-[11px] font-bold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
               {filteredLedger.length} entries
             </span>
           </div>
 
           {/* Search Box */}
           <div className="relative flex-1 sm:max-w-xs">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-on-surface-variant">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-[16px] text-slate-500">
               search
             </span>
             <input
@@ -563,14 +563,14 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
               placeholder="Search bill, party, or notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-7 py-1.5 text-xs bg-surface-container-lowest border border-outline-variant/30 rounded-xl outline-none focus:border-secondary text-on-surface placeholder:text-on-surface-variant/60"
+              className="w-full pl-8 pr-7 py-1.5 text-xs bg-surface-container-lowest border border-outline-variant/30 rounded-xl outline-none focus:border-secondary text-slate-900 placeholder:text-slate-500 shadow-xs"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
@@ -590,7 +590,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all flex-shrink-0 ${
               accountFilter === 'ALL' && !selectedAccountId
                 ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             All Accounts
@@ -604,7 +604,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1 flex-shrink-0 ${
               accountFilter === 'CASH'
                 ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]">payments</span>
@@ -619,7 +619,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all flex items-center gap-1 flex-shrink-0 ${
               accountFilter === 'BANK'
                 ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]">account_balance</span>
@@ -635,7 +635,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1 flex-shrink-0 ${
               flowFilter === 'IN'
                 ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]">arrow_downward</span>
@@ -647,7 +647,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1 flex-shrink-0 ${
               flowFilter === 'OUT'
                 ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]">arrow_upward</span>
@@ -659,7 +659,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             className={`px-2.5 py-1 rounded-xl text-[11px] font-bold cursor-pointer transition-all flex items-center gap-1 flex-shrink-0 ${
               flowFilter === 'CONTRA'
                 ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container text-on-surface-variant hover:text-on-surface'
+                : 'bg-surface-container text-slate-700 hover:text-slate-900 border border-outline-variant/20 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[13px]">swap_horiz</span>
@@ -679,10 +679,10 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
         {/* Passbook Ledger Rows */}
         <div className="flex flex-col gap-1.5">
           {filteredLedger.length === 0 ? (
-            <div className="p-8 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 text-center flex flex-col items-center justify-center gap-2">
-              <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">receipt_long</span>
-              <p className="font-bold text-sm text-on-surface">No transactions found</p>
-              <p className="text-xs text-on-surface-variant max-w-xs">
+            <div className="p-8 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 text-center flex flex-col items-center justify-center gap-2 shadow-sm">
+              <span className="material-symbols-outlined text-4xl text-slate-400">receipt_long</span>
+              <p className="font-bold text-sm text-slate-900">No transactions found</p>
+              <p className="text-xs text-slate-500 max-w-xs">
                 {searchQuery
                   ? 'No entries match your search criteria. Try a different query.'
                   : 'Start recording sales, expenses, or cash transfers to see your live passbook.'}
@@ -716,7 +716,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       handleOpenDetailModal(entry);
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs hover:border-outline-variant/70 hover:bg-surface-container-low/50 transition-all cursor-pointer group flex flex-col gap-1"
+                  className="px-3 py-2 rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm hover:border-outline-variant/70 hover:bg-surface-container-low/50 transition-all cursor-pointer group flex flex-col gap-1"
                 >
                   {/* Line 1: Icon + Title + Reference + Contra Route + Amount */}
                   <div className="flex items-center justify-between gap-2 min-w-0">
@@ -724,10 +724,10 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       <div
                         className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center shrink-0 ${
                           isContra
-                            ? 'bg-blue-500/10 text-blue-600'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
                             : isInflow
-                            ? 'bg-emerald-500/10 text-emerald-600'
-                            : 'bg-rose-500/10 text-rose-600'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}
                       >
                         <span className="material-symbols-outlined text-[15px] sm:text-[17px]">
@@ -739,18 +739,18 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                         </span>
                       </div>
 
-                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate group-hover:text-primary transition-colors">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 truncate group-hover:text-primary transition-colors">
                         {entry.counterpartyOrTitle}
                       </span>
 
                       {entry.referenceNo && (
-                        <span className="hidden sm:inline-flex text-[10px] text-on-surface-variant font-mono bg-surface-container px-1 py-0.2 rounded shrink-0">
+                        <span className="hidden sm:inline-flex text-[10px] text-slate-600 font-mono bg-slate-100 border border-slate-200 px-1 py-0.2 rounded shrink-0">
                           #{entry.referenceNo}
                         </span>
                       )}
 
                       {isContra && (
-                        <span className="hidden sm:inline-flex text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-500/10 px-1.5 py-0.2 rounded shrink-0">
+                        <span className="hidden sm:inline-flex text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded shrink-0">
                           {entry.fromAccountName || (entry.flow === 'OUT' ? entry.accountName : 'Cash')} → {entry.toAccountName || (entry.flow === 'IN' ? entry.accountName : 'Bank')}
                         </span>
                       )}
@@ -768,14 +768,14 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       >
                         {isInflow ? '+' : isOutflow ? '-' : '⇄'} {formatINR(entry.amount)}
                       </span>
-                      <span className="material-symbols-outlined text-[16px] text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all">
+                      <span className="material-symbols-outlined text-[16px] text-slate-400 group-hover:text-primary group-hover:translate-x-0.5 transition-all">
                         chevron_right
                       </span>
                     </div>
                   </div>
 
                   {/* Line 2: Date • Account • Mode • Description */}
-                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-on-surface-variant pl-8 sm:pl-9 min-w-0 overflow-hidden">
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-600 pl-8 sm:pl-9 min-w-0 overflow-hidden">
                     <span className="shrink-0">{formatDate(entry.date)}</span>
                     <span className="shrink-0">•</span>
                     <span className="flex items-center gap-0.5 shrink-0">
@@ -785,7 +785,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       <span>{entry.accountName}</span>
                     </span>
                     <span className="shrink-0">•</span>
-                    <span className="px-1 py-0.2 rounded bg-surface-container font-semibold text-[9px] sm:text-[10px] shrink-0">
+                    <span className="px-1 py-0.2 rounded bg-slate-100 border border-slate-200 font-semibold text-[9px] sm:text-[10px] shrink-0 text-slate-700">
                       {entry.mode}
                     </span>
                     {entry.description && (

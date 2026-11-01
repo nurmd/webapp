@@ -748,7 +748,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           data-testid="settings-sidebar"
         >
           {/* Mobile Profile Card Summary */}
-          <div className="md:hidden mb-4 p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex items-center gap-3 shadow-xs">
+          <div className="md:hidden mb-4 p-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex items-center gap-3 shadow-sm">
             <div className="w-12 h-12 rounded-xl bg-secondary/15 flex items-center justify-center font-bold text-secondary text-lg flex-shrink-0">
               {profile.logoUrl ? (
                 <img src={profile.logoUrl} alt="Store Logo" className="w-full h-full object-cover rounded-xl" />
@@ -757,8 +757,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-sm text-on-surface truncate">{profile.businessName || 'Vyapar Store'}</h3>
-              <p className="text-xs text-on-surface-variant truncate">
+              <h3 className="font-bold text-sm text-slate-900 truncate">{profile.businessName || 'Vyapar Store'}</h3>
+              <p className="text-xs text-slate-600 truncate">
                 {isGstActive ? (profile.gstin || 'GST Configured') : 'Direct Billing Mode'}
               </p>
             </div>
@@ -775,8 +775,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
           </div>
 
           {/* Sidebar Menu Card */}
-          <nav className="bg-surface-container-lowest rounded-2xl p-2.5 border border-outline-variant/30 shadow-xs md:sticky md:top-[80px]">
-            <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-outline hidden md:flex items-center gap-1.5">
+          <nav className="bg-surface-container-lowest rounded-2xl p-2.5 border border-outline-variant/30 shadow-sm md:sticky md:top-[80px]">
+            <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hidden md:flex items-center gap-1.5">
               <Sparkles size={13} className="text-secondary" />
               <span>Settings Hub</span>
             </div>
@@ -798,7 +798,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-secondary text-on-secondary shadow-sm font-bold'
-                        : 'text-on-surface hover:bg-surface-container-low font-medium'
+                        : 'text-slate-900 hover:bg-surface-container-low font-medium'
                     }`}
                   >
                     <span
@@ -823,7 +823,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                                 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                                 : isSelected
                                 ? 'bg-on-secondary/20 text-on-secondary'
-                                : 'bg-surface-container text-on-surface-variant'
+                                : 'bg-surface-container text-slate-600'
                             }`}
                           >
                             {cat.id === 'data_sync' ? dataSyncBadge : cat.badge}
@@ -832,7 +832,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                       </div>
                       <p
                         className={`text-[10px] truncate leading-tight mt-0.5 ${
-                          isSelected ? 'text-on-secondary/80' : 'text-on-surface-variant'
+                          isSelected ? 'text-on-secondary/80' : 'text-slate-600'
                         }`}
                       >
                         {cat.subtitle}
@@ -842,7 +842,7 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
                     <ChevronRight
                       size={15}
                       className={`flex-shrink-0 transition-transform ${
-                        isSelected ? 'text-on-secondary translate-x-0.5' : 'text-outline/60'
+                        isSelected ? 'text-on-secondary translate-x-0.5' : 'text-slate-400'
                       }`}
                     />
                   </button>
@@ -852,8 +852,8 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
 
             {/* Version Footer */}
             <div className="mt-4 pt-3 border-t border-outline-variant/20 px-3 text-center hidden md:block">
-              <p className="text-[11px] font-bold text-outline">Vyapar PRO Books • v{CURRENT_APP_VERSION}</p>
-              <p className="text-[10px] text-outline-variant">100% Offline-First Multi-Device Architecture</p>
+              <p className="text-[11px] font-bold text-slate-600">Vyapar PRO Books • v{CURRENT_APP_VERSION}</p>
+              <p className="text-[10px] text-slate-500">100% Offline-First Multi-Device Architecture</p>
             </div>
           </nav>
         </aside>
@@ -876,20 +876,20 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
               <ArrowLeft size={16} />
               <span>Back to Settings</span>
             </button>
-            <span className="text-xs font-bold text-on-surface truncate">
+            <span className="text-xs font-bold text-slate-900 truncate">
               {activeCategoryMeta.label}
             </span>
           </div>
 
           {/* Active Category Header Banner (Desktop) */}
-          <div className="hidden md:flex items-center justify-between p-4 mb-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
+          <div className="hidden md:flex items-center justify-between p-4 mb-4 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-secondary/15 text-secondary flex items-center justify-center flex-shrink-0">
                 {React.createElement(activeCategoryMeta.icon, { size: 20 })}
               </div>
               <div>
-                <h2 className="text-base font-bold text-on-surface">{activeCategoryMeta.label}</h2>
-                <p className="text-xs text-on-surface-variant">{activeCategoryMeta.subtitle}</p>
+                <h2 className="text-base font-bold text-slate-900">{activeCategoryMeta.label}</h2>
+                <p className="text-xs text-slate-600">{activeCategoryMeta.subtitle}</p>
               </div>
             </div>
           </div>

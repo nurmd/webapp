@@ -483,6 +483,32 @@ The `StorageService` class (`db`) is the unified database facade composing focus
     - Vouchers: `RECEIPT` -> `Receipt Voucher`, `PAYMENT` -> `Payment Voucher`, `CONTRA` -> `Contra Voucher`, `JOURNAL` -> `Journal Voucher`, `DEBIT_NOTE` -> `Debit Note`, `CREDIT_NOTE` -> `Credit Note`.
     - Expenses: `Expense`.
   - Return documents (Sales Return, Purchase Return) render with distinctive purple return badges and `assignment_return` icons.
+- **Phase 2: Inventory, Purchases, and Sales Hubs Light-Theme Contrast & Declutter (`InventoryView.tsx`, `InventoryItemCard.tsx`, `PurchasesHubView.tsx`, `SalesHubView.tsx`)**:
+  - **High-Contrast Typography & Hierarchy**: Replaced low-contrast secondary labels (`text-outline`, `text-on-surface-variant`) with high-contrast `text-slate-600` (or `text-slate-500` minimum), item/party headings with `text-slate-900`, and monetary amounts with high-contrast tabular figures.
+  - **Card & Border Strengthening**: Strengthened card, row, and input borders from `/15` or `/20` to at least `border-outline-variant/30` and elevated card surfaces to `shadow-sm` for crisp visual separation across high-density lists.
+  - **Inventory Hub Valuation & Sticky Controls**: Converted top stock valuation to a high-contrast light card (`bg-surface-container-lowest border border-outline-variant/30 shadow-sm`) with `text-slate-600` labels, `text-slate-900` values, and an amber alert badge for restock. Preserved sticky search bar with 1-tap clear button, privacy toggles, and filter sheet.
+  - **Purchases & Sales Hubs Declutter**: Removed redundant helper text (e.g. "X items" within line 3 and redundant "bill/bills" duplications) to keep transaction cards compact and readable. Preserved sticky search bars, date range filters, multi-select bulk toolbars, quick pay triggers, and statutory E-Way / conversion badges.
+- **Phase 3: Payments, Cash & Bank, Reports, and Settings Light-Theme Contrast & Declutter (`PaymentTransactionsView.tsx`, `CashBankManagementView.tsx`, `BusinessReportsView.tsx`, `BusinessPerformanceCard.tsx`, `ReportsNavList.tsx`, `DedicatedReportPageHeader.tsx`, `CompanySettingsView.tsx`)**:
+  - **Business Performance Card Converted to Light High-Contrast (`BusinessPerformanceCard.tsx`)**:
+    - Eliminated dark card theme (`bg-slate-950`, `bg-slate-900`, `border-slate-850`, `text-white`), replacing it with a light surface (`bg-white dark:bg-surface-container-lowest text-slate-900 border border-outline-variant/30 shadow-sm`).
+    - Metric cards across all 3 slides (Profits & Margins, Sales & Purchases, Stock Valuation) render in light tinted panels (`bg-emerald-50/70 border-emerald-200`, `bg-teal-50/70 border-teal-200`, `bg-blue-50/70 border-blue-200`, `bg-amber-50/70 border-amber-200`, `bg-purple-50/70 border-purple-200`) with high-contrast 700-level amounts (`text-emerald-700`, `text-teal-700`, `text-blue-700`, `text-amber-700`, `text-purple-700`, `text-rose-700`) and `text-slate-900` values.
+    - SVG Area Chart container upgraded to light surface (`bg-slate-50 border border-slate-200/80 shadow-xs`) with `#cbd5e1` zero baseline/vertical guides, `#64748b` axis typography, and `#ffffff` stroke halos around active beacons and badges.
+    - Bottom slide navigation selector upgraded to a light tab matrix (`bg-slate-100 border border-slate-200`, active tab `bg-white text-slate-900 shadow-xs border border-slate-200`, inactive tab `text-slate-600 hover:text-slate-900`).
+  - **Reports Hub & Dedicated Page Headers (`ReportsNavList.tsx`, `DedicatedReportPageHeader.tsx`)**:
+    - Report navigation cards elevated to `shadow-sm` and `border-outline-variant/30` with `text-slate-900` titles, `text-slate-600` subtitles, and `text-slate-600` chip tags.
+    - Standalone report page headers updated with `text-slate-900` titles, `text-slate-600` subtitles, and `text-slate-500` search placeholders.
+  - **Payments Hub (`PaymentTransactionsView.tsx`)**:
+    - Total summary metrics card upgraded to `border-outline-variant/30 shadow-sm` with `text-slate-600` uppercase labels, `text-slate-900` figures, and `text-slate-500` sublabels.
+    - Sticky search & filter bar uses `border-outline-variant/30 shadow-xs` with `text-slate-900` input and `text-slate-500` placeholder/icons.
+    - Payment In and Payment Out transaction rows use `border-outline-variant/30 shadow-sm hover:shadow-md` with `text-slate-900` counterparty names, `text-slate-600` date/mode/ref secondary details, and light badges.
+  - **Cash & Bank Management (`CashBankManagementView.tsx`)**:
+    - Compact financial summary strip upgraded to `border-outline-variant/30 shadow-sm` with `text-slate-600` labels, `text-slate-900` balances, and `text-slate-500` subtexts.
+    - Preserved negative balance banner and its invariant test phrase (`not a calculation error`).
+    - Account register cards use `border-outline-variant/30 shadow-sm` with `text-slate-900` titles and `text-slate-500` sublabels.
+    - Passbook ledger feed items use `border-outline-variant/30 shadow-sm` with `text-slate-900` titles, `text-slate-600` secondary lines, and `bg-slate-100 text-slate-700` mode chips.
+  - **Company Settings Hub (`CompanySettingsView.tsx`)**:
+    - Settings navigation sidebar elevated to `border-outline-variant/30 shadow-sm` with `text-slate-900` item labels, `text-slate-600` subtitles, and `text-slate-500` version footer.
+    - Desktop banner and mobile summary cards styled with `border-outline-variant/30 shadow-sm`, `text-slate-900` business titles, and `text-slate-600` status indicators.
 
 ### E. WhatsApp Integration & Chooser Architecture (`whatsappIntent.ts`, `whatsappService.ts`)
 - **URL Normalization & Phone Validation (`src/core/utils/whatsappIntent.ts`)**:

@@ -318,7 +318,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
           <button
             type="button"
             onClick={() => onNavigateTab('dashboard')}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:bg-surface-container-high transition-colors cursor-pointer flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer flex-shrink-0"
             title="Back to Dashboard"
             aria-label="Back to dashboard"
           >
@@ -326,20 +326,20 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
           </button>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="font-headline-sm text-base sm:text-lg font-bold text-on-surface truncate">
+              <h1 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900 truncate">
                 {pageTitle}
               </h1>
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   isFlowIn
-                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-rose-500/15 text-rose-700 dark:text-rose-400'
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border border-rose-200'
                 }`}
               >
                 {isFlowIn ? 'Money In' : 'Money Out'}
               </span>
             </div>
-            <span className="text-[11px] text-on-surface-variant truncate">
+            <span className="text-[11px] text-slate-600 truncate">
               {pageSubtitle}
             </span>
           </div>
@@ -372,7 +372,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
           <button
             type="button"
             onClick={() => setIsDirectModalOpen(true)}
-            className="h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold flex items-center gap-1 border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant transition-all cursor-pointer"
+            className="h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold flex items-center gap-1 border border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container text-slate-700 shadow-xs transition-all cursor-pointer"
             title={ctaLabel}
             aria-label={ctaLabel}
           >
@@ -385,10 +385,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       </div>
 
       {/* 2. Total Summary Strip for Filtered Set */}
-      <section className="grid grid-cols-3 gap-2 p-2.5 sm:p-3.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-xs">
+      <section className="grid grid-cols-3 gap-2 p-2.5 sm:p-3.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
         {/* Metric 1: Total Sum */}
         <div className="flex flex-col min-w-0 px-1 border-r border-outline-variant/20">
-          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1 truncate">
+          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1 truncate">
             <span
               className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                 isFlowIn ? 'bg-emerald-500' : 'bg-rose-500'
@@ -405,35 +405,35 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
           >
             {formatINR(totalAmount)}
           </span>
-          <span className="text-[10px] text-on-surface-variant font-medium truncate">
+          <span className="text-[10px] text-slate-500 font-medium truncate">
             {totalCount} transaction{totalCount === 1 ? '' : 's'}
           </span>
         </div>
 
         {/* Metric 2: Cash Component */}
         <div className="flex flex-col min-w-0 px-1 border-r border-outline-variant/20">
-          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1 truncate">
+          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1 truncate">
             <span className="material-symbols-outlined text-[13px] flex-shrink-0">payments</span>
             <span className="truncate">In Cash</span>
           </span>
-          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-on-surface mt-0.5 truncate">
+          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-slate-900 mt-0.5 truncate">
             {formatINR(cashPortion)}
           </span>
-          <span className="text-[10px] text-on-surface-variant font-medium truncate">
+          <span className="text-[10px] text-slate-500 font-medium truncate">
             Physical register
           </span>
         </div>
 
         {/* Metric 3: Bank / Online Component */}
         <div className="flex flex-col min-w-0 px-1">
-          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1 truncate">
+          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1 truncate">
             <span className="material-symbols-outlined text-[13px] flex-shrink-0">account_balance</span>
             <span className="truncate">Via Bank / UPI</span>
           </span>
-          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-on-surface mt-0.5 truncate">
+          <span className="font-tabular-data text-sm sm:text-base md:text-lg font-black text-slate-900 mt-0.5 truncate">
             {formatINR(bankPortion)}
           </span>
-          <span className="text-[10px] text-on-surface-variant font-medium truncate">
+          <span className="text-[10px] text-slate-500 font-medium truncate">
             Bank transfers & UPI
           </span>
         </div>
@@ -444,7 +444,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
         <div className="flex items-center gap-2">
           {/* Search Box */}
           <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 px-3 py-1.5 shadow-xs">
-            <span className="material-symbols-outlined text-outline text-[18px] mr-2 flex-shrink-0">
+            <span className="material-symbols-outlined text-slate-500 text-[18px] mr-2 flex-shrink-0">
               search
             </span>
             <input
@@ -452,14 +452,14 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
               placeholder={`Search ${pageTitle.toLowerCase()} by party, ref, mode, narration...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent text-xs text-on-surface placeholder:text-outline outline-none"
+              className="w-full bg-transparent text-xs text-slate-900 placeholder:text-slate-500 outline-none"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
                 aria-label="Clear search"
-                className="text-outline hover:text-on-surface p-0.5 flex-shrink-0 cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-0.5 flex-shrink-0 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>
               </button>
@@ -473,9 +473,9 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             className={`h-9 flex items-center gap-1.5 px-3 rounded-xl shadow-xs text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
               datePreset !== 'ALL_TIME'
                 ? isFlowIn
-                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                  : 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30'
-                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-rose-50 text-rose-800 border-rose-200'
+                : 'bg-surface-container-lowest text-slate-700 border-outline-variant/30 hover:bg-surface-container-low'
             }`}
             title="Filter by date range"
             aria-label="Filter by date range"
@@ -508,7 +508,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             className={`min-h-[30px] px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex-shrink-0 ${
               accountFilter === 'ALL'
                 ? 'bg-primary text-on-primary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+                : 'bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 shadow-xs'
             }`}
           >
             All Accounts
@@ -519,7 +519,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             className={`min-h-[30px] px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 flex-shrink-0 ${
               accountFilter === 'CASH'
                 ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+                : 'bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[14px]">payments</span>
@@ -531,7 +531,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             className={`min-h-[30px] px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 flex-shrink-0 ${
               accountFilter === 'BANK'
                 ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+                : 'bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 shadow-xs'
             }`}
           >
             <span className="material-symbols-outlined text-[14px]">account_balance</span>
@@ -551,7 +551,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                   className={`min-h-[30px] px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer flex-shrink-0 ${
                     isSelected
                       ? 'bg-secondary text-on-secondary shadow-xs font-bold'
-                      : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container border border-outline-variant/20'
+                      : 'bg-surface-container-lowest text-slate-700 hover:bg-surface-container border border-outline-variant/30 shadow-xs'
                   }`}
                   title={acc.accountName}
                 >
@@ -585,20 +585,20 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       {/* 4. Transactions List */}
       <section className="flex flex-col gap-2">
         {filteredEntries.length === 0 ? (
-          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs flex flex-col items-center justify-center gap-2">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 text-center text-slate-600 border border-outline-variant/30 shadow-sm flex flex-col items-center justify-center gap-2">
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                isFlowIn ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                isFlowIn ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
               }`}
             >
               <span className="material-symbols-outlined text-[26px]">
                 {isFlowIn ? 'call_received' : 'call_made'}
               </span>
             </div>
-            <p className="font-bold text-sm text-on-surface">
+            <p className="font-bold text-sm text-slate-900">
               No {pageTitle} transactions found
             </p>
-            <p className="text-xs text-outline max-w-sm">
+            <p className="text-xs text-slate-500 max-w-sm">
               {searchQuery || accountFilter !== 'ALL' || datePreset !== 'ALL_TIME'
                 ? 'Try clearing your active search or filters to see more entries.'
                 : isFlowIn
@@ -627,15 +627,15 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
               <div
                 key={entry.id}
                 onClick={() => handleOpenDetailModal(entry)}
-                className="w-full p-3 sm:p-3.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/25 hover:border-secondary/40 shadow-xs hover:shadow-sm transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]"
+                className="w-full p-3 sm:p-3.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 hover:border-secondary/40 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]"
               >
                 {/* Left Side: Avatar + Details */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
                     className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0 ${
                       isFlowIn
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-rose-500/15 text-rose-700 dark:text-rose-400'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[20px]">
@@ -645,10 +645,10 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
 
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate whitespace-nowrap shrink-0">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 truncate whitespace-nowrap shrink-0">
                         {entry.counterpartyOrTitle || (isFlowIn ? 'Direct Inflow' : 'Direct Outflow')}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-surface-container text-on-surface-variant shrink-0 whitespace-nowrap">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200 shrink-0 whitespace-nowrap">
                         {entry.type.replace('_', ' ')}
                       </span>
                       {isNative ? (
@@ -656,13 +656,13 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                           Direct
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 shrink-0 whitespace-nowrap">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0 whitespace-nowrap">
                           Auto
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] text-on-surface-variant mt-0.5 truncate">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-600 mt-0.5 truncate">
                       <span>{formatDate(entry.date)}</span>
                       <span>•</span>
                       <span className="truncate flex items-center gap-0.5">
@@ -695,7 +695,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                         const unallocatedAmount = Math.max(0, Math.round((linkedVoucher.totalAmount - allocatedSum) * 100) / 100);
                         return (
                           <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
-                            <span className="text-[10px] text-on-surface-variant font-medium whitespace-nowrap shrink-0">Linked to:</span>
+                            <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap shrink-0">Linked to:</span>
                             {linkedVoucher.paymentAllocations.map((alloc) => {
                               const isOpeningBal = alloc.documentId.startsWith('OPENING-BALANCE-');
                               if (isOpeningBal) {
@@ -705,7 +705,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary border border-secondary/20 text-[10px] font-bold font-mono whitespace-nowrap shrink-0"
                                   >
                                     <span>Opening Balance</span>
-                                    <span className="font-sans font-medium text-[9px] text-on-surface-variant">
+                                    <span className="font-sans font-medium text-[9px] text-slate-500">
                                       ({formatINR(alloc.amount)})
                                     </span>
                                   </span>
@@ -726,7 +726,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                                   title={`Click to view ${alloc.documentNumber}`}
                                 >
                                   <span>{alloc.documentNumber}</span>
-                                  <span className="font-sans font-medium text-[9px] text-on-surface-variant">
+                                  <span className="font-sans font-medium text-[9px] text-slate-500">
                                     ({formatINR(alloc.amount)})
                                   </span>
                                   <span className="material-symbols-outlined text-[11px]">open_in_new</span>
@@ -734,7 +734,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                               );
                             })}
                             {unallocatedAmount > 0 ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium whitespace-nowrap shrink-0">
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-medium whitespace-nowrap shrink-0">
                                 Advance: {formatINR(unallocatedAmount)}
                               </span>
                             ) : null}
@@ -759,7 +759,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                       if (linkedVoucher.allocationMode === 'UNALLOCATED' || (!linkedVoucher.paymentAllocations?.length && linkedVoucher.partyId)) {
                         return (
                           <div className="flex items-center gap-1.5 mt-1.5 overflow-x-auto no-scrollbar py-0.5">
-                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-medium whitespace-nowrap shrink-0">
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-medium whitespace-nowrap shrink-0">
                               Unallocated Advance: {formatINR(linkedVoucher.totalAmount || entry.amount)}
                             </span>
                             {linkedVoucher.allocationMode !== 'SOURCE_DOCUMENT' && (
@@ -806,7 +806,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
                   >
                     {isFlowIn ? `+${formatINR(entry.amount)}` : `-${formatINR(entry.amount)}`}
                   </span>
-                  <span className="text-[10px] text-outline mt-0.5">
+                  <span className="text-[10px] text-slate-500 mt-0.5">
                     {isNative ? 'Tap to edit' : 'Tap for details'}
                   </span>
                 </div>

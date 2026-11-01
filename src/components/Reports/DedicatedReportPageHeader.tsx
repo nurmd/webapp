@@ -77,7 +77,7 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
   return (
     <div className="space-y-2.5 sm:space-y-4 mb-4 sm:mb-6">
       {/* Top Navigation & Actions Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4 bg-surface-container-low p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-outline-variant/40 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4 bg-surface-container-low p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-outline-variant/40 shadow-sm">
         {/* Left: Back Button & Title */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
@@ -99,10 +99,10 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
               </span>
             )}
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base lg:text-lg font-bold text-on-surface tracking-tight m-0 truncate">
+              <h1 className="text-sm sm:text-base lg:text-lg font-bold text-slate-900 tracking-tight m-0 truncate">
                 {title}
               </h1>
-              <p className="text-[11px] sm:text-xs text-on-surface-variant m-0 truncate">
+              <p className="text-[11px] sm:text-xs text-slate-600 m-0 truncate">
                 {subtitle}
               </p>
             </div>
@@ -197,7 +197,7 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
             <div className="relative min-w-[180px] sm:w-64">
               <Search
                 size={13}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
               />
               <input
                 type="text"
@@ -205,14 +205,14 @@ export const DedicatedReportPageHeader: React.FC<DedicatedReportPageHeaderProps>
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder={searchPlaceholder}
                 aria-label="Filter report records"
-                className="w-full pl-7 pr-6 py-1 text-xs bg-surface border border-outline-variant/40 rounded-md sm:rounded-lg text-on-surface placeholder:text-on-surface-variant/60 focus:outline-hidden focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                className="w-full pl-7 pr-6 py-1 text-xs bg-surface border border-outline-variant/40 rounded-md sm:rounded-lg text-slate-900 placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-primary focus:border-primary transition-all"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => onSearchChange('')}
                   aria-label="Clear search"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer p-0.5"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
                 >
                   <X size={11} />
                 </button>

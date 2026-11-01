@@ -17,11 +17,6 @@ export interface PartyInfoCardProps {
   showPartyDetails: boolean;
   setShowPartyDetails: React.Dispatch<React.SetStateAction<boolean>>;
   onEditParty: (party: Party) => void;
-  isCustomer?: boolean;
-  isPaymentOpen?: boolean;
-  onRecordPayment?: () => void;
-  onCreateInvoice?: (party: Party) => void;
-  onCreatePurchase?: (party: Party) => void;
 }
 
 export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
@@ -36,11 +31,6 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
   showPartyDetails,
   setShowPartyDetails,
   onEditParty,
-  isCustomer = false,
-  isPaymentOpen = false,
-  onRecordPayment,
-  onCreateInvoice,
-  onCreatePurchase,
 }) => {
   const group = party.groupId ? db.getPartyGroups().find((g) => g.id === party.groupId) : undefined;
   const category = party.categoryId ? db.getPartyCategories().find((c) => c.id === party.categoryId) : undefined;
@@ -88,73 +78,47 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
         </div>
       </div>
 
-      {/* Quick Sub-Metrics Bar: Total Bill / Total Paid + action buttons (justified right) */}
+      {/* Quick Sub-Metrics Bar: Sticky Label and Amount without wrapping */}
       <div className="flex items-center gap-2 sm:gap-4 pt-2 border-t border-outline-variant/20 text-xs overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0 whitespace-nowrap">
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
-            <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Bill:</span>
-            <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalBilled)}</span>
-          </div>
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
-            <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Paid:</span>
-            <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalPaid)}</span>
-          </div>
+        <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
+          <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Bill:</span>
+          <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalBilled)}</span>
         </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
-          {onRecordPayment && (
-            <button
-              type="button"
-              onClick={onRecordPayment}
-              className={`flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl font-bold text-[11px] active:scale-95 transition-all cursor-pointer shadow-xs ${
-                isPaymentOpen
-                  ? 'bg-secondary text-on-secondary'
-                  : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[15px]">
-                {isPaymentOpen ? 'close' : 'payments'}
-              </span>
-              <span>{isPaymentOpen ? 'Close' : 'Record Payment'}</span>
-            </button>
-          )}
-
-          {isCustomer
-            ? onCreateInvoice && (
-                <button
-                  type="button"
-                  onClick={() => onCreateInvoice(party)}
-                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-[11px] active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[15px]">receipt_long</span>
-                  <span>New Invoice</span>
-                </button>
-              )
-            : onCreatePurchase
-            ? (
-                <button
-                  type="button"
-                  onClick={() => onCreatePurchase(party)}
-                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-[11px] active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[15px]">shopping_bag</span>
-                  <span>New Bill</span>
-                </button>
-              )
-            : onCreateInvoice && (
-                <button
-                  type="button"
-                  onClick={() => onCreateInvoice(party)}
-                  className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-primary text-on-primary font-bold text-[11px] active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90"
-                >
-                  <span className="material-symbols-outlined text-[15px]">receipt_long</span>
-                  <span>New Invoice</span>
-                </button>
-              )}
+        <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
+          <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Paid:</span>
+          <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalPaid)}</span>
         </div>
       </div>
 
-      {/* Opening balance is managed via dedicated flows; not displayed in party summary. */}
+      {/* Opening Balance info chip if set */}
+      {((typeof party.openingBalance === 'number' && party.openingBalance > 0) || party.openingBalanceDate) && (
+        <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/60">
+          <span className="flex items-center gap-1 font-medium text-slate-600">
+            <span className="material-symbols-outlined text-[14px] text-secondary">account_balance_wallet</span>
+            <span>Opening Balance:</span>
+          </span>
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className={party.openingBalanceType === 'TO_PAY' ? 'text-rose-700' : 'text-emerald-700'}>
+              {formatINR(party.openingBalance || 0)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
+            </span>
+            {party.openingBalanceDate && (
+              <span className="text-[10px] text-slate-500 font-normal">
+                • {party.openingBalanceDate}
+              </span>
+            )}
+            {!isSystemParty(party) && (
+              <button
+                type="button"
+                onClick={() => onEditParty(party)}
+                className="p-0.5 text-slate-500 hover:text-slate-900 rounded cursor-pointer ml-1"
+                title="Edit Opening Balance"
+              >
+                <span className="material-symbols-outlined text-[13px]">edit</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Collapsible Info Drawer */}
       {showPartyDetails && (
@@ -214,7 +178,28 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 )}
               </div>
             )}
-            {/* Opening balance is managed via dedicated actions; not shown in party details. */}
+            <div className="col-span-2 pt-1 border-t border-outline-variant/20 flex items-center justify-between">
+              <span className="text-slate-600">Opening Balance</span>
+              <div className="flex items-center gap-1.5">
+                {party.openingBalance ? (
+                  <span className={`font-bold ${party.openingBalanceType === 'TO_PAY' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {formatINR(party.openingBalance)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
+                  </span>
+                ) : (
+                  <span className="text-slate-500 italic">Not set</span>
+                )}
+                {!isSystemParty(party) && (
+                  <button
+                    type="button"
+                    onClick={() => onEditParty(party)}
+                    className="text-secondary font-semibold hover:underline cursor-pointer text-[10px] flex items-center gap-0.5"
+                  >
+                    <span className="material-symbols-outlined text-[12px]">edit</span>
+                    <span>{party.openingBalance ? 'Edit' : 'Set'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {party.creditLimit && party.creditLimit > 0 && (

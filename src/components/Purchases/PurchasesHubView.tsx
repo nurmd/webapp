@@ -592,7 +592,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
       </section>
 
       {/* Floating Action Buttons: AI intake + New Purchase */}
-      <div className="fixed bottom-24 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2">
         <button
           onClick={() => setIsIntakeOpen(true)}
           className="h-10 px-3.5 rounded-full bg-primary text-on-primary font-bold text-[11px] shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"

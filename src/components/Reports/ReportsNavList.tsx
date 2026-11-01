@@ -175,10 +175,10 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
   const renderSection = (title: string, subtitle: string, items: ReportNavItemConfig[]) => (
     <div className="space-y-2 sm:space-y-2.5">
       <div className="px-0.5">
-        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-on-surface-variant m-0">
+        <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700 m-0">
           {title}
         </h3>
-        <p className="text-[11px] sm:text-xs text-on-surface-variant/80 mt-0.5 mb-0">
+        <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 mb-0">
           {subtitle}
         </p>
       </div>
@@ -199,7 +199,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                 }
               }}
               aria-label={`Open ${item.title} report`}
-              className="group flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 hover:border-primary/40 shadow-xs hover:shadow-md transition-all cursor-pointer text-left active:scale-[0.99]"
+              className="group flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 hover:border-emerald-600/40 shadow-sm hover:shadow-md transition-all cursor-pointer text-left active:scale-[0.99]"
             >
               <div className="flex items-center sm:items-start gap-2.5 sm:gap-3 min-w-0 pr-1.5 sm:pr-2">
                 <div className={`p-2 sm:p-2.5 rounded-xl ${item.iconBg} ${item.iconColor} shrink-0 transition-transform group-hover:scale-105`}>
@@ -208,7 +208,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                    <h4 className="text-xs sm:text-sm font-bold text-on-surface group-hover:text-primary transition-colors m-0 truncate shrink-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors m-0 truncate shrink-0">
                       {item.title}
                     </h4>
                     {item.badge && (
@@ -218,7 +218,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                     )}
                   </div>
 
-                  <p className="text-[11px] sm:text-xs text-on-surface-variant line-clamp-1 mt-0.5 mb-1 sm:mb-1.5">
+                  <p className="text-[11px] sm:text-xs text-slate-600 line-clamp-1 mt-0.5 mb-1 sm:mb-1.5">
                     {item.subtitle}
                   </p>
 
@@ -226,7 +226,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                     {item.chips.map((chip, idx) => (
                       <span
                         key={idx}
-                        className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded bg-surface font-medium text-on-surface-variant border border-outline-variant/20 whitespace-nowrap shrink-0"
+                        className="text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded bg-surface font-medium text-slate-600 border border-outline-variant/30 whitespace-nowrap shrink-0"
                       >
                         {chip}
                       </span>
@@ -235,7 +235,7 @@ export const ReportsNavList: React.FC<ReportsNavListProps> = ({
                 </div>
               </div>
 
-              <div className="p-1 sm:p-1.5 rounded-lg text-on-surface-variant/50 group-hover:text-primary group-hover:bg-primary/5 transition-all shrink-0">
+              <div className="p-1 sm:p-1.5 rounded-lg text-slate-400 group-hover:text-emerald-700 group-hover:bg-emerald-50 transition-all shrink-0">
                 <ChevronRight size={16} />
               </div>
             </div>
