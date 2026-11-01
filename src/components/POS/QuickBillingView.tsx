@@ -872,17 +872,17 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {/* ======================================================== */}
       {/* Left Catalog Pane (md:col-span-7)                       */}
       {/* ======================================================== */}
-      <div className="md:col-span-7 flex flex-col h-full border-r border-outline-variant/25 overflow-hidden bg-surface">
+      <div className="md:col-span-7 flex flex-col h-full border-r border-outline-variant/30 overflow-hidden bg-surface">
         {/* Top Controls Area (Fixed, not scrolling) */}
-        <div className="flex-shrink-0 p-3 pb-2 space-y-2.5 bg-surface border-b border-outline-variant/15">
+        <div className="flex-shrink-0 p-3 pb-2 space-y-2.5 bg-surface border-b border-outline-variant/30">
           {/* Status Ribbon & Quick Tools */}
-          <div className="flex items-center justify-between text-xs text-on-surface-variant">
+          <div className="flex items-center justify-between text-xs text-slate-600">
             <div className="flex items-center gap-2 min-w-0">
               <span className="inline-flex items-center gap-1.5 bg-secondary-container/60 text-on-secondary-container px-2.5 py-0.5 rounded-full font-bold text-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
                 POS Counter #01
               </span>
-              <span className="text-outline font-mono text-[11px] font-semibold">
+              <span className="text-slate-600 font-mono text-[11px] font-semibold">
                 Bill #{previewInvoiceNumber}
               </span>
             </div>
@@ -893,8 +893,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 onClick={() => setIsHoldModalOpen(true)}
                 className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
                   heldBills.length > 0
-                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-xs animate-pulse-gentle'
-                    : 'bg-surface-container text-outline hover:text-on-surface'
+                    ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-sm animate-pulse-gentle'
+                    : 'bg-surface-container text-slate-600 hover:text-slate-900 border border-outline-variant/30'
                 }`}
                 title="Parked / Held Bills (F7)"
               >
@@ -905,7 +905,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsShortcutsModalOpen(true)}
-                className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
+                className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-slate-600 hover:text-slate-900 border border-outline-variant/30 cursor-pointer"
                 title="Keyboard Shortcuts (?)"
               >
                 <span className="material-symbols-outlined text-[15px]">help</span>
@@ -915,8 +915,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
           {/* Clean Search & Barcode Bar */}
           <div className="flex items-center gap-2">
-            <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 px-3 py-2 shadow-xs focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all">
-              <span className="material-symbols-outlined text-outline text-[18px] mr-2">
+            <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 px-3 py-2 shadow-sm focus-within:border-secondary focus-within:ring-1 focus-within:ring-secondary transition-all">
+              <span className="material-symbols-outlined text-slate-500 text-[18px] mr-2">
                 barcode_scanner
               </span>
               <input
@@ -943,13 +943,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     }
                   }
                 }}
-                className="w-full bg-transparent text-xs sm:text-sm text-on-surface placeholder:text-outline outline-none"
+                className="w-full bg-transparent text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 outline-none"
               />
               {search && (
                 <button
                   onClick={() => setSearch('')}
                   aria-label="Clear search"
-                  className="text-outline hover:text-on-surface ml-1 cursor-pointer"
+                  className="text-slate-400 hover:text-slate-700 ml-1 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">close</span>
                 </button>
@@ -960,7 +960,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             <button
               type="button"
               onClick={() => setIsScannerOpen(true)}
-              className="h-9 px-3 bg-primary text-on-primary rounded-xl flex items-center gap-1 font-semibold text-xs shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              className="h-9 px-3 bg-primary text-on-primary rounded-xl flex items-center gap-1 font-semibold text-xs shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
               title="Camera Scanner"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
@@ -971,7 +971,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             <button
               type="button"
               onClick={() => setIsCustomItemModalOpen(true)}
-              className="h-9 px-3 bg-surface-container-lowest text-on-surface border border-outline-variant/30 hover:border-secondary rounded-xl flex items-center gap-1 text-xs font-bold shadow-xs active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              className="h-9 px-3 bg-surface-container-lowest text-slate-700 border border-outline-variant/30 hover:border-secondary hover:text-slate-900 rounded-xl flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
               title="Add Custom Line Item (F8)"
             >
               <span className="material-symbols-outlined text-[16px] text-secondary">add_box</span>
@@ -1003,10 +1003,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   key={cat}
                   type="button"
                   onClick={() => setSelectedCategory(cat)}
-                  className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold shadow-xs transition-all flex-shrink-0 cursor-pointer ${
+                  className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold shadow-sm transition-all flex-shrink-0 cursor-pointer ${
                     selectedCategory === cat
                       ? 'bg-secondary text-on-secondary font-bold'
-                      : 'bg-surface-container-lowest text-on-surface border border-outline-variant/25 hover:bg-surface-container-low'
+                      : 'bg-surface-container-lowest text-slate-700 border border-outline-variant/30 hover:bg-surface-container-low'
                   }`}
                 >
                   {cat === 'ALL' ? 'All' : cat}
@@ -1014,14 +1014,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               ))}
             </div>
 
-            <div className="flex items-center bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-0.5 flex-shrink-0">
+            <div className="flex items-center bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-0.5 flex-shrink-0 shadow-sm">
               <button
                 type="button"
                 onClick={() => setCatalogViewMode('GRID')}
                 className={`p-1 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
                   catalogViewMode === 'GRID'
                     ? 'bg-secondary text-on-secondary'
-                    : 'text-outline hover:text-on-surface'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
                 title="Grid Cards"
               >
@@ -1033,7 +1033,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 className={`p-1 rounded-lg flex items-center justify-center cursor-pointer transition-colors ${
                   catalogViewMode === 'LIST'
                     ? 'bg-secondary text-on-secondary'
-                    : 'text-outline hover:text-on-surface'
+                    : 'text-slate-500 hover:text-slate-900'
                 }`}
                 title="Dense List"
               >
@@ -1046,9 +1046,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         {/* Catalog Items Container (Scrollable only here) */}
         <div className="flex-1 overflow-y-auto min-h-0 p-3">
           {filteredItems.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-outline gap-2 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/40">
-              <span className="material-symbols-outlined text-4xl text-outline-variant">search_off</span>
-              <p className="text-xs font-semibold text-on-surface">No matching items found.</p>
+            <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/40">
+              <span className="material-symbols-outlined text-4xl text-slate-400">search_off</span>
+              <p className="text-xs font-semibold text-slate-900">No matching items found.</p>
               <button
                 type="button"
                 onClick={() => setIsCustomItemModalOpen(true)}
@@ -1068,10 +1068,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     key={item.id}
                     data-testid={`pos-item-${item.id}`}
                     onClick={() => addToCart(item)}
-                    className={`bg-surface-container-lowest rounded-xl p-3 shadow-xs border transition-all cursor-pointer flex flex-col justify-between select-none relative group ${
+                    className={`bg-surface-container-lowest rounded-xl p-3 shadow-sm border transition-all cursor-pointer flex flex-col justify-between select-none relative group ${
                       inCartQty > 0
                         ? 'border-secondary ring-1 ring-secondary/50 bg-secondary-container/5'
-                        : 'border-outline-variant/25 hover:border-secondary hover:shadow-sm'
+                        : 'border-outline-variant/30 hover:border-secondary'
                     }`}
                   >
                     {/* Top line with Stock Badge and GST Rate */}
@@ -1079,8 +1079,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                       <span
                         className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
                           isLowStock
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                            : 'bg-surface-container text-outline'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                         }`}
                       >
                         Stock: {item.currentStock}
@@ -1095,29 +1095,29 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
                     {/* Item Details (Clean, NO HSN) */}
                     <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-on-surface truncate group-hover:text-secondary transition-colors">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-secondary transition-colors">
                         {item.name}
                       </p>
-                      <p className="text-[11px] text-outline truncate mt-0.5">
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
                         {item.category || 'General'}
                       </p>
                     </div>
 
                     {/* Price and Add Action */}
-                    <div className="mt-2.5 pt-2 border-t border-outline-variant/15 flex items-center justify-between">
+                    <div className="mt-2.5 pt-2 border-t border-outline-variant/30 flex items-center justify-between">
                       <div className="flex items-baseline gap-0.5">
-                        <span className="text-xs sm:text-sm font-black text-on-surface font-tabular-data">
+                        <span className="text-xs sm:text-sm font-black text-slate-900 font-tabular-data">
                           {formatINR(item.salePrice)}
                         </span>
-                        <span className="text-[10px] text-outline">/{item.unit.toLowerCase()}</span>
+                        <span className="text-[10px] text-slate-500">/{item.unit.toLowerCase()}</span>
                       </div>
 
                       {inCartQty > 0 ? (
-                        <span className="h-6 px-2 bg-secondary text-on-secondary rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-xs">
+                        <span className="h-6 px-2 bg-secondary text-on-secondary rounded-lg font-bold text-[11px] flex items-center gap-1 shadow-sm">
                           <span>{inCartQty}</span>
                         </span>
                       ) : (
-                        <span className="w-6 h-6 bg-surface-container group-hover:bg-secondary group-hover:text-on-secondary rounded-lg text-outline flex items-center justify-center transition-colors">
+                        <span className="w-6 h-6 bg-slate-100 group-hover:bg-secondary group-hover:text-on-secondary rounded-lg text-slate-600 flex items-center justify-center transition-colors border border-outline-variant/30">
                           <span className="material-symbols-outlined text-[15px]">add</span>
                         </span>
                       )}
@@ -1128,7 +1128,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             </div>
           ) : (
             /* Dense List View (Clean, NO HSN) */
-            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/25 overflow-hidden divide-y divide-outline-variant/15 shadow-xs mb-4">
+            <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20 shadow-sm mb-4">
               {filteredItems.map((item) => {
                 const inCartQty = cart.find((c) => c.item.id === item.id)?.qty || 0;
                 return (
@@ -1141,7 +1141,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-on-surface truncate">
+                        <span className="text-xs font-bold text-slate-900 truncate">
                           {item.name}
                         </span>
                         {isGstActive && item.gstRate > 0 && (
@@ -1150,7 +1150,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-outline mt-0.5 flex items-center gap-2">
+                      <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
                         <span>{item.category || 'General'}</span>
                         <span>•</span>
                         <span>Stock: {item.currentStock} {item.unit}</span>
@@ -1159,18 +1159,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
-                        <div className="text-xs font-bold text-on-surface font-tabular-data">
+                        <div className="text-xs font-bold text-slate-900 font-tabular-data">
                           {formatINR(item.salePrice)}
                         </div>
-                        <div className="text-[10px] text-outline">/{item.unit.toLowerCase()}</div>
+                        <div className="text-[10px] text-slate-500">/{item.unit.toLowerCase()}</div>
                       </div>
 
                       <button
                         type="button"
-                        className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs cursor-pointer ${
+                        className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm cursor-pointer ${
                           inCartQty > 0
                             ? 'bg-secondary text-on-secondary'
-                            : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                            : 'bg-surface-container text-slate-700 hover:bg-surface-container-high border border-outline-variant/30'
                         }`}
                       >
                         <span className="material-symbols-outlined text-[14px]">
@@ -1192,7 +1192,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {/* ======================================================== */}
       <div className="hidden md:flex md:col-span-5 bg-surface-container-low flex-col h-full overflow-hidden border-t md:border-t-0">
         {/* Cart Top Section: Customer Selection Bar (Moved to Cart Side) */}
-        <div className="flex-shrink-0 p-2.5 bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs">
+        <div className="flex-shrink-0 p-2.5 bg-surface-container-lowest border-b border-outline-variant/30 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <div
               onClick={() => setIsCustomerModalOpen(true)}
@@ -1201,8 +1201,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold flex-shrink-0 ${
                   customer.party
-                    ? 'bg-secondary/10 text-secondary'
-                    : 'bg-surface-container text-outline'
+                    ? 'bg-secondary/10 text-secondary border border-secondary/20'
+                    : 'bg-slate-100 text-slate-600 border border-slate-200'
                 }`}
               >
                 <span className="material-symbols-outlined text-[18px]">
@@ -1211,25 +1211,25 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-on-surface truncate">
+                  <span className="text-xs font-bold text-slate-900 truncate">
                     {customer.party ? customer.party.name : 'Walk-in Retail Customer'}
                   </span>
                   <span
                     className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
                       customer.isB2b
-                        ? 'bg-primary/10 text-primary font-mono'
-                        : 'bg-surface-container text-outline'
+                        ? 'bg-primary/10 text-primary font-mono border border-primary/20'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
                     {customer.isB2b ? 'B2B' : 'B2C'}
                   </span>
                 </div>
-                <div className="text-[10px] text-outline truncate flex items-center gap-1.5 mt-0.5">
+                <div className="text-[10px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
                   <span>{customer.phone || 'Tap to select customer'}</span>
                   {customer.party && (customer.party.currentBalance || 0) !== 0 && (
                     <span
                       className={`font-semibold ${
-                        customer.party.currentBalance > 0 ? 'text-amber-600' : 'text-secondary'
+                        customer.party.currentBalance > 0 ? 'text-amber-700' : 'text-secondary'
                       }`}
                     >
                       • Bal: {formatINR(customer.party.currentBalance)}
@@ -1244,7 +1244,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectCustomer(null)}
-                  className="w-6 h-6 rounded-md hover:bg-surface-container text-outline flex items-center justify-center cursor-pointer"
+                  className="w-6 h-6 rounded-md hover:bg-surface-container text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
                   title="Reset to Walk-in"
                 >
                   <span className="material-symbols-outlined text-[14px]">close</span>
@@ -1253,7 +1253,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCustomerModalOpen(true)}
-                className="px-2 py-1 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg text-[11px] font-bold border border-outline-variant/30 flex items-center gap-0.5 cursor-pointer"
+                className="px-2 py-1 bg-surface-container hover:bg-surface-container-high text-slate-700 rounded-lg text-[11px] font-bold border border-outline-variant/30 flex items-center gap-0.5 cursor-pointer shadow-sm"
               >
                 <span className="material-symbols-outlined text-[13px]">person_search</span>
                 <span>{customer.party ? 'Change' : 'Select'}</span>
@@ -1263,8 +1263,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         </div>
 
         {/* Cart Sub-Header (Items Count, Hold, Clear) */}
-        <div className="flex-shrink-0 px-3 py-2 bg-surface-container-lowest/80 border-b border-outline-variant/20 flex items-center justify-between text-xs">
-          <span className="font-bold text-on-surface flex items-center gap-1.5">
+        <div className="flex-shrink-0 px-3 py-2 bg-surface-container-lowest/80 border-b border-outline-variant/30 flex items-center justify-between text-xs">
+          <span className="font-bold text-slate-900 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-secondary text-[17px]">shopping_cart</span>
             <span>Current Bill ({totalCartCount} {totalCartCount === 1 ? 'Item' : 'Items'})</span>
           </span>
@@ -1275,7 +1275,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 <button
                   type="button"
                   onClick={handleHoldBill}
-                  className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                  className="text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors border border-amber-500/20"
                   title="Hold Bill (F4)"
                 >
                   <span className="material-symbols-outlined text-[13px]">pause</span>
@@ -1284,7 +1284,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowClearCartConfirm(true)}
-                  className="text-[11px] text-error hover:underline cursor-pointer"
+                  className="text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
                 >
                   Clear
                 </button>
@@ -1296,12 +1296,12 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         {/* Item Table in Cart - THIS IS THE ONLY SCROLLABLE AREA IN THE CART */}
         <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-2">
           {cart.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-outline gap-2 py-12">
-              <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-outline-variant">
+            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2 py-12">
+              <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-slate-400 border border-outline-variant/30">
                 <span className="material-symbols-outlined text-2xl">point_of_sale</span>
               </div>
-              <p className="text-xs font-semibold text-on-surface">Cart is Empty</p>
-              <p className="text-[11px] text-outline text-center max-w-xs">
+              <p className="text-xs font-semibold text-slate-900">Cart is Empty</p>
+              <p className="text-[11px] text-slate-500 text-center max-w-xs">
                 Tap items from catalog or scan barcodes to begin sale.
               </p>
             </div>
@@ -1318,15 +1318,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               return (
               <div
                 key={item.id}
-                className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/20 shadow-xs flex flex-col gap-1.5 hover:border-secondary/30 transition-all"
+                className="bg-surface-container-lowest p-2.5 rounded-xl border border-outline-variant/30 shadow-sm flex flex-col gap-1.5 hover:border-secondary/30 transition-all"
               >
                 {/* Line 1: Clean Name, Unit/GST, Delete */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-on-surface truncate block">
+                    <span className="text-xs font-bold text-slate-900 truncate block">
                       {item.name}
                     </span>
-                    <span className="text-[10px] text-outline">
+                    <span className="text-[10px] text-slate-500">
                       {item.unit}
                       {isGstActive && !company.isCompositionScheme ? (
                         <>
@@ -1340,7 +1340,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   <button
                     type="button"
                     onClick={() => removeFromCart(item.id)}
-                    className="text-outline hover:text-error cursor-pointer p-0.5"
+                    className="text-slate-400 hover:text-rose-600 cursor-pointer p-0.5"
                     title="Remove item"
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -1348,13 +1348,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 </div>
 
                 {/* Line 2: Quantity Stepper, Editable Rate, and Line Total */}
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/10">
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-outline-variant/30">
                   {/* Stepper with Direct Input */}
-                  <div className="flex items-center gap-1 bg-surface-container-low rounded-lg p-0.5 border border-outline-variant/25">
+                  <div className="flex items-center gap-1 bg-surface-container-low rounded-lg p-0.5 border border-outline-variant/30">
                     <button
                       type="button"
                       onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(4)))}
-                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer border border-outline-variant/30"
                     >
                       -
                     </button>
@@ -1367,12 +1367,12 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         const val = parseFloat(sanitized);
                         updateCartQty(item.id, !isNaN(val) && val > 0 ? roundQuantity(val, 4) : 0);
                       }}
-                      className="w-14 text-center text-xs font-bold bg-transparent outline-none font-tabular-data"
+                      className="w-14 text-center text-xs font-bold bg-transparent outline-none font-tabular-data text-slate-900"
                     />
                     <button
                       type="button"
                       onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(4)))}
-                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-5 h-5 rounded bg-surface-container-lowest hover:bg-surface-container-high text-slate-700 flex items-center justify-center font-bold text-xs cursor-pointer border border-outline-variant/30"
                     >
                       +
                     </button>
@@ -1380,7 +1380,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
                   {/* Inline Rate Input & Mode Toggle */}
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-outline">₹</span>
+                    <span className="text-[10px] text-slate-500">₹</span>
                     <input
                       type="number"
                       step="any"
@@ -1395,7 +1395,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                           updateCartExclusivePrice(item.id, val);
                         }
                       }}
-                      className="w-16 bg-surface-container-low border border-outline-variant/25 rounded-md px-1 py-0.5 text-xs font-bold text-on-surface outline-none focus:border-secondary font-tabular-data"
+                      className="w-16 bg-surface-container-low border border-outline-variant/30 rounded-md px-1 py-0.5 text-xs font-bold text-slate-900 outline-none focus:border-secondary font-tabular-data"
                     />
                     {isGstActive && !company.isCompositionScheme && (
                       <>
@@ -1405,13 +1405,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                           className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
                             isInclusive
                               ? 'bg-secondary/15 text-secondary border border-secondary/30'
-                              : 'bg-surface-container text-on-surface-variant border border-outline-variant/30'
+                              : 'bg-surface-container text-slate-700 border border-outline-variant/30'
                           }`}
                           title="Toggle Exclusive / Inclusive rate mode"
                         >
                           {isInclusive ? 'Incl' : 'Excl'}
                         </button>
-                        <span className="text-[10px] text-outline font-medium">
+                        <span className="text-[10px] text-slate-500 font-medium">
                           {isInclusive ? `Excl. ₹${otherRate}` : `Incl. ₹${otherRate}`}
                         </span>
                       </>
@@ -1420,7 +1420,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
                   {/* Subtotal */}
                   <div className="text-right">
-                    <div className="text-xs font-bold text-on-surface font-tabular-data">
+                    <div className="text-xs font-bold text-slate-900 font-tabular-data">
                       {formatINR(lineTotal)}
                     </div>
                   </div>
@@ -1432,18 +1432,18 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
         {/* Fixed Summary & Checkout Dock (Never scrolls away) */}
         {cart.length > 0 && (
-          <div className="flex-shrink-0 p-3 bg-surface-container-lowest border-t border-outline-variant/25 space-y-2 shadow-xl">
+          <div className="flex-shrink-0 p-3 bg-surface-container-lowest border-t border-outline-variant/30 space-y-2 shadow-xl">
             {/* Bill Adjustments: Discount & Extra Charges */}
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/20">
-                <span className="text-[10px] text-outline font-semibold">Disc</span>
+              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/30">
+                <span className="text-[10px] text-slate-600 font-semibold">Disc</span>
                 <input
                   type="number"
                   min="0"
                   placeholder="0"
                   value={cartDiscountValue || ''}
                   onChange={(e) => setCartDiscountValue(parseFloat(e.target.value) || 0)}
-                  className="w-10 bg-transparent text-xs font-bold outline-none font-tabular-data text-on-surface"
+                  className="w-10 bg-transparent text-xs font-bold outline-none font-tabular-data text-slate-900"
                 />
                 <button
                   type="button"
@@ -1456,15 +1456,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 </button>
               </div>
 
-              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/20">
-                <span className="text-[10px] text-outline font-semibold">Extra ₹</span>
+              <div className="flex items-center gap-1 bg-surface-container-low px-2 py-1 rounded-lg border border-outline-variant/30">
+                <span className="text-[10px] text-slate-600 font-semibold">Extra ₹</span>
                 <input
                   type="number"
                   min="0"
                   placeholder="0"
                   value={additionalCharges || ''}
                   onChange={(e) => setAdditionalCharges(parseFloat(e.target.value) || 0)}
-                  className="flex-1 bg-transparent text-xs font-bold outline-none font-tabular-data text-on-surface"
+                  className="flex-1 bg-transparent text-xs font-bold outline-none font-tabular-data text-slate-900"
                 />
               </div>
             </div>
@@ -1473,15 +1473,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             <div className="space-y-0.5 text-xs">
               {isGstActive && (
                 <>
-                  <div className="flex justify-between text-outline text-[11px]">
+                  <div className="flex justify-between text-slate-600 text-[11px]">
                     <span>Taxable</span>
                     <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
                   </div>
-                  <div className="flex justify-between text-outline text-[11px] items-center">
+                  <div className="flex justify-between text-slate-600 text-[11px] items-center">
                     {isAllGstExempt ? (
                       <span className="flex items-center gap-1.5 text-secondary font-semibold">
                         <span>GST ({isIntraState ? 'CGST+SGST' : 'IGST'})</span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20">
                           GST Exempt (0%)
                         </span>
                       </span>
@@ -1502,7 +1502,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
                   {/* Collapsible Tax Detail */}
                   {showTaxBreakdown && (
-                    <div className="p-1.5 bg-surface-container-low rounded-lg border border-outline-variant/20 space-y-0.5 text-[10px] text-on-surface-variant">
+                    <div className="p-1.5 bg-surface-container-low rounded-lg border border-outline-variant/30 space-y-0.5 text-[10px] text-slate-600">
                       {isIntraState ? (
                         <>
                           <div className="flex justify-between">
@@ -1516,7 +1516,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         </div>
                       )}
                       {calcSummary.roundOff !== 0 && (
-                        <div className="flex justify-between text-outline">
+                        <div className="flex justify-between text-slate-500">
                           <span>Round Off: {calcSummary.roundOff > 0 ? `+₹${calcSummary.roundOff}` : `₹${calcSummary.roundOff}`}</span>
                         </div>
                       )}
@@ -1526,7 +1526,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               )}
 
               {/* Grand Total */}
-              <div className="flex justify-between font-black text-on-surface pt-1 border-t border-outline-variant/20 items-baseline">
+              <div className="flex justify-between font-black text-slate-900 pt-1 border-t border-outline-variant/30 items-baseline">
                 <span className="text-xs">Grand Total</span>
                 <span className="text-secondary text-lg font-tabular-data">
                   {formatINR(finalPayableTotal)}
@@ -1547,8 +1547,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   }}
                   className={`py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
                     paymentMode === mode
-                      ? 'bg-secondary text-on-secondary shadow-xs'
-                      : 'bg-surface-container-low border border-outline-variant/25 text-on-surface hover:bg-surface-container'
+                      ? 'bg-secondary text-on-secondary shadow-sm'
+                      : 'bg-surface-container-low border border-outline-variant/30 text-slate-700 hover:bg-surface-container'
                   }`}
                 >
                   {mode === 'CREDIT' ? 'Udhaar' : mode}
@@ -1558,15 +1558,15 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
             {/* Cash Tendered Calculator (Clean, visible only on CASH) */}
             {paymentMode === 'CASH' && (
-              <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/20 space-y-1">
+              <div className="bg-surface-container-low p-2 rounded-xl border border-outline-variant/30 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-outline font-semibold">Cash Given:</span>
+                  <span className="text-[10px] text-slate-600 font-semibold">Cash Given:</span>
                   <input
                     type="number"
                     placeholder={`e.g. ${finalPayableTotal}`}
                     value={cashTendered}
                     onChange={(e) => setCashTendered(e.target.value)}
-                    className="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-md px-1.5 py-0.5 text-xs font-black text-on-surface outline-none focus:border-secondary font-tabular-data text-right"
+                    className="w-20 bg-surface-container-lowest border border-outline-variant/30 rounded-md px-1.5 py-0.5 text-xs font-black text-slate-900 outline-none focus:border-secondary font-tabular-data text-right"
                   />
                   <div className="flex items-center gap-1">
                     <button
@@ -1583,7 +1583,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                           key={preset}
                           type="button"
                           onClick={() => setCashTendered(preset.toString())}
-                          className="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded text-[9px] font-bold text-outline cursor-pointer"
+                          className="px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant/30 rounded text-[9px] font-bold text-slate-600 cursor-pointer"
                         >
                           ₹{preset}
                         </button>
@@ -1593,7 +1593,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 </div>
 
                 {cashChangeDue > 0 && (
-                  <div className="flex items-center justify-between text-xs pt-1 border-t border-outline-variant/15 font-bold text-emerald-600 dark:text-emerald-400">
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-outline-variant/30 font-bold text-emerald-700 dark:text-emerald-400">
                     <span>Return Change:</span>
                     <span className="font-tabular-data font-black">
                       {formatINR(cashChangeDue)}
@@ -1622,7 +1622,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {cart.length > 0 && !isMobileCartDrawerOpen && (
         <div className="md:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-2.5 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-xs shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-xs shadow-sm">
               {totalCartCount}
             </div>
             <div>
@@ -1651,13 +1651,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         <div className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
           <div className="bg-surface-container-lowest rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl border-t border-outline-variant/30">
             {/* Mobile Drawer Header with Customer Selection */}
-            <div className="p-3 border-b border-outline-variant/20 space-y-2">
+            <div className="p-3 border-b border-outline-variant/30 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-secondary text-[20px]">
                     shopping_cart
                   </span>
-                  <span className="text-sm font-bold text-on-surface">
+                  <span className="text-sm font-bold text-slate-900">
                     Current Bill ({totalCartCount} {totalCartCount === 1 ? 'Item' : 'Items'})
                   </span>
                 </div>
@@ -1665,14 +1665,14 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   <button
                     type="button"
                     onClick={handleHoldBill}
-                    className="px-2 py-0.5 text-xs text-amber-700 bg-amber-500/10 rounded-lg font-bold"
+                    className="px-2 py-0.5 text-xs text-amber-700 bg-amber-500/10 rounded-lg font-bold border border-amber-500/20"
                   >
                     Hold
                   </button>
                   <button
                     onClick={() => setIsMobileCartDrawerOpen(false)}
                     aria-label="Close cart drawer"
-                    className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-outline cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer border border-outline-variant/30"
                   >
                     <span className="material-symbols-outlined text-[16px]">close</span>
                   </button>
@@ -1682,13 +1682,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
               {/* Customer Row on Mobile Cart */}
               <div
                 onClick={() => setIsCustomerModalOpen(true)}
-                className="p-2 bg-surface-container-low rounded-xl border border-outline-variant/20 flex items-center justify-between cursor-pointer"
+                className="p-2 bg-surface-container-low rounded-xl border border-outline-variant/30 flex items-center justify-between cursor-pointer"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="material-symbols-outlined text-secondary text-[16px]">
                     {customer.party ? 'person' : 'storefront'}
                   </span>
-                  <span className="text-xs font-bold text-on-surface truncate">
+                  <span className="text-xs font-bold text-slate-900 truncate">
                     {customer.party ? customer.party.name : 'Walk-in Retail Customer'}
                   </span>
                 </div>
@@ -1710,13 +1710,13 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 return (
                 <div
                   key={item.id}
-                  className="bg-surface-container-low/70 p-2.5 rounded-xl border border-outline-variant/20 flex items-center justify-between gap-2"
+                  className="bg-surface-container-low/70 p-2.5 rounded-xl border border-outline-variant/30 flex items-center justify-between gap-2 shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-on-surface truncate">
+                    <div className="text-xs font-bold text-slate-900 truncate">
                       {item.name}
                     </div>
-                    <div className="text-[11px] text-outline mt-0.5">
+                    <div className="text-[11px] text-slate-500 mt-0.5">
                       {isGstActive && !company.isCompositionScheme ? (
                         <span>
                           Excl ₹{unitPrice} · Incl ₹{inclPrice} × {formatQuantity(qty, 4)} = {formatINR(lineTotal)}
@@ -1733,21 +1733,21 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => updateCartQty(item.id, Number((qty - 1).toFixed(4)))}
-                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs text-slate-700 cursor-pointer"
                     >
                       -
                     </button>
-                    <span className="min-w-6 text-center text-xs font-bold px-1">{formatQuantity(qty, 4)}</span>
+                    <span className="min-w-6 text-center text-xs font-bold px-1 text-slate-900">{formatQuantity(qty, 4)}</span>
                     <button
                       onClick={() => updateCartQty(item.id, Number((qty + 1).toFixed(4)))}
-                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs cursor-pointer"
+                      className="w-6 h-6 rounded-lg bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center font-bold text-xs text-slate-700 cursor-pointer"
                     >
                       +
                     </button>
                     <button
                       onClick={() => removeFromCart(item.id)}
                       aria-label="Remove item from cart"
-                      className="text-outline hover:text-error ml-1 cursor-pointer"
+                      className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[15px]">delete</span>
                     </button>
@@ -1757,30 +1757,30 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             </div>
 
             {/* Summary & Checkout Footer */}
-            <div className="p-3 bg-surface-container-low/50 border-t border-outline-variant/20 space-y-2.5">
+            <div className="p-3 bg-surface-container-low/50 border-t border-outline-variant/30 space-y-2.5">
               <div className="space-y-0.5 text-xs">
                 {isGstActive && (
                   <>
-                    <div className="flex justify-between text-outline text-[11px]">
+                    <div className="flex justify-between text-slate-600 text-[11px]">
                       <span>Taxable Subtotal</span>
-                      <span>{formatINR(calcSummary.totalTaxableAmount)}</span>
+                      <span className="font-tabular-data">{formatINR(calcSummary.totalTaxableAmount)}</span>
                     </div>
-                    <div className="flex justify-between text-outline text-[11px] items-center">
+                    <div className="flex justify-between text-slate-600 text-[11px] items-center">
                       <span className="flex items-center gap-1.5">
                         <span>GST Total</span>
                         {isAllGstExempt && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold">
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/20">
                             GST Exempt (0%)
                           </span>
                         )}
                       </span>
-                      <span>{formatINR(calcSummary.totalTax)}</span>
+                      <span className="font-tabular-data">{formatINR(calcSummary.totalTax)}</span>
                     </div>
                   </>
                 )}
-                <div className="flex justify-between font-black text-on-surface pt-1 border-t border-outline-variant/20">
+                <div className="flex justify-between font-black text-slate-900 pt-1 border-t border-outline-variant/30">
                   <span className="text-xs">Grand Total</span>
-                  <span className="text-secondary text-base">{formatINR(finalPayableTotal)}</span>
+                  <span className="text-secondary text-base font-tabular-data">{formatINR(finalPayableTotal)}</span>
                 </div>
               </div>
 
@@ -1797,8 +1797,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     }}
                     className={`py-1 rounded-lg text-[9px] font-bold cursor-pointer transition-colors ${
                       paymentMode === mode
-                        ? 'bg-secondary text-on-secondary shadow-xs'
-                        : 'bg-surface-container-lowest border border-outline-variant/30 text-on-surface'
+                        ? 'bg-secondary text-on-secondary shadow-sm'
+                        : 'bg-surface-container-lowest border border-outline-variant/30 text-slate-700'
                     }`}
                   >
                     {mode === 'CREDIT' ? 'Udhaar' : mode}
