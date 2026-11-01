@@ -1,15 +1,15 @@
 {
-  "version": "1.2.57",
+  "version": "1.2.58",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-10-31T14:50:47.853Z",
+  "buildTime": "2026-11-01T07:32:21.297Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "3-line transaction card layout with voucher type, doc number, and balance/linking metadata",
-    "invoice-linked returns with item picker and balance reversal",
-    "tag sales/purchase returns correctly in activity timeline",
-    "party payment linking with remaining balance clamping",
-    "horizontal pill scrolling, party invoice preview cleanup, PDF bridge fixes",
-    "square quick action cards and scrollable invoice preview"
+    "move record/new invoice into summary metrics; remove opening balance from details",
+    "light contrast and declutter pass on QuickBillingView",
+    "light contrast pass on payments, cash & bank, reports, settings",
+    "raise floating action buttons above bottom nav",
+    "increase contrast and declutter inventory/purchases/sales hubs",
+    "remove opening balance summary chip from party card"
   ]
 }
