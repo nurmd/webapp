@@ -513,7 +513,7 @@ export const InvoiceHeaderMeta: React.FC<InvoiceHeaderMetaProps> = ({
           {/* Credit / Debit Note Return Reference Fields */}
           {(isCreditNote || isDebitNote) && (
             <>
-              {isCreditNote ? (
+              {isCreditNote && onParentInvoiceChange ? (
                 <>
                   <div
                     className="h-7 px-2 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium text-xs flex items-center gap-1 border border-rose-500/30 shrink-0"

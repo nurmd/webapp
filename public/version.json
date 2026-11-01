@@ -1,15 +1,15 @@
 {
-  "version": "1.2.59",
+  "version": "1.2.60",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-01T08:27:02.356Z",
+  "buildTime": "2026-11-01T15:16:54.506Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "add Agy efficiency guidelines",
-    "small-screen layout audit and fixes across views",
-    "mobile-only reports redesign + responsive party action buttons",
-    "v1.2.58 light-theme redesign, party detail, hubs, POS, payments/reports/settings",
-    "move record/new invoice into summary metrics; remove opening balance from details",
-    "light contrast and declutter pass on QuickBillingView"
+    "drop A4/PDF shortcut, scroll preview items, share thermal receipt as image",
+    "link sales returns to a parent invoice with delta balance reconciliation",
+    "Add Party quick action opens the new-party modal",
+    "simplify and redesign expense register and sheets",
+    "small-screen layout audit and fixes across all views",
+    "mobile-only reports redesign and responsive party action buttons"
   ]
 }
