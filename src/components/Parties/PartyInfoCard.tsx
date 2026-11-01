@@ -154,35 +154,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
         </div>
       </div>
 
-      {/* Opening Balance info chip if set */}
-      {((typeof party.openingBalance === 'number' && party.openingBalance > 0) || party.openingBalanceDate) && (
-        <div className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-200/60">
-          <span className="flex items-center gap-1 font-medium text-slate-600">
-            <span className="material-symbols-outlined text-[14px] text-secondary">account_balance_wallet</span>
-            <span>Opening Balance:</span>
-          </span>
-          <div className="flex items-center gap-1.5 font-bold">
-            <span className={party.openingBalanceType === 'TO_PAY' ? 'text-rose-700' : 'text-emerald-700'}>
-              {formatINR(party.openingBalance || 0)} ({party.openingBalanceType === 'TO_PAY' ? 'To Pay' : 'To Receive'})
-            </span>
-            {party.openingBalanceDate && (
-              <span className="text-[10px] text-slate-500 font-normal">
-                • {party.openingBalanceDate}
-              </span>
-            )}
-            {!isSystemParty(party) && (
-              <button
-                type="button"
-                onClick={() => onEditParty(party)}
-                className="p-0.5 text-slate-500 hover:text-slate-900 rounded cursor-pointer ml-1"
-                title="Edit Opening Balance"
-              >
-                <span className="material-symbols-outlined text-[13px]">edit</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Opening balance is managed via dedicated flows; not displayed in party summary. */}
 
       {/* Collapsible Info Drawer */}
       {showPartyDetails && (
