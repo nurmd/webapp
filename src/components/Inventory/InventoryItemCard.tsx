@@ -32,13 +32,13 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
           onClick();
         }
       }}
-      className={`w-full bg-surface-container-lowest rounded-xl shadow-sm p-3 sm:p-space-md flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99] ${
-        itemDisabled ? 'opacity-70 border border-dashed border-outline-variant/60 bg-surface-container-low/40' : ''
+      className={`w-full bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 p-3 sm:p-space-md flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99] ${
+        itemDisabled ? 'opacity-70 border-dashed border-outline-variant/60 bg-surface-container-low/40' : ''
       }`}
     >
       {/* Thumbnail / Item Avatar */}
       <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex-shrink-0 flex items-center justify-center ${
-        itemDisabled ? 'bg-surface-container-high text-outline' : 'bg-surface-container-low text-secondary'
+        itemDisabled ? 'bg-surface-container-high text-slate-400' : 'bg-surface-container-low text-secondary'
       }`}>
         <span className="material-symbols-outlined text-[22px] sm:text-[24px]">
           {itemDisabled ? 'block' : 'inventory_2'}
@@ -51,7 +51,7 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <h3 className={`font-headline-sm text-sm sm:text-base truncate font-semibold ${
-              itemDisabled ? 'text-on-surface-variant line-through' : 'text-on-surface'
+              itemDisabled ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-on-surface'
             }`}>
               {item.name}
             </h3>
@@ -95,8 +95,8 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
         <div className="flex items-center justify-between gap-2 mt-1.5 text-xs">
           {/* Sale Price */}
           <div className="inline-flex items-baseline gap-1.5">
-            <span className="text-[10px] font-extrabold uppercase text-on-surface-variant tracking-wider">Sale:</span>
-            <span className="font-headline-sm text-xs sm:text-sm font-extrabold text-on-surface">
+            <span className="text-[10px] font-extrabold uppercase text-slate-600 tracking-wider">Sale:</span>
+            <span className="font-headline-sm text-xs sm:text-sm font-extrabold text-slate-900 dark:text-on-surface">
               {formatINR(item.salePrice)}
             </span>
           </div>
@@ -108,11 +108,11 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
             className="inline-flex items-center justify-end gap-1.5 cursor-pointer hover:opacity-85 active:scale-95 transition-all text-right ml-auto bg-surface-container-low px-2 py-0.5 rounded-md border border-outline-variant/30"
             title={isBuyPriceVisible ? 'Click to hide purchase price' : 'Click to view purchase price'}
           >
-            <span className="text-[10px] font-bold uppercase text-on-surface-variant tracking-wider">Buy:</span>
-            <span className="font-tabular-data text-xs font-bold text-on-surface font-mono tracking-wider">
+            <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider">Buy:</span>
+            <span className="font-tabular-data text-xs font-bold text-slate-900 dark:text-on-surface font-mono tracking-wider">
               {isBuyPriceVisible ? formatINR(item.purchasePrice) : '•••'}
             </span>
-            <span className="material-symbols-outlined text-[13px] text-on-surface-variant ml-0.5">
+            <span className="material-symbols-outlined text-[13px] text-slate-500 ml-0.5">
               {isBuyPriceVisible ? 'visibility' : 'visibility_off'}
             </span>
           </button>

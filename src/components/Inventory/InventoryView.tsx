@@ -425,18 +425,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="flex flex-col w-full max-w-7xl mx-auto md:px-6">
         {/* Top Stock Value & Financial Valuation Summary (Tactile Fintech Card) */}
         <section className="px-margin-mobile pt-space-sm pb-space-xs">
-          <div className="bg-primary-container text-on-primary rounded-xl p-space-md shadow-sm relative overflow-hidden">
+          <div className="bg-surface-container-lowest text-on-surface rounded-xl p-space-md shadow-sm border border-outline-variant/30 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-outline-variant uppercase tracking-wider">
+                <span className="font-label-sm text-label-sm text-slate-600 uppercase tracking-wider font-bold">
                   Total Stock Value
                 </span>
                 <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="font-currency-display-mobile text-[22px] font-bold text-on-primary">
+                  <span className="font-currency-display-mobile text-[22px] font-bold text-slate-900">
                     {formattedStockValueDisplay}
-                  </span>
-                  <span className="font-body-sm text-body-sm text-on-primary-container">
-                    · {items.length} Items
                   </span>
                 </div>
               </div>
@@ -448,10 +445,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 className={`min-h-[36px] flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                   filterStockStatus === 'LOW_STOCK'
                     ? 'bg-secondary text-on-secondary shadow-sm'
-                    : 'bg-tertiary-fixed text-on-tertiary-fixed hover:bg-tertiary-fixed-dim'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 shadow-xs'
                 }`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-on-tertiary-container animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span>{lowStockCount} Need Restock</span>
               </button>
             </div>
@@ -459,14 +456,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         </section>
 
         {/* Sticky Search & Filter Input Area */}
-        <section className="sticky top-0 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/10 shadow-xs">
+        <section className="sticky top-0 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/25 shadow-xs">
           <div className="flex items-center gap-space-xs">
-            <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm">
-              <span className="material-symbols-outlined text-outline ml-3 mr-2 text-[20px]">
+            <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30">
+              <span className="material-symbols-outlined text-slate-500 ml-3 mr-2 text-[20px]">
                 search
               </span>
               <input
-                className="w-full min-w-0 h-12 bg-transparent font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none pr-2"
+                className="w-full min-w-0 h-12 bg-transparent font-body-md text-body-md text-slate-900 placeholder:text-slate-400 focus:outline-none pr-2"
                 placeholder={isGstActive ? "Search items, SKU, or HSN code..." : "Search items or SKU..."}
                 type="text"
                 value={search}
@@ -483,7 +480,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   title="Clear Search"
                   type="button"
                   onClick={() => setSearch('')}
-                  className="w-10 h-10 mr-1 flex-shrink-0 flex items-center justify-center rounded-lg text-outline hover:text-on-surface active:bg-surface-container-low transition-colors cursor-pointer"
+                  className="w-10 h-10 mr-1 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 active:bg-surface-container-low transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
@@ -492,8 +489,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               aria-label={showBuyPricesGlobally ? 'Hide Buy Prices' : 'Show Buy Prices'}
               title={showBuyPricesGlobally ? 'Hide Buy Prices (Privacy Mode)' : 'Show Buy Prices'}
-              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
-                !showBuyPricesGlobally ? 'text-outline border border-outline/30' : 'text-primary'
+              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer ${
+                !showBuyPricesGlobally ? 'text-slate-500' : 'text-primary'
               }`}
               type="button"
               onClick={toggleGlobalBuyPrice}
@@ -504,7 +501,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             </button>
             <button
               aria-label="Filter & Sort Options"
-              className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-on-surface shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
+              className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-slate-700 shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer ${
                 activeFilterCount > 0 ? 'border-2 border-secondary text-secondary bg-secondary/5 font-bold' : ''
               }`}
               type="button"
@@ -520,7 +517,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               aria-label="Print Barcode & QR Sticker Labels"
               title="Print Barcode & QR Sticker Labels"
-              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm active:bg-surface-container-low transition-colors cursor-pointer hover:bg-secondary/10"
+              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer hover:bg-secondary/10"
               type="button"
               onClick={() => {
                 setBarcodeModalInitialItem(undefined);
@@ -534,7 +531,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           {/* Active Filter Chips Row (if any filter is active) */}
           {activeFilterCount > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-              <span className="text-[11px] text-outline font-semibold flex-shrink-0">Active:</span>
+              <span className="text-[11px] text-slate-600 font-bold flex-shrink-0">Active:</span>
 
               {filterCategory !== 'ALL' && (
                 <button
@@ -632,7 +629,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         {/* Stock Discrepancy Reconciliation Banner */}
         {itemsWithDiscrepancy.length > 0 && (
           <div className="px-margin-mobile pt-1 pb-1">
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-fade-in shadow-xs">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-fade-in shadow-sm">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
                   <span className="material-symbols-outlined text-[18px]">published_with_changes</span>
@@ -641,7 +638,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   <span className="font-bold text-amber-900 dark:text-amber-200 block truncate">
                     {itemsWithDiscrepancy.length} item{itemsWithDiscrepancy.length > 1 ? 's have' : ' has'} stock discrepancy
                   </span>
-                  <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate">
+                  <span className="text-[11px] text-slate-600 dark:text-slate-300 block mt-0.5 truncate">
                     Catalog stock differs from transaction history (e.g. double counted new items)
                   </span>
                 </div>
@@ -649,7 +646,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <button
                 type="button"
                 onClick={handleReconcileAllDiscrepancies}
-                className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs flex-shrink-0 transition-all"
+                className="px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm flex-shrink-0 transition-all"
               >
                 <span className="material-symbols-outlined text-[15px]">done_all</span>
                 <span>Sync All ({itemsWithDiscrepancy.length})</span>
@@ -665,7 +662,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
                 filterCategory === 'ALL' && filterStockStatus === 'ALL' && !showDisabled
                   ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-lowest text-on-surface-variant active:bg-surface-container-low'
+                  : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30 active:bg-surface-container-low'
               }`}
               type="button"
               onClick={() => {
@@ -684,7 +681,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
                 filterStockStatus === 'LOW_STOCK'
                   ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-lowest text-on-surface-variant'
+                  : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
               }`}
               type="button"
               onClick={() => {
@@ -699,7 +696,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
                   showDisabled
                     ? 'bg-amber-600 text-white shadow-sm'
-                    : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low'
+                    : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30 hover:bg-surface-container-low'
                 }`}
                 type="button"
                 onClick={() => setShowDisabled(!showDisabled)}
@@ -717,7 +714,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 className={`px-3.5 py-1.5 rounded-full font-label-sm text-label-sm whitespace-nowrap shadow-sm active:bg-surface-container-low transition-colors cursor-pointer ${
                   filterCategory === cat && !showDisabled
                     ? 'bg-primary text-on-primary'
-                    : 'bg-surface-container-lowest text-on-surface-variant'
+                    : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
                 }`}
                 type="button"
                 onClick={() => {
@@ -733,12 +730,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         {/* Inventory Line Items Feed */}
         <section className="px-margin-mobile md:px-0 grid grid-cols-1 md:grid-cols-2 gap-space-sm pb-36 sm:pb-40">
           {filtered.length === 0 ? (
-            <div className="md:col-span-2 w-full bg-surface-container-lowest rounded-xl shadow-sm p-8 text-center text-on-surface-variant">
-              <span className="material-symbols-outlined text-[36px] text-outline mb-2">
+            <div className="md:col-span-2 w-full bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 p-8 text-center text-slate-600">
+              <span className="material-symbols-outlined text-[36px] text-slate-400 mb-2">
                 inventory_2
               </span>
-              <p className="font-headline-sm text-sm font-semibold">No stock items match your search.</p>
-              <p className="text-body-sm text-outline mt-1">Tap + Add New Item to create an inventory item.</p>
+              <p className="font-headline-sm text-sm font-bold text-slate-900">No stock items match your search.</p>
+              <p className="text-body-sm text-slate-600 mt-1">Tap + Add New Item to create an inventory item.</p>
             </div>
           ) : (
             filtered.map((item) => (

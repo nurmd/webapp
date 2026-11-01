@@ -404,17 +404,17 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-            <span className="text-sm font-bold text-on-surface">Sales Ledger</span>
+            <span className="text-sm font-bold text-slate-900 dark:text-on-surface">Sales Ledger</span>
           </div>
 
           {/* Date Range Selector Pill */}
           <button
             type="button"
             onClick={() => setIsDateModalOpen(true)}
-            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-xs text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
+            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-sm text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
               datePreset !== 'ALL_TIME'
                 ? 'bg-secondary/15 text-secondary border-secondary/30'
-                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+                : 'bg-surface-container-lowest text-slate-700 dark:text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-low'
             }`}
             title="Filter by date range"
             aria-label="Filter by date range"
@@ -436,7 +436,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 close
               </span>
             ) : (
-              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[13px] text-slate-500">arrow_drop_down</span>
             )}
           </button>
         </div>
@@ -444,33 +444,33 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         {/* Row 2: 2-Card Summary Grid for Total & Due */}
         <div className="grid grid-cols-2 gap-2">
           {/* Sales Total Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between text-outline text-[11px] font-bold">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-[11px] font-bold">
               <span className="uppercase tracking-wider">Sales Total</span>
-              <span className="text-[10px] bg-surface-container-low px-1.5 py-0.2 rounded font-semibold text-on-surface-variant">
-                {dateFilteredInvoices.length} {dateFilteredInvoices.length === 1 ? 'bill' : 'bills'}
+              <span className="text-[10px] bg-surface-container-low px-1.5 py-0.2 rounded font-semibold text-slate-700 dark:text-slate-300">
+                {dateFilteredInvoices.length}
               </span>
             </div>
-            <div className="mt-1 text-base sm:text-lg font-black text-on-surface tabular-nums tracking-tight">
+            <div className="mt-1 text-base sm:text-lg font-black text-slate-900 dark:text-on-surface tabular-nums tracking-tight">
               {formatINR(totalSales)}
             </div>
           </div>
 
           {/* Total Due Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between text-error text-[11px] font-bold">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-rose-700 text-[11px] font-bold">
               <span className="uppercase tracking-wider">Total Due</span>
               {overdueCount > 0 ? (
-                <span className="text-[10px] bg-error/10 px-1.5 py-0.2 rounded font-bold text-error">
+                <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-bold">
                   {overdueCount} due
                 </span>
               ) : (
-                <span className="text-[10px] bg-secondary/10 px-1.5 py-0.2 rounded font-bold text-secondary">
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-bold">
                   All Clear
                 </span>
               )}
             </div>
-            <div className={`mt-1 text-base sm:text-lg font-black tabular-nums tracking-tight ${totalPending > 0 ? 'text-error' : 'text-on-surface'}`}>
+            <div className={`mt-1 text-base sm:text-lg font-black tabular-nums tracking-tight ${totalPending > 0 ? 'text-rose-700' : 'text-slate-900 dark:text-on-surface'}`}>
               {formatINR(totalPending)}
             </div>
           </div>
@@ -479,11 +479,11 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         {/* Row 3: Search + Sort Selector */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-[120px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[16px]">
               search
             </span>
             <input
-              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-on-surface text-xs sm:text-sm rounded-xl shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary/40"
+              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-slate-900 dark:text-on-surface text-xs sm:text-sm rounded-xl shadow-sm border border-outline-variant/30 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-secondary/40"
               placeholder={company.isGstEnabled !== false ? "Search customer, bill, GSTIN..." : "Search customer, bill..."}
               type="text"
               value={search}
@@ -492,7 +492,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 cursor-pointer"
                 type="button"
                 title="Clear search"
                 aria-label="Clear search"
@@ -507,19 +507,19 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs active:scale-95"
+              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-slate-700 dark:text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer transition-all shadow-sm active:scale-95"
               title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
               aria-label="Sort sales ledger"
             >
               <span className="material-symbols-outlined text-[15px] text-secondary">sort</span>
-              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[13px] text-slate-500">arrow_drop_down</span>
             </button>
 
             {isSortDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
                 <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-1 overflow-hidden animate-fade-in">
-                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-outline-variant/20">
                     Sort Sales Ledger
                   </div>
                   {(Object.keys(LEDGER_SORT_LABELS) as LedgerSortOption[]).map((key) => {
@@ -533,7 +533,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                           setIsSortDropdownOpen(false);
                         }}
                         className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
-                          isSelected ? 'text-secondary font-bold bg-secondary/5' : 'text-on-surface'
+                          isSelected ? 'text-secondary font-bold bg-secondary/5' : 'text-slate-900 dark:text-on-surface'
                         }`}
                       >
                         <span>{LEDGER_SORT_LABELS[key]}</span>
@@ -557,49 +557,49 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             onClick={() => setActiveTab('ALL')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'ALL'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
             }`}
             type="button"
           >
             <span>All</span>
-            <span className="text-[10px] opacity-80">({dateFilteredInvoices.length})</span>
+            <span className="text-[10px] text-slate-500 font-medium">({dateFilteredInvoices.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('UNPAID')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'UNPAID'
-                ? 'bg-error text-on-error shadow-xs'
-                : 'bg-surface-container-lowest text-error border border-outline-variant/25'
+                ? 'bg-error text-on-error shadow-sm'
+                : 'bg-surface-container-lowest text-rose-700 border border-outline-variant/30 hover:bg-surface-container-low'
             }`}
             type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-error" />
             <span>Due</span>
-            <span className="text-[10px] opacity-90 font-bold">({overdueCount})</span>
+            <span className="text-[10px] font-bold">({overdueCount})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('PAID')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               activeTab === 'PAID'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
             }`}
             type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             <span>Paid</span>
-            <span className="text-[10px] opacity-80">({dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
+            <span className="text-[10px] text-slate-500 font-medium">({dateFilteredInvoices.filter((i) => i.paymentStatus === 'PAID').length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('ESTIMATES')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap active:scale-95 ${
               activeTab === 'ESTIMATES'
-                ? 'bg-secondary text-on-secondary shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+                ? 'bg-secondary text-on-secondary shadow-sm'
+                : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
             }`}
             type="button"
           >
@@ -610,7 +610,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
       {/* Select All & Multi-Selection Bar */}
       {sortedInvoices.length > 0 && (
-        <div className="px-margin-mobile md:px-0 mt-2 flex items-center justify-between py-1 text-xs text-on-surface-variant">
+        <div className="px-margin-mobile md:px-0 mt-2 flex items-center justify-between py-1 text-xs text-slate-700 dark:text-slate-300">
           <label className="flex items-center gap-2 cursor-pointer select-none font-semibold">
             <input
               type="checkbox"
@@ -640,7 +640,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         {sortedInvoices.length === 0 ? (
           <div
             data-testid="sales-hub-empty-state"
-            className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center gap-3 border border-outline-variant/20 shadow-xs animate-fade-in"
+            className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center justify-center gap-3 border border-outline-variant/30 shadow-sm animate-fade-in"
           >
             {invoices.length === 0 ? (
               /* Case 1: Total Empty State - No invoices recorded yet */
@@ -648,10 +648,10 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-secondary/10 text-secondary flex items-center justify-center mb-1 shadow-inner ring-8 ring-secondary/5">
                   <span className="material-symbols-outlined text-[36px] sm:text-[42px]">receipt_long</span>
                 </div>
-                <h3 className="text-base sm:text-lg font-extrabold text-on-surface tracking-tight">
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-on-surface tracking-tight">
                   No Sales Bills Yet
                 </h3>
-                <p className="text-xs sm:text-sm text-on-surface-variant max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
                   Create your first GST-compliant tax invoice or cash bill to start tracking sales, payments, and customer balances.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
@@ -671,7 +671,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                     <button
                       type="button"
                       onClick={onQuickPos}
-                      className="min-h-[44px] px-4 py-2.5 rounded-xl bg-surface-container-low text-on-surface font-semibold text-xs border border-outline-variant/30 hover:bg-surface-container active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="min-h-[44px] px-4 py-2.5 rounded-xl bg-surface-container-low text-slate-700 dark:text-on-surface font-semibold text-xs border border-outline-variant/30 hover:bg-surface-container active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
                       aria-label="Quick POS Billing"
                     >
                       <span className="material-symbols-outlined text-[18px] text-secondary">point_of_sale</span>
@@ -683,13 +683,13 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             ) : (
               /* Case 2: Filter/Search Mismatch - Invoices exist but 0 matches */
               <>
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-surface-container-low text-outline flex items-center justify-center mb-1">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-surface-container-low text-slate-400 flex items-center justify-center mb-1">
                   <span className="material-symbols-outlined text-[28px] sm:text-[32px]">filter_list_off</span>
                 </div>
-                <h3 className="text-sm sm:text-base font-bold text-on-surface">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-on-surface">
                   No Invoices Found
                 </h3>
-                <p className="text-xs text-on-surface-variant max-w-sm mx-auto leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
                   {search
                     ? `No invoices match "${search}" with current filters.`
                     : activeTab !== 'ALL'
@@ -717,7 +717,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                         setCustomStart('');
                         setCustomEnd('');
                       }}
-                      className="min-h-[40px] px-4 rounded-xl bg-surface-container-low text-on-surface-variant font-bold text-xs hover:bg-surface-container cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
+                      className="min-h-[40px] px-4 rounded-xl bg-surface-container-low text-slate-700 dark:text-on-surface font-bold text-xs border border-outline-variant/30 hover:bg-surface-container cursor-pointer transition-all active:scale-95 flex items-center gap-1.5"
                       aria-label="Reset Filters"
                     >
                       <span className="material-symbols-outlined text-[16px]">refresh</span>
@@ -749,10 +749,10 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 onClick={() => onViewInvoice(inv)}
                 onMouseEnter={preloadSimplifiedInvoiceModal}
                 onFocus={preloadSimplifiedInvoiceModal}
-                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
+                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-sm border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
                   isSelected(inv.id)
                     ? 'border-secondary ring-1 ring-secondary/30 bg-secondary/5'
-                    : 'border-outline-variant/20 hover:border-secondary/40'
+                    : 'border-outline-variant/30 hover:border-secondary/40'
                 }`}
               >
                 {/* Line 1: Checkbox + Party Name (left) | Grand Total (right) */}
@@ -773,18 +773,18 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                         className="w-3.5 h-3.5 rounded text-secondary accent-secondary cursor-pointer"
                       />
                     </div>
-                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-on-surface truncate">
                       {inv.partyName || 'Cash Customer'}
                     </span>
                   </div>
-                  <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(inv.grandTotal)}
                   </span>
                 </div>
 
                 {/* Line 2 (Middle): Invoice # & Overdue Badge */}
                 <div className="flex items-center gap-1.5 -mt-0.5 overflow-x-auto no-scrollbar py-0.5">
-                  <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 px-1.5 py-0.2 rounded font-mono whitespace-nowrap">
+                  <span className="text-[10px] font-semibold text-secondary shrink-0 bg-secondary/10 border border-secondary/20 px-1.5 py-0.2 rounded font-mono whitespace-nowrap">
                     #{inv.invoiceNumber}
                   </span>
 
@@ -856,18 +856,16 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                   )}
                 </div>
 
-                {/* Line 3: Date & Items count (left) | Due amount + Record Pay button on a single line (right) */}
-                <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
+                {/* Line 3: Date (left) | Due amount + Record Pay button on a single line (right) */}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-400">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
-                    <span>{formatDate(inv.date)}</span>
-                    <span>•</span>
-                    <span className="truncate">{inv.items?.length || 0} {inv.items?.length === 1 ? 'item' : 'items'}</span>
+                    <span className="text-slate-500 font-medium">{formatDate(inv.date)}</span>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {inv.balanceAmount > 0 ? (
                       <>
-                        <span className="text-[11px] font-bold text-error whitespace-nowrap tabular-nums">
+                        <span className="text-[11px] font-bold text-rose-700 whitespace-nowrap tabular-nums">
                           Due {formatINR(inv.balanceAmount)}
                         </span>
                         <button
@@ -889,7 +887,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                         </button>
                       </>
                     ) : (
-                      <span className="text-[10px] font-bold text-secondary flex items-center gap-0.5">
+                      <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">
                         <span className="material-symbols-outlined text-[13px]">check_circle</span>
                         <span>Paid</span>
                       </span>
@@ -920,7 +918,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
         <div className="fixed inset-0 z-50 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-sm shadow-xl border border-outline-variant/30 flex flex-col gap-4">
             <h3 className="font-headline-sm text-lg font-bold text-on-surface">Record Payment In</h3>
-            <div className="text-xs text-on-surface-variant">
+            <div className="text-xs text-slate-600 dark:text-slate-400">
               Invoice <strong>{paymentModalInvoice.invoiceNumber}</strong> • {paymentModalInvoice.partyName}
             </div>
 
@@ -942,7 +940,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
 
               {/* Mode Selector */}
               <div>
-                <label className="block text-xs font-bold text-on-surface-variant mb-1">
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
                   Payment Mode
                 </label>
                 <div className="grid grid-cols-4 gap-1">
@@ -964,7 +962,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                       className={`py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
                         paymentMode === m
                           ? 'bg-secondary text-on-secondary shadow-xs'
-                          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                          : 'bg-surface-container text-slate-700 hover:bg-surface-container-high'
                       }`}
                     >
                       {m}
@@ -976,7 +974,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               {/* Single Amount Input */}
               {paymentMode !== 'SPLIT' ? (
                 <div>
-                  <label className="block text-xs font-bold text-on-surface-variant mb-1">
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
                     Amount Received (₹)
                   </label>
                   <input
@@ -1031,7 +1029,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                             Cash
                           </span>
                           <div className="relative flex-1">
-                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <span className="absolute left-2 top-1.5 text-xs text-slate-500 font-bold">₹</span>
                             <input
                               type="number"
                               step="0.01"
@@ -1062,7 +1060,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                             UPI
                           </span>
                           <div className="relative flex-1">
-                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <span className="absolute left-2 top-1.5 text-xs text-slate-500 font-bold">₹</span>
                             <input
                               type="number"
                               step="0.01"
@@ -1093,7 +1091,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                             Bank
                           </span>
                           <div className="relative flex-1">
-                            <span className="absolute left-2 top-1.5 text-xs text-on-surface-variant font-bold">₹</span>
+                            <span className="absolute left-2 top-1.5 text-xs text-slate-500 font-bold">₹</span>
                             <input
                               type="number"
                               step="0.01"
@@ -1125,7 +1123,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
               {/* Discount Allowed Input */}
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-on-surface-variant">
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400">
                     Discount Allowed (₹)
                   </label>
                   {discountAmount > 0 && (
@@ -1149,7 +1147,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentModalInvoice(null)}
-                  className="px-4 py-2 rounded-xl text-on-surface-variant text-xs font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 text-xs font-bold cursor-pointer"
                 >
                   Cancel
                 </button>

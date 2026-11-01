@@ -269,17 +269,17 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-            <span className="text-sm font-bold text-on-surface">Purchase Ledger</span>
+            <span className="text-sm font-bold text-slate-900 dark:text-on-surface">Purchase Ledger</span>
           </div>
 
           {/* Date Range Selector Pill */}
           <button
             type="button"
             onClick={() => setIsDateModalOpen(true)}
-            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-xs text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
+            className={`min-h-[36px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1.5 px-3 rounded-xl shadow-sm text-xs font-bold cursor-pointer border transition-all shrink-0 active:scale-95 ${
               datePreset !== 'ALL_TIME'
                 ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30'
-                : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant/25 hover:bg-surface-container-low'
+                : 'bg-surface-container-lowest text-slate-700 dark:text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-low'
             }`}
             title="Filter by date range"
             aria-label="Filter by date range"
@@ -301,7 +301,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                 close
               </span>
             ) : (
-              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[13px] text-slate-500">arrow_drop_down</span>
             )}
           </button>
         </div>
@@ -309,33 +309,33 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         {/* Row 2: 2-Card Summary Grid for Total & Due */}
         <div className="grid grid-cols-2 gap-2">
           {/* Purchase Total Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between text-outline text-[11px] font-bold">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-[11px] font-bold">
               <span className="uppercase tracking-wider">Purchase Total</span>
-              <span className="text-[10px] bg-surface-container-low px-1.5 py-0.2 rounded font-semibold text-on-surface-variant">
-                {dateFilteredPurchases.length} {dateFilteredPurchases.length === 1 ? 'bill' : 'bills'}
+              <span className="text-[10px] bg-surface-container-low px-1.5 py-0.2 rounded font-semibold text-slate-700 dark:text-slate-300">
+                {dateFilteredPurchases.length}
               </span>
             </div>
-            <div className="mt-1 text-base sm:text-lg font-black text-on-surface tabular-nums tracking-tight">
+            <div className="mt-1 text-base sm:text-lg font-black text-slate-900 dark:text-on-surface tabular-nums tracking-tight">
               {formatINR(totalPurchases)}
             </div>
           </div>
 
           {/* Total to Pay Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/20 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between text-error text-[11px] font-bold">
+          <div className="bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between text-rose-700 text-[11px] font-bold">
               <span className="uppercase tracking-wider">Total to Pay</span>
               {unpaidPurchases.length > 0 ? (
-                <span className="text-[10px] bg-error/10 px-1.5 py-0.2 rounded font-bold text-error">
+                <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-1.5 py-0.2 rounded font-bold">
                   {unpaidPurchases.length} due
                 </span>
               ) : (
-                <span className="text-[10px] bg-secondary/10 px-1.5 py-0.2 rounded font-bold text-secondary">
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-bold">
                   Settled
                 </span>
               )}
             </div>
-            <div className={`mt-1 text-base sm:text-lg font-black tabular-nums tracking-tight ${totalToPay > 0 ? 'text-error' : 'text-on-surface'}`}>
+            <div className={`mt-1 text-base sm:text-lg font-black tabular-nums tracking-tight ${totalToPay > 0 ? 'text-rose-700' : 'text-slate-900 dark:text-on-surface'}`}>
               {formatINR(totalToPay)}
             </div>
           </div>
@@ -344,11 +344,11 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
         {/* Row 3: Search + Sort Selector */}
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-[120px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-[16px]">
               search
             </span>
             <input
-              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-on-surface text-xs sm:text-sm rounded-xl shadow-xs border border-outline-variant/25 placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-orange-500/40"
+              className="w-full min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 pl-8 pr-7 bg-surface-container-lowest text-slate-900 dark:text-on-surface text-xs sm:text-sm rounded-xl shadow-sm border border-outline-variant/30 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40"
               placeholder="Search bill, supplier..."
               type="text"
               value={search}
@@ -357,7 +357,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 cursor-pointer"
                 type="button"
                 title="Clear search"
                 aria-label="Clear search"
@@ -372,19 +372,19 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             <button
               type="button"
               onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
-              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25 hover:bg-surface-container-low cursor-pointer transition-all shadow-xs active:scale-95"
+              className="min-h-[38px] sm:min-h-[40px] h-9 sm:h-10 flex items-center gap-1 px-2.5 rounded-xl text-xs font-bold bg-surface-container-lowest text-slate-700 dark:text-on-surface-variant border border-outline-variant/30 hover:bg-surface-container-low cursor-pointer transition-all shadow-sm active:scale-95"
               title={`Sort: ${LEDGER_SORT_LABELS[sortBy]}`}
               aria-label="Sort purchases ledger"
             >
               <span className="material-symbols-outlined text-[15px] text-orange-600 dark:text-orange-400">sort</span>
-              <span className="material-symbols-outlined text-[13px] text-outline">arrow_drop_down</span>
+              <span className="material-symbols-outlined text-[13px] text-slate-500">arrow_drop_down</span>
             </button>
 
             {isSortDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
                 <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-1 overflow-hidden animate-fade-in">
-                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
+                  <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-outline-variant/20">
                     Sort Purchase Ledger
                   </div>
                   {(Object.keys(LEDGER_SORT_LABELS) as LedgerSortOption[]).map((key) => {
@@ -398,7 +398,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                           setIsSortDropdownOpen(false);
                         }}
                         className={`w-full px-3 py-1.5 text-left text-xs font-semibold flex items-center justify-between hover:bg-surface-container-low cursor-pointer transition-colors ${
-                          isSelected ? 'text-orange-600 dark:text-orange-400 font-bold bg-orange-500/5' : 'text-on-surface'
+                          isSelected ? 'text-orange-600 dark:text-orange-400 font-bold bg-orange-500/5' : 'text-slate-900 dark:text-on-surface'
                         }`}
                       >
                         <span>{LEDGER_SORT_LABELS[key]}</span>
@@ -422,48 +422,48 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
             onClick={() => setFilterStatus('ALL')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'ALL'
-                ? 'bg-orange-600 text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+                ? 'bg-orange-600 text-white shadow-sm'
+                : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
             }`}
             type="button"
           >
             <span>All</span>
-            <span className="text-[10px] opacity-80">({dateFilteredPurchases.length})</span>
+            <span className="text-[10px] text-slate-500 font-medium">({dateFilteredPurchases.length})</span>
           </button>
 
           <button
             onClick={() => setFilterStatus('UNPAID')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'UNPAID'
-                ? 'bg-error text-on-error shadow-xs'
-                : 'bg-surface-container-lowest text-error border border-outline-variant/25'
+                ? 'bg-error text-on-error shadow-sm'
+                : 'bg-surface-container-lowest text-rose-700 border border-outline-variant/30 hover:bg-surface-container-low'
             }`}
             type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-error" />
             <span>Due</span>
-            <span className="text-[10px] opacity-90 font-bold">({unpaidPurchases.length})</span>
+            <span className="text-[10px] font-bold">({unpaidPurchases.length})</span>
           </button>
 
           <button
             onClick={() => setFilterStatus('PAID')}
             className={`min-h-[36px] sm:min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
               filterStatus === 'PAID'
-                ? 'bg-orange-600 text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/25'
+                ? 'bg-orange-600 text-white shadow-sm'
+                : 'bg-surface-container-lowest text-slate-700 hover:text-slate-900 border border-outline-variant/30'
             }`}
             type="button"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
             <span>Settled</span>
-            <span className="text-[10px] opacity-80">({dateFilteredPurchases.filter((p) => p.paymentStatus === 'PAID').length})</span>
+            <span className="text-[10px] text-slate-500 font-medium">({dateFilteredPurchases.filter((p) => p.paymentStatus === 'PAID').length})</span>
           </button>
         </div>
       </div>
 
       {/* Select All & Multi-Selection Bar */}
       {sortedPurchases.length > 0 && (
-        <div className="flex items-center justify-between py-1 text-xs text-on-surface-variant">
+        <div className="flex items-center justify-between py-1 text-xs text-slate-700 dark:text-slate-300">
           <label className="flex items-center gap-2 cursor-pointer select-none font-semibold">
             <input
               type="checkbox"
@@ -491,7 +491,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
       {/* 4. Purchase Bills List Stream (Slim Passbook Cards) */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
         {sortedPurchases.length === 0 ? (
-          <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-on-surface-variant border border-outline-variant/20 shadow-xs">
+          <div className="md:col-span-2 bg-surface-container-lowest rounded-2xl p-8 text-center text-slate-600 dark:text-slate-400 border border-outline-variant/30 shadow-sm">
             No purchase records found.
           </div>
         ) : (
@@ -507,10 +507,10 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                 onClick={() => setSelectedBillForPreview(bill)}
                 onMouseEnter={preloadSimplifiedPurchaseModal}
                 onFocus={preloadSimplifiedPurchaseModal}
-                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-xs border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
+                className={`bg-surface-container-lowest rounded-xl p-2.5 sm:p-3 shadow-sm border flex flex-col gap-1.5 active:scale-[0.99] transition-all cursor-pointer ${
                   isSelected(bill.id)
                     ? 'border-orange-500 ring-1 ring-orange-500/30 bg-orange-500/5'
-                    : 'border-outline-variant/20 hover:border-orange-500/40'
+                    : 'border-outline-variant/30 hover:border-orange-500/40'
                 }`}
               >
                 {/* Line 1: Checkbox + Supplier Name (left) | Grand Total (right) */}
@@ -531,32 +531,30 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                         className="w-3.5 h-3.5 rounded text-orange-600 accent-orange-600 cursor-pointer"
                       />
                     </div>
-                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-on-surface truncate">
                       {bill.supplierName}
                     </span>
                   </div>
-                  <span className="font-extrabold text-xs sm:text-sm text-on-surface whitespace-nowrap tabular-nums shrink-0">
+                  <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-on-surface whitespace-nowrap tabular-nums shrink-0">
                     {formatINR(bill.grandTotal)}
                   </span>
                 </div>
 
                 {/* Line 2 (Middle): Bill # */}
                 <div className="flex items-center gap-1.5 -mt-0.5">
-                  <span className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 shrink-0 bg-orange-500/10 px-1.5 py-0.2 rounded font-mono">
+                  <span className="text-[10px] font-semibold text-orange-700 dark:text-orange-300 shrink-0 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 px-1.5 py-0.2 rounded font-mono">
                     #{bill.billNumber}
                   </span>
                 </div>
 
-                {/* Line 3: Date & Items count (left) | Due amount + Quick Pay button on a single line (right) */}
-                <div className="flex items-center justify-between gap-2 text-[11px] text-on-surface-variant">
+                {/* Line 3: Date (left) | Due amount + Quick Pay button on a single line (right) */}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-400">
                   <div className="flex items-center gap-1.5 min-w-0 truncate text-[11px]">
-                    <span>{formatDate(bill.date)}</span>
-                    <span>•</span>
-                    <span className="truncate">{bill.items?.length || 0} {bill.items?.length === 1 ? 'item' : 'items'}</span>
+                    <span className="text-slate-500 font-medium">{formatDate(bill.date)}</span>
                     {isGstActive && bill.totalTax > 0 && (
                       <>
-                        <span>•</span>
-                        <span className="font-semibold text-orange-600 dark:text-orange-400">+{formatINR(bill.totalTax)} ITC</span>
+                        <span className="text-slate-400">•</span>
+                        <span className="font-semibold text-orange-700 dark:text-orange-300">+{formatINR(bill.totalTax)} ITC</span>
                       </>
                     )}
                   </div>
@@ -564,7 +562,7 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                   <div className="flex items-center gap-1.5 shrink-0">
                     {(isUnpaid || isPartial) ? (
                       <>
-                        <span className="text-[11px] font-bold text-error whitespace-nowrap tabular-nums">
+                        <span className="text-[11px] font-bold text-rose-700 whitespace-nowrap tabular-nums">
                           Due {formatINR(dueAmt)}
                         </span>
                         <button
@@ -573,14 +571,14 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
                             e.stopPropagation();
                             handleQuickPay(bill);
                           }}
-                          className="h-6 px-2 rounded-md bg-error/15 hover:bg-error/25 text-error font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
+                          className="h-6 px-2 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10px] cursor-pointer active:scale-95 transition-all flex items-center gap-0.5"
                         >
                           <span className="material-symbols-outlined text-[12px]">payments</span>
                           <span>Pay</span>
                         </button>
                       </>
                     ) : (
-                      <span className="text-[10px] font-bold text-secondary flex items-center gap-0.5">
+                      <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-0.5">
                         <span className="material-symbols-outlined text-[13px]">check_circle</span>
                         <span>Settled</span>
                       </span>
