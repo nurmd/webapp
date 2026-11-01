@@ -433,7 +433,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   if (!isOpen) return null;
 
   const content = (
-    <div className={`bg-surface flex flex-col ${mode === 'page' ? 'min-h-screen animate-fade-in pb-8' : 'h-full overflow-y-auto'}`}>
+    <div className={`bg-surface flex flex-col ${mode === 'page' ? 'min-h-screen animate-fade-in pb-28 sm:pb-8' : 'h-full overflow-y-auto pb-20 sm:pb-4'}`}>
       {/* 1. Mobile-Optimized Sticky Top Navigation (slides out on scroll) */}
       <header
         className={`sticky top-0 z-30 bg-surface/95 backdrop-blur-md border-b border-outline-variant/20 px-3 py-2 sm:px-6 sm:py-3 shadow-xs transition-all duration-300 ease-in-out ${
@@ -502,11 +502,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               {party.phone && party.phone.trim() !== '00' && party.phone.trim() !== '0' && (
                 <a
                   href={`tel:${party.phone}`}
-                  className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors shrink-0"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors shrink-0"
                   title="Call"
                   aria-label="Call party"
                 >
-                  <span className="material-symbols-outlined text-[17px]">call</span>
+                  <span className="material-symbols-outlined text-[16px] sm:text-[17px]">call</span>
                 </a>
               )}
 
@@ -514,22 +514,22 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
               <button
                 type="button"
                 onClick={handlePrintStatement}
-                className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-secondary flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Print Ledger Statement"
                 aria-label="Print ledger statement"
               >
-                <span className="material-symbols-outlined text-[17px]">print</span>
+                <span className="material-symbols-outlined text-[16px] sm:text-[17px]">print</span>
               </button>
 
               {/* 3. WhatsApp */}
               <button
                 type="button"
                 onClick={() => setIsWhatsAppModalOpen(true)}
-                className="w-8 h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors shrink-0"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] flex items-center justify-center cursor-pointer transition-colors shrink-0"
                 title="WhatsApp Reminder & Statement"
                 aria-label="Send WhatsApp message"
               >
-                <span className="material-symbols-outlined text-[17px]">chat</span>
+                <span className="material-symbols-outlined text-[16px] sm:text-[17px]">chat</span>
               </button>
 
               {/* 4. Edit */}
@@ -537,11 +537,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => onEditParty(party)}
-                  className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   title="Edit Profile"
                   aria-label="Edit party profile"
                 >
-                  <span className="material-symbols-outlined text-[17px]">edit</span>
+                  <span className="material-symbols-outlined text-[16px] sm:text-[17px]">edit</span>
                 </button>
               )}
 
@@ -550,11 +550,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="w-8 h-8 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-on-surface-variant hover:text-error hover:bg-error/10 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   title="Delete Party"
                   aria-label="Delete party"
                 >
-                  <span className="material-symbols-outlined text-[17px]">delete</span>
+                  <span className="material-symbols-outlined text-[16px] sm:text-[17px]">delete</span>
                 </button>
               )}
             </div>

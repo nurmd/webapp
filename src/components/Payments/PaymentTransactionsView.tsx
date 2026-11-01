@@ -311,7 +311,7 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       : undefined;
 
   return (
-    <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 gap-3.5 max-w-7xl mx-auto">
+    <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 py-3 pb-28 sm:pb-6 gap-3.5 max-w-7xl mx-auto">
       {/* 1. Header Bar with Back Button to Dashboard */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

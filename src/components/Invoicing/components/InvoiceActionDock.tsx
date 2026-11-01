@@ -106,7 +106,7 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
             type="button"
             onClick={onSaveInvoice}
             data-testid="invoice-save-btn"
-            className="h-10 px-3 sm:px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95 shrink-0"
+            className="h-10 px-2.5 sm:px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95 flex-1 sm:flex-initial shrink-0"
             title={isSalesOrder ? 'Save Sales Order directly' : isCreditNote ? 'Save Credit Note directly' : 'Save bill as Unpaid directly'}
           >
             <span className="material-symbols-outlined text-[18px]">save</span>
@@ -117,7 +117,7 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
             type="button"
             onClick={onPayAndSave}
             data-testid="invoice-pay-save-btn"
-            className="h-10 px-3.5 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer shrink-0"
+            className="h-10 px-2.5 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex-1 sm:flex-initial shrink-0"
             title={isSalesOrder ? 'Record booking advance and save' : 'Open Payment Modal to settle tender and save'}
           >
             <span className="material-symbols-outlined text-[18px]">payments</span>

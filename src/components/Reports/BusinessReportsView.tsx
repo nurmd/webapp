@@ -392,7 +392,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   // -------------------------------------------------------------
   if (activeReportPage === 'hub') {
     return (
-      <div className="p-2 sm:p-3.5 md:p-5 max-w-7xl mx-auto space-y-2.5 sm:space-y-3.5 md:space-y-5">
+      <div className="p-2 sm:p-3.5 md:p-5 max-w-7xl mx-auto space-y-2.5 sm:space-y-3.5 md:space-y-5 pb-28 sm:pb-8">
         {/* Top Business Performance & Profit Card */}
         <BusinessPerformanceCard
           summary={tradingSummary}
@@ -433,7 +433,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
   const subReportTabs = SUB_REPORTS_MAP[activeReportPage] || [];
 
   return (
-    <div className="p-2.5 sm:p-5 max-w-7xl mx-auto space-y-3.5 sm:space-y-5">
+    <div className="p-2.5 sm:p-5 max-w-7xl mx-auto space-y-3.5 sm:space-y-5 pb-28 sm:pb-8">
       {/* Universal Standalone Page Header with Back Button */}
       <DedicatedReportPageHeader
         title={categoryMeta.title}

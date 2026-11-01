@@ -397,7 +397,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-24 max-w-7xl mx-auto md:px-6">
+    <div className="flex flex-col w-full pb-28 sm:pb-24 max-w-7xl mx-auto md:px-6">
       {/* Header, Metrics & Controls Strip */}
       <div className="px-margin-mobile pt-1.5 pb-1 flex flex-col gap-2">
         {/* Row 1: Title + Date Range Selector Pill */}

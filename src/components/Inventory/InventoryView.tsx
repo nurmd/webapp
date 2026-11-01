@@ -457,13 +457,13 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
 
         {/* Sticky Search & Filter Input Area */}
         <section className="sticky top-0 z-20 bg-surface/95 backdrop-blur-md px-margin-mobile pt-space-sm pb-space-xs flex flex-col gap-2 border-b border-outline-variant/25 shadow-xs">
-          <div className="flex items-center gap-space-xs">
-            <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30">
-              <span className="material-symbols-outlined text-slate-500 ml-3 mr-2 text-[20px]">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="relative flex-1 flex items-center bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 min-w-0">
+              <span className="material-symbols-outlined text-slate-500 ml-2.5 sm:ml-3 mr-1.5 sm:mr-2 text-[18px] sm:text-[20px] shrink-0">
                 search
               </span>
               <input
-                className="w-full min-w-0 h-12 bg-transparent font-body-md text-body-md text-slate-900 placeholder:text-slate-400 focus:outline-none pr-2"
+                className="w-full min-w-0 h-10 sm:h-12 bg-transparent font-body-md text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none pr-1 sm:pr-2"
                 placeholder={isGstActive ? "Search items, SKU, or HSN code..." : "Search items or SKU..."}
                 type="text"
                 value={search}
@@ -480,36 +480,36 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                   title="Clear Search"
                   type="button"
                   onClick={() => setSearch('')}
-                  className="w-10 h-10 mr-1 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 active:bg-surface-container-low transition-colors cursor-pointer"
+                  className="w-8 h-8 sm:w-10 sm:h-10 mr-1 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 active:bg-surface-container-low transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
                 </button>
               )}
             </div>
             <button
               aria-label={showBuyPricesGlobally ? 'Hide Buy Prices' : 'Show Buy Prices'}
               title={showBuyPricesGlobally ? 'Hide Buy Prices (Privacy Mode)' : 'Show Buy Prices'}
-              className={`w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer ${
+              className={`w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer shrink-0 ${
                 !showBuyPricesGlobally ? 'text-slate-500' : 'text-primary'
               }`}
               type="button"
               onClick={toggleGlobalBuyPrice}
             >
-              <span className="material-symbols-outlined text-[20px]">
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                 {showBuyPricesGlobally ? 'visibility' : 'visibility_off'}
               </span>
             </button>
             <button
               aria-label="Filter & Sort Options"
-              className={`relative w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-slate-700 shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer ${
+              className={`relative w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-slate-700 shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer shrink-0 ${
                 activeFilterCount > 0 ? 'border-2 border-secondary text-secondary bg-secondary/5 font-bold' : ''
               }`}
               type="button"
               onClick={() => setIsFilterModalOpen(true)}
             >
-              <span className="material-symbols-outlined text-[20px]">filter_list</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">filter_list</span>
               {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary text-on-secondary text-[10px] font-bold flex items-center justify-center shadow">
+                <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-secondary text-on-secondary text-[9px] sm:text-[10px] font-bold flex items-center justify-center shadow">
                   {activeFilterCount}
                 </span>
               )}
@@ -517,14 +517,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             <button
               aria-label="Print Barcode & QR Sticker Labels"
               title="Print Barcode & QR Sticker Labels"
-              className="w-12 h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer hover:bg-secondary/10"
+              className="w-9 h-9 sm:w-11 sm:h-11 md:w-12 md:h-12 flex items-center justify-center rounded-xl bg-surface-container-lowest text-secondary shadow-sm border border-outline-variant/30 active:bg-surface-container-low transition-colors cursor-pointer hover:bg-secondary/10 shrink-0"
               type="button"
               onClick={() => {
                 setBarcodeModalInitialItem(undefined);
                 setIsBarcodeModalOpen(true);
               }}
             >
-              <span className="material-symbols-outlined text-[22px]">qr_code_2</span>
+              <span className="material-symbols-outlined text-[19px] sm:text-[22px]">qr_code_2</span>
             </button>
           </div>
 

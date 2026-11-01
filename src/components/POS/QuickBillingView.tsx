@@ -876,22 +876,22 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         {/* Top Controls Area (Fixed, not scrolling) */}
         <div className="flex-shrink-0 p-3 pb-2 space-y-2.5 bg-surface border-b border-outline-variant/30">
           {/* Status Ribbon & Quick Tools */}
-          <div className="flex items-center justify-between text-xs text-slate-600">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="inline-flex items-center gap-1.5 bg-secondary-container/60 text-on-secondary-container px-2.5 py-0.5 rounded-full font-bold text-xs">
+          <div className="flex items-center justify-between gap-1 text-xs text-slate-600 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="inline-flex items-center gap-1 bg-secondary-container/60 text-on-secondary-container px-2 py-0.5 rounded-full font-bold text-[11px] sm:text-xs shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
                 POS Counter #01
               </span>
-              <span className="text-slate-600 font-mono text-[11px] font-semibold">
+              <span className="text-slate-600 font-mono text-[10px] sm:text-[11px] font-semibold truncate">
                 Bill #{previewInvoiceNumber}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsHoldModalOpen(true)}
-                className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
+                className={`px-2 py-1 rounded-xl font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer ${
                   heldBills.length > 0
                     ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shadow-sm animate-pulse-gentle'
                     : 'bg-surface-container text-slate-600 hover:text-slate-900 border border-outline-variant/30'
@@ -960,7 +960,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             <button
               type="button"
               onClick={() => setIsScannerOpen(true)}
-              className="h-9 px-3 bg-primary text-on-primary rounded-xl flex items-center gap-1 font-semibold text-xs shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              className="h-9 px-2 sm:px-3 bg-primary text-on-primary rounded-xl flex items-center gap-1 font-semibold text-xs shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
               title="Camera Scanner"
             >
               <span className="material-symbols-outlined text-[16px]">photo_camera</span>
@@ -971,11 +971,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
             <button
               type="button"
               onClick={() => setIsCustomItemModalOpen(true)}
-              className="h-9 px-3 bg-surface-container-lowest text-slate-700 border border-outline-variant/30 hover:border-secondary hover:text-slate-900 rounded-xl flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
+              className="h-9 px-2 sm:px-3 bg-surface-container-lowest text-slate-700 border border-outline-variant/30 hover:border-secondary hover:text-slate-900 rounded-xl flex items-center gap-1 text-xs font-bold shadow-sm active:scale-95 transition-transform flex-shrink-0 cursor-pointer"
               title="Add Custom Line Item (F8)"
             >
               <span className="material-symbols-outlined text-[16px] text-secondary">add_box</span>
-              <span>+ Custom</span>
+              <span className="truncate">+ Custom</span>
             </button>
           </div>
 
@@ -1044,7 +1044,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
         </div>
 
         {/* Catalog Items Container (Scrollable only here) */}
-        <div className="flex-1 overflow-y-auto min-h-0 p-3">
+        <div className="flex-1 overflow-y-auto min-h-0 p-3 pb-28 md:pb-3">
           {filteredItems.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2 bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/40">
               <span className="material-symbols-outlined text-4xl text-slate-400">search_off</span>
@@ -1620,7 +1620,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {/* Mobile Floating Sticky Cart Bar                          */}
       {/* ======================================================== */}
       {cart.length > 0 && !isMobileCartDrawerOpen && (
-        <div className="md:hidden fixed bottom-16 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-2.5 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
+        <div className="md:hidden fixed bottom-20 left-3 right-3 z-40 bg-on-surface text-surface rounded-2xl p-2.5 shadow-2xl flex items-center justify-between animate-fade-in border border-surface-container-highest/20">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-xl bg-secondary text-on-secondary flex items-center justify-center font-black text-xs shadow-sm">
               {totalCartCount}

@@ -60,39 +60,39 @@ export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
       : 'Save Debit Note'
     : isSubmitting
     ? 'Saving Bill...'
-    : 'Save Purchase Bill';
+    : 'Save Bill';
 
   return (
     <aside
       aria-label="Purchase Actions"
       className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest/95 backdrop-blur-xl border-t border-outline-variant/30 shadow-lg pb-safe"
     >
-      <div className="px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 w-full">
-        <div className="flex flex-col">
+      <div className="px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2 sm:gap-3 w-full">
+        <div className="flex flex-col shrink-0">
           <span className="text-[10px] text-on-surface-variant uppercase font-bold tracking-wider">
             {totalLabel}
           </span>
-          <span className={`font-tabular-data font-black text-base sm:text-lg ${amountColor}`}>
+          <span className={`font-tabular-data font-black text-sm sm:text-lg ${amountColor}`}>
             {formatINR(finalGrandTotal)}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {onSaveDraft && (
             <button
               type="button"
               onClick={onSaveDraft}
-              className="h-10 px-3.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95"
+              className="h-10 px-2.5 sm:px-3.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95 shrink-0"
               title="Save current progress as draft"
             >
               <span className="material-symbols-outlined text-[18px]">drafts</span>
-              <span>Save Draft</span>
+              <span className="hidden sm:inline">Save Draft</span>
             </button>
           )}
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer border border-outline-variant/40 active:scale-95"
+            className="h-10 px-2.5 sm:px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs sm:text-sm flex items-center gap-1 transition-all cursor-pointer border border-outline-variant/40 active:scale-95 shrink-0"
           >
             Cancel
           </button>
@@ -101,7 +101,7 @@ export const PurchaseActionDock: React.FC<PurchaseActionDockProps> = ({
             disabled={isSubmitting}
             onClick={onSaveBill}
             data-testid="purchase-save-btn"
-            className={`h-10 px-5 rounded-xl ${saveBtnBg} text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition-all ${
+            className={`h-10 px-3 sm:px-5 rounded-xl ${saveBtnBg} text-white font-bold text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 shadow-sm transition-all shrink-0 ${
               isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-95 cursor-pointer'
             }`}
           >

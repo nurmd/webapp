@@ -90,24 +90,24 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
 
       {/* Quick Sub-Metrics Bar: Sticky Label and Amount on Left, Action Buttons on Right */}
       <div className="flex items-center justify-between gap-2 pt-2 border-t border-outline-variant/20 text-xs flex-wrap sm:flex-nowrap">
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
-            <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Bill:</span>
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 p-1.5 sm:p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
+            <span className="text-slate-600 text-[10px] sm:text-[11px] whitespace-nowrap font-medium">Total Bill:</span>
             <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalBilled)}</span>
           </div>
-          <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
-            <span className="text-slate-600 text-[11px] whitespace-nowrap font-medium">Total Paid:</span>
+          <div className="flex items-center gap-1.5 p-1.5 sm:p-2 rounded-xl bg-slate-50 dark:bg-surface-container-low border border-slate-200/60 shrink-0 whitespace-nowrap">
+            <span className="text-slate-600 text-[10px] sm:text-[11px] whitespace-nowrap font-medium">Total Paid:</span>
             <span className="font-bold text-slate-900 whitespace-nowrap">{formatINR(totalPaid)}</span>
           </div>
         </div>
 
         {(onRecordPayment || onCreateInvoice || onCreatePurchase) && (
-          <div className="flex items-center gap-1.5 ml-auto justify-end shrink-0 md:hidden">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto sm:ml-auto justify-end shrink-0 md:hidden mt-1 sm:mt-0">
             {onRecordPayment && (
               <button
                 type="button"
                 onClick={onRecordPayment}
-                className={`flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs shrink-0 ${
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1 py-1.5 px-2 sm:px-2.5 rounded-xl font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs shrink-0 ${
                   isPaymentOpen
                     ? 'bg-secondary text-on-secondary'
                     : 'bg-secondary/10 text-secondary border border-secondary/25 hover:bg-secondary/20'
@@ -125,7 +125,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onCreateInvoice(party)}
-                  className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 py-1.5 px-2 sm:px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
                   title="Create new sales invoice for this customer"
                 >
                   <span className="material-symbols-outlined text-[16px]">receipt_long</span>
@@ -137,7 +137,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onCreatePurchase(party)}
-                  className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 py-1.5 px-2 sm:px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
                   title="Create new purchase bill from this supplier"
                 >
                   <span className="material-symbols-outlined text-[16px]">shopping_bag</span>
@@ -147,7 +147,7 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
                 <button
                   type="button"
                   onClick={() => onCreateInvoice(party)}
-                  className="flex items-center justify-center gap-1 py-1.5 px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1 py-1.5 px-2 sm:px-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs active:scale-95 transition-all cursor-pointer shadow-xs hover:opacity-90 shrink-0"
                   title="Create new sales invoice"
                 >
                   <span className="material-symbols-outlined text-[16px]">receipt_long</span>

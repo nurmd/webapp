@@ -77,14 +77,14 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
           placeholder="Search by invoice #, note, amount..."
           value={searchTxn}
           onChange={(e) => setSearchTxn(e.target.value)}
-          className="w-full bg-surface-container-low pl-8 pr-7 py-1 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none border border-outline-variant/20"
+          className="w-full bg-surface-container-low pl-8 pr-8 py-1 rounded-xl text-xs text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none border border-outline-variant/20"
         />
         {searchTxn && (
           <button
             type="button"
             onClick={() => setSearchTxn('')}
             aria-label="Clear search"
-            className="absolute right-2 text-on-surface-variant hover:text-on-surface cursor-pointer"
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-on-surface-variant hover:text-on-surface cursor-pointer"
           >
             <span className="material-symbols-outlined text-[13px]">close</span>
           </button>

@@ -648,7 +648,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       )}
 
       {/* Note & Save */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <input
           type="text"
           placeholder="Reference / Note"
@@ -659,7 +659,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         <button
           type="submit"
           disabled={isSubmitDisabled}
-          className={`px-4 py-1.5 text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-50 ${
+          className={`px-4 py-2 sm:py-1.5 text-white text-xs font-bold rounded-xl shadow-xs active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-50 text-center ${
             paymentType === 'IN' ? 'bg-secondary' : 'bg-amber-600'
           }`}
         >

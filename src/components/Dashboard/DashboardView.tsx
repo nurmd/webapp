@@ -924,7 +924,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-1 text-slate-600 group-hover:text-emerald-700 font-bold text-xs group-hover:underline">
-                <span>Passbook</span>
+                <span className="hidden sm:inline">Passbook</span>
                 <span className="material-symbols-outlined text-[15px]">chevron_right</span>
               </div>
             </div>
@@ -1041,7 +1041,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Collapsible Filter Dropdowns Bar */}
-          <div className={`${isFilterExpanded ? 'flex' : 'hidden'} items-center gap-1.5 sm:gap-2 w-full pt-1 transition-all`}>
+          <div className={`${isFilterExpanded ? 'grid grid-cols-1 sm:grid-cols-3' : 'hidden'} gap-1.5 sm:gap-2 w-full pt-1 transition-all`}>
             {/* Entity Type Dropdown */}
             <div className="relative flex-1 min-w-0">
               <select
