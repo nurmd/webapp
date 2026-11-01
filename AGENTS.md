@@ -116,3 +116,18 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 - Whenever modifying frontend code that changes Vite chunk hashes, run `npm run build` before `npm run test:all`; build the APK before publishing.
 
 
+
+---
+
+## Agy Efficiency Guidelines (for implementer)
+- Search first with grep before editing.
+- Batch independent edits; avoid one-edit-at-a-time cycles.
+- Targeted reads only.
+- Run `npx tsc --noEmit` once per batch.
+- Run relevant tests during iteration; full `npm run test:all` only at the end.
+- Never commit generated artifacts; restore after builds.
+- Verify with `git status --short`.
+- Fix root causes; don't blindly retry.
+- Use Ctrl+G for long prompts.
+- Avoid request-review mode delays.
+- Preserve production data and guardrails.
