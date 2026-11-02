@@ -1,5 +1,20 @@
+import { toBlob } from 'html-to-image';
 import { normalizeWhatsAppPhone } from './whatsappIntent.ts';
 import { safeOpenExternalUrl } from './upiAndShare.ts';
+
+/**
+ * Captures a styled HTML thermal preview DOM element to a high-resolution PNG Blob via html-to-image.
+ */
+export async function renderThermalPreviewImage(node: HTMLElement): Promise<Blob> {
+  if (!node) {
+    throw new Error('Target node is missing for thermal preview capture');
+  }
+  const blob = await toBlob(node, { cacheBust: true, pixelRatio: 2 });
+  if (!blob) {
+    throw new Error('html-to-image failed to produce a Blob');
+  }
+  return blob;
+}
 
 /**
  * Renders a thermal receipt text string onto an offscreen canvas and converts it into a PNG Blob.
@@ -73,7 +88,7 @@ export async function shareReceiptImage(
   blob: Blob,
   fileName: string,
   options?: { text?: string; phone?: string }
-): Promise<'shared' | 'downloaded' | 'failed'> {
+): Promise<'shared' | 'downloaded' | 'failed' | 'cancelled'> {
   try {
     const file = new File([blob], fileName, { type: 'image/png' });
 
@@ -83,11 +98,18 @@ export async function shareReceiptImage(
       typeof navigator.canShare === 'function' &&
       navigator.canShare({ files: [file] })
     ) {
-      await navigator.share({
-        files: [file],
-        text: options?.text,
-      });
-      return 'shared';
+      try {
+        await navigator.share({
+          files: [file],
+          text: options?.text,
+        });
+        return 'shared';
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.name === 'NotAllowedError') {
+          return 'cancelled';
+        }
+        return 'failed';
+      }
     }
 
     // 2. Fallback: Trigger client-side file download

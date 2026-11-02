@@ -705,6 +705,27 @@ describe('Print Bridge, A4 Native, and Cash & Bank Suite', () => {
       expect(handlePrintA4).toHaveBeenCalledWith(mockInvoice);
     });
 
+    it('ThermalPrintModal still renders its A4 / PDF button and its share-thermal-image button', () => {
+      act(() => {
+        root.render(
+          <ThermalPrintModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+            onPrintA4={vi.fn()}
+          />
+        );
+      });
+
+      const buttons = Array.from(container.querySelectorAll('button'));
+      const a4Btn = buttons.find((b) => b.textContent?.includes('A4 / PDF'));
+      expect(a4Btn).toBeDefined();
+
+      const shareThermalBtn = container.querySelector('[data-testid="share-thermal-image"]');
+      expect(shareThermalBtn).not.toBeNull();
+      expect(shareThermalBtn?.textContent).toContain('Share Image');
+    });
+
     it('SimplifiedInvoiceModal omits A4 / PDF button even if onOpenFullA4Preview prop is passed', () => {
       const handleOpenA4 = vi.fn();
       act(() => {

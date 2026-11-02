@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import {
-  formatThermalReceiptText,
   ThermalReceiptData,
 } from '../../core/printer/escpos.ts';
 import {
@@ -10,14 +9,19 @@ import {
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
-import { inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
 import {
+  renderThermalPreviewImage,
   renderThermalReceiptImage,
   shareReceiptImage,
 } from '../../core/utils/receiptImageShare.ts';
+import {
+  buildThermalReceiptData,
+  buildThermalReceiptText,
+} from '../../core/utils/thermalReceiptText.ts';
+import { ThermalReceiptPreview } from './ThermalReceiptPreview.tsx';
 import { showAppToast } from '../../services/toast.ts';
 
 export interface ThermalPrintModalProps {
@@ -53,6 +57,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const [isSharingImage, setIsSharingImage] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const thermalPreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -78,77 +83,15 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     );
   }, [invoice.partyId, invoice.partyName]);
 
-  const isDeliveryChallan = invoice.invoiceType === 'DELIVERY_CHALLAN';
-  const challanPurpose = invoice.challanType === 'SUPPLY_ON_APPROVAL'
-    ? 'Supply on approval'
-    : invoice.challanType === 'JOB_WORK'
-    ? 'Job work'
-    : invoice.challanType === 'OTHERS'
-    ? 'Others'
-    : invoice.challanType === 'FOR_REMOVAL'
-    ? 'For removal'
-    : undefined;
+  const receiptData = useMemo(
+    () => buildThermalReceiptData(invoice, company),
+    [invoice, company]
+  );
 
-  const receiptData: ThermalReceiptData = {
-    companyName: thermalSettings.customStoreName || company.tradeName || company.businessName,
-    companyAddress: thermalSettings.showAddress ? company.address : '',
-    gstin: thermalSettings.showGstin ? company.gstin : '',
-    isGst: company.isGstEnabled !== false,
-    phone: thermalSettings.showPhone ? company.phone : '',
-    receiptTitle: isDeliveryChallan
-      ? 'DELIVERY CHALLAN'
-      : company.isCompositionScheme
-      ? (!thermalSettings.receiptTitle || thermalSettings.receiptTitle === 'TAX INVOICE' || thermalSettings.receiptTitle === 'RETAIL INVOICE' ? 'Bill of Supply' : thermalSettings.receiptTitle)
-      : thermalSettings.receiptTitle,
-    invoiceNo: invoice.invoiceNumber,
-    date: invoice.date,
-    customerName: invoice.partyName,
-    customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
-    items: invoice.items.map((i) => {
-      const stored = Number(i.unitPriceInclusive);
-      const isGstActive = company.isGstEnabled !== false && !company.isCompositionScheme;
-      const rateInclusive =
-        Number.isFinite(stored) && stored > 0
-          ? stored
-          : isGstActive
-          ? inclusiveFromExclusive(i.unitPrice, i.gstRate || 0)
-          : undefined;
-      return {
-        name: i.name,
-        qty: i.quantity,
-        rate: i.unitPrice,
-        rateInclusive,
-        cessRate: i.cessRate,
-        amount: i.totalAmount,
-      };
-    }),
-    taxableAmount: invoice.totalTaxableAmount,
-    totalDiscount: thermalSettings.showItemDiscount ? invoice.totalDiscount : 0,
-    cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalCgst : 0,
-    sgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalSgst : 0,
-    igstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalIgst : 0,
-    totalCess:
-      !company.isCompositionScheme && thermalSettings.showTaxBreakdown
-        ? invoice.totalCess
-        : 0,
-    shippingAmount: invoice.shippingAmount,
-    roundOff: invoice.roundOff,
-    grandTotal: invoice.grandTotal,
-    paidAmount: isDeliveryChallan ? undefined : invoice.paidAmount,
-    balanceAmount: isDeliveryChallan ? undefined : (thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined),
-    partyBalance: isDeliveryChallan ? undefined : (thermalSettings.showPartyBalance && party ? party.currentBalance : undefined),
-    paymentSplits: isDeliveryChallan ? undefined : invoice.paymentSplits,
-    upiId: isDeliveryChallan ? undefined : (thermalSettings.showUpiQr ? company.upiId : undefined),
-    terms: thermalSettings.greetingText || company.termsAndConditions,
-    isCompositionScheme: Boolean(company.isCompositionScheme),
-    isDeliveryChallan,
-    challanPurpose,
-    vehicleNumber: invoice.vehicleNumber,
-  };
-
-  const previewText = formatThermalReceiptText(receiptData, width, {
-    showPartyBalance: thermalSettings.showPartyBalance,
-  });
+  const previewText = useMemo(
+    () => buildThermalReceiptText(invoice, company, width),
+    [invoice, company, width]
+  );
 
   const [printersList, setPrintersList] = useState<{ name: string; address: string }[]>([]);
 
@@ -268,13 +211,26 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const handleShareImage = async () => {
     setIsSharingImage(true);
     try {
-      const blob = await renderThermalReceiptImage(previewText, width);
+      let blob: Blob | null = null;
+      if (thermalPreviewRef.current) {
+        try {
+          blob = await renderThermalPreviewImage(thermalPreviewRef.current);
+        } catch (_domErr) {
+          blob = null;
+        }
+      }
+      if (!blob) {
+        blob = await renderThermalReceiptImage(previewText, width);
+      }
+
       const fileName = `Receipt-${invoice.invoiceNumber || 'Document'}.png`;
       const res = await shareReceiptImage(blob, fileName, { phone: party?.phone });
       if (res === 'shared') {
         showAppToast('Receipt image shared.');
       } else if (res === 'downloaded') {
         showAppToast('Receipt image saved. Attach it in the WhatsApp chat.');
+      } else if (res === 'cancelled') {
+        showAppToast('Share cancelled.');
       } else {
         showAppToast('Could not create the receipt image.');
       }
@@ -394,15 +350,11 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
               </div>
             ) : (
               <div className="flex justify-center p-2 bg-surface-container-low/60 rounded-2xl border border-outline-variant/20">
-                <div
-                  className={`w-full ${
-                    width === 32 ? 'max-w-[320px]' : 'max-w-[420px]'
-                  } bg-[#fefdfb] text-slate-950 p-3.5 sm:p-4 rounded-xl border border-stone-300 shadow-md font-mono ${
-                    width === 32 ? 'text-[11px]' : 'text-[10px]'
-                  } leading-relaxed overflow-x-auto whitespace-pre select-text font-bold transition-all`}
-                >
-                  {previewText}
-                </div>
+                <ThermalReceiptPreview
+                  ref={thermalPreviewRef}
+                  previewText={previewText}
+                  width={width}
+                />
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import {
@@ -14,6 +14,13 @@ import {
 import { isDemoModeActive } from '../../core/utils/demoMode.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import {
+  renderThermalPreviewImage,
+  renderThermalReceiptImage,
+  shareReceiptImage,
+} from '../../core/utils/receiptImageShare.ts';
+import { buildThermalReceiptText } from '../../core/utils/thermalReceiptText.ts';
+import { ThermalReceiptPreview } from '../Printing/ThermalReceiptPreview.tsx';
 
 interface WhatsAppShareModalProps {
   invoice: Invoice;
@@ -44,6 +51,19 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [phone, setPhone] = useState(resolvedPhone);
   const [phoneError, setPhoneError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isSharingImage, setIsSharingImage] = useState(false);
+  const [paperWidth, setPaperWidth] = useState<32 | 48>(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const val = Number(localStorage.getItem('printer_paper_width'));
+        if (val === 32 || val === 48) return val;
+      }
+    } catch {
+      // Fallback
+    }
+    return 32;
+  });
+  const thermalPreviewRef = useRef<HTMLDivElement>(null);
 
   const messagePreview = formatWhatsAppMessage(company, invoice, {
     language,
@@ -59,6 +79,54 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       setTimeout(() => setCopied(false), 2500);
     } else {
       showAppToast('Unable to access clipboard.');
+    }
+  };
+
+  const handleShareImage = async () => {
+    setIsSharingImage(true);
+    try {
+      let width: 32 | 48 = 32;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const val = Number(localStorage.getItem('printer_paper_width'));
+          if (val === 32 || val === 48) {
+            width = val;
+          }
+        }
+      } catch {
+        // Fallback to 32
+      }
+      setPaperWidth(width);
+
+      const receiptText = buildThermalReceiptText(invoice, company, width);
+      let blob: Blob | null = null;
+      if (thermalPreviewRef.current) {
+        try {
+          blob = await renderThermalPreviewImage(thermalPreviewRef.current);
+        } catch (_domErr) {
+          blob = null;
+        }
+      }
+      if (!blob) {
+        blob = await renderThermalReceiptImage(receiptText, width);
+      }
+
+      const fileName = `Receipt-${invoice.invoiceNumber || 'Document'}.png`;
+      const res = await shareReceiptImage(blob, fileName, { text: messagePreview, phone });
+
+      if (res === 'shared') {
+        showAppToast('Receipt image shared.');
+      } else if (res === 'downloaded') {
+        showAppToast('Receipt image saved. Attach it in the WhatsApp chat.');
+      } else if (res === 'cancelled') {
+        showAppToast('Share cancelled.');
+      } else {
+        showAppToast('Could not create the receipt image.');
+      }
+    } catch (_err) {
+      showAppToast('Could not create the receipt image.');
+    } finally {
+      setIsSharingImage(false);
     }
   };
 
@@ -258,7 +326,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             Cancel
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <button
               type="button"
               data-testid="whatsapp-copy-button"
@@ -273,6 +341,29 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
             <button
               type="button"
+              data-testid="whatsapp-share-image-button"
+              disabled={isSharingImage}
+              onClick={handleShareImage}
+              className="px-4 py-2 bg-[#25D366] hover:bg-[#20bd5a] disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              title="Share thermal receipt image"
+            >
+              {isSharingImage ? (
+                <>
+                  <span className="material-symbols-outlined text-[16px] animate-spin">
+                    progress_activity
+                  </span>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[16px]">share</span>
+                  <span>Share Image</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
               data-testid="whatsapp-send-button"
               onClick={handleSend}
               className="px-6 py-2.5 bg-[#25D366] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#20bd5a] active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
@@ -281,6 +372,18 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
               <span>Send on WhatsApp</span>
             </button>
           </div>
+        </div>
+
+        {/* Hidden thermal preview node for high-fidelity html-to-image capture */}
+        <div
+          aria-hidden="true"
+          className="fixed -left-[9999px] -top-[9999px] pointer-events-none opacity-0"
+        >
+          <ThermalReceiptPreview
+            ref={thermalPreviewRef}
+            previewText={buildThermalReceiptText(invoice, company, paperWidth)}
+            width={paperWidth}
+          />
         </div>
       </div>
     </div>

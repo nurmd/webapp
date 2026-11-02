@@ -40,6 +40,8 @@ import { CompanyProfile } from '../models/company.ts';
 import { Invoice } from '../models/invoice.ts';
 import { resetBackNavigationForTesting } from '../core/utils/backNavigation.ts';
 import { POUCH_PERSIST_KEYS } from '../services/db/localDbConstants.ts';
+import * as receiptImageShare from '../core/utils/receiptImageShare.ts';
+import * as toastService from '../services/toast.ts';
 
 const mockCompany: CompanyProfile = {
   id: 'COMP-1',
@@ -528,6 +530,127 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       const warning = container.querySelector('[data-testid="whatsapp-demo-warning"]');
       expect(warning).not.toBeNull();
       expect(warning?.textContent).toContain('Demo Mode: this message uses demo data');
+    });
+
+    it('renders whatsapp-share-image-button in footer', () => {
+      act(() => {
+        root.render(
+          <FolderWhatsAppShareModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      expect(shareImgBtn).not.toBeNull();
+      expect(shareImgBtn.textContent).toContain('Share Image');
+      expect(shareImgBtn.disabled).toBe(false);
+    });
+
+    it('clicking whatsapp-share-image-button captures thermal preview DOM and shows success toast', async () => {
+      const fakeBlob = new Blob(['fake-receipt'], { type: 'image/png' });
+      const previewSpy = vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+      const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
+      const toastSpy = vi.spyOn(toastService, 'showAppToast');
+
+      act(() => {
+        root.render(
+          <FolderWhatsAppShareModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      expect(shareImgBtn).not.toBeNull();
+
+      await act(async () => {
+        shareImgBtn.click();
+      });
+
+      expect(previewSpy).toHaveBeenCalledWith(expect.any(HTMLElement));
+      expect(shareSpy).toHaveBeenCalledWith(
+        fakeBlob,
+        `Receipt-${mockInvoice.invoiceNumber}.png`,
+        expect.objectContaining({
+          phone: '9876543210',
+        })
+      );
+      expect(toastSpy).toHaveBeenCalledWith('Receipt image shared.');
+    });
+
+    it('falls back to canvas renderThermalReceiptImage when DOM capture fails in WhatsAppShareModal', async () => {
+      vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockRejectedValue(new Error('DOM capture failed'));
+      const fallbackBlob = new Blob(['fallback-canvas'], { type: 'image/png' });
+      const canvasSpy = vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(fallbackBlob);
+      const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
+
+      act(() => {
+        root.render(
+          <FolderWhatsAppShareModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      await act(async () => {
+        shareImgBtn.click();
+      });
+
+      expect(canvasSpy).toHaveBeenCalled();
+      expect(shareSpy).toHaveBeenCalledWith(
+        fallbackBlob,
+        `Receipt-${mockInvoice.invoiceNumber}.png`,
+        expect.objectContaining({
+          phone: '9876543210',
+        })
+      );
+    });
+
+    it('handles downloaded, cancelled, and failed share responses with corresponding toasts', async () => {
+      const fakeBlob = new Blob(['fake-receipt'], { type: 'image/png' });
+      vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+      vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(fakeBlob);
+      const toastSpy = vi.spyOn(toastService, 'showAppToast');
+
+      // 1. Downloaded fallback
+      const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('downloaded');
+      act(() => {
+        root.render(
+          <FolderWhatsAppShareModal
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      await act(async () => {
+        shareImgBtn.click();
+      });
+      expect(toastSpy).toHaveBeenCalledWith('Receipt image saved. Attach it in the WhatsApp chat.');
+
+      // 2. Cancelled
+      shareSpy.mockResolvedValue('cancelled');
+      await act(async () => {
+        shareImgBtn.click();
+      });
+      expect(toastSpy).toHaveBeenCalledWith('Share cancelled.');
+
+      // 3. Failed
+      shareSpy.mockResolvedValue('failed');
+      await act(async () => {
+        shareImgBtn.click();
+      });
+      expect(toastSpy).toHaveBeenCalledWith('Could not create the receipt image.');
     });
   });
 

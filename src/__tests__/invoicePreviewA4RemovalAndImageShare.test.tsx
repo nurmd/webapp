@@ -192,9 +192,9 @@ describe('Invoice Preview A4 Removal & Thermal Image Share', () => {
 
   // 4. ThermalPrintModal renders Share Image button and triggers share flow
   it('4. ThermalPrintModal renders Share Image button and triggers share flow', async () => {
-    const renderReceiptSpy = vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(
-      new Blob(['fake-image'], { type: 'image/png' })
-    );
+    const fakeBlob = new Blob(['fake-image'], { type: 'image/png' });
+    const previewSpy = vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+    const renderReceiptSpy = vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(fakeBlob);
     const shareReceiptSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
     const toastSpy = vi.spyOn(toastService, 'showAppToast');
 
@@ -217,7 +217,7 @@ describe('Invoice Preview A4 Removal & Thermal Image Share', () => {
       shareBtn?.click();
     });
 
-    expect(renderReceiptSpy).toHaveBeenCalled();
+    expect(previewSpy.mock.calls.length + renderReceiptSpy.mock.calls.length).toBeGreaterThan(0);
     expect(shareReceiptSpy).toHaveBeenCalled();
     expect(toastSpy).toHaveBeenCalledWith('Receipt image shared.');
   });
@@ -347,6 +347,33 @@ describe('Invoice Preview A4 Removal & Thermal Image Share', () => {
       try {
         const result = await shareReceiptImage(fakeBlob, 'test.png');
         expect(result).toBe('failed');
+      } finally {
+        nav.canShare = origCanShare;
+        nav.share = origShare;
+      }
+    });
+
+    it('returns "cancelled" when navigator.share throws AbortError or NotAllowedError', async () => {
+      const nav = window.navigator as any;
+      const origCanShare = nav.canShare;
+      const origShare = nav.share;
+
+      nav.canShare = vi.fn().mockReturnValue(true);
+
+      const abortError = new Error('The user aborted the share operation.');
+      abortError.name = 'AbortError';
+      nav.share = vi.fn().mockRejectedValue(abortError);
+
+      try {
+        const result1 = await shareReceiptImage(fakeBlob, 'test.png');
+        expect(result1).toBe('cancelled');
+
+        const notAllowedError = new Error('Permission denied.');
+        notAllowedError.name = 'NotAllowedError';
+        nav.share = vi.fn().mockRejectedValue(notAllowedError);
+
+        const result2 = await shareReceiptImage(fakeBlob, 'test.png');
+        expect(result2).toBe('cancelled');
       } finally {
         nav.canShare = origCanShare;
         nav.share = origShare;
