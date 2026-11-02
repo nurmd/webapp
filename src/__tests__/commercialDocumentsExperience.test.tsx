@@ -250,6 +250,11 @@ describe('Commercial Documents Dedicated Experience & Scoped Drafts', () => {
             onOpenDueDateModal={() => {}}
             onAutoFixConflict={() => {}}
             invoiceType="CREDIT_NOTE"
+            parentInvoiceOptions={[
+              { id: 'inv-456', invoiceNumber: 'INV-456', partyName: 'Test Customer', date: '2026-10-10', balanceAmount: 4500 },
+            ]}
+            originalInvoiceId="inv-456"
+            onParentInvoiceChange={() => {}}
             originalInvoiceNumber={origInv}
             onOriginalInvoiceNumberChange={(v) => { origInv = v; }}
             originalInvoiceDate={origDate}
@@ -266,9 +271,13 @@ describe('Commercial Documents Dedicated Experience & Scoped Drafts', () => {
 
       // Return Reference fields
       expect(container.textContent).toContain('Orig Inv #:');
-      const origInvInput = container.querySelector('input[placeholder="e.g. INV-001"]') as HTMLInputElement;
-      expect(origInvInput).not.toBeNull();
-      expect(origInvInput.value).toBe('INV-456');
+      const parentInvoiceSelect = container.querySelector(
+        'select[data-testid="parent-invoice-select"]'
+      ) as HTMLSelectElement | null;
+      expect(parentInvoiceSelect).not.toBeNull();
+      expect(parentInvoiceSelect?.value).toBe('inv-456');
+      expect(parentInvoiceSelect?.textContent).toContain('#INV-456');
+      expect(parentInvoiceSelect?.textContent).toContain('No parent invoice');
 
       expect(container.textContent).toContain('Orig Date:');
       expect(container.textContent).toContain('Reason:');
