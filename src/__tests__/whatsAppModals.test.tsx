@@ -572,7 +572,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         shareImgBtn.click();
       });
 
-      expect(previewSpy).toHaveBeenCalledWith(expect.any(HTMLElement));
+      expect(previewSpy).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        expect.any(String),
+        expect.any(Number)
+      );
       expect(shareSpy).toHaveBeenCalledWith(
         fakeBlob,
         `Receipt-${mockInvoice.invoiceNumber}.png`,
@@ -651,6 +655,43 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         shareImgBtn.click();
       });
       expect(toastSpy).toHaveBeenCalledWith('Could not create the receipt image.');
+      shareSpy.mockRestore();
+    });
+
+    it('invokes AndroidBridge.shareImage when clicking whatsapp-share-image-button if bridge is present', async () => {
+      const shareMock = vi.fn();
+      (window as any).AndroidBridge = { shareImage: shareMock };
+      const fakeBlob = new Blob(['whatsapp-modal-receipt'], { type: 'image/png' });
+      vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+      const toastSpy = vi.spyOn(toastService, 'showAppToast');
+
+      try {
+        act(() => {
+          root.render(
+            <FolderWhatsAppShareModal
+              invoice={mockInvoice}
+              company={mockCompany}
+              onClose={vi.fn()}
+            />
+          );
+        });
+
+        const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+        await act(async () => {
+          shareImgBtn.click();
+          await vi.waitFor(() => {
+            expect(shareMock).toHaveBeenCalledWith(
+              btoa('whatsapp-modal-receipt'),
+              `Receipt-${mockInvoice.invoiceNumber}.png`,
+              'Share receipt image',
+              '9876543210'
+            );
+          });
+        });
+        expect(toastSpy).toHaveBeenCalledWith('Receipt image shared.');
+      } finally {
+        delete (window as any).AndroidBridge;
+      }
     });
   });
 

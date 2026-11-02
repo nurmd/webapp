@@ -7,6 +7,8 @@ import {
   renderThermalPreviewImage,
   renderThermalReceiptImage,
   shareReceiptImage,
+  blobToBase64,
+  shareImageNative,
 } from '../core/utils/receiptImageShare.ts';
 import * as receiptImageShare from '../core/utils/receiptImageShare.ts';
 import {
@@ -197,7 +199,11 @@ describe('Thermal Preview & Receipt Image Share Suite', () => {
         shareBtn?.click();
       });
 
-      expect(previewSpy).toHaveBeenCalledWith(expect.any(HTMLElement));
+      expect(previewSpy).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        expect.any(String),
+        expect.any(Number)
+      );
       expect(shareSpy).toHaveBeenCalledWith(fakeBlob, expect.any(String), expect.any(Object));
       expect(toastSpy).toHaveBeenCalledWith('Receipt image shared.');
     });
@@ -226,11 +232,50 @@ describe('Thermal Preview & Receipt Image Share Suite', () => {
       expect(fallbackSpy).toHaveBeenCalled();
       expect(shareSpy).toHaveBeenCalledWith(fallbackBlob, expect.any(String), expect.any(Object));
     });
+
+    it('invokes AndroidBridge.shareImage when clicking Share Image in ThermalPrintModal if bridge is present', async () => {
+      vi.spyOn(db, 'getParties').mockReturnValue([
+        { id: 'PARTY-1', name: 'Tata Motors Limited', phone: '9876543210' } as any,
+      ]);
+      const shareMock = vi.fn();
+      (window as any).AndroidBridge = { shareImage: shareMock };
+      const fakeBlob = new Blob(['thermal-modal-receipt'], { type: 'image/png' });
+      vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+      const toastSpy = vi.spyOn(toastService, 'showAppToast');
+
+      try {
+        act(() => {
+          root.render(
+            <ThermalPrintModal
+              invoice={mockInvoice}
+              company={mockCompany}
+              onClose={vi.fn()}
+            />
+          );
+        });
+
+        const shareBtn = container.querySelector<HTMLButtonElement>('[data-testid="share-thermal-image"]');
+        await act(async () => {
+          shareBtn?.click();
+          await vi.waitFor(() => {
+            expect(shareMock).toHaveBeenCalledWith(
+              btoa('thermal-modal-receipt'),
+              `Receipt-${mockInvoice.invoiceNumber}.png`,
+              'Share receipt image',
+              '9876543210'
+            );
+          });
+        });
+        expect(toastSpy).toHaveBeenCalledWith('Receipt image shared.');
+      } finally {
+        delete (window as any).AndroidBridge;
+      }
+    });
   });
 
   describe('receiptImageShare utilities', () => {
     it('renderThermalPreviewImage calls toBlob from html-to-image with cacheBust and pixelRatio', async () => {
-      const fakeBlob = new Blob(['preview-image'], { type: 'image/png' });
+      const fakeBlob = new Blob([new Uint8Array(2048)], { type: 'image/png' });
       const toBlobSpy = vi.spyOn(htmlToImage, 'toBlob').mockResolvedValue(fakeBlob);
       const testNode = document.createElement('div');
 
@@ -240,6 +285,43 @@ describe('Thermal Preview & Receipt Image Share Suite', () => {
         cacheBust: true,
         pixelRatio: 2,
       });
+    });
+
+    it('renderThermalPreviewImage falls back to canvas when toBlob returns suspiciously small blob (<1KB)', async () => {
+      const tinyBlob = new Blob(['too small'], { type: 'image/png' }); // 9 bytes
+      vi.spyOn(htmlToImage, 'toBlob').mockResolvedValue(tinyBlob);
+
+      const origCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        if (tagName === 'canvas') {
+          return {
+            set width(_: number) {},
+            get width() { return 576; },
+            set height(_: number) {},
+            get height() { return 100; },
+            getContext: (type: string) => {
+              if (type === '2d') {
+                return {
+                  fillRect: vi.fn(),
+                  fillText: vi.fn(),
+                  fillStyle: '',
+                  font: '',
+                  textBaseline: '',
+                };
+              }
+              return null;
+            },
+            toBlob: (cb: (b: Blob | null) => void) => {
+              cb(new Blob(['fallback-canvas-blob'], { type: 'image/png' }));
+            },
+          } as any;
+        }
+        return origCreateElement(tagName);
+      });
+
+      const testNode = document.createElement('div');
+      const result = await renderThermalPreviewImage(testNode, 'FALLBACK TEXT', 32);
+      expect(result).toBeInstanceOf(Blob);
     });
 
     it('renderThermalPreviewImage rejects when node is missing or toBlob returns null', async () => {
@@ -315,6 +397,68 @@ describe('Thermal Preview & Receipt Image Share Suite', () => {
         expect(res).toBe('cancelled');
       } finally {
         nav.canShare = origCanShare;
+        nav.share = origShare;
+      }
+    });
+
+    it('blobToBase64 converts a blob to a raw base64 string without data URL prefix', async () => {
+      const testBlob = new Blob(['hello world'], { type: 'text/plain' });
+      const base64 = await blobToBase64(testBlob);
+      expect(base64).toBe(btoa('hello world'));
+      expect(base64).not.toContain('data:');
+    });
+
+    it('shareImageNative returns false when AndroidBridge is absent or lacks shareImage', async () => {
+      delete (window as any).AndroidBridge;
+      const testBlob = new Blob(['sample'], { type: 'image/png' });
+      const res1 = await shareImageNative(testBlob, 'receipt.png');
+      expect(res1).toBe(false);
+
+      (window as any).AndroidBridge = {};
+      const res2 = await shareImageNative(testBlob, 'receipt.png');
+      expect(res2).toBe(false);
+      delete (window as any).AndroidBridge;
+    });
+
+    it('shareImageNative invokes AndroidBridge.shareImage with base64 and returns true', async () => {
+      const shareMock = vi.fn();
+      (window as any).AndroidBridge = { shareImage: shareMock };
+      try {
+        const testBlob = new Blob(['sample-content'], { type: 'image/png' });
+        const res = await shareImageNative(testBlob, 'receipt.png', '9876543210');
+        expect(res).toBe(true);
+        expect(shareMock).toHaveBeenCalledWith(
+          btoa('sample-content'),
+          'receipt.png',
+          'Share receipt image',
+          '9876543210'
+        );
+      } finally {
+        delete (window as any).AndroidBridge;
+      }
+    });
+
+    it('shareReceiptImage dispatches to AndroidBridge.shareImage before Web Share when bridge is present', async () => {
+      const shareMock = vi.fn();
+      (window as any).AndroidBridge = { shareImage: shareMock };
+      const nav = window.navigator as any;
+      const origShare = nav.share;
+      const webShareSpy = vi.fn();
+      nav.share = webShareSpy;
+
+      try {
+        const testBlob = new Blob(['bridge-receipt'], { type: 'image/png' });
+        const res = await shareReceiptImage(testBlob, 'Receipt-INV-101.png', { phone: '9876543210' });
+        expect(res).toBe('shared');
+        expect(shareMock).toHaveBeenCalledWith(
+          btoa('bridge-receipt'),
+          'Receipt-INV-101.png',
+          'Share receipt image',
+          '9876543210'
+        );
+        expect(webShareSpy).not.toHaveBeenCalled();
+      } finally {
+        delete (window as any).AndroidBridge;
         nav.share = origShare;
       }
     });

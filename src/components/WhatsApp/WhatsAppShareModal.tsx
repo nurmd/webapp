@@ -102,8 +102,9 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       let blob: Blob | null = null;
       if (thermalPreviewRef.current) {
         try {
-          blob = await renderThermalPreviewImage(thermalPreviewRef.current);
-        } catch (_domErr) {
+          blob = await renderThermalPreviewImage(thermalPreviewRef.current, receiptText, width);
+        } catch (err: any) {
+          console.warn('[share] dom capture failed:', err);
           blob = null;
         }
       }
@@ -116,6 +117,8 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
 
       if (res === 'shared') {
         showAppToast('Receipt image shared.');
+      } else if (res === 'copied') {
+        showAppToast('Receipt image copied to clipboard. Paste it in WhatsApp.');
       } else if (res === 'downloaded') {
         showAppToast('Receipt image saved. Attach it in the WhatsApp chat.');
       } else if (res === 'cancelled') {
@@ -123,8 +126,10 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       } else {
         showAppToast('Could not create the receipt image.');
       }
-    } catch (_err) {
-      showAppToast('Could not create the receipt image.');
+    } catch (err: any) {
+      console.warn('[share] dom capture failed:', err);
+      const detail = err?.message ? `: ${err.message}` : '';
+      showAppToast(`Could not create the receipt image${detail}.`);
     } finally {
       setIsSharingImage(false);
     }
@@ -377,7 +382,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         {/* Hidden thermal preview node for high-fidelity html-to-image capture */}
         <div
           aria-hidden="true"
-          className="fixed -left-[9999px] -top-[9999px] pointer-events-none opacity-0"
+          className="fixed -left-[9999px] top-0 pointer-events-none"
         >
           <ThermalReceiptPreview
             ref={thermalPreviewRef}

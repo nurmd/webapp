@@ -694,6 +694,70 @@ class AndroidBridge(
     }
 
     @JavascriptInterface
+    fun shareImage(base64Png: String, fileName: String, chooserTitle: String) {
+        shareImage(base64Png, fileName, chooserTitle, "")
+    }
+
+    @JavascriptInterface
+    fun shareImage(base64Png: String, fileName: String, chooserTitle: String, phone: String?) {
+        (context as? Activity)?.runOnUiThread {
+            try {
+                val safeName = fileName.trim().ifBlank { "receipt.png" }
+                    .replace(Regex("[^a-zA-Z0-9._-]"), "_")
+                val imageFile = File(context.cacheDir, safeName)
+                val rawBase64 = if (base64Png.contains(",")) base64Png.substringAfter(",") else base64Png
+                val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+                FileOutputStream(imageFile).use { it.write(bytes) }
+                val contentUri = FileProvider.getUriForFile(
+                    context,
+                    "com.gstbilling.pos.fileprovider",
+                    imageFile
+                )
+                val safePhone = phone?.trim() ?: ""
+                val caption = if (safePhone.isNotEmpty()) "Receipt for $safePhone" else ""
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    putExtra(Intent.EXTRA_TEXT, caption)
+                    clipData = android.content.ClipData.newRawUri("receipt", contentUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                // Try to target WhatsApp directly:
+                val waIntent = Intent(intent).apply {
+                    setPackage("com.whatsapp")
+                    clipData = intent.clipData
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                if (waIntent.resolveActivity(context.packageManager) != null) {
+                    waIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(waIntent)
+                    return@runOnUiThread
+                }
+
+                // WhatsApp Business
+                val waBizIntent = Intent(intent).apply {
+                    setPackage("com.whatsapp.w4b")
+                    clipData = intent.clipData
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                if (waBizIntent.resolveActivity(context.packageManager) != null) {
+                    waBizIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(waBizIntent)
+                    return@runOnUiThread
+                }
+
+                // Fallback: chooser
+                val chooser = Intent.createChooser(intent, chooserTitle.ifBlank { "Share receipt" })
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Share failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun exitApp() {
         (context as? Activity)?.let { act ->
             act.runOnUiThread {

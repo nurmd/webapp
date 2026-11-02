@@ -214,8 +214,9 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       let blob: Blob | null = null;
       if (thermalPreviewRef.current) {
         try {
-          blob = await renderThermalPreviewImage(thermalPreviewRef.current);
-        } catch (_domErr) {
+          blob = await renderThermalPreviewImage(thermalPreviewRef.current, previewText, width);
+        } catch (err: any) {
+          console.warn('[share] dom capture failed:', err);
           blob = null;
         }
       }
@@ -227,6 +228,8 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       const res = await shareReceiptImage(blob, fileName, { phone: party?.phone });
       if (res === 'shared') {
         showAppToast('Receipt image shared.');
+      } else if (res === 'copied') {
+        showAppToast('Receipt image copied to clipboard. Paste it in WhatsApp.');
       } else if (res === 'downloaded') {
         showAppToast('Receipt image saved. Attach it in the WhatsApp chat.');
       } else if (res === 'cancelled') {
@@ -234,8 +237,10 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
       } else {
         showAppToast('Could not create the receipt image.');
       }
-    } catch (_err) {
-      showAppToast('Could not create the receipt image.');
+    } catch (err: any) {
+      console.warn('[share] dom capture failed:', err);
+      const detail = err?.message ? `: ${err.message}` : '';
+      showAppToast(`Could not create the receipt image${detail}.`);
     } finally {
       setIsSharingImage(false);
     }
