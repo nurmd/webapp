@@ -335,6 +335,201 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(warning).not.toBeNull();
       expect(warning?.textContent).toContain('Demo Mode: this message uses demo data');
     });
+
+    it('tab control renders both tabs when invoice is passed', () => {
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            onClose={vi.fn()}
+            company={mockCompany}
+            invoice={mockInvoice}
+          />
+        );
+      });
+
+      const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]');
+      const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]');
+      expect(textTab).not.toBeNull();
+      expect(textTab?.textContent).toContain('Text Message');
+      expect(imgTab).not.toBeNull();
+      expect(imgTab?.textContent).toContain('Receipt Image');
+    });
+
+    it('no tabs when only party is passed without invoice or paymentReceiptParams', () => {
+      const mockParty = {
+        id: 'PTY-1',
+        name: 'Rajesh Kumar',
+        phone: '9876543210',
+        type: 'CUSTOMER' as const,
+      };
+
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            onClose={vi.fn()}
+            company={mockCompany}
+            party={mockParty as any}
+          />
+        );
+      });
+
+      expect(container.querySelector('[data-testid="whatsapp-tab-text"]')).toBeNull();
+      expect(container.querySelector('[data-testid="whatsapp-tab-image"]')).toBeNull();
+    });
+
+    it('switching to Receipt Image shows whatsapp-share-image-button', () => {
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            onClose={vi.fn()}
+            company={mockCompany}
+            invoice={mockInvoice}
+          />
+        );
+      });
+
+      const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]') as HTMLButtonElement;
+      act(() => {
+        imgTab.click();
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      expect(shareImgBtn).not.toBeNull();
+      expect(shareImgBtn.textContent).toContain('Share Image');
+      expect(shareImgBtn.disabled).toBe(false);
+
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).toBeNull();
+    });
+
+    it('The Share Image caption contains Bill Amount: and Total Balance Due:', async () => {
+      const fakeBlob = new Blob(['fake-receipt'], { type: 'image/png' });
+      vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
+      const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
+
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            invoice={{ ...mockInvoice, grandTotal: 2950, balanceAmount: 1500 }}
+            company={mockCompany}
+            initialBalance={1800}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]') as HTMLButtonElement;
+      act(() => {
+        imgTab.click();
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      await act(async () => {
+        shareImgBtn.click();
+      });
+
+      expect(shareSpy).toHaveBeenCalledWith(
+        fakeBlob,
+        `Receipt-${mockInvoice.invoiceNumber}.png`,
+        expect.objectContaining({
+          text: expect.stringMatching(/Bill Amount:\s*₹2950[\s\S]*Total Balance Due:\s*₹1800/),
+        })
+      );
+    });
+
+    it('payment share (no invoice) renders Text/Receipt Image tabs and placeholder', () => {
+      const paymentParams = {
+        companyName: 'Sharma General Store',
+        heading: 'Payment In Receipt',
+        docNumber: 'REC-001',
+        amount: 2500,
+        partyName: 'Rajesh Kumar',
+        partyBalance: 1200,
+      };
+
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            company={mockCompany}
+            paymentShareText="*Payment In Receipt*\n*Amount:* ₹2,500.00\n*Total Balance Due:* ₹1,200.00"
+            paymentReceiptParams={paymentParams}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]');
+      const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]');
+      expect(textTab).not.toBeNull();
+      expect(imgTab).not.toBeNull();
+
+      act(() => {
+        (imgTab as HTMLButtonElement).click();
+      });
+
+      const placeholder = container.querySelector('[data-testid="payment-receipt-placeholder"]');
+      expect(placeholder).not.toBeNull();
+      expect(placeholder?.textContent).toContain('Payment receipt');
+    });
+
+    it('image tab Share Image button calls renderThermalReceiptImage with a payment receipt text and caption contains amount and balance', async () => {
+      const fakeBlob = new Blob(['payment-canvas-receipt'], { type: 'image/png' });
+      const canvasSpy = vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(fakeBlob);
+      const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
+
+      const paymentParams = {
+        companyName: 'Sharma General Store',
+        heading: 'Payment In Receipt',
+        docNumber: 'REC-100',
+        amount: 3500,
+        partyName: 'Rajesh Kumar',
+        partyBalance: 500,
+      };
+
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            company={mockCompany}
+            initialPhone="9876543210"
+            paymentShareText="*Payment In Receipt - Sharma General Store*\n*Amount:* ₹3,500.00\n*Total Balance Due:* ₹500.00"
+            paymentReceiptParams={paymentParams}
+            onClose={vi.fn()}
+          />
+        );
+      });
+
+      const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]') as HTMLButtonElement;
+      act(() => {
+        imgTab.click();
+      });
+
+      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      expect(shareImgBtn).not.toBeNull();
+
+      await act(async () => {
+        shareImgBtn.click();
+      });
+
+      expect(canvasSpy).toHaveBeenCalledTimes(1);
+      const passedReceiptText = canvasSpy.mock.calls[0][0];
+      expect(passedReceiptText).toContain('PAYMENT IN RECEIPT');
+      expect(passedReceiptText).toContain('3500.00');
+
+      expect(shareSpy).toHaveBeenCalledWith(
+        fakeBlob,
+        'Receipt-REC-100.png',
+        expect.objectContaining({
+          text: expect.stringMatching(/Amount:[\s\S]*3,?500[\s\S]*Total Balance Due:[\s\S]*500/),
+          phone: '9876543210',
+        })
+      );
+    });
   });
 
   describe('WhatsApp/WhatsAppShareModal (Invoice Preview & Grid)', () => {

@@ -12,6 +12,7 @@ import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMes
 import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 export interface CashBankTransactionDetailModalProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<{
     voucherId: string;
     documentType: 'INVOICE' | 'PURCHASE';
@@ -281,31 +283,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
     (entry?.flow === 'IN' ? entry.accountName : (defaultBank?.accountName || 'Bank Account'));
 
   const handleShareWhatsApp = () => {
-    const heading = isTransferCategory
-      ? 'Cash / Bank Transfer'
-      : isInflow
-      ? 'Payment Received'
-      : 'Payment Made';
-
-    const text = buildPaymentVoucherWhatsAppMessage(rawTransaction || entry, linkedParty, company, undefined, {
-      heading,
-      docNumber: rawTransaction?.txnNumber,
-      date: activeDate ? formatDate(activeDate) : undefined,
-      amount: activeAmount,
-      type: rawTransaction?.type || entry?.type,
-      isContra: Boolean(isTransferCategory),
-      fromAccountName: resolvedFromName,
-      toAccountName: resolvedToName,
-      accountName:
-        entry?.accountName ||
-        (rawTransaction?.type === 'ADD_MONEY' ? toAcc?.accountName : fromAcc?.accountName),
-      paymentMode: entry?.mode,
-      reference: activeRef,
-      counterpartyOrTitle: entry?.counterpartyOrTitle,
-      notes: activeDesc,
-    });
-
-    safeOpenExternalUrl(`https://wa.me/?text=${encodeURIComponent(text)}`);
+    setIsWhatsAppShareOpen(true);
   };
 
   const handleTransferTypeSwitch = (newType: CashBankTxnType) => {
@@ -1155,6 +1133,61 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
           </div>
         )}
       </div>
+
+      {/* WhatsApp Share & Reminder Modal for Cash/Bank & Vouchers */}
+      {isWhatsAppShareOpen && (
+        <WhatsAppShareModal
+          isOpen={isWhatsAppShareOpen}
+          onClose={() => setIsWhatsAppShareOpen(false)}
+          company={company || db.getCompany()}
+          invoice={undefined}
+          party={linkedParty || undefined}
+          initialPhone={linkedParty?.phone}
+          initialBalance={linkedParty ? (getPartyTotalBalanceDue(linkedParty) ?? undefined) : undefined}
+          paymentShareText={(() => {
+            const heading = isTransferCategory
+              ? 'Cash / Bank Transfer'
+              : isInflow
+              ? 'Payment Received'
+              : 'Payment Made';
+
+            return buildPaymentVoucherWhatsAppMessage(rawTransaction || entry, linkedParty, company || db.getCompany(), linkedParty ? getPartyTotalBalanceDue(linkedParty) : undefined, {
+              heading,
+              docNumber: rawTransaction?.txnNumber,
+              date: activeDate ? formatDate(activeDate) : undefined,
+              amount: activeAmount,
+              type: rawTransaction?.type || entry?.type,
+              isContra: Boolean(isTransferCategory),
+              fromAccountName: resolvedFromName,
+              toAccountName: resolvedToName,
+              accountName:
+                entry?.accountName ||
+                (rawTransaction?.type === 'ADD_MONEY' ? toAcc?.accountName : fromAcc?.accountName),
+              paymentMode: entry?.mode,
+              reference: activeRef,
+              counterpartyOrTitle: entry?.counterpartyOrTitle,
+              notes: activeDesc,
+            });
+          })()}
+          paymentReceiptParams={{
+            companyName: (company || db.getCompany())?.tradeName || (company || db.getCompany())?.businessName || '',
+            heading: isTransferCategory
+              ? 'Cash / Bank Transfer'
+              : isInflow
+              ? 'Payment In Receipt'
+              : 'Payment Out Voucher',
+            docNumber: rawTransaction?.txnNumber,
+            date: activeDate ? formatDate(activeDate) : undefined,
+            partyName: linkedParty?.name || entry?.counterpartyOrTitle,
+            amount: activeAmount,
+            paymentMode: entry?.mode,
+            bankAccountName: resolvedFromName || resolvedToName,
+            reference: activeRef,
+            notes: activeDesc,
+            partyBalance: linkedParty ? (getPartyTotalBalanceDue(linkedParty) ?? undefined) : undefined,
+          }}
+        />
+      )}
     </div>
   );
 };

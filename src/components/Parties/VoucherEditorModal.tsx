@@ -18,6 +18,7 @@ import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface VoucherEditorModalProps {
@@ -68,6 +69,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   });
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editMode, setEditMode] = useState('UPI');
@@ -802,26 +804,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
   const handleShareWhatsApp = () => {
     if (!editingLedgerEntry) return;
-
-    const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
-    const text = buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company, partyTotalDue, {
-      heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
-      docNumber: editingLedgerEntry.docNumber,
-      date: formatDate(editDate || editingLedgerEntry.date),
-      amount: currentAmount,
-      discount: currentDiscount,
-      paymentMode: editMode,
-      bankAccountName: selectedBank?.accountName,
-      splits: editMode === 'SPLIT' ? {
-        cash: parseFloat(editSplitCash) || 0,
-        upi: parseFloat(editSplitUPI) || 0,
-        bank: parseFloat(editSplitBank) || 0,
-      } : undefined,
-      notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
-    });
-
-    const { url } = buildWhatsAppSendUrl({ phone: party.phone, text });
-    safeOpenExternalUrl(url);
+    setIsWhatsAppShareOpen(true);
   };
 
   const renderLinkedDocs = () => (
@@ -1737,6 +1720,50 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           confirmText={editingLedgerEntry.isOpening ? 'Clear Balance' : 'Delete Transaction'}
           onConfirm={() => executeDeleteLedgerItem(editingLedgerEntry)}
           onClose={() => setIsDeleteConfirmOpen(false)}
+        />
+      )}
+
+      {/* WhatsApp Share & Reminder Modal for Payment Vouchers */}
+      {isWhatsAppShareOpen && editingLedgerEntry && (
+        <WhatsAppShareModal
+          isOpen={isWhatsAppShareOpen}
+          onClose={() => setIsWhatsAppShareOpen(false)}
+          company={company || db.getCompany()}
+          invoice={undefined}
+          party={party}
+          initialPhone={party?.phone}
+          initialBalance={partyTotalDue ?? undefined}
+          paymentShareText={(() => {
+            const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
+            return buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || db.getCompany(), partyTotalDue, {
+              heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
+              docNumber: editingLedgerEntry.docNumber,
+              date: formatDate(editDate || editingLedgerEntry.date),
+              amount: currentAmount,
+              discount: currentDiscount,
+              paymentMode: editMode,
+              bankAccountName: selectedBank?.accountName,
+              splits: editMode === 'SPLIT' ? {
+                cash: parseFloat(editSplitCash) || 0,
+                upi: parseFloat(editSplitUPI) || 0,
+                bank: parseFloat(editSplitBank) || 0,
+              } : undefined,
+              notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
+            });
+          })()}
+          paymentReceiptParams={{
+            companyName: (company || db.getCompany())?.tradeName || (company || db.getCompany())?.businessName || '',
+            heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
+            docNumber: editingLedgerEntry.docNumber,
+            date: formatDate(editDate || editingLedgerEntry.date),
+            partyName: party?.name,
+            amount: currentAmount,
+            paymentMode: editMode,
+            bankAccountName: availableBankAccounts.find((a) => a.id === editBankAccountId)?.accountName,
+            reference: editingLedgerEntry.rawVoucher?.referenceNo || undefined,
+            notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
+            partyBalance: partyTotalDue ?? undefined,
+          }}
         />
       )}
     </div>
