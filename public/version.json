@@ -1,15 +1,15 @@
 {
-  "version": "1.2.60",
+  "version": "1.2.61",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-01T15:16:54.506Z",
+  "buildTime": "2026-11-02T09:27:50.609Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "drop A4/PDF shortcut, scroll preview items, share thermal receipt as image",
-    "link sales returns to a parent invoice with delta balance reconciliation",
-    "Add Party quick action opens the new-party modal",
-    "simplify and redesign expense register and sheets",
-    "small-screen layout audit and fixes across all views",
-    "mobile-only reports redesign and responsive party action buttons"
+    "WhatsApp text and thermal receipt image tabs in common share modal",
+    "WhatsApp receipt image share for payment in/out and vouchers",
+    "monospace payment receipt text generator and thermal canvas rendering",
+    "native Android share-image bridge for direct WhatsApp image sharing",
+    "capture thermal receipt as styled DOM image via html-to-image",
+    "bill amount and balance due prefill in WhatsApp image caption"
   ]
 }
