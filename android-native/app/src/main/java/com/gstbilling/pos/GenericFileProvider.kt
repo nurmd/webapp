@@ -38,10 +38,11 @@ class GenericFileProvider : ContentProvider() {
 
     override fun getType(uri: Uri): String {
         val fileName = uri.lastPathSegment ?: ""
-        return if (fileName.endsWith(".pdf", ignoreCase = true)) {
-            "application/pdf"
-        } else {
-            "application/vnd.android.package-archive"
+        return when {
+            fileName.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+            fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+            fileName.endsWith(".jpg", ignoreCase = true) || fileName.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+            else -> "application/vnd.android.package-archive"
         }
     }
 

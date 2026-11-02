@@ -708,11 +708,7 @@ class AndroidBridge(
                 val rawBase64 = if (base64Png.contains(",")) base64Png.substringAfter(",") else base64Png
                 val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
                 FileOutputStream(imageFile).use { it.write(bytes) }
-                val contentUri = FileProvider.getUriForFile(
-                    context,
-                    "com.gstbilling.pos.fileprovider",
-                    imageFile
-                )
+                val contentUri = Uri.parse("content://com.gstbilling.pos.fileprovider/$safeName")
                 val safePhone = phone?.trim() ?: ""
                 val caption = if (safePhone.isNotEmpty()) "Receipt for $safePhone" else ""
                 val intent = Intent(Intent.ACTION_SEND).apply {
