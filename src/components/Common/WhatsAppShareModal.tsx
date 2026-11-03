@@ -61,10 +61,12 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     return true;
   }, isOpen, 35);
 
-  const [shareTab, setShareTab] = useState<'text' | 'image'>(() => {
+  const [previewMode, setPreviewMode] = useState<'text' | 'image'>(() => {
     try {
       if (typeof localStorage !== 'undefined') {
-        const saved = localStorage.getItem('whatsappShareTab');
+        const saved =
+          localStorage.getItem('whatsappPreviewMode') ||
+          localStorage.getItem('whatsappShareTab');
         if (saved === 'text' || saved === 'image') return saved;
       }
     } catch {
@@ -76,12 +78,13 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   useEffect(() => {
     try {
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('whatsappShareTab', shareTab);
+        localStorage.setItem('whatsappPreviewMode', previewMode);
+        localStorage.setItem('whatsappShareTab', previewMode);
       }
     } catch {
       // ignore
     }
-  }, [shareTab]);
+  }, [previewMode]);
 
   const defaultPhone =
     (initialPhone && initialPhone.trim()) ||
@@ -149,7 +152,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   if (!isOpen) return null;
 
   const hasImageShare = Boolean(invoice || paymentReceiptParams);
-  const showImageTab = Boolean(hasImageShare && shareTab === 'image');
+  const isImageMode = Boolean(hasImageShare && previewMode === 'image');
 
   const handleSend = () => {
     const trimmedPhone = phone.trim();
@@ -329,39 +332,6 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           </button>
         </div>
 
-        {/* Segmented Tab Control */}
-        {hasImageShare && (
-          <div className="px-5 pt-3 pb-1 shrink-0">
-            <div className="grid grid-cols-2 gap-1 bg-surface-container-low p-1 rounded-2xl border border-outline-variant/30">
-              <button
-                type="button"
-                data-testid="whatsapp-tab-text"
-                onClick={() => setShareTab('text')}
-                className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  shareTab === 'text'
-                    ? 'bg-surface text-on-surface shadow-xs font-extrabold'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">chat</span>
-                <span>Text Message</span>
-              </button>
-              <button
-                type="button"
-                data-testid="whatsapp-tab-image"
-                onClick={() => setShareTab('image')}
-                className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  shareTab === 'image'
-                    ? 'bg-surface text-on-surface shadow-xs font-extrabold'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">image</span>
-                <span>Receipt Image</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Scrollable Configuration Body */}
         <div className="p-5 space-y-4 overflow-y-auto flex-1 text-sm">
@@ -380,95 +350,33 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             </div>
           )}
 
-          {showImageTab ? (
-            <>
-              {/* Receipt Image Preview Thumbnail or Placeholder */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Receipt Preview
-                  </label>
-                  <span className="text-xs text-on-surface-variant font-mono">
-                    {paperWidth} cols
-                  </span>
-                </div>
-                {invoice ? (
-                  <div className="max-h-[40vh] overflow-y-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-center shadow-inner">
-                    <ThermalReceiptPreview
-                      ref={thermalPreviewRef}
-                      previewText={buildThermalReceiptText(invoice, company, paperWidth)}
-                      width={paperWidth}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    data-testid="payment-receipt-placeholder"
-                    className="p-6 border border-outline-variant/30 rounded-2xl bg-surface-container-low/50 text-center text-xs text-on-surface-variant flex flex-col items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[28px] text-emerald-600">receipt_long</span>
-                    <span className="font-bold text-on-surface text-sm">Payment receipt</span>
-                    <p className="text-[11px] text-on-surface-variant">Thermal receipt image will be generated on share</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Recipient Phone (Image Tab) */}
-              <div>
-                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                  Customer Mobile Number (WhatsApp)
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 text-xs font-bold text-outline select-none">
-                    +91
-                  </span>
-                  <input
-                    data-testid="whatsapp-phone-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      if (phoneError) setPhoneError('');
-                    }}
-                    placeholder="9876543210"
-                    className="w-full pl-11 pr-3 py-2.5 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary"
-                  />
-                </div>
-                {phoneError && (
-                  <p data-testid="whatsapp-phone-error" className="text-xs text-error mt-1.5 font-medium">
-                    {phoneError}
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Recipient Phone */}
-              <div>
-                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                  Customer Mobile Number (WhatsApp)
-                </label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 text-xs font-bold text-outline select-none">
-                    +91
-                  </span>
-                  <input
-                    data-testid="whatsapp-phone-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
-                      if (phoneError) setPhoneError('');
-                    }}
-                    placeholder="9876543210"
-                    className="w-full pl-11 pr-3 py-2.5 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary"
-                  />
-                </div>
-                {phoneError && (
-                  <p data-testid="whatsapp-phone-error" className="text-xs text-error mt-1.5 font-medium">
-                    {phoneError}
-                  </p>
-                )}
-              </div>
+          {/* Recipient Phone */}
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
+              Customer Mobile Number (WhatsApp)
+            </label>
+            <div className="relative flex items-center">
+              <span className="absolute left-3 text-xs font-bold text-outline select-none">
+                +91
+              </span>
+              <input
+                data-testid="whatsapp-phone-input"
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  if (phoneError) setPhoneError('');
+                }}
+                placeholder="9876543210"
+                className="w-full pl-11 pr-3 py-2.5 rounded-xl border border-outline-variant/50 bg-surface-container-lowest text-on-surface text-sm font-mono focus:outline-none focus:ring-2 focus:ring-secondary"
+              />
+            </div>
+            {phoneError && (
+              <p data-testid="whatsapp-phone-error" className="text-xs text-error mt-1.5 font-medium">
+                {phoneError}
+              </p>
+            )}
+          </div>
 
               {!paymentShareText && (
                 <>
@@ -581,12 +489,54 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 </>
               )}
 
-              {/* Live Message Preview */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                    Message Preview
-                  </label>
+          {/* Preview Area (below selectors) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                {isImageMode ? 'Receipt Preview' : 'Message Preview'}
+              </label>
+
+              <div className="flex items-center gap-2">
+                {/* Small toggle Text | Image (only when invoice or paymentReceiptParams present) */}
+                {hasImageShare && (
+                  <div
+                    data-testid="whatsapp-preview-toggle"
+                    className="inline-flex bg-surface-container-low p-0.5 rounded-xl border border-outline-variant/30"
+                  >
+                    <button
+                      type="button"
+                      data-testid="whatsapp-tab-text"
+                      onClick={() => setPreviewMode('text')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                        previewMode === 'text'
+                          ? 'bg-surface text-on-surface shadow-xs font-extrabold'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">chat</span>
+                      <span>Text</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="whatsapp-tab-image"
+                      onClick={() => setPreviewMode('image')}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                        previewMode === 'image'
+                          ? 'bg-surface text-on-surface shadow-xs font-extrabold'
+                          : 'text-on-surface-variant hover:text-on-surface'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">image</span>
+                      <span>Image</span>
+                    </button>
+                  </div>
+                )}
+
+                {isImageMode ? (
+                  <span className="text-xs text-on-surface-variant font-mono">
+                    {paperWidth} cols
+                  </span>
+                ) : (
                   <button
                     type="button"
                     onClick={handleCopy}
@@ -597,16 +547,39 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                     </span>
                     <span>{copied ? 'Copied' : 'Copy Text'}</span>
                   </button>
-                </div>
-                <div
-                  data-testid="whatsapp-message-preview-box"
-                  className="p-3.5 rounded-2xl bg-emerald-950/10 dark:bg-emerald-950/30 border border-emerald-500/20 text-xs font-mono whitespace-pre-wrap text-on-surface leading-relaxed max-h-48 overflow-y-auto"
-                >
-                  {text}
-                </div>
+                )}
               </div>
-            </>
-          )}
+            </div>
+
+            {/* Toggle swaps Text preview ↔ Thermal receipt image */}
+            {isImageMode ? (
+              invoice ? (
+                <div className="max-h-[40vh] overflow-y-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-center shadow-inner">
+                  <ThermalReceiptPreview
+                    ref={thermalPreviewRef}
+                    previewText={buildThermalReceiptText(invoice, company, paperWidth)}
+                    width={paperWidth}
+                  />
+                </div>
+              ) : (
+                <div
+                  data-testid="payment-receipt-placeholder"
+                  className="p-6 border border-outline-variant/30 rounded-2xl bg-surface-container-low/50 text-center text-xs text-on-surface-variant flex flex-col items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[28px] text-emerald-600">receipt_long</span>
+                  <span className="font-bold text-on-surface text-sm">Payment receipt</span>
+                  <p className="text-[11px] text-on-surface-variant">Thermal receipt image will be generated on share</p>
+                </div>
+              )
+            ) : (
+              <div
+                data-testid="whatsapp-message-preview-box"
+                className="p-3.5 rounded-2xl bg-emerald-950/10 dark:bg-emerald-950/30 border border-emerald-500/20 text-xs font-mono whitespace-pre-wrap text-on-surface leading-relaxed max-h-48 overflow-y-auto"
+              >
+                {text}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer Actions */}
@@ -618,51 +591,44 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           >
             Cancel
           </button>
-          {showImageTab ? (
-            <button
-              type="button"
-              data-testid="whatsapp-share-image-button"
-              disabled={isSharingImage}
-              onClick={handleShareImage}
-              className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
-              title="Share thermal receipt image"
-            >
-              {isSharingImage ? (
-                <>
-                  <span className="material-symbols-outlined text-[16px] animate-spin">
-                    progress_activity
-                  </span>
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[16px]">share</span>
-                  <span>Share Image</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                data-testid="whatsapp-copy-button"
-                onClick={handleCopy}
-                className="px-4 py-2.5 rounded-xl border border-secondary text-secondary text-xs font-bold hover:bg-secondary/10 flex items-center gap-1.5 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                <span>Copy SMS</span>
-              </button>
-              <button
-                type="button"
-                data-testid="whatsapp-send-button"
-                onClick={handleSend}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer transition-transform"
-              >
-                <span className="material-symbols-outlined text-[18px]">send</span>
-                <span>Send WhatsApp</span>
-              </button>
-            </>
-          )}
+          <button
+            type="button"
+            data-testid="whatsapp-copy-button"
+            onClick={handleCopy}
+            className="px-4 py-2.5 rounded-xl border border-secondary text-secondary text-xs font-bold hover:bg-secondary/10 flex items-center gap-1.5 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">content_copy</span>
+            <span>Copy SMS</span>
+          </button>
+          <button
+            type="button"
+            data-testid="whatsapp-send-button"
+            disabled={isSharingImage}
+            onClick={() => {
+              if (isImageMode) {
+                handleShareImage();
+              } else {
+                handleSend();
+              }
+            }}
+            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer transition-transform"
+          >
+            {isSharingImage ? (
+              <>
+                <span className="material-symbols-outlined text-[16px] animate-spin">
+                  progress_activity
+                </span>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[18px]">
+                  {isImageMode ? 'share' : 'send'}
+                </span>
+                <span>Share on WhatsApp</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

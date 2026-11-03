@@ -336,7 +336,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(warning?.textContent).toContain('Demo Mode: this message uses demo data');
     });
 
-    it('tab control renders both tabs when invoice is passed', () => {
+    it('toggle renders both Text and Image labels when invoice is passed', () => {
       act(() => {
         root.render(
           <CommonWhatsAppShareModal
@@ -351,12 +351,12 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]');
       const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]');
       expect(textTab).not.toBeNull();
-      expect(textTab?.textContent).toContain('Text Message');
+      expect(textTab?.textContent).toContain('Text');
       expect(imgTab).not.toBeNull();
-      expect(imgTab?.textContent).toContain('Receipt Image');
+      expect(imgTab?.textContent).toContain('Image');
     });
 
-    it('no tabs when only party is passed without invoice or paymentReceiptParams', () => {
+    it('no toggle when only party is passed without invoice or paymentReceiptParams', () => {
       const mockParty = {
         id: 'PTY-1',
         name: 'Rajesh Kumar',
@@ -379,7 +379,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(container.querySelector('[data-testid="whatsapp-tab-image"]')).toBeNull();
     });
 
-    it('switching to Receipt Image shows whatsapp-share-image-button', () => {
+    it('switching toggle swaps preview content but keeps phone input visible', () => {
       act(() => {
         root.render(
           <CommonWhatsAppShareModal
@@ -387,25 +387,41 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
             onClose={vi.fn()}
             company={mockCompany}
             invoice={mockInvoice}
+            initialPhone="9876543210"
           />
         );
       });
+
+      const phoneInput = container.querySelector('[data-testid="whatsapp-phone-input"]') as HTMLInputElement;
+      expect(phoneInput).not.toBeNull();
+      expect(phoneInput.value).toBe('9876543210');
+      expect(container.querySelector('[data-testid="whatsapp-message-preview-box"]')).not.toBeNull();
 
       const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]') as HTMLButtonElement;
       act(() => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
-      expect(shareImgBtn).not.toBeNull();
-      expect(shareImgBtn.textContent).toContain('Share Image');
-      expect(shareImgBtn.disabled).toBe(false);
+      expect(container.querySelector('[data-testid="whatsapp-message-preview-box"]')).toBeNull();
+      const phoneInputAfter = container.querySelector('[data-testid="whatsapp-phone-input"]') as HTMLInputElement;
+      expect(phoneInputAfter).not.toBeNull();
+      expect(phoneInputAfter.value).toBe('9876543210');
 
-      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
-      expect(previewBox).toBeNull();
+      const shareBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
+      expect(shareBtn).not.toBeNull();
+      expect(shareBtn.textContent).toContain('Share on WhatsApp');
+      expect(shareBtn.disabled).toBe(false);
+
+      const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]') as HTMLButtonElement;
+      act(() => {
+        textTab.click();
+      });
+
+      expect(container.querySelector('[data-testid="whatsapp-message-preview-box"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="whatsapp-phone-input"]')).not.toBeNull();
     });
 
-    it('The Share Image caption contains Bill Amount: and Total Balance Due:', async () => {
+    it('The single share button in image mode captures receipt and caption contains Bill Amount: and Total Balance Due:', async () => {
       const fakeBlob = new Blob(['fake-receipt'], { type: 'image/png' });
       vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
       const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
@@ -427,9 +443,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      const shareBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
       await act(async () => {
-        shareImgBtn.click();
+        shareBtn.click();
       });
 
       expect(shareSpy).toHaveBeenCalledWith(
@@ -441,7 +457,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       );
     });
 
-    it('payment share (no invoice) renders Text/Receipt Image tabs and placeholder', () => {
+    it('payment share (no invoice) renders Text/Image toggle and placeholder', () => {
       const paymentParams = {
         companyName: 'Sharma General Store',
         heading: 'Payment In Receipt',
@@ -467,6 +483,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]');
       expect(textTab).not.toBeNull();
       expect(imgTab).not.toBeNull();
+      expect(textTab?.textContent).toContain('Text');
+      expect(imgTab?.textContent).toContain('Image');
 
       act(() => {
         (imgTab as HTMLButtonElement).click();
@@ -477,7 +495,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(placeholder?.textContent).toContain('Payment receipt');
     });
 
-    it('image tab Share Image button calls renderThermalReceiptImage with a payment receipt text and caption contains amount and balance', async () => {
+    it('single share button in image mode calls renderThermalReceiptImage with a payment receipt text and caption contains amount and balance', async () => {
       const fakeBlob = new Blob(['payment-canvas-receipt'], { type: 'image/png' });
       const canvasSpy = vi.spyOn(receiptImageShare, 'renderThermalReceiptImage').mockResolvedValue(fakeBlob);
       const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
@@ -509,11 +527,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
-      expect(shareImgBtn).not.toBeNull();
+      const shareBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
+      expect(shareBtn).not.toBeNull();
 
       await act(async () => {
-        shareImgBtn.click();
+        shareBtn.click();
       });
 
       expect(canvasSpy).toHaveBeenCalledTimes(1);
@@ -529,6 +547,31 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
           phone: '9876543210',
         })
       );
+    });
+
+    it('persists previewMode toggle in localStorage key whatsappPreviewMode', () => {
+      localStorage.setItem('whatsappPreviewMode', 'image');
+
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            onClose={vi.fn()}
+            company={mockCompany}
+            invoice={mockInvoice}
+          />
+        );
+      });
+
+      expect(container.querySelector('[data-testid="whatsapp-message-preview-box"]')).toBeNull();
+
+      const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]') as HTMLButtonElement;
+      act(() => {
+        textTab.click();
+      });
+
+      expect(localStorage.getItem('whatsappPreviewMode')).toBe('text');
+      expect(container.querySelector('[data-testid="whatsapp-message-preview-box"]')).not.toBeNull();
     });
   });
 
