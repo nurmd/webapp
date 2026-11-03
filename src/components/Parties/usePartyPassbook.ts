@@ -39,6 +39,37 @@ export interface UsePartyPassbookParams {
   vouchers?: Voucher[];
 }
 
+export function comparePassbookEntries(
+  a: Omit<PassbookEntry, 'runningBalance'>,
+  b: Omit<PassbookEntry, 'runningBalance'>,
+  descending = false
+): number {
+  // Opening balance must always be the baseline transaction of the passbook / ledger statement
+  if (a.type === 'OPENING' && b.type === 'OPENING') return 0;
+  if (a.type === 'OPENING') return -1;
+  if (b.type === 'OPENING') return 1;
+
+  const dateA = a.date ? new Date(a.date).getTime() : 0;
+  const dateB = b.date ? new Date(b.date).getTime() : 0;
+  const timeA = isNaN(dateA) ? 0 : dateA;
+  const timeB = isNaN(dateB) ? 0 : dateB;
+  const timeDiff = descending ? timeB - timeA : timeA - timeB;
+  if (timeDiff !== 0) return timeDiff;
+
+  if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
+  if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
+
+  // Normal sales come before sales returns (Credit Notes) on the same date
+  if (a.type === 'SALE' && b.type === 'SALE') {
+    const aIsCN = a.rawInvoice?.invoiceType === 'CREDIT_NOTE';
+    const bIsCN = b.rawInvoice?.invoiceType === 'CREDIT_NOTE';
+    if (!aIsCN && bIsCN) return -1;
+    if (aIsCN && !bIsCN) return 1;
+  }
+
+  return 0;
+}
+
 export function usePartyPassbook({
   party,
   company,
@@ -356,26 +387,7 @@ export function usePartyPassbook({
       });
     }
 
-    rawEntries.sort((a, b) => {
-      // Opening balance must always be the baseline transaction of the passbook / ledger statement
-      if (a.type === 'OPENING' && b.type === 'OPENING') return 0;
-      if (a.type === 'OPENING') return -1;
-      if (b.type === 'OPENING') return 1;
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      const timeDiff = (isNaN(dateA) ? 0 : dateA) - (isNaN(dateB) ? 0 : dateB);
-      if (timeDiff !== 0) return timeDiff;
-      if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
-      if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
-      // Normal sales come before sales returns (Credit Notes) on the same date
-      if (a.type === 'SALE' && b.type === 'SALE') {
-        const aIsCN = a.rawInvoice?.invoiceType === 'CREDIT_NOTE';
-        const bIsCN = b.rawInvoice?.invoiceType === 'CREDIT_NOTE';
-        if (!aIsCN && bIsCN) return -1;
-        if (aIsCN && !bIsCN) return 1;
-      }
-      return 0;
-    });
+    rawEntries.sort((a, b) => comparePassbookEntries(a, b, false));
 
     let running = 0;
     return rawEntries.map((entry) => {
@@ -446,7 +458,7 @@ export function usePartyPassbook({
     });
 
     if (txnSortOrder === 'NEWEST') {
-      return [...matches].reverse();
+      return [...matches].sort((a, b) => comparePassbookEntries(a, b, true));
     }
     return matches;
   }, [passbook, txnFilter, dateFilter, searchTxn, txnSortOrder]);

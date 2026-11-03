@@ -82,7 +82,7 @@ import { PurchaseBill } from '../models/purchase.ts';
 import { InventoryItem } from '../models/item.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../models/company.ts';
-import { usePartyPassbook } from '../components/Parties/usePartyPassbook.ts';
+import { usePartyPassbook, comparePassbookEntries } from '../components/Parties/usePartyPassbook.ts';
 import { TableGridInvoiceModal } from '../components/Invoicing/TableGridInvoiceModal.tsx';
 import { CreateInvoiceModal } from '../components/Invoicing/CreateInvoiceModal.tsx';
 import { QuickBillingView } from '../components/POS/QuickBillingView.tsx';
@@ -857,6 +857,324 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
 
       expect(res.liveNetBalance).toBe(12500);
       harness.unmount();
+    });
+
+    it('maintains proper same-date secondary priority (sales before payments) in both NEWEST and OLDEST sort orders', () => {
+      const customer: Party = {
+        id: 'PTY-SORT-001',
+        name: 'Sort Test Customer',
+        type: 'CUSTOMER',
+        phone: '9811223344',
+        billingAddress: 'Main Road, Delhi',
+        stateCode: '07',
+        openingBalance: 1000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 1000,
+        createdAt: '2026-04-01T08:00:00Z',
+        updatedAt: '2026-04-01T08:00:00Z',
+      };
+
+      const saleInv1: Invoice = {
+        id: 'INV-SORT-1',
+        invoiceNumber: 'INV-SORT-1',
+        invoiceType: 'B2CS',
+        date: '2026-04-05',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '07',
+        placeOfSupplyStateCode: '07',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 2000,
+        totalDiscount: 0,
+        totalTaxableAmount: 2000,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 2000,
+        amountInWords: 'Two Thousand Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 2000,
+        createdAt: '2026-04-05T10:00:00Z',
+        updatedAt: '2026-04-05T10:00:00Z',
+      };
+
+      const paymentVoucher1: Voucher = {
+        id: 'VCHR-SORT-1',
+        voucherNumber: 'PAY-SORT-1',
+        voucherType: 'RECEIPT',
+        date: '2026-04-05',
+        partyId: customer.id,
+        partyName: customer.name,
+        totalAmount: 1500,
+        entries: [
+          { accountId: 'ACC_CASH', accountName: 'Cash', debit: 1500, credit: 0 },
+          { accountId: customer.id, accountName: customer.name, debit: 0, credit: 1500 },
+        ],
+        narration: 'Payment 1500',
+        createdAt: '2026-04-05T12:00:00Z',
+      };
+
+      const saleInv2: Invoice = {
+        id: 'INV-SORT-2',
+        invoiceNumber: 'INV-SORT-2',
+        invoiceType: 'B2CS',
+        date: '2026-04-06',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '07',
+        placeOfSupplyStateCode: '07',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 3000,
+        totalDiscount: 0,
+        totalTaxableAmount: 3000,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 3000,
+        amountInWords: 'Three Thousand Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 3000,
+        createdAt: '2026-04-06T10:00:00Z',
+        updatedAt: '2026-04-06T10:00:00Z',
+      };
+
+      const harness = renderPassbookHook({
+        party: customer,
+        company: dummyCompany,
+        invoices: [saleInv1, saleInv2],
+        purchases: [],
+        vouchers: [paymentVoucher1],
+      });
+
+      const res = harness.result();
+      expect(res.txnSortOrder).toBe('NEWEST');
+      expect(res.filteredPassbook.length).toBe(4);
+
+      // In NEWEST order:
+      // 1. OPENING stays first as baseline (index 0)
+      expect(res.filteredPassbook[0].type).toBe('OPENING');
+      expect(res.filteredPassbook[0].docNumber).toBe('OPENING');
+
+      // 2. Newer date 2026-04-06 comes before 2026-04-05
+      expect(res.filteredPassbook[1].type).toBe('SALE');
+      expect(res.filteredPassbook[1].docNumber).toBe('INV-SORT-2');
+      expect(res.filteredPassbook[1].date).toBe('2026-04-06');
+
+      // 3. For 2026-04-05: SALE must come before PAYMENT_IN (not inverted by reverse)
+      expect(res.filteredPassbook[2].type).toBe('SALE');
+      expect(res.filteredPassbook[2].docNumber).toBe('INV-SORT-1');
+      expect(res.filteredPassbook[2].date).toBe('2026-04-05');
+
+      expect(res.filteredPassbook[3].type).toBe('PAYMENT_IN');
+      expect(res.filteredPassbook[3].docNumber).toBe('PAY-SORT-1');
+      expect(res.filteredPassbook[3].date).toBe('2026-04-05');
+
+      // Switch to OLDEST order:
+      act(() => {
+        res.setTxnSortOrder('OLDEST');
+      });
+
+      const resOldest = harness.result();
+      expect(resOldest.txnSortOrder).toBe('OLDEST');
+      expect(resOldest.filteredPassbook.length).toBe(4);
+
+      // In OLDEST order:
+      // 1. OPENING at index 0
+      expect(resOldest.filteredPassbook[0].type).toBe('OPENING');
+
+      // 2. 2026-04-05 SALE before 2026-04-05 PAYMENT_IN
+      expect(resOldest.filteredPassbook[1].type).toBe('SALE');
+      expect(resOldest.filteredPassbook[1].docNumber).toBe('INV-SORT-1');
+      expect(resOldest.filteredPassbook[1].date).toBe('2026-04-05');
+
+      expect(resOldest.filteredPassbook[2].type).toBe('PAYMENT_IN');
+      expect(resOldest.filteredPassbook[2].docNumber).toBe('PAY-SORT-1');
+      expect(resOldest.filteredPassbook[2].date).toBe('2026-04-05');
+
+      // 3. 2026-04-06 SALE last
+      expect(resOldest.filteredPassbook[3].type).toBe('SALE');
+      expect(resOldest.filteredPassbook[3].docNumber).toBe('INV-SORT-2');
+      expect(resOldest.filteredPassbook[3].date).toBe('2026-04-06');
+
+      harness.unmount();
+    });
+
+    it('keeps normal sales before sales returns (credit notes) on the same date for both NEWEST and OLDEST', () => {
+      const customer: Party = {
+        id: 'PTY-SORT-002',
+        name: 'Credit Note Sort Customer',
+        type: 'CUSTOMER',
+        phone: '9811223355',
+        billingAddress: 'Main Road, Delhi',
+        stateCode: '07',
+        currentBalance: 0,
+        createdAt: '2026-04-01T08:00:00Z',
+        updatedAt: '2026-04-01T08:00:00Z',
+      };
+
+      const normalSale: Invoice = {
+        id: 'INV-SALE-SAME-DATE',
+        invoiceNumber: 'INV-SAME-01',
+        invoiceType: 'B2CS',
+        date: '2026-04-05',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '07',
+        placeOfSupplyStateCode: '07',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 2000,
+        totalDiscount: 0,
+        totalTaxableAmount: 2000,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 2000,
+        amountInWords: 'Two Thousand Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 2000,
+        createdAt: '2026-04-05T10:00:00Z',
+        updatedAt: '2026-04-05T10:00:00Z',
+      };
+
+      const creditNote: Invoice = {
+        id: 'INV-CN-SAME-DATE',
+        invoiceNumber: 'CN-SAME-01',
+        invoiceType: 'CREDIT_NOTE',
+        date: '2026-04-05',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '07',
+        placeOfSupplyStateCode: '07',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 500,
+        totalDiscount: 0,
+        totalTaxableAmount: 500,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 500,
+        amountInWords: 'Five Hundred Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'PAID',
+        paidAmount: 0,
+        balanceAmount: 0,
+        createdAt: '2026-04-05T11:00:00Z',
+        updatedAt: '2026-04-05T11:00:00Z',
+      };
+
+      const harness = renderPassbookHook({
+        party: customer,
+        company: dummyCompany,
+        invoices: [normalSale, creditNote],
+        purchases: [],
+        vouchers: [],
+      });
+
+      const resNewest = harness.result();
+      expect(resNewest.txnSortOrder).toBe('NEWEST');
+      expect(resNewest.filteredPassbook[0].docNumber).toBe('INV-SAME-01');
+      expect(resNewest.filteredPassbook[1].docNumber).toBe('CN-SAME-01');
+
+      act(() => {
+        resNewest.setTxnSortOrder('OLDEST');
+      });
+
+      const resOldest = harness.result();
+      expect(resOldest.txnSortOrder).toBe('OLDEST');
+      expect(resOldest.filteredPassbook[0].docNumber).toBe('INV-SAME-01');
+      expect(resOldest.filteredPassbook[1].docNumber).toBe('CN-SAME-01');
+
+      harness.unmount();
+    });
+
+    it('comparePassbookEntries directly tests ascending and descending same-date secondary priority', () => {
+      const sale = {
+        id: 's1',
+        date: '2026-04-05',
+        docNumber: 'INV-1',
+        type: 'SALE' as const,
+        description: 'Sale 1',
+        debit: 100,
+        credit: 0,
+        rawInvoice: { invoiceType: 'B2CS' } as any,
+      };
+      const creditNote = {
+        id: 'cn1',
+        date: '2026-04-05',
+        docNumber: 'CN-1',
+        type: 'SALE' as const,
+        description: 'Return 1',
+        debit: 0,
+        credit: 50,
+        rawInvoice: { invoiceType: 'CREDIT_NOTE' } as any,
+      };
+      const payment = {
+        id: 'p1',
+        date: '2026-04-05',
+        docNumber: 'PAY-1',
+        type: 'PAYMENT_IN' as const,
+        description: 'Payment 1',
+        debit: 0,
+        credit: 100,
+      };
+      const opening = {
+        id: 'op1',
+        date: '2026-04-01',
+        docNumber: 'OPENING',
+        type: 'OPENING' as const,
+        description: 'Opening',
+        debit: 500,
+        credit: 0,
+      };
+
+      // In ascending (descending = false):
+      // Opening is always first
+      expect(comparePassbookEntries(opening, sale, false)).toBe(-1);
+      expect(comparePassbookEntries(sale, opening, false)).toBe(1);
+      // Sale before payment on same date
+      expect(comparePassbookEntries(sale, payment, false)).toBe(-1);
+      expect(comparePassbookEntries(payment, sale, false)).toBe(1);
+      // Normal sale before credit note on same date
+      expect(comparePassbookEntries(sale, creditNote, false)).toBe(-1);
+      expect(comparePassbookEntries(creditNote, sale, false)).toBe(1);
+
+      // In descending (descending = true):
+      // Opening is STILL always first
+      expect(comparePassbookEntries(opening, sale, true)).toBe(-1);
+      expect(comparePassbookEntries(sale, opening, true)).toBe(1);
+      // Sale before payment on same date
+      expect(comparePassbookEntries(sale, payment, true)).toBe(-1);
+      expect(comparePassbookEntries(payment, sale, true)).toBe(1);
+      // Normal sale before credit note on same date
+      expect(comparePassbookEntries(sale, creditNote, true)).toBe(-1);
+      expect(comparePassbookEntries(creditNote, sale, true)).toBe(1);
     });
   });
 
