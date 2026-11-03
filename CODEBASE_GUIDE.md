@@ -582,22 +582,22 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - When running inside the native Android WebView, links route via `window.AndroidBridge.openWhatsAppUrl(url)`.
   - The bridge call is wrapped in a `try/catch` block; if the native bridge throws, execution falls through gracefully to `window.open` / anchor click fallback without crashing.
 - **Demo Mode Guardrail & Copy Message Fallback**:
-  - Modals (`Common/WhatsAppShareModal.tsx` and `WhatsApp/WhatsAppShareModal.tsx`) check `isDemoModeActive()` (`POUCH_PERSIST_KEYS.DEMO_MODE`).
+  - The sharing hub (`Common/WhatsAppShareModal.tsx`) checks `isDemoModeActive()` (`POUCH_PERSIST_KEYS.DEMO_MODE`).
   - When active, a non-blocking warning banner (`whatsapp-demo-warning`) alerts the merchant that sample demo data is being sent and real WhatsApp will be opened without changing production records.
-  - Both modals provide a 1-tap **Copy message** action (`whatsapp-copy-button`) with clipboard feedback, serving as the graceful fallback when WhatsApp is not installed.
-  - Neither modal accepts or performs production data mutations.
+  - The modal provides a 1-tap **Copy message** action (`whatsapp-copy-button`) with clipboard feedback, serving as the graceful fallback when WhatsApp is not installed.
+  - Does not accept or perform production data mutations.
+- **Unified Sharing Hub & Action Tiles (`src/components/Common/WhatsAppShareModal.tsx`)**:
+  - Serves as the single sharing hub across Invoice Preview, Table Grid Invoicing, Simplified Invoicing, Parties, Payment Vouchers, and Cash/Bank.
+  - Features an inline **Text | Image** toggle, phone input, template selector, language toggle, and primary **Share on WhatsApp** button.
+  - Includes a compact secondary action row under the primary button for **A4 / PDF** (`onPrintA4`) and **Print** (`onPrint`) tiles when provided by invoicing call sites.
 - **Party Phone Prefill & Fallback Hierarchy**:
-  - **Folder Share Modal (`src/components/WhatsApp/WhatsAppShareModal.tsx`)**:
-    - Initializes the phone input directly with `invoice.partyPhone?.trim() || ''`.
-    - Automatically prefills party phone numbers already stored on invoice records for Invoice Preview and Table Grid share workflows.
-  - **Common Share Modal (`src/components/Common/WhatsAppShareModal.tsx`)**:
-    - Resolves the default phone value using strict priority fallback order:
-      1. `initialPhone` (if non-empty / trimmed)
-      2. `invoice.partyPhone` (if non-empty / trimmed)
-      3. `party.phone` (if non-empty / trimmed)
-      4. `''` (empty string)
-    - Prevents empty string prop overrides (`initialPhone=""`) from masking pre-existing invoice or party phone numbers.
-    - Explicit user clears in the input field remain cleared after mount; the reactive re-synchronization effect only updates state if the resolved `defaultPhone` reference changes.
+  - Resolves the default phone value using strict priority fallback order:
+    1. `initialPhone` (if non-empty / trimmed)
+    2. `invoice.partyPhone` (if non-empty / trimmed)
+    3. `party.phone` (if non-empty / trimmed)
+    4. `''` (empty string)
+  - Prevents empty string prop overrides (`initialPhone=""`) from masking pre-existing invoice or party phone numbers.
+  - Explicit user clears in the input field remain cleared after mount; the reactive re-synchronization effect only updates state if the resolved `defaultPhone` reference changes.
 - **Native Intent Chooser Contract (`MainActivity.kt` & `AndroidManifest.xml`)**:
   - Android manifest declares `<queries>` for both `com.whatsapp` and `com.whatsapp.w4b` (WhatsApp Business).
   - When both packages are installed, `MainActivity.kt` builds `Intent.createChooser` with `EXTRA_INITIAL_INTENTS` to prompt the user.

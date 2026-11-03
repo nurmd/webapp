@@ -40,6 +40,8 @@ export interface WhatsAppShareModalProps {
   overdueDays?: number;
   paymentShareText?: string;
   paymentReceiptParams?: PaymentReceiptParams;
+  onPrintA4?: () => void;   // A4 / PDF
+  onPrint?: () => void;     // thermal / receipt print
 }
 
 export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
@@ -55,6 +57,8 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   overdueDays,
   paymentShareText,
   paymentReceiptParams,
+  onPrintA4,
+  onPrint,
 }) => {
   useBackNavigation(() => {
     onClose();
@@ -125,6 +129,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         invoice,
         party,
         balanceAmount: initialBalance,
+        totalBalanceDue: initialBalance,
         partyName: initialPartyName,
         partyPhone: phone,
       },
@@ -583,52 +588,90 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low flex items-center justify-end gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant text-xs font-semibold hover:bg-surface-container cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            data-testid="whatsapp-copy-button"
-            onClick={handleCopy}
-            className="px-4 py-2.5 rounded-xl border border-secondary text-secondary text-xs font-bold hover:bg-secondary/10 flex items-center gap-1.5 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">content_copy</span>
-            <span>Copy SMS</span>
-          </button>
-          <button
-            type="button"
-            data-testid="whatsapp-send-button"
-            disabled={isSharingImage}
-            onClick={() => {
-              if (isImageMode) {
-                handleShareImage();
-              } else {
-                handleSend();
-              }
-            }}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer transition-transform"
-          >
-            {isSharingImage ? (
-              <>
-                <span className="material-symbols-outlined text-[16px] animate-spin">
-                  progress_activity
-                </span>
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-[18px]">
-                  {isImageMode ? 'share' : 'send'}
-                </span>
-                <span>Share on WhatsApp</span>
-              </>
-            )}
-          </button>
+        <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low flex flex-col gap-2.5 shrink-0">
+          <div className="flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl border border-outline-variant/40 text-on-surface-variant text-xs font-semibold hover:bg-surface-container cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-testid="whatsapp-copy-button"
+              onClick={handleCopy}
+              className="px-4 py-2.5 rounded-xl border border-secondary text-secondary text-xs font-bold hover:bg-secondary/10 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">content_copy</span>
+              <span>Copy SMS</span>
+            </button>
+            <button
+              type="button"
+              data-testid="whatsapp-send-button"
+              disabled={isSharingImage}
+              onClick={() => {
+                if (isImageMode) {
+                  handleShareImage();
+                } else {
+                  handleSend();
+                }
+              }}
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-95 text-white text-xs font-bold flex items-center gap-2 shadow-md cursor-pointer transition-transform"
+            >
+              {isSharingImage ? (
+                <>
+                  <span className="material-symbols-outlined text-[16px] animate-spin">
+                    progress_activity
+                  </span>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[18px]">
+                    {isImageMode ? 'share' : 'send'}
+                  </span>
+                  <span>Share on WhatsApp</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {(onPrintA4 || onPrint) && (
+            <div
+              data-testid="share-hub-secondary-actions"
+              className="flex items-center gap-2 pt-2.5 border-t border-outline-variant/20"
+            >
+              {onPrintA4 && (
+                <button
+                  type="button"
+                  data-testid="btn-share-hub-a4"
+                  onClick={() => {
+                    onPrintA4();
+                    onClose();
+                  }}
+                  className="flex-1 py-2 px-3 rounded-xl border border-outline-variant/40 bg-surface hover:bg-surface-container flex items-center justify-center gap-2 text-xs font-bold text-on-surface transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">picture_as_pdf</span>
+                  <span>A4 / PDF</span>
+                </button>
+              )}
+              {onPrint && (
+                <button
+                  type="button"
+                  data-testid="btn-share-hub-print"
+                  onClick={() => {
+                    onPrint();
+                    onClose();
+                  }}
+                  className="flex-1 py-2 px-3 rounded-xl border border-outline-variant/40 bg-surface hover:bg-surface-container flex items-center justify-center gap-2 text-xs font-bold text-on-surface transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-secondary">print</span>
+                  <span>Print</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

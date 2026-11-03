@@ -11,7 +11,7 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
   - Specifically for `Party`: `openingBalance`, `openingBalanceType`, and `openingBalanceDate` must remain intact unless explicitly deleted via dedicated methods (e.g., `db.clearPartyOpeningBalance(partyId)`) or set to an explicit zero.
   - Cross-tab synchronizations (`PouchDB`, `BroadcastChannel`) and modal save callbacks must merge incoming partial records with existing stored records.
 - **Signed Balance Recalculations**: `recalculatePartyBalance(partyId)` must always incorporate signed opening balances (`TO_RECEIVE` as positive receivable, `TO_PAY` as liability/advance) along with active, non-cancelled invoice balances and unallocated receipts.
-- **Passbook Ledger Baseline**: The customer/supplier passbook (`usePartyPassbook`) must always anchor the `OPENING` entry at index 0 as the baseline transaction before subsequent invoices and vouchers.
+- **Passbook Ledger Baseline**: The customer/supplier passbook (`usePartyPassbook`) treats `OPENING` as the chronological baseline — first in ascending/Oldest order, last in descending/Newest order.
 
 ---
 

@@ -31,7 +31,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { WhatsAppShareModal as CommonWhatsAppShareModal } from '../components/Common/WhatsAppShareModal.tsx';
-import { WhatsAppShareModal as FolderWhatsAppShareModal } from '../components/WhatsApp/WhatsAppShareModal.tsx';
 import { InvoicePreviewModal } from '../components/Invoicing/InvoicePreviewModal.tsx';
 import { SimplifiedInvoiceModal } from '../components/Invoicing/SimplifiedInvoiceModal.tsx';
 import { CreateInvoiceModal } from '../components/Invoicing/CreateInvoiceModal.tsx';
@@ -576,14 +575,15 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
   });
 
   describe('WhatsApp/WhatsAppShareModal (Invoice Preview & Grid)', () => {
-    it('allows optional empty phone and dispatches chooser URL without recipient', () => {
+    it('blocks send and shows inline error when invoice has no partyPhone and input is empty', () => {
       const bridgeSpy = vi.fn();
       (window as any).AndroidBridge = { openWhatsAppUrl: bridgeSpy };
       const onClose = vi.fn();
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoiceNoPhone}
             company={mockCompany}
             onClose={onClose}
@@ -596,21 +596,23 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         sendBtn.click();
       });
 
-      expect(bridgeSpy).toHaveBeenCalledTimes(1);
-      const url = bridgeSpy.mock.calls[0][0];
-      expect(url).toContain('https://api.whatsapp.com/send?text=');
-      expect(url).not.toContain('phone=');
-      expect(onClose).toHaveBeenCalled();
+      expect(bridgeSpy).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      const errorEl = container.querySelector('[data-testid="whatsapp-phone-error"]');
+      expect(errorEl).not.toBeNull();
+      expect(errorEl?.textContent).toContain('valid 10-digit');
     });
 
-    it('prefills invoice.partyPhone and sends using api.whatsapp.com', () => {
+    it('prefills invoice.partyPhone and sends using wa.me URL', () => {
       const bridgeSpy = vi.fn();
       (window as any).AndroidBridge = { openWhatsAppUrl: bridgeSpy };
       const onClose = vi.fn();
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={onClose}
@@ -628,11 +630,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       expect(bridgeSpy).toHaveBeenCalledTimes(1);
       const url = bridgeSpy.mock.calls[0][0];
-      expect(url).toContain('https://api.whatsapp.com/send?phone=919876543210&text=');
+      expect(url).toContain('https://wa.me/919876543210?text=');
       expect(onClose).toHaveBeenCalled();
     });
-
-
 
     it('prefills input from initialPhone prop even when invoice has no partyPhone', () => {
       const bridgeSpy = vi.fn();
@@ -641,7 +641,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoiceNoPhone}
             company={mockCompany}
             onClose={onClose}
@@ -660,7 +661,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       expect(bridgeSpy).toHaveBeenCalledTimes(1);
       const url = bridgeSpy.mock.calls[0][0];
-      expect(url).toContain('https://api.whatsapp.com/send?phone=919876543210&text=');
+      expect(url).toContain('https://wa.me/919876543210?text=');
       expect(onClose).toHaveBeenCalled();
     });
 
@@ -671,7 +672,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={onClose}
@@ -691,11 +693,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       expect(bridgeSpy).toHaveBeenCalledTimes(1);
       const url = bridgeSpy.mock.calls[0][0];
-      expect(url).toContain('https://api.whatsapp.com/send?phone=919876543210&text=');
+      expect(url).toContain('https://wa.me/919876543210?text=');
       expect(onClose).toHaveBeenCalled();
     });
-
-
 
     it('blocks send and displays inline error when non-empty input is invalid', () => {
       const bridgeSpy = vi.fn();
@@ -704,7 +704,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={onClose}
@@ -730,10 +731,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(errorEl?.textContent).toContain('Only Indian (+91)');
     });
 
-    it('copies the message and displays feedback in the Folder modal', () => {
+    it('copies the message and displays feedback in the modal', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -753,11 +755,12 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(container.textContent).toContain('Copied');
     });
 
-    it('renders Demo Mode warning in Folder modal when active', () => {
+    it('renders Demo Mode warning in modal when active', () => {
       localStorage.setItem(POUCH_PERSIST_KEYS.DEMO_MODE, 'true');
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -770,10 +773,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(warning?.textContent).toContain('Demo Mode: this message uses demo data');
     });
 
-    it('tab control renders both Text Message and Receipt Image', () => {
+    it('tab control renders both Text and Image labels', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -784,15 +788,16 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       const textTab = container.querySelector('[data-testid="whatsapp-tab-text"]');
       const imgTab = container.querySelector('[data-testid="whatsapp-tab-image"]');
       expect(textTab).not.toBeNull();
-      expect(textTab?.textContent).toContain('Text Message');
+      expect(textTab?.textContent).toContain('Text');
       expect(imgTab).not.toBeNull();
-      expect(imgTab?.textContent).toContain('Receipt Image');
+      expect(imgTab?.textContent).toContain('Image');
     });
 
-    it('switching to Receipt Image shows whatsapp-share-image-button and hides the message preview box', () => {
+    it('switching to Image hides the message preview box and keeps single share button', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -805,19 +810,20 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
-      expect(shareImgBtn).not.toBeNull();
-      expect(shareImgBtn.textContent).toContain('Share Image');
-      expect(shareImgBtn.disabled).toBe(false);
+      const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
+      expect(sendBtn).not.toBeNull();
+      expect(sendBtn.textContent).toContain('Share on WhatsApp');
+      expect(sendBtn.disabled).toBe(false);
 
       const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
       expect(previewBox).toBeNull();
     });
 
-    it('switching back to Text Message shows the preview box and copy/send buttons', () => {
+    it('switching back to Text shows the preview box and copy/send buttons', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -840,14 +846,13 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect(copyBtn).not.toBeNull();
       const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]');
       expect(sendBtn).not.toBeNull();
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]');
-      expect(shareImgBtn).toBeNull();
     });
 
     it('preserves phone number when switching between tabs', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoiceNoPhone}
             company={mockCompany}
             onClose={vi.fn()}
@@ -883,10 +888,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={{ ...mockInvoice, grandTotal: 2950, balanceAmount: 1500 }}
             company={mockCompany}
-            totalBalanceDue={1800}
+            initialBalance={1800}
             onClose={vi.fn()}
           />
         );
@@ -897,9 +903,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
 
       expect(shareSpy).toHaveBeenCalledWith(
@@ -911,7 +917,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       );
     });
 
-    it('clicking whatsapp-share-image-button captures thermal preview DOM and shows success toast', async () => {
+    it('clicking share in image mode captures thermal preview DOM and shows success toast', async () => {
       const fakeBlob = new Blob(['fake-receipt'], { type: 'image/png' });
       const previewSpy = vi.spyOn(receiptImageShare, 'renderThermalPreviewImage').mockResolvedValue(fakeBlob);
       const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('shared');
@@ -919,7 +925,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -932,11 +939,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
-      expect(shareImgBtn).not.toBeNull();
+      const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
+      expect(sendBtn).not.toBeNull();
 
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
 
       expect(previewSpy).toHaveBeenCalledWith(
@@ -962,7 +969,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
 
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -975,9 +983,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
 
       expect(canvasSpy).toHaveBeenCalled();
@@ -1000,7 +1008,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       const shareSpy = vi.spyOn(receiptImageShare, 'shareReceiptImage').mockResolvedValue('downloaded');
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
@@ -1013,29 +1022,29 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
         imgTab.click();
       });
 
-      const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+      const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
       expect(toastSpy).toHaveBeenCalledWith('Receipt image saved. Attach it in the WhatsApp chat.');
 
       // 2. Cancelled
       shareSpy.mockResolvedValue('cancelled');
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
       expect(toastSpy).toHaveBeenCalledWith('Share cancelled.');
 
       // 3. Failed
       shareSpy.mockResolvedValue('failed');
       await act(async () => {
-        shareImgBtn.click();
+        sendBtn.click();
       });
       expect(toastSpy).toHaveBeenCalledWith('Could not create the receipt image.');
       shareSpy.mockRestore();
     });
 
-    it('invokes AndroidBridge.shareImage when clicking whatsapp-share-image-button if bridge is present', async () => {
+    it('invokes AndroidBridge.shareImage when clicking send button in image mode if bridge is present', async () => {
       const shareMock = vi.fn();
       (window as any).AndroidBridge = { shareImage: shareMock };
       const fakeBlob = new Blob(['whatsapp-modal-receipt'], { type: 'image/png' });
@@ -1045,7 +1054,8 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       try {
         act(() => {
           root.render(
-            <FolderWhatsAppShareModal
+            <CommonWhatsAppShareModal
+              isOpen={true}
               invoice={mockInvoice}
               company={mockCompany}
               onClose={vi.fn()}
@@ -1058,9 +1068,9 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
           imgTab.click();
         });
 
-        const shareImgBtn = container.querySelector('[data-testid="whatsapp-share-image-button"]') as HTMLButtonElement;
+        const sendBtn = container.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
         await act(async () => {
-          shareImgBtn.click();
+          sendBtn.click();
           await vi.waitFor(() => {
             expect(shareMock).toHaveBeenCalledWith(
               btoa('whatsapp-modal-receipt'),
@@ -1077,9 +1087,86 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
     });
   });
 
+  describe('Sharing Hub Secondary Action Tiles (A4/PDF & Print)', () => {
+    it('renders A4/PDF and Print tiles when callbacks are supplied and hides them when omitted', () => {
+      const onPrintA4 = vi.fn();
+      const onPrint = vi.fn();
+      const onClose = vi.fn();
+
+      // 1. Both callbacks supplied
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={onClose}
+            onPrintA4={onPrintA4}
+            onPrint={onPrint}
+          />
+        );
+      });
+
+      const secondaryActions = container.querySelector('[data-testid="share-hub-secondary-actions"]');
+      expect(secondaryActions).not.toBeNull();
+
+      const a4Btn = container.querySelector('[data-testid="btn-share-hub-a4"]') as HTMLButtonElement;
+      const printBtn = container.querySelector('[data-testid="btn-share-hub-print"]') as HTMLButtonElement;
+      expect(a4Btn).not.toBeNull();
+      expect(a4Btn.textContent).toContain('A4 / PDF');
+      expect(printBtn).not.toBeNull();
+      expect(printBtn.textContent).toContain('Print');
+
+      act(() => {
+        a4Btn.click();
+      });
+      expect(onPrintA4).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      onClose.mockClear();
+      act(() => {
+        printBtn.click();
+      });
+      expect(onPrint).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      // 2. Only onPrint supplied (e.g. TableGrid)
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={onClose}
+            onPrint={onPrint}
+          />
+        );
+      });
+
+      expect(container.querySelector('[data-testid="btn-share-hub-a4"]')).toBeNull();
+      expect(container.querySelector('[data-testid="btn-share-hub-print"]')).not.toBeNull();
+
+      // 3. Neither callback supplied (e.g. payment voucher or party statement)
+      act(() => {
+        root.render(
+          <CommonWhatsAppShareModal
+            isOpen={true}
+            invoice={mockInvoice}
+            company={mockCompany}
+            onClose={onClose}
+          />
+        );
+      });
+
+      expect(container.querySelector('[data-testid="share-hub-secondary-actions"]')).toBeNull();
+      expect(container.querySelector('[data-testid="btn-share-hub-a4"]')).toBeNull();
+      expect(container.querySelector('[data-testid="btn-share-hub-print"]')).toBeNull();
+    });
+  });
+
   describe('Production Data Protection Guardrail', () => {
-    it('asserts that neither modal accepts or invokes database write mutations', () => {
-      // TypeScript compile-time and runtime check: neither modal prop interface declares write callbacks
+    it('asserts that modal does not accept or invoke database write mutations', () => {
+      // TypeScript compile-time and runtime check: modal prop interface declares no write callbacks
       const commonProps = {
         isOpen: true,
         onClose: vi.fn(),
@@ -1089,19 +1176,11 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
       expect('saveInvoice' in commonProps).toBe(false);
       expect('onSave' in commonProps).toBe(false);
       expect('persist' in commonProps).toBe(false);
-
-      const folderProps = {
-        invoice: mockInvoice,
-        company: mockCompany,
-        onClose: vi.fn(),
-      };
-      expect('saveInvoice' in folderProps).toBe(false);
-      expect('onSave' in folderProps).toBe(false);
     });
   });
 
   describe('End-to-End Invoice Party Phone Prefill Integration', () => {
-    it('prefills phone in Folder WhatsAppShareModal via party lookup when invoice has no partyPhone', () => {
+    it('prefills phone in WhatsAppShareModal via party lookup when invoice has no partyPhone', () => {
       vi.spyOn(db, 'getParties').mockReturnValue([
         {
           id: 'PTY-1',

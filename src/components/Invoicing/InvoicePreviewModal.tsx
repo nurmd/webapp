@@ -21,7 +21,7 @@ import {
   Building2,
   User,
 } from 'lucide-react';
-import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 const ThermalPrintModal = React.lazy(() =>
   import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
@@ -2144,11 +2144,14 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
 
       {isWhatsAppModalOpen && (
         <WhatsAppShareModal
+          isOpen={true}
           invoice={invoice}
           company={company}
           onClose={() => setIsWhatsAppModalOpen(false)}
           initialPhone={party?.phone}
-          totalBalanceDue={totalBalanceDue}
+          initialBalance={totalBalanceDue}
+          onPrintA4={handlePrint}
+          onPrint={() => setIsThermalModalOpen(true)}
         />
       )}
     </div>

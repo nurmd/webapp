@@ -719,34 +719,48 @@ class AndroidBridge(
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
-                // Try to target WhatsApp directly:
-                val waIntent = Intent(intent).apply {
-                    setPackage("com.whatsapp")
-                    clipData = intent.clipData
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                if (waIntent.resolveActivity(context.packageManager) != null) {
-                    waIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(waIntent)
-                    return@runOnUiThread
+                val title = chooserTitle.trim().ifBlank { "Share receipt" }
+                val pm = context.packageManager
+                val packages = listOf("com.whatsapp", "com.whatsapp.w4b")
+                val availableIntents = mutableListOf<Intent>()
+
+                for (pkg in packages) {
+                    val targetIntent = Intent(intent).apply {
+                        setPackage(pkg)
+                        clipData = intent.clipData
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    @Suppress("DEPRECATION")
+                    val resolveInfos = pm.queryIntentActivities(targetIntent, 0)
+                    if (resolveInfos.isNotEmpty()) {
+                        availableIntents.add(targetIntent)
+                    }
                 }
 
-                // WhatsApp Business
-                val waBizIntent = Intent(intent).apply {
-                    setPackage("com.whatsapp.w4b")
-                    clipData = intent.clipData
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                when {
+                    availableIntents.size >= 2 -> {
+                        val primaryIntent = availableIntents.removeAt(0)
+                        val chooserIntent = Intent.createChooser(primaryIntent, title).apply {
+                            putExtra(Intent.EXTRA_INITIAL_INTENTS, availableIntents.toTypedArray())
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(chooserIntent)
+                    }
+                    availableIntents.size == 1 -> {
+                        val singleIntent = availableIntents[0].apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(singleIntent)
+                    }
+                    else -> {
+                        val fallbackChooser = Intent.createChooser(intent, title).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(fallbackChooser)
+                    }
                 }
-                if (waBizIntent.resolveActivity(context.packageManager) != null) {
-                    waBizIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(waBizIntent)
-                    return@runOnUiThread
-                }
-
-                // Fallback: chooser
-                val chooser = Intent.createChooser(intent, chooserTitle.ifBlank { "Share receipt" })
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(chooser)
             } catch (e: Exception) {
                 Toast.makeText(context, "Share failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }

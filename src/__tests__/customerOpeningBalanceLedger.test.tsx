@@ -965,24 +965,28 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       expect(res.txnSortOrder).toBe('NEWEST');
       expect(res.filteredPassbook.length).toBe(4);
 
+      // Internal running balance build keeps OPENING at index 0
+      expect(res.passbook[0].type).toBe('OPENING');
+      expect(res.passbook[0].docNumber).toBe('OPENING');
+
       // In NEWEST order:
-      // 1. OPENING stays first as baseline (index 0)
-      expect(res.filteredPassbook[0].type).toBe('OPENING');
-      expect(res.filteredPassbook[0].docNumber).toBe('OPENING');
+      // 1. Newer date 2026-04-06 comes before 2026-04-05
+      expect(res.filteredPassbook[0].type).toBe('SALE');
+      expect(res.filteredPassbook[0].docNumber).toBe('INV-SORT-2');
+      expect(res.filteredPassbook[0].date).toBe('2026-04-06');
 
-      // 2. Newer date 2026-04-06 comes before 2026-04-05
+      // 2. For 2026-04-05: SALE must come before PAYMENT_IN (not inverted by reverse)
       expect(res.filteredPassbook[1].type).toBe('SALE');
-      expect(res.filteredPassbook[1].docNumber).toBe('INV-SORT-2');
-      expect(res.filteredPassbook[1].date).toBe('2026-04-06');
+      expect(res.filteredPassbook[1].docNumber).toBe('INV-SORT-1');
+      expect(res.filteredPassbook[1].date).toBe('2026-04-05');
 
-      // 3. For 2026-04-05: SALE must come before PAYMENT_IN (not inverted by reverse)
-      expect(res.filteredPassbook[2].type).toBe('SALE');
-      expect(res.filteredPassbook[2].docNumber).toBe('INV-SORT-1');
+      expect(res.filteredPassbook[2].type).toBe('PAYMENT_IN');
+      expect(res.filteredPassbook[2].docNumber).toBe('PAY-SORT-1');
       expect(res.filteredPassbook[2].date).toBe('2026-04-05');
 
-      expect(res.filteredPassbook[3].type).toBe('PAYMENT_IN');
-      expect(res.filteredPassbook[3].docNumber).toBe('PAY-SORT-1');
-      expect(res.filteredPassbook[3].date).toBe('2026-04-05');
+      // 3. OPENING (2026-04-01) is the last entry in NEWEST (descending) order
+      expect(res.filteredPassbook[3].type).toBe('OPENING');
+      expect(res.filteredPassbook[3].docNumber).toBe('OPENING');
 
       // Switch to OLDEST order:
       act(() => {
@@ -1166,15 +1170,100 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       expect(comparePassbookEntries(creditNote, sale, false)).toBe(1);
 
       // In descending (descending = true):
-      // Opening is STILL always first
-      expect(comparePassbookEntries(opening, sale, true)).toBe(-1);
-      expect(comparePassbookEntries(sale, opening, true)).toBe(1);
+      // Opening is last (date 2026-04-01 is older than sale 2026-04-05)
+      expect(comparePassbookEntries(opening, sale, true)).toBeGreaterThan(0);
+      expect(comparePassbookEntries(sale, opening, true)).toBeLessThan(0);
       // Sale before payment on same date
       expect(comparePassbookEntries(sale, payment, true)).toBe(-1);
       expect(comparePassbookEntries(payment, sale, true)).toBe(1);
       // Normal sale before credit note on same date
       expect(comparePassbookEntries(sale, creditNote, true)).toBe(-1);
       expect(comparePassbookEntries(creditNote, sale, true)).toBe(1);
+    });
+
+    it('NEWEST sort places OPENING last and the remaining rows are strictly newest -> oldest', () => {
+      const customer: Party = {
+        id: 'PTY-FOCUS-001',
+        name: 'Focus Test Customer',
+        type: 'CUSTOMER',
+        phone: '9800112233',
+        billingAddress: 'Commercial Street, Bangalore',
+        stateCode: '29',
+        openingBalance: 1000,
+        openingBalanceType: 'TO_RECEIVE',
+        openingBalanceDate: '2026-04-01',
+        currentBalance: 6000,
+        createdAt: '2026-04-01T08:00:00Z',
+        updatedAt: '2026-04-01T08:00:00Z',
+      };
+
+      const baseInv: Invoice = {
+        id: 'INV-F1',
+        invoiceNumber: 'INV-01',
+        invoiceType: 'B2CS',
+        date: '2026-04-03',
+        partyId: customer.id,
+        partyName: customer.name,
+        partyAddress: customer.billingAddress,
+        partyStateCode: '29',
+        placeOfSupplyStateCode: '29',
+        isIntraState: true,
+        items: [],
+        totalGrossAmount: 2000,
+        totalDiscount: 0,
+        totalTaxableAmount: 2000,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
+        totalCess: 0,
+        totalTax: 0,
+        roundOff: 0,
+        grandTotal: 2000,
+        amountInWords: 'Two Thousand Only',
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 2000,
+        createdAt: '2026-04-03T10:00:00Z',
+        updatedAt: '2026-04-03T10:00:00Z',
+      };
+
+      const inv1 = { ...baseInv, id: 'INV-F1', invoiceNumber: 'INV-01', date: '2026-04-03' };
+      const inv2 = { ...baseInv, id: 'INV-F2', invoiceNumber: 'INV-02', date: '2026-04-08' };
+      const inv3 = { ...baseInv, id: 'INV-F3', invoiceNumber: 'INV-03', date: '2026-04-15' };
+
+      const harness = renderPassbookHook({
+        party: customer,
+        company: dummyCompany,
+        invoices: [inv1, inv2, inv3],
+        purchases: [],
+        vouchers: [],
+      });
+
+      const res = harness.result();
+      expect(res.txnSortOrder).toBe('NEWEST');
+      expect(res.filteredPassbook.length).toBe(4);
+
+      // Remaining rows strictly newest -> oldest:
+      expect(res.filteredPassbook[0].docNumber).toBe('INV-03');
+      expect(res.filteredPassbook[0].date).toBe('2026-04-15');
+
+      expect(res.filteredPassbook[1].docNumber).toBe('INV-02');
+      expect(res.filteredPassbook[1].date).toBe('2026-04-08');
+
+      expect(res.filteredPassbook[2].docNumber).toBe('INV-01');
+      expect(res.filteredPassbook[2].date).toBe('2026-04-03');
+
+      // OPENING row placed last in NEWEST (descending) order
+      expect(res.filteredPassbook[3].type).toBe('OPENING');
+      expect(res.filteredPassbook[3].docNumber).toBe('OPENING');
+      expect(res.filteredPassbook[3].date).toBe('2026-04-01');
+
+      // Internal ascending baseline passbook still has OPENING first
+      expect(res.passbook[0].type).toBe('OPENING');
+      expect(res.passbook[3].docNumber).toBe('INV-03');
+
+      harness.unmount();
     });
   });
 

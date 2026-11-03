@@ -13,7 +13,7 @@ import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { SelectPartyModal } from '../Parties/SelectPartyModal.tsx';
 import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
-import { WhatsAppShareModal } from '../WhatsApp/WhatsAppShareModal.tsx';
+import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 
 const ThermalPrintModal = React.lazy(() =>
   import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
@@ -1397,13 +1397,15 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       {/* WhatsApp Share Modal */}
       {whatsAppInvoiceData && (
         <WhatsAppShareModal
+          isOpen={true}
           invoice={whatsAppInvoiceData}
           company={company}
           onClose={() => {
             setWhatsAppInvoiceData(null);
             onClose();
           }}
-          totalBalanceDue={whatsAppPartyTotalDue}
+          initialBalance={whatsAppPartyTotalDue}
+          onPrint={() => setPreviewInvoiceData(whatsAppInvoiceData)}
         />
       )}
 

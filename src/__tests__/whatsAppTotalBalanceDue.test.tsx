@@ -13,7 +13,7 @@ import { Party } from '../models/party.ts';
 import { PurchaseBill } from '../models/purchase.ts';
 import { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../models/bankAccount.ts';
 import { CashBankTransactionDetailModal } from '../components/CashBank/CashBankTransactionDetailModal.tsx';
-import { WhatsAppShareModal as FolderWhatsAppShareModal } from '../components/WhatsApp/WhatsAppShareModal.tsx';
+import { WhatsAppShareModal as CommonWhatsAppShareModal } from '../components/Common/WhatsAppShareModal.tsx';
 import { DashboardView } from '../components/Dashboard/DashboardView.tsx';
 import { DashboardVoucherModal } from '../components/Dashboard/DashboardVoucherModal.tsx';
 import { formatWhatsAppMessage } from '../services/whatsappService.ts';
@@ -463,15 +463,16 @@ describe('WhatsApp Total Balance Due Suite', () => {
     });
   });
 
-  describe('4. Folder WhatsApp Modal & formatWhatsAppMessage', () => {
-    it('Folder WhatsApp modal with explicit totalBalanceDue displays the value in preview', () => {
+  describe('4. Consolidated WhatsApp Modal & formatWhatsAppMessage', () => {
+    it('Consolidated WhatsApp modal with explicit initialBalance displays the value in preview', () => {
       act(() => {
         root.render(
-          <FolderWhatsAppShareModal
+          <CommonWhatsAppShareModal
+            isOpen={true}
             invoice={mockInvoice}
             company={mockCompany}
             onClose={vi.fn()}
-            totalBalanceDue={24500}
+            initialBalance={24500}
           />
         );
       });

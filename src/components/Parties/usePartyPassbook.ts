@@ -46,8 +46,10 @@ export function comparePassbookEntries(
 ): number {
   // Opening balance must always be the baseline transaction of the passbook / ledger statement
   if (a.type === 'OPENING' && b.type === 'OPENING') return 0;
-  if (a.type === 'OPENING') return -1;
-  if (b.type === 'OPENING') return 1;
+  if (!descending) {
+    if (a.type === 'OPENING') return -1;
+    if (b.type === 'OPENING') return 1;
+  }
 
   const dateA = a.date ? new Date(a.date).getTime() : 0;
   const dateB = b.date ? new Date(b.date).getTime() : 0;
@@ -55,6 +57,12 @@ export function comparePassbookEntries(
   const timeB = isNaN(dateB) ? 0 : dateB;
   const timeDiff = descending ? timeB - timeA : timeA - timeB;
   if (timeDiff !== 0) return timeDiff;
+
+  // On the same date, OPENING is the day's start (oldest), so in descending order it appears after other entries
+  if (descending) {
+    if (a.type === 'OPENING') return 1;
+    if (b.type === 'OPENING') return -1;
+  }
 
   if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
   if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
