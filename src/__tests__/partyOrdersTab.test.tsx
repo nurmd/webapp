@@ -1,3 +1,5 @@
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
@@ -37,7 +39,9 @@ import { PurchaseBill } from '../models/purchase.ts';
 import { Invoice } from '../models/invoice.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../models/company.ts';
+import { preloadSimplifiedPurchaseModal } from '../core/utils/modalPreload.ts';
 import { PartyDetailPage } from '../components/Parties/PartyDetailPage.tsx';
+import { SimplifiedPurchaseModal } from '../components/Purchases/SimplifiedPurchaseModal.tsx';
 import { usePartyPassbook } from '../components/Parties/usePartyPassbook.ts';
 import { formatINR } from '../core/utils/formatters.ts';
 
@@ -336,11 +340,27 @@ describe('Supplier Detail: Transactions / Orders tabs spec', () => {
     expect(container.textContent).toContain('Billed → #PUR-009');
     expect(container.textContent).toContain('Cancelled');
 
-    // 8. Clicking P1 calls onEditPurchase with P1
+    // 8. Clicking P1 opens the preview modal instead of immediately jumping to edit
+    await preloadSimplifiedPurchaseModal();
     const p1Row = container.querySelector(`[data-testid="party-order-row-${poP1.id}"]`) as HTMLElement;
     expect(p1Row).not.toBeNull();
     await act(async () => {
       p1Row.click();
+    });
+
+    expect(onEditPurchase).not.toHaveBeenCalled();
+
+    // Wait for SimplifiedPurchaseModal lazy load
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    expect(container.querySelector('[data-testid="edit-purchase-btn"]')).not.toBeNull();
+
+    // Clicking Edit in preview invokes onEditPurchase
+    const editBtn = container.querySelector('[data-testid="edit-purchase-btn"]') as HTMLButtonElement;
+    await act(async () => {
+      editBtn.click();
     });
     expect(onEditPurchase).toHaveBeenCalledTimes(1);
     expect(onEditPurchase).toHaveBeenCalledWith(expect.objectContaining({ id: poP1.id, billNumber: 'P1' }));

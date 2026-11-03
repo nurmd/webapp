@@ -1,13 +1,10 @@
 {
-  "version": "1.2.67",
+  "version": "1.2.68",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-03T15:05:45.601Z",
+  "buildTime": "2026-11-03T16:00:23.514Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Party passbook: sleek unified preview for every transaction type (invoice, purchase, payment, opening)",
-    "Preview modal: delete top-left, edit and close top-right, scrollable item table, actions at bottom",
-    "Modal is large but inset so a strip of the blurred background stays visible; back closes it",
-    "Smaller transaction card icons for more room for text info"
+    "GRN and order rows now open a preview modal instead of jumping to edit"
   ]
 }

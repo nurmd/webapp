@@ -875,11 +875,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
                 grnTotal={grnTotal}
                 unbilledOrdersTotal={unbilledOrdersTotal}
                 onOrderClick={(order) => {
-                  if (onEditPurchase) {
-                    onEditPurchase(order);
-                  } else {
-                    setSelectedPurchaseBill(order);
-                  }
+                  setSelectedPurchaseBill(order);
                 }}
               />
             )}
