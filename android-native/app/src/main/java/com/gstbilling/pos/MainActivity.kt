@@ -1019,7 +1019,6 @@ class AndroidBridge(
         isDownloading = false
         downloadThread?.interrupt()
         downloadThread = null
-        clearTempApk()
     }
 
     @JavascriptInterface

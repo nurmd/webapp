@@ -24,6 +24,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   const [showServerDetails, setShowServerDetails] = useState(false);
 
   const cancelDownloadRef = useRef<(() => void) | null>(null);
+  const isDownloadingRef = useRef<boolean>(false);
   const [activeRelease, setActiveRelease] = useState<AppReleaseInfo | null>(releaseInfo || null);
   const [dynamicNotes, setDynamicNotes] = useState<string[]>([]);
 
@@ -60,11 +61,19 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
       setTotalBytes(0);
       setErrorMessage(null);
       setVerifiedHash(null);
-      if (cancelDownloadRef.current) {
+      if (cancelDownloadRef.current && isDownloadingRef.current) {
         cancelDownloadRef.current();
         cancelDownloadRef.current = null;
       }
+      isDownloadingRef.current = false;
     }
+    return () => {
+      if (cancelDownloadRef.current && isDownloadingRef.current) {
+        cancelDownloadRef.current();
+        cancelDownloadRef.current = null;
+      }
+      isDownloadingRef.current = false;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -113,6 +122,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
     setDownloadProgress(0);
     setLoadedBytes(0);
     setErrorMessage(null);
+    isDownloadingRef.current = true;
 
     const cancelFn = updateService.startInternalDownload({
       apkUrl: info.apkUrl,
@@ -128,10 +138,14 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
         }
       },
       onSuccess: (hash) => {
+        isDownloadingRef.current = false;
+        cancelDownloadRef.current = null;
         setVerifiedHash(hash);
         setStatus('success');
       },
       onError: (msg) => {
+        isDownloadingRef.current = false;
+        cancelDownloadRef.current = null;
         setErrorMessage(msg);
         setStatus('error');
         updateService.clearTempApk();
@@ -155,6 +169,7 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   };
 
   const handleCancelDownload = () => {
+    isDownloadingRef.current = false;
     if (cancelDownloadRef.current) {
       cancelDownloadRef.current();
       cancelDownloadRef.current = null;

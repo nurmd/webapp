@@ -280,4 +280,230 @@ describe('updateService OTA fallback and release safety', () => {
     expect(downloadBtn?.textContent).toContain('Download & Verify (5.4 MB)');
     expect(container?.querySelector('[data-testid="btn-open-github-release"]')).toBeNull();
   });
+
+  it('closing the modal during in-flight download cancels the download without clearing temp APK', async () => {
+    const mockStart = vi.fn();
+    const mockCancel = vi.fn();
+    const mockClear = vi.fn();
+    (window as any).AndroidBridge = {
+      startInternalDownload: mockStart,
+      cancelInternalDownload: mockCancel,
+      clearTempApk: mockClear,
+    };
+
+    const testRelease: AppReleaseInfo = {
+      version: '9.9.9',
+      versionCode: 90909,
+      releaseDate: '2026-10-24',
+      releaseTitle: 'Vyapar PRO v9.9.9',
+      releaseNotes: ['APK package available'],
+      apkUrl: 'https://github.com/nurmd/webapp/releases/download/v9.9.9/GSTBilling-Vyapar.apk',
+      apkSize: '5.4 MB',
+      sha256: 'a'.repeat(64),
+      htmlUrl: 'https://github.com/nurmd/webapp/releases/tag/v9.9.9',
+      isPwa: false,
+    };
+
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: true,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    const downloadBtn = container?.querySelector('[data-testid="btn-download-apk"]') as HTMLButtonElement | null;
+    await act(async () => {
+      downloadBtn?.click();
+    });
+
+    expect(mockStart).toHaveBeenCalledWith(testRelease.apkUrl, testRelease.sha256);
+    expect(mockCancel).not.toHaveBeenCalled();
+
+    // Closing while download is actively in-flight
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: false,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    expect(mockCancel).toHaveBeenCalledTimes(1);
+    expect(mockClear).not.toHaveBeenCalled();
+  });
+
+  it('closing the modal after successful download does NOT call cancelInternalDownload or clearTempApk', async () => {
+    const mockStart = vi.fn();
+    const mockCancel = vi.fn();
+    const mockClear = vi.fn();
+    (window as any).AndroidBridge = {
+      startInternalDownload: mockStart,
+      cancelInternalDownload: mockCancel,
+      clearTempApk: mockClear,
+    };
+
+    const testRelease: AppReleaseInfo = {
+      version: '9.9.9',
+      versionCode: 90909,
+      releaseDate: '2026-10-24',
+      releaseTitle: 'Vyapar PRO v9.9.9',
+      releaseNotes: ['APK package available'],
+      apkUrl: 'https://github.com/nurmd/webapp/releases/download/v9.9.9/GSTBilling-Vyapar.apk',
+      apkSize: '5.4 MB',
+      sha256: 'a'.repeat(64),
+      htmlUrl: 'https://github.com/nurmd/webapp/releases/tag/v9.9.9',
+      isPwa: false,
+    };
+
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: true,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    const downloadBtn = container?.querySelector('[data-testid="btn-download-apk"]') as HTMLButtonElement | null;
+    await act(async () => {
+      downloadBtn?.click();
+    });
+
+    expect(mockStart).toHaveBeenCalledTimes(1);
+
+    // Simulate native download success event
+    await act(async () => {
+      (window as any).onOtaSuccess?.('a'.repeat(64));
+    });
+
+    expect(container?.textContent).toContain('Installation Prompt Opened');
+    mockCancel.mockClear();
+    mockClear.mockClear();
+
+    // User closes modal after download has succeeded
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: false,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    expect(mockCancel).not.toHaveBeenCalled();
+    expect(mockClear).not.toHaveBeenCalled();
+  });
+
+  it('unmounting the modal after successful download does NOT call cancelInternalDownload or clearTempApk', async () => {
+    const mockStart = vi.fn();
+    const mockCancel = vi.fn();
+    const mockClear = vi.fn();
+    (window as any).AndroidBridge = {
+      startInternalDownload: mockStart,
+      cancelInternalDownload: mockCancel,
+      clearTempApk: mockClear,
+    };
+
+    const testRelease: AppReleaseInfo = {
+      version: '9.9.9',
+      versionCode: 90909,
+      releaseDate: '2026-10-24',
+      releaseTitle: 'Vyapar PRO v9.9.9',
+      releaseNotes: ['APK package available'],
+      apkUrl: 'https://github.com/nurmd/webapp/releases/download/v9.9.9/GSTBilling-Vyapar.apk',
+      apkSize: '5.4 MB',
+      sha256: 'a'.repeat(64),
+      htmlUrl: 'https://github.com/nurmd/webapp/releases/tag/v9.9.9',
+      isPwa: false,
+    };
+
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: true,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    const downloadBtn = container?.querySelector('[data-testid="btn-download-apk"]') as HTMLButtonElement | null;
+    await act(async () => {
+      downloadBtn?.click();
+    });
+
+    await act(async () => {
+      (window as any).onOtaSuccess?.('a'.repeat(64));
+    });
+
+    mockCancel.mockClear();
+    mockClear.mockClear();
+
+    // Component unmounts
+    await act(async () => {
+      root!.unmount();
+      root = null;
+    });
+
+    expect(mockCancel).not.toHaveBeenCalled();
+    expect(mockClear).not.toHaveBeenCalled();
+  });
+
+  it('user clicking Cancel Download explicitly calls cancelInternalDownload and clearTempApk', async () => {
+    const mockStart = vi.fn();
+    const mockCancel = vi.fn();
+    const mockClear = vi.fn();
+    (window as any).AndroidBridge = {
+      startInternalDownload: mockStart,
+      cancelInternalDownload: mockCancel,
+      clearTempApk: mockClear,
+    };
+
+    const testRelease: AppReleaseInfo = {
+      version: '9.9.9',
+      versionCode: 90909,
+      releaseDate: '2026-10-24',
+      releaseTitle: 'Vyapar PRO v9.9.9',
+      releaseNotes: ['APK package available'],
+      apkUrl: 'https://github.com/nurmd/webapp/releases/download/v9.9.9/GSTBilling-Vyapar.apk',
+      apkSize: '5.4 MB',
+      sha256: 'a'.repeat(64),
+      htmlUrl: 'https://github.com/nurmd/webapp/releases/tag/v9.9.9',
+      isPwa: false,
+    };
+
+    await act(async () => {
+      root!.render(
+        React.createElement(AppUpdateModal, {
+          isOpen: true,
+          releaseInfo: testRelease,
+          onClose: () => {},
+        })
+      );
+    });
+
+    const downloadBtn = container?.querySelector('[data-testid="btn-download-apk"]') as HTMLButtonElement | null;
+    await act(async () => {
+      downloadBtn?.click();
+    });
+
+    const cancelBtn = Array.from(container?.querySelectorAll('button') || []).find((b) =>
+      b.textContent?.includes('Cancel Download')
+    );
+    expect(cancelBtn).toBeDefined();
+
+    await act(async () => {
+      cancelBtn?.click();
+    });
+
+    expect(mockCancel).toHaveBeenCalledTimes(1);
+    expect(mockClear).toHaveBeenCalledTimes(1);
+  });
 });

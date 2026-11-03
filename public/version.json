@@ -1,15 +1,13 @@
 {
-  "version": "1.2.61",
+  "version": "1.2.63",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-02T09:27:50.609Z",
+  "buildTime": "2026-11-03T13:07:08.121Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "WhatsApp text and thermal receipt image tabs in common share modal",
-    "WhatsApp receipt image share for payment in/out and vouchers",
-    "monospace payment receipt text generator and thermal canvas rendering",
-    "native Android share-image bridge for direct WhatsApp image sharing",
-    "capture thermal receipt as styled DOM image via html-to-image",
-    "bill amount and balance due prefill in WhatsApp image caption"
+    "Fix OTA updates: published APK now matches the release version and installs correctly",
+    "Single WhatsApp share button with Text/Image preview toggle",
+    "Passbook same-date ordering fixed in Newest sort",
+    "Payment voucher WhatsApp image sharing and FileProvider MIME support"
   ]
 }
