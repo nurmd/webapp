@@ -105,6 +105,22 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
     </div>
   );
 
+  const trailingAction = onEditInvoice ? (
+    <button
+      type="button"
+      data-testid="edit-invoice-btn"
+      onClick={() => {
+        onClose();
+        onEditInvoice(invoice);
+      }}
+      className="py-1 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+      title="Edit Invoice"
+    >
+      <span className="material-symbols-outlined text-[16px]">edit</span>
+      <span>Edit</span>
+    </button>
+  ) : undefined;
+
   const footerNode = (
     <div className="flex flex-wrap items-center gap-2">
       {/* Print Button (Thermal) */}
@@ -142,22 +158,6 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         >
           <span className="material-symbols-outlined text-[16px]">assignment_return</span>
           <span>Return Items</span>
-        </button>
-      )}
-
-      {/* Edit Invoice Button */}
-      {onEditInvoice && (
-        <button
-          type="button"
-          onClick={() => {
-            onClose();
-            onEditInvoice(invoice);
-          }}
-          className="py-2 px-3 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
-          title="Edit Invoice"
-        >
-          <span className="material-symbols-outlined text-[16px]">edit</span>
-          <span>Edit</span>
         </button>
       )}
 
@@ -202,8 +202,9 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         onClose={onClose}
         title={titleNode}
         headerLeading={leadingAction}
+        headerTrailing={trailingAction}
         closeAriaLabel="Close invoice details"
-        maxWidth="md"
+        maxWidth="xl"
         customFooter={footerNode}
         backNavPriority={25}
       >

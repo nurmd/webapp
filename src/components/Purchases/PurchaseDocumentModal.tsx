@@ -53,7 +53,7 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
   footerTrailing,
   variant = 'modal',
   maxWidth = '4xl',
-  maxHeight = 'sm:max-h-[96vh]',
+  maxHeight = 'sm:max-h-[90vh]',
   viewportClassName = 'p-3 sm:p-4 overflow-y-auto flex-1 flex flex-col gap-2.5 print-preview-viewport',
   children,
   backNavPriority = 25,
@@ -128,9 +128,9 @@ export const PurchaseDocumentModal: React.FC<PurchaseDocumentModalProps> = ({
 
   // Dialog Modal layout (used by SimplifiedPurchaseModal)
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-2.5 print-modal-overlay animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 print-modal-overlay animate-fade-in">
       <div
-        className={`bg-surface-container-lowest text-on-surface rounded-none sm:rounded-2xl border-0 sm:border sm:border-outline-variant/30 w-full ${maxWidthClasses} h-full sm:h-auto ${maxHeight} flex flex-col shadow-2xl overflow-hidden print-modal-container`}
+        className={`bg-surface-container-lowest text-on-surface rounded-2xl border border-outline-variant/30 w-full ${maxWidthClasses} max-h-[90vh] ${maxHeight} flex flex-col shadow-2xl overflow-hidden print-modal-container`}
       >
         {/* Modal Controls Toolbar / Header */}
         <div className="no-print px-3 sm:px-4 py-2 border-b border-outline-variant/20 flex items-center justify-between bg-surface-container-low/95 gap-2 shrink-0">

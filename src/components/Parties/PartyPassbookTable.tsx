@@ -295,25 +295,25 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 {/* Left Icon and 3-Line Details */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconColorClasses}`}
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconColorClasses}`}
                   >
-                    <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
+                    <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
                       {iconName}
                     </span>
                   </div>
 
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
                     {/* Line 1: Voucher type (invoice, return, payment) and date */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
+                      <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm whitespace-nowrap shrink-0">
                         {voucherTypeLabel}
                       </span>
-                      <span className="text-slate-500 text-[11px] sm:text-xs">
+                      <span className="text-slate-500 text-[11px] sm:text-xs whitespace-nowrap truncate min-w-0">
                         • {entry.date}
                       </span>
                       {entry.status && entry.status !== 'OPENING' && (
                         <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap ${
                             entry.status === 'PAID'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : entry.status === 'PARTIAL'

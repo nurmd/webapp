@@ -399,4 +399,113 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(desktopActionBar?.textContent).toContain('Record Payment');
     expect(desktopActionBar?.textContent).toContain('New Invoice');
   });
+
+  it('renders Line 1 as a strict single-line flex-nowrap row keeping status badge inline with long voucher types', () => {
+    const mockEntries: any[] = [
+      {
+        id: 'vchr-pay-in-1',
+        rawId: 'pay-in-1',
+        date: '2026-10-28',
+        type: 'PAYMENT_IN',
+        description: 'Payment In received via bank transfer',
+        debit: 0,
+        credit: 15000,
+        runningBalance: -10000,
+        docNumber: 'RCPT-2026-0045',
+        status: 'PAID',
+        rawVoucher: {
+          id: 'pay-in-1',
+          voucherNumber: 'RCPT-2026-0045',
+          voucherType: 'RECEIPT',
+          totalAmount: 15000,
+          date: '2026-10-28',
+        },
+      },
+      {
+        id: 'sale-inv-long-1',
+        rawId: 'inv-long-1',
+        date: '2026-10-28',
+        type: 'SALE',
+        description: 'Tax Invoice with partial settlement',
+        debit: 25000,
+        credit: 0,
+        runningBalance: 15000,
+        docNumber: 'INV-2026-0999',
+        status: 'PARTIAL',
+        rawInvoice: {
+          id: 'inv-long-1',
+          invoiceNumber: 'INV-2026-0999',
+          grandTotal: 25000,
+          balanceAmount: 10000,
+          paidAmount: 15000,
+          invoiceType: 'TAX_INVOICE',
+        },
+      },
+    ];
+
+    act(() => {
+      root.render(
+        <PartyPassbookTable
+          filteredPassbook={mockEntries}
+          txnFilter="ALL"
+          setTxnFilter={vi.fn()}
+          txnSortOrder="NEWEST"
+          setTxnSortOrder={vi.fn()}
+          searchTxn=""
+          setSearchTxn={vi.fn()}
+          onTransactionClick={vi.fn()}
+        />
+      );
+    });
+
+    const paymentRow = container.querySelector('[data-testid="passbook-entry-vchr-pay-in-1"]');
+    expect(paymentRow).not.toBeNull();
+
+    // Find the Line 1 container
+    const voucherTypeEl = Array.from(paymentRow?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === 'Payment In'
+    );
+    expect(voucherTypeEl).toBeDefined();
+    expect(voucherTypeEl?.className).toContain('whitespace-nowrap');
+    expect(voucherTypeEl?.className).toContain('shrink-0');
+
+    const line1Container = voucherTypeEl?.parentElement;
+    expect(line1Container).toBeDefined();
+    expect(line1Container?.className).toContain('flex');
+    expect(line1Container?.className).toContain('items-center');
+    expect(line1Container?.className).toContain('flex-nowrap');
+    expect(line1Container?.className).toContain('min-w-0');
+    expect(line1Container?.className).not.toContain('flex-wrap');
+
+    // Date inside Line 1
+    const dateEl = line1Container?.querySelector('span.text-slate-500');
+    expect(dateEl).not.toBeNull();
+    expect(dateEl?.textContent).toContain('2026-10-28');
+    expect(dateEl?.className).toContain('whitespace-nowrap');
+    expect(dateEl?.className).toContain('truncate');
+    expect(dateEl?.className).toContain('min-w-0');
+
+    // Status badge inside Line 1
+    const badgeEl = Array.from(line1Container?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === 'PAID'
+    );
+    expect(badgeEl).toBeDefined();
+    expect(badgeEl?.className).toContain('shrink-0');
+    expect(badgeEl?.className).toContain('whitespace-nowrap');
+    expect(badgeEl?.className).toContain('rounded-full');
+    expect(badgeEl?.parentElement).toBe(line1Container);
+
+    // Partial badge on invoice row
+    const invoiceRow = container.querySelector('[data-testid="passbook-entry-sale-inv-long-1"]');
+    expect(invoiceRow).not.toBeNull();
+    const partialBadge = Array.from(invoiceRow?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === 'PARTIAL'
+    );
+    expect(partialBadge).toBeDefined();
+    expect(partialBadge?.className).toContain('shrink-0');
+    expect(partialBadge?.className).toContain('whitespace-nowrap');
+    const invoiceLine1 = partialBadge?.parentElement;
+    expect(invoiceLine1?.className).toContain('flex-nowrap');
+    expect(invoiceLine1?.className).not.toContain('flex-wrap');
+  });
 });

@@ -67,17 +67,17 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
     : 'bg-orange-500/15 text-orange-600 dark:text-orange-400';
 
   const titleNode = (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <h3 className="font-bold text-sm text-on-surface truncate">
+    <div className="flex items-center gap-1.5 min-w-0 flex-nowrap overflow-x-auto no-scrollbar py-0.5">
+      <h3 className="font-bold text-sm text-on-surface truncate min-w-0 shrink-0">
         {headerTitle}
       </h3>
       {isChallan ? (
-        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300">
+        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 whitespace-nowrap shrink-0">
           {bill.isConverted ? 'CONVERTED' : (bill.challanStatus || 'RECEIVED')}
         </span>
       ) : (
         <span
-          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full ${
+          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap shrink-0 ${
             isPaid
               ? 'bg-secondary/15 text-secondary'
               : isPartial
@@ -99,31 +99,50 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
     printPurchaseBill(company, bill);
   };
 
+  const leadingAction = onDeletePurchase ? (
+    <button
+      type="button"
+      onClick={handleDelete}
+      className="w-8 h-8 rounded-xl bg-error/15 text-error hover:bg-error/25 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+      title={isChallan ? 'Delete Purchase Challan' : 'Delete Purchase Bill'}
+      aria-label="Delete purchase"
+    >
+      <span className="material-symbols-outlined text-[18px]">delete</span>
+    </button>
+  ) : (
+    <div className={`w-8 h-8 rounded-xl ${headerIconBg} flex items-center justify-center flex-shrink-0`}>
+      <span className="material-symbols-outlined text-[18px]">{headerIcon}</span>
+    </div>
+  );
+
+  const trailingAction = onEditPurchase && (!bill.isConverted || isPo) ? (
+    <button
+      type="button"
+      data-testid="edit-purchase-btn"
+      onClick={() => {
+        onClose();
+        onEditPurchase(bill);
+      }}
+      className="py-1 px-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+      title={isChallan ? 'Edit Purchase Challan' : 'Edit Purchase Bill'}
+    >
+      <span className="material-symbols-outlined text-[16px]">edit</span>
+      <span>{isChallan ? 'Edit Challan' : isPo ? 'Edit PO' : 'Edit Bill'}</span>
+    </button>
+  ) : undefined;
+
   const footerNode = (
     <div className="flex items-center justify-end gap-2">
       {/* Print Button */}
       <button
         type="button"
         onClick={handlePrint}
-        className="min-h-[44px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
+        className="min-h-[40px] py-2 px-3.5 rounded-xl bg-surface-container-lowest text-on-surface border border-outline-variant/30 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
         title={isChallan ? 'Print Purchase Challan' : 'Print Purchase Bill'}
       >
         <span className="material-symbols-outlined text-[16px]">print</span>
         <span>Print</span>
       </button>
-
-      {/* Delete Button */}
-      {onDeletePurchase && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="min-h-[44px] py-2 px-3.5 rounded-xl text-error hover:bg-error/10 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors active:scale-95"
-          title={isChallan ? 'Delete Purchase Challan' : 'Delete Purchase Bill'}
-        >
-          <span className="material-symbols-outlined text-[16px]">delete</span>
-          <span>Delete</span>
-        </button>
-      )}
 
       {/* Return Items (Debit Note) */}
       {!isReturn && !bill.isCancelled && (
@@ -131,27 +150,11 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
           type="button"
           data-testid="create-purchase-return-btn"
           onClick={() => setIsReturnPickerOpen(true)}
-          className="min-h-[44px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
+          className="min-h-[40px] py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all"
           title="Return items from this bill (Debit Note)"
         >
           <span className="material-symbols-outlined text-[16px]">assignment_turned_in</span>
           <span>Return Items</span>
-        </button>
-      )}
-
-      {/* Edit Button */}
-      {onEditPurchase && (!bill.isConverted || isPo) && (
-        <button
-          type="button"
-          onClick={() => {
-            onClose();
-            onEditPurchase(bill);
-          }}
-          className="min-h-[44px] py-2 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1 active:scale-95 transition-all shadow-xs"
-          title={isChallan ? 'Edit Purchase Challan' : 'Edit Purchase Bill'}
-        >
-          <span className="material-symbols-outlined text-[16px]">edit</span>
-          <span>{isChallan ? 'Edit Challan' : isPo ? 'Edit PO' : 'Edit Bill'}</span>
         </button>
       )}
     </div>
@@ -163,13 +166,10 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         isOpen={!!bill}
         onClose={onClose}
         title={titleNode}
-        headerLeading={
-          <div className={`w-8 h-8 rounded-xl ${headerIconBg} flex items-center justify-center flex-shrink-0`}>
-            <span className="material-symbols-outlined text-[18px]">{headerIcon}</span>
-          </div>
-        }
+        headerLeading={leadingAction}
+        headerTrailing={trailingAction}
         closeAriaLabel="Close purchase details"
-        maxWidth="md"
+        maxWidth="xl"
         customFooter={footerNode}
         backNavPriority={25}
       >
@@ -186,13 +186,18 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
         )}
 
         {/* Purchased Items Table View */}
-        <DocumentLineItemsGrid
-          mode="compact"
-          kind="purchase"
-          rows={bill.items}
-          isGstActive={isGstActive}
-          isCompositionScheme={company.isCompositionScheme}
-        />
+        <div
+          data-testid="purchase-preview-items-scroll"
+          className="max-h-[45vh] overflow-y-auto overscroll-contain -mx-0.5 px-0.5 [scrollbar-width:thin] border-t border-b border-outline-variant/20"
+        >
+          <DocumentLineItemsGrid
+            mode="compact"
+            kind="purchase"
+            rows={bill.items}
+            isGstActive={isGstActive}
+            isCompositionScheme={company.isCompositionScheme}
+          />
+        </div>
 
         {/* Financial Breakdown */}
         <DocumentTaxSummary

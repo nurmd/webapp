@@ -126,24 +126,24 @@ export const InvoiceSelectorModal: React.FC<InvoiceSelectorModalProps> = ({
                   }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-bold text-xs text-secondary bg-secondary/10 px-1.5 py-0.2 rounded">
+                    <div className="flex items-center gap-2 min-w-0 flex-nowrap">
+                      <span className="font-mono font-bold text-xs text-secondary bg-secondary/10 px-1.5 py-0.2 rounded shrink-0 whitespace-nowrap">
                         #{inv.invoiceNumber}
                       </span>
-                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                      <span className="font-bold text-xs sm:text-sm text-on-surface truncate min-w-0">
                         {inv.partyName || 'Cash Customer'}
                       </span>
 
                       {summary.isFullyReturned ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 shrink-0 whitespace-nowrap">
                           Fully Returned
                         </span>
                       ) : summary.isPartiallyReturned ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 shrink-0 whitespace-nowrap">
                           Partially Returned
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0 whitespace-nowrap">
                           Eligible
                         </span>
                       )}

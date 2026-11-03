@@ -1,12 +1,13 @@
 {
-  "version": "1.2.64",
+  "version": "1.2.67",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-03T14:02:30.866Z",
+  "buildTime": "2026-11-03T15:05:45.601Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Unified sharing hub: one clean modal with WhatsApp text/image, A4/PDF and Print",
-    "WhatsApp image share: choose between WhatsApp and WhatsApp Business",
-    "Passbook: OPENING balance follows Newest/Oldest order (last in Newest)"
+    "Party passbook: sleek unified preview for every transaction type (invoice, purchase, payment, opening)",
+    "Preview modal: delete top-left, edit and close top-right, scrollable item table, actions at bottom",
+    "Modal is large but inset so a strip of the blurred background stays visible; back closes it",
+    "Smaller transaction card icons for more room for text info"
   ]
 }

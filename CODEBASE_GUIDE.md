@@ -379,7 +379,17 @@ The `StorageService` class (`db`) is the unified database facade composing focus
     - `PurchaseDocumentModal.tsx`: Specialized shell for purchase documents with PO/Challan/Bill status header, print-preview-viewport, and action bar (Print, Edit, Delete). Consumed by `SimplifiedPurchaseModal` and `TableGridPurchaseModal`.
     - `ReportPreviewModal.tsx`: Shared report preview shell featuring report name header, date range badge, back button, mobile cards vs A4 sheet mode switch, zoom fit toggle, page count indicator, CSV export action, and direct PDF/print action bar. Consumed by `ReportPdfPreviewModal.tsx`, `BusinessReportsView.tsx`, and `DaybookView.tsx`.
   - **Consolidated Party Detail Architecture (`src/components/Parties/PartyDetailModal.tsx`)**:
-    - Single consolidated component supporting `mode: 'page' | 'modal'`. Employs shared subcomponents `PartyInfoCard` (high-contrast light transaction card with `text-slate-900` primary balances, non-wrapping Total Bill/Total Paid metrics, and inline Record Payment + New Invoice/Bill action buttons), `PartyPassbookTable` (light card container with high-contrast white transaction cards, dark primary text, and slate-500/600 metadata), `PartyOrdersTable`, and `PartyWhatsAppReminder`. Features an animated collapsible header action container housing Call, Print, WhatsApp, Edit, and Delete actions. `PartyDetailPage.tsx` acts as a clean backward-compatible wrapper (`mode="page"`). In Party invoice preview (`SimplifiedInvoiceModal`), redundant A4/PDF button is omitted in favor of a clean Print button that opens `ThermalPrintModal`, which directly connects to full A4/PDF preview (`InvoicePreviewModal`).
+    - Single consolidated component supporting `mode: 'page' | 'modal'`. Employs shared subcomponents `PartyInfoCard` (high-contrast light transaction card with `text-slate-900` primary balances, non-wrapping Total Bill/Total Paid metrics, and inline Record Payment + New Invoice/Bill action buttons), `PartyPassbookTable` (light card container with high-contrast white transaction cards, dark primary text, and slate-500/600 metadata), `PartyOrdersTable`, and `PartyWhatsAppReminder`. Features an animated collapsible header action container housing Call, Print, WhatsApp, Edit, and Delete actions. `PartyDetailPage.tsx` acts as a clean backward-compatible wrapper (`mode="page"`).
+    - **Unified Inset Transaction Previews**:
+      - Clicking any passbook entry opens a sleek, inset preview modal (`maxWidth="xl"`, overlay padding `p-3 sm:p-5`, `maxHeight="sm:max-h-[90vh]"`, hardware back navigation priority 25):
+        - `SALE` &rarr; `SimplifiedInvoiceModal`
+        - `PURCHASE` &rarr; `SimplifiedPurchaseModal`
+        - `PAYMENT_IN` / `PAYMENT_OUT` / `OPENING` &rarr; `PartyPaymentPreviewModal`
+      - Standardized layout across all preview modals:
+        - **Top-left**: Delete button (`headerLeading`)
+        - **Top-right**: Edit button (`headerTrailing`) alongside Close button
+        - **Body**: Document header, party details, scrollable item grid (`max-h-[45vh] overflow-y-auto`) or payment breakdown, and running balance impact
+        - **Bottom**: Secondary actions (WhatsApp share, Print slip/voucher, Return items, E-Way/E-Inv)
   - **Unified Delete Confirmation Pattern (`ConfirmDeleteModal.tsx`)**:
     - Standardized confirmation across all domain deletion actions: invoices, purchases, payments/vouchers, parties, inventory items/categories, bank accounts, and cash/bank ledger transactions. Protects against accidental data loss and preserves statutory warnings.
   - **Unified Party Selector (`src/components/Parties/SelectPartyModal.tsx`)**:

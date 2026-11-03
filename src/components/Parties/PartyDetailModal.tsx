@@ -35,6 +35,9 @@ const SimplifiedPurchaseModal = React.lazy(() =>
 const SimplifiedInvoiceModal = React.lazy(() =>
   import('../Invoicing/SimplifiedInvoiceModal.tsx').then((m) => ({ default: m.SimplifiedInvoiceModal }))
 );
+const PartyPaymentPreviewModal = React.lazy(() =>
+  import('./PartyPaymentPreviewModal.tsx').then((m) => ({ default: m.PartyPaymentPreviewModal }))
+);
 const VoucherEditorModal = React.lazy(() =>
   import('./VoucherEditorModal.tsx').then((m) => ({ default: m.VoucherEditorModal }))
 );
@@ -121,6 +124,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<Invoice | null>(null);
   const [thermalPrintInvoice, setThermalPrintInvoice] = useState<Invoice | null>(null);
   const [fullA4Invoice, setFullA4Invoice] = useState<Invoice | null>(null);
+  const [selectedPaymentForView, setSelectedPaymentForView] = useState<PassbookEntry | null>(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -376,7 +380,50 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
     } else if (entry.type === 'PURCHASE' && entry.rawPurchase) {
       setSelectedPurchaseBill(entry.rawPurchase);
     } else {
-      setEditingLedgerEntry(entry);
+      setSelectedPaymentForView(entry);
+    }
+  };
+
+  const executeDeletePaymentEntry = (entry: PassbookEntry) => {
+    try {
+      if (entry.rawVoucher) {
+        const v = entry.rawVoucher;
+        db.reversePaymentVoucher(v, `Reversal of ${v.voucherType} #${v.voucherNumber} from Party Passbook`);
+      } else if (entry.id.startsWith('pay-inv-') && entry.rawInvoice) {
+        const inv = entry.rawInvoice;
+        const amt = entry.credit;
+        const newPaid = Math.max(0, (inv.paidAmount || 0) - amt);
+        const newBalance = Number((inv.grandTotal - newPaid).toFixed(2));
+        const updatedInv: Invoice = {
+          ...inv,
+          paidAmount: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= inv.grandTotal ? 'PAID' : 'PARTIAL'),
+          updatedAt: new Date().toISOString(),
+        };
+        db.saveInvoice(updatedInv);
+        db.recalculatePartyBalance(effectiveParty.id);
+      } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
+        const pur = entry.rawPurchase;
+        const amt = entry.debit;
+        const newPaid = Math.max(0, (pur.paidAmount || 0) - amt);
+        const newBalance = Number((pur.grandTotal - newPaid).toFixed(2));
+        const updatedPur: PurchaseBill = {
+          ...pur,
+          paidAmount: newPaid,
+          balanceAmount: newBalance,
+          paymentStatus: newPaid <= 0 ? 'UNPAID' : (newPaid >= pur.grandTotal ? 'PAID' : 'PARTIAL'),
+          updatedAt: new Date().toISOString(),
+        };
+        db.savePurchase(updatedPur);
+        db.recalculatePartyBalance(effectiveParty.id);
+      } else if (entry.isOpening || entry.type === 'OPENING') {
+        db.clearPartyOpeningBalance(effectiveParty.id);
+      }
+      setSelectedPaymentForView(null);
+      onRefresh?.();
+    } catch (err: any) {
+      alert(err.message || 'Cannot delete transaction.');
     }
   };
 
@@ -839,6 +886,25 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Payment / Opening Entry Preview Modal */}
+      {selectedPaymentForView && (
+        <React.Suspense fallback={null}>
+          <PartyPaymentPreviewModal
+            entry={selectedPaymentForView}
+            party={effectiveParty}
+            company={company}
+            isOpen={true}
+            onClose={() => setSelectedPaymentForView(null)}
+            onEdit={(entry) => {
+              setSelectedPaymentForView(null);
+              setEditingLedgerEntry(entry);
+            }}
+            onDelete={executeDeletePaymentEntry}
+            onRefresh={onRefresh}
+          />
+        </React.Suspense>
+      )}
 
       {/* Edit Ledger Item Modal */}
       {editingLedgerEntry && (
