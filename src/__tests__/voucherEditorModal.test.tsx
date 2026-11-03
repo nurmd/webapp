@@ -811,6 +811,28 @@ describe('VoucherEditorModal Component-Level Verification', () => {
       shareBtn.click();
     });
 
+    // Opening WhatsAppShareModal with preview text
+    const previewBox = container!.querySelector('[data-testid="whatsapp-message-preview-box"]');
+    expect(previewBox).not.toBeNull();
+    const previewText = previewBox?.textContent || '';
+
+    expect(previewText).toContain('Acme Traders');
+    expect(previewText).toContain('RCPT-WA-777');
+    expect(previewText).toContain('Acme Enterprises');
+    expect(previewText).toContain('4,500');
+    expect(previewText).toContain('*Payment Mode:* CASH');
+    expect(previewText).toContain('Total Balance Due');
+    expect(previewText).toContain('5,000');
+    expect(previewText).toContain('Festival season advance');
+    expect(previewText).toContain('Recorded in GST Billing App');
+
+    // Clicking Send WhatsApp in the modal dispatches URL
+    const sendBtn = container!.querySelector('[data-testid="whatsapp-send-button"]') as HTMLButtonElement;
+    expect(sendBtn).not.toBeNull();
+    act(() => {
+      sendBtn.click();
+    });
+
     expect(openWhatsAppUrlMock).toHaveBeenCalledTimes(1);
     const sentUrl = openWhatsAppUrlMock.mock.calls[0][0];
     const decodedUrl = decodeURIComponent(sentUrl);

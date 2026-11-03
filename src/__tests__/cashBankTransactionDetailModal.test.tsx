@@ -870,19 +870,22 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
-      expect(url.startsWith('https://wa.me/?text=')).toBe(true);
+      // Assert Common WhatsAppShareModal is rendered
+      expect(container.querySelector('[data-testid="whatsapp-tab-text"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="whatsapp-tab-image"]')).not.toBeNull();
 
-      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
-      expect(decoded).toContain('Payment Received - Bharat Traders');
-      expect(decoded).toContain('*Txn No:* IN-2026-0002');
-      expect(decoded).toContain('16/10/2026');
-      expect(decoded).toContain('20,000');
-      expect(decoded).toContain('*Account:* SBI Current A/C');
-      expect(decoded).toContain('*Reference:* UTR998877');
-      expect(decoded).toContain('*Notes:* Capital Investment from Owner');
-      expect(decoded).toContain('Recorded in GST Billing App');
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+
+      expect(previewText).toContain('Payment Received - Bharat Traders');
+      expect(previewText).toContain('*Txn No:* IN-2026-0002');
+      expect(previewText).toContain('16/10/2026');
+      expect(previewText).toContain('20,000');
+      expect(previewText).toContain('*Account:* SBI Current A/C');
+      expect(previewText).toContain('*Reference:* UTR998877');
+      expect(previewText).toContain('*Notes:* Capital Investment from Owner');
+      expect(previewText).toContain('Recorded in GST Billing App');
     });
 
     it('shares contra transfer message containing both account names and transfer heading', async () => {
@@ -932,14 +935,18 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
-      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
-      expect(decoded).toContain('Cash / Bank Transfer - Bharat Traders');
-      expect(decoded).toContain('*From:* Cash in Hand');
-      expect(decoded).toContain('*To:* SBI Current A/C');
-      expect(decoded).toContain('5,000');
-      expect(decoded).toContain('*Txn No:* TRF-2026-0001');
+      // Assert Common WhatsAppShareModal is rendered
+      expect(container.querySelector('[data-testid="whatsapp-tab-text"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="whatsapp-tab-image"]')).not.toBeNull();
+
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Cash / Bank Transfer - Bharat Traders');
+      expect(previewText).toContain('*From:* Cash in Hand');
+      expect(previewText).toContain('*To:* SBI Current A/C');
+      expect(previewText).toContain('5,000');
+      expect(previewText).toContain('*Txn No:* TRF-2026-0001');
     });
 
     it('does not render share button while editing or during delete confirmation', async () => {
@@ -1060,10 +1067,11 @@ describe('CashBankTransactionDetailModal and Transaction Editing Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0] as string;
-      const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
-      expect(decoded).toContain('Payment Received - GST Billing App');
+      // Assert Common WhatsAppShareModal is rendered
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Payment Received - GST Billing App');
     });
   });
 

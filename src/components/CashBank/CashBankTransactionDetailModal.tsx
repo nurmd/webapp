@@ -1151,7 +1151,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
               ? 'Payment Received'
               : 'Payment Made';
 
-            return buildPaymentVoucherWhatsAppMessage(rawTransaction || entry, linkedParty, company || db.getCompany(), linkedParty ? getPartyTotalBalanceDue(linkedParty) : undefined, {
+            return buildPaymentVoucherWhatsAppMessage(rawTransaction || entry, linkedParty, company, linkedParty ? getPartyTotalBalanceDue(linkedParty) : undefined, {
               heading,
               docNumber: rawTransaction?.txnNumber,
               date: activeDate ? formatDate(activeDate) : undefined,

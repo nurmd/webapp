@@ -258,9 +258,6 @@ describe('WhatsApp Total Balance Due Suite', () => {
 
   describe('3. Payment Detail Modal (CashBankTransactionDetailModal)', () => {
     it('includes Total Balance Due when a non-transfer transaction has a linked party', async () => {
-      const mockOpenWhatsApp = vi.fn();
-      (window as any).AndroidBridge = { openWhatsAppUrl: mockOpenWhatsApp };
-
       const entryWithParty: UnifiedLedgerEntry = {
         id: 'LEDGER-1',
         date: '2026-10-28',
@@ -295,18 +292,15 @@ describe('WhatsApp Total Balance Due Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0];
-      const decoded = decodeURIComponent(url);
-      expect(decoded).toContain('Payment Received - Apex Supplies');
-      expect(decoded).toContain('*Amount:* ₹ 5,000.00');
-      expect(decoded).toContain(`*Total Balance Due:* ${formatINR(14500)}`);
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Payment Received - Apex Supplies');
+      expect(previewText).toContain('*Amount:* ₹ 5,000.00');
+      expect(previewText).toContain(`*Total Balance Due:* ${formatINR(14500)}`);
     });
 
     it('omits Total Balance Due when transaction has no linked party', async () => {
-      const mockOpenWhatsApp = vi.fn();
-      (window as any).AndroidBridge = { openWhatsAppUrl: mockOpenWhatsApp };
-
       const directEntry: UnifiedLedgerEntry = {
         id: 'LEDGER-2',
         date: '2026-10-28',
@@ -338,15 +332,13 @@ describe('WhatsApp Total Balance Due Suite', () => {
         shareBtn.click();
       });
 
-      const url = mockOpenWhatsApp.mock.calls[0][0];
-      const decoded = decodeURIComponent(url);
-      expect(decoded).not.toContain('Total Balance Due');
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).not.toContain('Total Balance Due');
     });
 
     it('omits Total Balance Due for contra transfers even if a party is passed', async () => {
-      const mockOpenWhatsApp = vi.fn();
-      (window as any).AndroidBridge = { openWhatsAppUrl: mockOpenWhatsApp };
-
       const contraEntry: UnifiedLedgerEntry = {
         id: 'LEDGER-3',
         date: '2026-10-28',
@@ -381,16 +373,14 @@ describe('WhatsApp Total Balance Due Suite', () => {
         shareBtn.click();
       });
 
-      const url = mockOpenWhatsApp.mock.calls[0][0];
-      const decoded = decodeURIComponent(url);
-      expect(decoded).toContain('Cash / Bank Transfer');
-      expect(decoded).not.toContain('Total Balance Due');
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Cash / Bank Transfer');
+      expect(previewText).not.toContain('Total Balance Due');
     });
 
     it('resolves linked customer from rawInvoiceId for a SALE passbook entry without partyId', async () => {
-      const mockOpenWhatsApp = vi.fn();
-      (window as any).AndroidBridge = { openWhatsAppUrl: mockOpenWhatsApp };
-
       const saleEntry: UnifiedLedgerEntry = {
         id: 'LEDGER-SALE-1',
         date: '2026-10-28',
@@ -424,17 +414,14 @@ describe('WhatsApp Total Balance Due Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0];
-      const decoded = decodeURIComponent(url);
-      expect(decoded).toContain('Payment Received - Apex Supplies');
-      expect(decoded).toContain(`*Total Balance Due:* ${formatINR(14500)}`);
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Payment Received - Apex Supplies');
+      expect(previewText).toContain(`*Total Balance Due:* ${formatINR(14500)}`);
     });
 
     it('resolves linked supplier from rawPurchaseId for a PURCHASE passbook entry without partyId', async () => {
-      const mockOpenWhatsApp = vi.fn();
-      (window as any).AndroidBridge = { openWhatsAppUrl: mockOpenWhatsApp };
-
       const purchaseEntry: UnifiedLedgerEntry = {
         id: 'LEDGER-PUR-1',
         date: '2026-10-28',
@@ -468,11 +455,11 @@ describe('WhatsApp Total Balance Due Suite', () => {
         shareBtn.click();
       });
 
-      expect(mockOpenWhatsApp).toHaveBeenCalledTimes(1);
-      const url = mockOpenWhatsApp.mock.calls[0][0];
-      const decoded = decodeURIComponent(url);
-      expect(decoded).toContain('Payment Made - Apex Supplies');
-      expect(decoded).toContain(`*Total Balance Due:* ${formatINR(8000)}`);
+      const previewBox = container.querySelector('[data-testid="whatsapp-message-preview-box"]');
+      expect(previewBox).not.toBeNull();
+      const previewText = previewBox?.textContent || '';
+      expect(previewText).toContain('Payment Made - Apex Supplies');
+      expect(previewText).toContain(`*Total Balance Due:* ${formatINR(8000)}`);
     });
   });
 

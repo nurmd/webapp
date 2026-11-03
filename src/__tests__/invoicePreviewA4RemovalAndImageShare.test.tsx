@@ -311,9 +311,18 @@ describe('Invoice Preview A4 Removal & Thermal Image Share', () => {
     });
 
     it('returns "downloaded" and triggers fallback download when navigator.canShare is false/unavailable', async () => {
+      const origAndroidBridge = (window as any).AndroidBridge;
+      (window as any).AndroidBridge = undefined;
+
       const nav = window.navigator as any;
       const origCanShare = nav.canShare;
       nav.canShare = vi.fn().mockReturnValue(false);
+
+      const origClipboardItem = (window as any).ClipboardItem;
+      (window as any).ClipboardItem = undefined;
+      const clipboardWriteSpy = nav.clipboard && typeof nav.clipboard.write === 'function'
+        ? vi.spyOn(nav.clipboard, 'write').mockRejectedValue(new Error('clipboard disabled'))
+        : null;
 
       const origCreateObjectUrl = URL.createObjectURL;
       const origRevokeObjectUrl = URL.revokeObjectURL;
@@ -330,7 +339,10 @@ describe('Invoice Preview A4 Removal & Thermal Image Share', () => {
         expect(appendSpy).toHaveBeenCalled();
         expect(removeSpy).toHaveBeenCalled();
       } finally {
+        (window as any).AndroidBridge = origAndroidBridge;
         nav.canShare = origCanShare;
+        (window as any).ClipboardItem = origClipboardItem;
+        clipboardWriteSpy?.mockRestore();
         URL.createObjectURL = origCreateObjectUrl;
         URL.revokeObjectURL = origRevokeObjectUrl;
       }
