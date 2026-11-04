@@ -22,7 +22,7 @@ const makeInvoice = (id: string, invoiceNumber: string, date: string, paidAmount
   createdAt: `${date}T10:00:00.000Z`,
   updatedAt: `${date}T10:00:00.000Z`,
   partyId: 'CUSTOM_PARTY',
-  partyName: 'Cash Counter Customer',
+  partyName: 'Walk-in Customer',
   partyAddress: '',
   partyStateCode: '18',
   placeOfSupplyStateCode: '18',
@@ -57,7 +57,7 @@ const receiptVoucher: Voucher = {
   narration: 'Payment received against invoice #INV-OLD',
   entries: [
     { accountId: 'ACC_CASH', accountName: 'Cash in Hand', debit: 1320, credit: 0, narration: 'Payment received via CASH' },
-    { accountId: 'CUSTOM_PARTY', accountName: 'Cash Counter Customer', debit: 0, credit: 1320, narration: 'Payment received against invoice #INV-OLD' },
+    { accountId: 'CUSTOM_PARTY', accountName: 'Walk-in Customer', debit: 0, credit: 1320, narration: 'Payment received against invoice #INV-OLD' },
   ],
   totalAmount: 1320,
   createdAt: '2026-10-01T10:00:00.000Z',

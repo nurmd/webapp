@@ -1,10 +1,10 @@
 {
-  "version": "1.2.68",
+  "version": "1.2.69",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-03T16:00:23.514Z",
+  "buildTime": "2026-11-04T07:03:46.017Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "GRN and order rows now open a preview modal instead of jumping to edit"
+    "Cash counter sales now attributed to the Walk-in Customer party instead of a phantom Cash Counter Customer"
   ]
 }

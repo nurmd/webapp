@@ -3,6 +3,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
+import { SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
@@ -760,8 +761,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       isGstInvoice: isGstActive,
       date: invoiceDate,
       dueDate: dueDate || undefined,
-      partyId: selectedParty?.id,
-      partyName: selectedParty?.name || 'Cash Counter Customer',
+      partyId: selectedParty?.id || SYSTEM_WALK_IN_PARTY_ID,
+      partyName: selectedParty?.name || SYSTEM_WALK_IN_PARTY_NAME,
       partyPhone: selectedParty?.phone || undefined,
       partyGstin: isGstActive ? selectedParty?.gstin : undefined,
       partyAddress: selectedParty?.billingAddress || 'Local Counter',
