@@ -28,7 +28,7 @@ import {
 import { ThermalReceiptPreview } from '../Printing/ThermalReceiptPreview.tsx';
 
 export interface WhatsAppShareModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   company: CompanyProfile;
   invoice?: Invoice;
@@ -45,7 +45,7 @@ export interface WhatsAppShareModalProps {
 }
 
 export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
   company,
   invoice,
@@ -60,6 +60,16 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   onPrintA4,
   onPrint,
 }) => {
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useBackNavigation(() => {
     onClose();
     return true;
@@ -189,7 +199,10 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       navigator.clipboard.writeText(text);
       setCopied(true);
       showAppToast('Message copied to clipboard!');
-      setTimeout(() => setCopied(false), 2500);
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2500);
     } else {
       showAppToast('Unable to access clipboard.');
     }
@@ -309,6 +322,8 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
       setIsSharingImage(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">

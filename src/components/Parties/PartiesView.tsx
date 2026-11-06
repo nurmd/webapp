@@ -251,20 +251,25 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
 
   const activePartiesList = activeSegment === 'CUSTOMERS' ? customers : suppliers;
 
+  const searchTokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
   const filtered = activePartiesList.filter((p) => {
-    const q = search.toLowerCase();
     const group = p.groupId ? groupMap.get(p.groupId) : undefined;
     const category = p.categoryId ? categoryMap.get(p.categoryId) : undefined;
 
     const matchesSearch =
-      p.name.toLowerCase().includes(q) ||
-      (p.phone && p.phone.includes(q)) ||
-      (p.gstin && p.gstin.toLowerCase().includes(q)) ||
-      (p.pan && p.pan.toLowerCase().includes(q)) ||
-      (p.email && p.email.toLowerCase().includes(q)) ||
-      p.billingAddress.toLowerCase().includes(q) ||
-      (group && group.name.toLowerCase().includes(q)) ||
-      (category && category.name.toLowerCase().includes(q));
+      searchTokens.length === 0 ||
+      searchTokens.every((token) => (
+        p.name.toLowerCase().includes(token) ||
+        (p.phone && p.phone.includes(token)) ||
+        (p.gstin && p.gstin.toLowerCase().includes(token)) ||
+        (p.pan && p.pan.toLowerCase().includes(token)) ||
+        (p.email && p.email.toLowerCase().includes(token)) ||
+        (p.billingAddress && p.billingAddress.toLowerCase().includes(token)) ||
+        (p.shippingAddress && p.shippingAddress.toLowerCase().includes(token)) ||
+        (group && group.name.toLowerCase().includes(token)) ||
+        (category && category.name.toLowerCase().includes(token))
+      ));
 
     if (!matchesSearch) return false;
 

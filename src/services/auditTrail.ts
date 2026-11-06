@@ -26,7 +26,16 @@ export type AuditActionType =
   | 'STOCK_ADJUSTMENT'
   | 'VOUCHER_CREATE'
   | 'VOUCHER_DELETE'
-  | 'SETTINGS_UPDATE';
+  | 'SETTINGS_UPDATE'
+  | 'PARTY_CREATE'
+  | 'PARTY_UPDATE'
+  | 'PARTY_DELETE'
+  | 'OPENING_BALANCE_CLEAR'
+  | 'ITEM_CREATE'
+  | 'ITEM_UPDATE'
+  | 'ITEM_DELETE'
+  | 'RETURN_LINK'
+  | 'RETURN_UNLINK';
 
 export type AuditDocumentType =
   | 'INVOICE'
@@ -34,7 +43,8 @@ export type AuditDocumentType =
   | 'PAYMENT'
   | 'ITEM'
   | 'VOUCHER'
-  | 'SETTINGS';
+  | 'SETTINGS'
+  | 'PARTY';
 
 export interface AuditRecord {
   id: string; // "audit_" + timestamp + "_" + randomHex

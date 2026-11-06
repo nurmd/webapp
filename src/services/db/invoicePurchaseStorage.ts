@@ -37,7 +37,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     return this.get<Invoice[]>(STORAGE_KEYS.INVOICES, DEFAULT_INVOICES);
   }
 
-  saveInvoice(invoice: Invoice, options?: { skipSettlementDerivation?: boolean }): void {
+  saveInvoice(invoice: Invoice, options?: { skipSettlementDerivation?: boolean; skipParentReconciliation?: boolean }): void {
     const list = [...this.getInvoices()];
     // Enforce unique invoice number under GST compliance
     const norm = (invoice.invoiceNumber || '').trim().toUpperCase();
@@ -183,7 +183,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
       this.recalculatePartyBalance(prevPartyId);
     }
 
-    if (invoice.invoiceType === 'CREDIT_NOTE') {
+    if (invoice.invoiceType === 'CREDIT_NOTE' && !options?.skipParentReconciliation) {
       this.reconcileCreditNoteParent(prevInvoice, invoice);
     }
 

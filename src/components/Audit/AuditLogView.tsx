@@ -85,6 +85,15 @@ const ACTION_COLORS: Record<AuditActionType, { bg: string; text: string; border:
   VOUCHER_CREATE: { bg: 'bg-indigo-500/15', text: 'text-indigo-500', border: 'border-indigo-500/30', label: 'Voucher Created' },
   VOUCHER_DELETE: { bg: 'bg-pink-500/15', text: 'text-pink-500', border: 'border-pink-500/30', label: 'Voucher Deleted' },
   SETTINGS_UPDATE: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30', label: 'Settings Updated' },
+  PARTY_CREATE: { bg: 'bg-emerald-500/15', text: 'text-emerald-500', border: 'border-emerald-500/30', label: 'Party Created' },
+  PARTY_UPDATE: { bg: 'bg-blue-500/15', text: 'text-blue-500', border: 'border-blue-500/30', label: 'Party Updated' },
+  PARTY_DELETE: { bg: 'bg-rose-500/15', text: 'text-rose-500', border: 'border-rose-500/30', label: 'Party Deleted' },
+  OPENING_BALANCE_CLEAR: { bg: 'bg-amber-500/15', text: 'text-amber-500', border: 'border-amber-500/30', label: 'Opening Balance Cleared' },
+  ITEM_CREATE: { bg: 'bg-emerald-500/15', text: 'text-emerald-500', border: 'border-emerald-500/30', label: 'Item Created' },
+  ITEM_UPDATE: { bg: 'bg-blue-500/15', text: 'text-blue-500', border: 'border-blue-500/30', label: 'Item Updated' },
+  ITEM_DELETE: { bg: 'bg-rose-500/15', text: 'text-rose-500', border: 'border-rose-500/30', label: 'Item Deleted' },
+  RETURN_LINK: { bg: 'bg-blue-500/15', text: 'text-blue-500', border: 'border-blue-500/30', label: 'Return Linked' },
+  RETURN_UNLINK: { bg: 'bg-amber-500/15', text: 'text-amber-500', border: 'border-amber-500/30', label: 'Return Unlinked' },
 };
 
 export const AuditLogView: React.FC<AuditLogViewProps> = ({
@@ -592,6 +601,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
               <option value="VOUCHER_CREATE">Voucher Created</option>
               <option value="VOUCHER_DELETE">Voucher Deleted</option>
               <option value="SETTINGS_UPDATE">Settings Updated</option>
+              <option value="PARTY_CREATE">Party Created</option>
+              <option value="PARTY_UPDATE">Party Updated</option>
+              <option value="PARTY_DELETE">Party Deleted</option>
+              <option value="OPENING_BALANCE_CLEAR">Opening Balance Cleared</option>
+              <option value="ITEM_CREATE">Item Created</option>
+              <option value="ITEM_UPDATE">Item Updated</option>
+              <option value="ITEM_DELETE">Item Deleted</option>
             </select>
           </div>
 

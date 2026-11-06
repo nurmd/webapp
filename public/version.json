@@ -1,10 +1,13 @@
 {
-  "version": "1.2.69",
+  "version": "1.2.70",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-04T07:03:46.017Z",
+  "buildTime": "2026-11-06T05:22:43.102Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Cash counter sales now attributed to the Walk-in Customer party instead of a phantom Cash Counter Customer"
+    "Unlinked sales returns can now be linked to an invoice to reduce its balance",
+    "Critical: audit-trail now covers Party and Item CRUD (MCA Rule 3(1))",
+    "High: duplicate item/party name checks are advisory, not blocking",
+    "High: party search now tokenizes multi-word queries"
   ]
 }

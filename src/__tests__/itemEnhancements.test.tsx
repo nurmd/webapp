@@ -289,7 +289,7 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
       expect(container.textContent).toContain('An item with this name already exists in inventory');
     });
 
-    it('strictly blocks submission and disables submit button when duplicate item name is entered', () => {
+    it('displays advisory warning but does not block submission or disable save button when duplicate item name is entered (Guardrail #7)', () => {
       const handleSave = vi.fn();
       act(() => {
         root.render(
@@ -311,10 +311,10 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
 
       expect(container.textContent).toContain('An item with this name already exists in inventory');
 
-      // The save button must be disabled
+      // The save button must NOT be disabled (Guardrail #7 non-blocking validation)
       const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
       expect(submitBtn).toBeTruthy();
-      expect(submitBtn.disabled).toBe(true);
+      expect(submitBtn.disabled).toBe(false);
 
       const form = container.querySelector('form');
       expect(form).toBeTruthy();
@@ -322,8 +322,8 @@ describe('Inventory Item Enhancements Suite (R1 - R4)', () => {
         form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       });
 
-      // Save must NOT be called when duplicate item name is entered
-      expect(handleSave).not.toHaveBeenCalled();
+      // Save MUST be called when user chooses to proceed with duplicate item name
+      expect(handleSave).toHaveBeenCalled();
     });
 
     it('flags duplicate name in edit mode even when neither item has an SKU (undefined or empty)', () => {

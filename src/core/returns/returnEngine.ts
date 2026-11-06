@@ -4,6 +4,9 @@ import { CompanyProfile } from '../../models/company.ts';
 import { generateNextDocumentNumber, InvoiceLike } from '../utils/invoiceNumber.ts';
 import { amountInWords } from '../utils/currencyWords.ts';
 import { db } from '../../services/db.ts';
+import { auditTrail } from '../../services/auditTrail.ts';
+import { rbac, UserRole } from '../../services/rbac.ts';
+import { showAppToast } from '../../services/toast.ts';
 
 export interface ItemReturnStatus {
   itemId: string;
@@ -550,4 +553,169 @@ export function executePurchaseReturn(params: {
   }
 
   return { debitNote, updatedSourceBill };
+}
+
+function getAuditUser(): { userId: string; userName: string; userRole: UserRole } {
+  try {
+    const u = rbac.getActiveUser();
+    return {
+      userId: u.id || 'usr_sys',
+      userName: u.name || 'System',
+      userRole: (u.role || 'OWNER') as UserRole,
+    };
+  } catch {
+    return {
+      userId: 'usr_sys',
+      userName: 'System',
+      userRole: 'OWNER' as UserRole,
+    };
+  }
+}
+
+export interface LinkSalesReturnResult {
+  success: boolean;
+  error?: string;
+  updatedInvoice?: Invoice;
+  updatedCreditNote?: Invoice;
+}
+
+/**
+ * Links an unlinked Sales Return (Credit Note) to a source Sales Invoice.
+ * 1. Guards party match (partyId or partyName).
+ * 2. Reduces source invoice's balance/paid via applyReturnToInvoice.
+ * 3. Updates credit note with source invoice references and customer info.
+ * 4. Saves updated invoice and credit note to the database.
+ * 5. Emits RETURN_LINK audit trail record and shows toast.
+ */
+export function linkCreditNoteToInvoice(
+  creditNote: Invoice,
+  invoice: Invoice
+): LinkSalesReturnResult {
+  // 1. Guard: invoice.partyId === cn.partyId (or partyName match); otherwise toast + abort
+  const partyMatch =
+    (creditNote.partyId && invoice.partyId && creditNote.partyId === invoice.partyId) ||
+    (creditNote.partyName &&
+      invoice.partyName &&
+      creditNote.partyName.trim().toLowerCase() === invoice.partyName.trim().toLowerCase());
+
+  if (!partyMatch) {
+    const errorMsg = 'Party mismatch: Cannot link to an invoice of a different customer.';
+    showAppToast(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+
+  // 2. updatedInvoice = applyReturnToInvoice(invoice, cn.grandTotal) (from returnEngine)
+  const updatedInvoice = applyReturnToInvoice(invoice, creditNote.grandTotal);
+
+  // 3. updatedCn = { ...cn, originalInvoiceId: invoice.id, originalInvoiceNumber: invoice.invoiceNumber, originalInvoiceDate: invoice.date, partyId: invoice.partyId || creditNote.partyId, partyName: invoice.partyName || creditNote.partyName }
+  const updatedCn: Invoice = {
+    ...creditNote,
+    originalInvoiceId: invoice.id,
+    originalInvoiceNumber: invoice.invoiceNumber,
+    originalInvoiceDate: invoice.date,
+    partyId: invoice.partyId || creditNote.partyId,
+    partyName: invoice.partyName || creditNote.partyName,
+  };
+
+  // 4. db.saveInvoice(updatedInvoice) then db.saveInvoice(updatedCn)
+  db.saveInvoice(updatedInvoice, { skipSettlementDerivation: true });
+  db.saveInvoice(updatedCn, { skipParentReconciliation: true });
+
+  // 5. Audit Trail Hook
+  const auditUser = getAuditUser();
+  auditTrail
+    .logEvent({
+      userId: auditUser.userId,
+      userName: auditUser.userName,
+      userRole: auditUser.userRole,
+      actionType: 'RETURN_LINK',
+      documentId: updatedCn.id,
+      documentType: 'INVOICE',
+      previousSnapshot: JSON.parse(JSON.stringify(creditNote)),
+      newSnapshot: JSON.parse(JSON.stringify(updatedCn)),
+      summary: `Linked Credit Note #${updatedCn.invoiceNumber} to Invoice #${invoice.invoiceNumber}`,
+    })
+    .catch((err) => console.error('Audit log failed for RETURN_LINK:', err));
+
+  showAppToast(`Linked to invoice #${invoice.invoiceNumber}`);
+
+  return {
+    success: true,
+    updatedInvoice,
+    updatedCreditNote: updatedCn,
+  };
+}
+
+export interface UnlinkSalesReturnResult {
+  success: boolean;
+  error?: string;
+  revertedInvoice?: Invoice;
+  updatedCreditNote?: Invoice;
+}
+
+/**
+ * Unlinks a linked Sales Return (Credit Note) from its source Sales Invoice.
+ * 1. Finds the source invoice by originalInvoiceId / originalInvoiceNumber.
+ * 2. Restores source invoice's balance/paid via revertReturnFromInvoice.
+ * 3. Clears original invoice reference fields on the credit note.
+ * 4. Saves reverted invoice and updated credit note to the database.
+ * 5. Emits RETURN_UNLINK audit trail record and shows toast.
+ */
+export function unlinkCreditNoteFromInvoice(
+  creditNote: Invoice,
+  existingInvoices?: Invoice[]
+): UnlinkSalesReturnResult {
+  // 1. Find the source invoice by originalInvoiceId/originalInvoiceNumber
+  const allInvoices = existingInvoices || db.getInvoices();
+  const sourceInvoice = allInvoices.find(
+    (i) =>
+      (creditNote.originalInvoiceId && i.id === creditNote.originalInvoiceId) ||
+      (creditNote.originalInvoiceNumber &&
+        i.invoiceNumber.trim().toUpperCase() === creditNote.originalInvoiceNumber.trim().toUpperCase())
+  );
+
+  if (!sourceInvoice) {
+    const errorMsg = `Source invoice #${creditNote.originalInvoiceNumber || ''} not found.`;
+    showAppToast(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+
+  // 2. revertedInvoice = revertReturnFromInvoice(sourceInvoice, cn.grandTotal)
+  const revertedInvoice = revertReturnFromInvoice(sourceInvoice, creditNote.grandTotal);
+
+  // 3. updatedCn = { ...cn, originalInvoiceId: undefined, originalInvoiceNumber: undefined, originalInvoiceDate: undefined }
+  const updatedCn: Invoice = {
+    ...creditNote,
+    originalInvoiceId: undefined,
+    originalInvoiceNumber: undefined,
+    originalInvoiceDate: undefined,
+  };
+
+  // 4. db.saveInvoice(revertedInvoice) then db.saveInvoice(updatedCn)
+  db.saveInvoice(revertedInvoice, { skipSettlementDerivation: true });
+  db.saveInvoice(updatedCn, { skipParentReconciliation: true });
+
+  // 5. Audit Trail Hook
+  const auditUser = getAuditUser();
+  auditTrail
+    .logEvent({
+      userId: auditUser.userId,
+      userName: auditUser.userName,
+      userRole: auditUser.userRole,
+      actionType: 'RETURN_UNLINK',
+      documentId: updatedCn.id,
+      documentType: 'INVOICE',
+      previousSnapshot: JSON.parse(JSON.stringify(creditNote)),
+      newSnapshot: JSON.parse(JSON.stringify(updatedCn)),
+      summary: `Unlinked Credit Note #${updatedCn.invoiceNumber} from Invoice #${sourceInvoice.invoiceNumber}`,
+    })
+    .catch((err) => console.error('Audit log failed for RETURN_UNLINK:', err));
+
+  showAppToast(`Unlinked Credit Note #${updatedCn.invoiceNumber}`);
+
+  return {
+    success: true,
+    revertedInvoice,
+    updatedCreditNote: updatedCn,
+  };
 }

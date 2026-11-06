@@ -151,6 +151,10 @@ gst-billing-app/
     - `delta < 0` → `revertReturnFromInvoice(parent, -delta)`
     Adjusted parents are saved with `{ skipSettlementDerivation: true }` to preserve balance adjustments.
   - **Document Deletion**: Deleting a linked credit note in `deleteInvoice` restores the parent invoice via `revertReturnFromInvoice(parent, inv.grandTotal)`.
+  - **Dynamic Link / Unlink for Credit Notes**:
+    - Unlinked sales-return credit notes (`!cn.originalInvoiceNumber`) can be linked later to an eligible source sales invoice directly from `SalesReturnsView` via the **"Link to Invoice"** action button, which opens `InvoiceSelectorModal`.
+    - `linkCreditNoteToInvoice(creditNote, invoice)` guards party match, applies `applyReturnToInvoice` to reduce the source invoice's balance/paid, sets `originalInvoiceId` / `originalInvoiceNumber` / `originalInvoiceDate`, settles the credit note to `PAID`, saves both documents (`skipParentReconciliation: true` to prevent duplicate reconciliation), emits a `RETURN_LINK` MCA audit log event, and displays a confirmation toast.
+    - Linked credit notes can be unlinked via the **"Unlink"** action button with a confirmation modal (`docToUnlink`). `unlinkCreditNoteFromInvoice(creditNote)` restores the source invoice balance/paid via `revertReturnFromInvoice`, clears reference fields, flips the credit note to `UNPAID` (`balanceAmount = grandTotal`), emits a `RETURN_UNLINK` audit record, and triggers view refresh.
 - **Item-Level Return Tracking**: Computes available return quantities per line item across multiple prior returns against the same source invoice/bill. Returned quantities are strictly clamped to available quantities (`0 <= returnQty <= availableQty`).
 - **Settlement & Value Reversal**: Updates the source document's `balanceAmount`, `paidAmount`, and `paymentStatus`:
   - Reduces outstanding `balanceAmount` first.

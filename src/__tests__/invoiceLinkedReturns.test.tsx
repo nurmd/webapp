@@ -28,6 +28,8 @@ import {
   getPurchaseReturnSummary,
   applyReturnToInvoice,
   applyReturnToPurchaseBill,
+  linkCreditNoteToInvoice,
+  unlinkCreditNoteFromInvoice,
 } from '../core/returns/returnEngine.ts';
 import { resetBackNavigationForTesting } from '../core/utils/backNavigation.ts';
 import type { Party } from '../models/party.ts';
@@ -657,5 +659,496 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
       itemRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv-601' }));
+  });
+
+  it('7. Linking an unlinked credit note to an invoice reduces the invoice balance/paid and sets originalInvoiceNumber', async () => {
+    const parentInv: Invoice = {
+      id: 'inv-701',
+      invoiceNumber: 'INV-701',
+      invoiceType: 'B2B',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 10,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 5000,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 5000,
+        },
+      ],
+      totalGrossAmount: 5000,
+      totalDiscount: 0,
+      totalTaxableAmount: 5000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 5000,
+      paidAmount: 0,
+      balanceAmount: 5000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(parentInv, { skipSettlementDerivation: true });
+
+    // Unlinked credit note
+    const unlinkedCN: Invoice = {
+      id: 'cn-701',
+      invoiceNumber: 'CN-701',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 3,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 1500,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1500,
+        },
+      ],
+      totalGrossAmount: 1500,
+      totalDiscount: 0,
+      totalTaxableAmount: 1500,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 1500,
+      paidAmount: 0,
+      balanceAmount: 1500,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(unlinkedCN);
+
+    // Initial check: parent balance is 5000, CN is unlinked with balance 1500
+    expect(db.getInvoices().find((i) => i.id === parentInv.id)!.balanceAmount).toBe(5000);
+    const initialCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(initialCN.originalInvoiceNumber).toBeUndefined();
+    expect(initialCN.balanceAmount).toBe(1500);
+    expect(initialCN.paymentStatus).toBe('UNPAID');
+
+    // Link unlinked credit note to parent invoice
+    const result = linkCreditNoteToInvoice(unlinkedCN, parentInv);
+    expect(result.success).toBe(true);
+
+    // Parent balance is reduced by 1500: 5000 - 1500 = 3500
+    const freshParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
+    expect(freshParent.balanceAmount).toBe(3500);
+
+    // Credit Note receives parent invoice fields and settles to PAID with balanceAmount = 0
+    const freshCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(freshCN.originalInvoiceId).toBe(parentInv.id);
+    expect(freshCN.originalInvoiceNumber).toBe(parentInv.invoiceNumber);
+    expect(freshCN.originalInvoiceDate).toBe(parentInv.date);
+    expect(freshCN.balanceAmount).toBe(0);
+    expect(freshCN.paidAmount).toBe(1500);
+    expect(freshCN.paymentStatus).toBe('PAID');
+    expect(freshCN.paymentMode).toBe('CASH');
+  });
+
+  it('8. Unlinking reverts the invoice balance/paid and clears originalInvoiceNumber', async () => {
+    const parentInv: Invoice = {
+      id: 'inv-801',
+      invoiceNumber: 'INV-801',
+      invoiceType: 'B2B',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 10,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 5000,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 5000,
+        },
+      ],
+      totalGrossAmount: 5000,
+      totalDiscount: 0,
+      totalTaxableAmount: 5000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 5000,
+      paidAmount: 0,
+      balanceAmount: 5000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(parentInv, { skipSettlementDerivation: true });
+
+    const linkedCN: Invoice = {
+      id: 'cn-801',
+      invoiceNumber: 'CN-801',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      originalInvoiceId: parentInv.id,
+      originalInvoiceNumber: parentInv.invoiceNumber,
+      originalInvoiceDate: parentInv.date,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 4,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 2000,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 2000,
+        },
+      ],
+      totalGrossAmount: 2000,
+      totalDiscount: 0,
+      totalTaxableAmount: 2000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 2000,
+      paidAmount: 2000,
+      balanceAmount: 0,
+      amountInWords: '',
+      paymentMode: 'CASH',
+      paymentStatus: 'PAID',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(linkedCN);
+
+    // Parent balance is reduced by 2000: 5000 - 2000 = 3000
+    expect(db.getInvoices().find((i) => i.id === parentInv.id)!.balanceAmount).toBe(3000);
+
+    // Unlink the credit note
+    const unlinkResult = unlinkCreditNoteFromInvoice(linkedCN);
+    expect(unlinkResult.success).toBe(true);
+
+    // Source invoice balance is restored: 3000 + 2000 = 5000
+    const restoredParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
+    expect(restoredParent.balanceAmount).toBe(5000);
+
+    // Credit Note has reference fields cleared and flips to UNPAID
+    const unlinkedFresh = db.getInvoices().find((i) => i.id === linkedCN.id)!;
+    expect(unlinkedFresh.originalInvoiceId).toBeUndefined();
+    expect(unlinkedFresh.originalInvoiceNumber).toBeUndefined();
+    expect(unlinkedFresh.originalInvoiceDate).toBeUndefined();
+    expect(unlinkedFresh.balanceAmount).toBe(2000);
+    expect(unlinkedFresh.paidAmount).toBe(0);
+    expect(unlinkedFresh.paymentStatus).toBe('UNPAID');
+    expect(unlinkedFresh.paymentMode).toBe('CREDIT');
+  });
+
+  it('9. Party mismatch aborts linking with a toast', async () => {
+    const parentInv: Invoice = {
+      id: 'inv-901',
+      invoiceNumber: 'INV-901',
+      invoiceType: 'B2B',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id, // cust-1
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 2,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 1000,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1000,
+        },
+      ],
+      totalGrossAmount: 1000,
+      totalDiscount: 0,
+      totalTaxableAmount: 1000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 1000,
+      paidAmount: 0,
+      balanceAmount: 1000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(parentInv, { skipSettlementDerivation: true });
+
+    // Credit Note belonging to a DIFFERENT party
+    const differentPartyCN: Invoice = {
+      id: 'cn-901',
+      invoiceNumber: 'CN-901',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: 'different-party-999',
+      partyName: 'Completely Different Customer Ltd',
+      partyAddress: 'Delhi',
+      partyStateCode: '07',
+      placeOfSupplyStateCode: '07',
+      isIntraState: false,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 1,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 500,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 500,
+        },
+      ],
+      totalGrossAmount: 500,
+      totalDiscount: 0,
+      totalTaxableAmount: 500,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 500,
+      paidAmount: 0,
+      balanceAmount: 500,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(differentPartyCN);
+
+    let toastMessage = '';
+    const toastHandler = (e: any) => {
+      toastMessage = e.detail;
+    };
+    window.addEventListener('app_show_toast', toastHandler);
+
+    // Attempt to link credit note of different party to parentInv
+    const result = linkCreditNoteToInvoice(differentPartyCN, parentInv);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Party mismatch');
+    expect(toastMessage).toContain('Party mismatch');
+
+    // Parent balance remains completely unchanged
+    expect(db.getInvoices().find((i) => i.id === parentInv.id)!.balanceAmount).toBe(1000);
+
+    // Credit Note remains unlinked
+    const cnStillUnlinked = db.getInvoices().find((i) => i.id === differentPartyCN.id)!;
+    expect(cnStillUnlinked.originalInvoiceNumber).toBeUndefined();
+    expect(cnStillUnlinked.balanceAmount).toBe(500);
+
+    window.removeEventListener('app_show_toast', toastHandler);
+  });
+
+  it('10. SalesReturnsView UI renders Link to Invoice for unlinked and Unlink for linked rows', async () => {
+    const parentInv: Invoice = {
+      id: 'inv-1001',
+      invoiceNumber: 'INV-1001',
+      invoiceType: 'B2B',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [],
+      totalGrossAmount: 4000,
+      totalDiscount: 0,
+      totalTaxableAmount: 4000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 4000,
+      paidAmount: 0,
+      balanceAmount: 4000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(parentInv, { skipSettlementDerivation: true });
+
+    const unlinkedCN: Invoice = {
+      id: 'cn-1001',
+      invoiceNumber: 'CN-1001',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [],
+      totalGrossAmount: 1000,
+      totalDiscount: 0,
+      totalTaxableAmount: 1000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 1000,
+      paidAmount: 0,
+      balanceAmount: 1000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(unlinkedCN);
+
+    await act(async () => {
+      root.render(
+        <SalesReturnsView
+          company={mockCompany}
+          invoices={db.getInvoices()}
+          onNewSalesReturn={vi.fn()}
+          onViewInvoice={vi.fn()}
+          onDeleteInvoice={vi.fn()}
+        />
+      );
+    });
+
+    // 1. Unlinked row displays "Link to Invoice" button
+    const linkBtn = container.querySelector(`[data-testid="link-invoice-btn-${unlinkedCN.id}"]`);
+    expect(linkBtn).toBeTruthy();
+    expect(linkBtn?.textContent).toContain('Link to Invoice');
+
+    // 2. Click "Link to Invoice" opens InvoiceSelectorModal
+    await act(async () => {
+      linkBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('[data-testid="invoice-selector-modal"]')).toBeTruthy();
+
+    // 3. Select the invoice from the modal
+    const invRow = container.querySelector(`[data-testid="select-invoice-item-${parentInv.invoiceNumber}"]`);
+    expect(invRow).toBeTruthy();
+    await act(async () => {
+      invRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    // 4. Row now shows "Against #INV-1001" and "Unlink" button
+    const unlinkBtn = container.querySelector(`[data-testid="unlink-invoice-btn-${unlinkedCN.id}"]`);
+    expect(unlinkBtn).toBeTruthy();
+    expect(unlinkBtn?.textContent).toContain('Unlink');
+    expect(container.textContent).toContain(`Against #${parentInv.invoiceNumber}`);
+
+    // 5. Clicking "Unlink" opens confirmation dialog
+    await act(async () => {
+      unlinkBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('Unlink from Invoice?');
+
+    // 6. Confirm unlinking
+    const confirmBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('Unlink') && b.className.includes('bg-amber-600'));
+    expect(confirmBtn).toBeTruthy();
+    await act(async () => {
+      confirmBtn?.click();
+    });
+
+    // 7. Reverted back to unlinked state: "Link to Invoice" button reappears
+    const reLinkBtn = container.querySelector(`[data-testid="link-invoice-btn-${unlinkedCN.id}"]`);
+    expect(reLinkBtn).toBeTruthy();
+    expect(reLinkBtn?.textContent).toContain('Link to Invoice');
   });
 });

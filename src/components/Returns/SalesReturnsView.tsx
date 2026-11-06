@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -15,6 +15,8 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { InvoiceSelectorModal } from './InvoiceSelectorModal.tsx';
 import { ReturnItemPickerModal } from './ReturnItemPickerModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
+import { db } from '../../services/db.ts';
+import { linkCreditNoteToInvoice, unlinkCreditNoteFromInvoice } from '../../core/returns/returnEngine.ts';
 
 export interface SalesReturnsViewProps {
   company: CompanyProfile;
@@ -23,6 +25,7 @@ export interface SalesReturnsViewProps {
   onViewInvoice: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
   onDeleteInvoice: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
@@ -32,9 +35,16 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
   onViewInvoice,
   onEditInvoice,
   onDeleteInvoice,
+  onRefresh,
 }) => {
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>(invoices);
+  useEffect(() => {
+    setLocalInvoices(invoices);
+  }, [invoices]);
+
   const [search, setSearch] = useState('');
   const [docToDelete, setDocToDelete] = useState<Invoice | null>(null);
+  const [docToUnlink, setDocToUnlink] = useState<Invoice | null>(null);
 
   // Sorting
   const [sortBy, setSortBy] = useState<LedgerSortOption>('NEWEST');
@@ -49,6 +59,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
   const [isInvoiceSelectorOpen, setIsInvoiceSelectorOpen] = useState(false);
   const [selectedInvoiceForReturn, setSelectedInvoiceForReturn] = useState<Invoice | null>(null);
   const [isItemPickerOpen, setIsItemPickerOpen] = useState(false);
+  const [creditNoteToLink, setCreditNoteToLink] = useState<Invoice | null>(null);
 
   useBackNavigation(() => {
     if (isItemPickerOpen) {
@@ -57,6 +68,11 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
     }
     if (isInvoiceSelectorOpen) {
       setIsInvoiceSelectorOpen(false);
+      setCreditNoteToLink(null);
+      return true;
+    }
+    if (docToUnlink) {
+      setDocToUnlink(null);
       return true;
     }
     if (docToDelete) {
@@ -68,16 +84,38 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
       return true;
     }
     return false;
-  }, isDateModalOpen || !!docToDelete || isInvoiceSelectorOpen || isItemPickerOpen, 20);
+  }, isDateModalOpen || !!docToDelete || !!docToUnlink || isInvoiceSelectorOpen || isItemPickerOpen, 20);
+
+  const handleLinkInvoice = (cn: Invoice, invoice: Invoice) => {
+    const res = linkCreditNoteToInvoice(cn, invoice);
+    if (res.success) {
+      if (onRefresh) {
+        onRefresh();
+      } else {
+        setLocalInvoices(db.getInvoices());
+      }
+    }
+  };
+
+  const handleUnlinkInvoice = (cn: Invoice) => {
+    const res = unlinkCreditNoteFromInvoice(cn, localInvoices);
+    if (res.success) {
+      if (onRefresh) {
+        onRefresh();
+      } else {
+        setLocalInvoices(db.getInvoices());
+      }
+    }
+  };
 
   // 1. Filter only Credit Notes (Sale Returns)
   const creditNotes = useMemo(() => {
-    return invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
-  }, [invoices]);
+    return localInvoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
+  }, [localInvoices]);
 
   // 2. Filter eligible source sales invoices
   const eligibleInvoices = useMemo(() => {
-    return invoices.filter(
+    return localInvoices.filter(
       (inv) =>
         !inv.isCancelled &&
         inv.invoiceType !== 'CREDIT_NOTE' &&
@@ -86,7 +124,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
         inv.invoiceType !== 'SALES_ORDER' &&
         inv.invoiceType !== 'DELIVERY_CHALLAN'
     );
-  }, [invoices]);
+  }, [localInvoices]);
 
   // 3. Date Filtering
   const dateRange = useMemo(() => {
@@ -131,8 +169,15 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
   }, [searchedNotes, sortBy]);
 
   const handleSelectInvoice = (inv: Invoice) => {
-    setSelectedInvoiceForReturn(inv);
-    setIsItemPickerOpen(true);
+    setIsInvoiceSelectorOpen(false);
+    if (creditNoteToLink) {
+      const cn = creditNoteToLink;
+      setCreditNoteToLink(null);
+      handleLinkInvoice(cn, inv);
+    } else {
+      setSelectedInvoiceForReturn(inv);
+      setIsItemPickerOpen(true);
+    }
   };
 
   return (
@@ -317,28 +362,58 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                   <span>Credit Note (Table 9B)</span>
                 </span>
 
-                {cn.originalInvoiceNumber && (
+                {cn.originalInvoiceNumber ? (
+                  <>
+                    <button
+                      type="button"
+                      data-testid={`source-invoice-link-${cn.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const orig = localInvoices.find(
+                          (i) =>
+                            (cn.originalInvoiceId && i.id === cn.originalInvoiceId) ||
+                            i.invoiceNumber.toUpperCase() === cn.originalInvoiceNumber?.toUpperCase()
+                        );
+                        if (orig) {
+                          onViewInvoice(orig);
+                        } else {
+                          showAppToast(`Original invoice #${cn.originalInvoiceNumber} not found`);
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-secondary hover:text-secondary-hover bg-surface-container-low hover:bg-secondary/10 px-1.5 py-0.2 rounded whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1 border border-outline-variant/30 transition-colors"
+                      title="Click to view original invoice"
+                    >
+                      <span className="material-symbols-outlined text-[11px]">receipt_long</span>
+                      <span>Against #{cn.originalInvoiceNumber}</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`unlink-invoice-btn-${cn.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDocToUnlink(cn);
+                      }}
+                      className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 px-1.5 py-0.2 rounded whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-0.5 border border-amber-300 dark:border-amber-800 transition-colors"
+                      title="Unlink from parent invoice"
+                    >
+                      <span className="material-symbols-outlined text-[11px]">link_off</span>
+                      <span>Unlink</span>
+                    </button>
+                  </>
+                ) : (
                   <button
                     type="button"
-                    data-testid={`source-invoice-link-${cn.id}`}
+                    data-testid={`link-invoice-btn-${cn.id}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const orig = invoices.find(
-                        (i) =>
-                          (cn.originalInvoiceId && i.id === cn.originalInvoiceId) ||
-                          i.invoiceNumber.toUpperCase() === cn.originalInvoiceNumber?.toUpperCase()
-                      );
-                      if (orig) {
-                        onViewInvoice(orig);
-                      } else {
-                        showAppToast(`Original invoice #${cn.originalInvoiceNumber} not found`);
-                      }
+                      setCreditNoteToLink(cn);
+                      setIsInvoiceSelectorOpen(true);
                     }}
-                    className="text-[10px] font-semibold text-secondary hover:text-secondary-hover bg-surface-container-low hover:bg-secondary/10 px-1.5 py-0.2 rounded whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1 border border-outline-variant/30 transition-colors"
-                    title="Click to view original invoice"
+                    className="text-[10px] font-semibold text-primary hover:text-primary-hover bg-primary/10 hover:bg-primary/20 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 cursor-pointer inline-flex items-center gap-1 border border-primary/30 transition-colors"
+                    title="Link this Credit Note to an original invoice"
                   >
-                    <span className="material-symbols-outlined text-[11px]">receipt_long</span>
-                    <span>Against #{cn.originalInvoiceNumber}</span>
+                    <span className="material-symbols-outlined text-[11px]">link</span>
+                    <span>Link to Invoice</span>
                   </button>
                 )}
 
@@ -435,8 +510,11 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
       {/* Invoice Selector Modal */}
       <InvoiceSelectorModal
         isOpen={isInvoiceSelectorOpen}
-        onClose={() => setIsInvoiceSelectorOpen(false)}
-        invoices={invoices}
+        onClose={() => {
+          setIsInvoiceSelectorOpen(false);
+          setCreditNoteToLink(null);
+        }}
+        invoices={localInvoices}
         onSelectInvoice={handleSelectInvoice}
       />
 
@@ -450,7 +528,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
         sourceDocument={selectedInvoiceForReturn}
         documentType="SALES"
         company={company}
-        existingInvoices={invoices}
+        existingInvoices={localInvoices}
         onSuccess={() => {
           setIsItemPickerOpen(false);
           setSelectedInvoiceForReturn(null);
@@ -471,6 +549,26 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
         }}
         accentColor="secondary"
       />
+
+      {/* Unlink Confirmation Modal */}
+      {docToUnlink && (
+        <ConfirmDeleteModal
+          isOpen={!!docToUnlink}
+          title="Unlink from Invoice?"
+          description={`Are you sure you want to unlink Credit Note #${docToUnlink.invoiceNumber} from Invoice #${docToUnlink.originalInvoiceNumber}? This will restore the original invoice balance and mark this credit note as an unlinked open credit.`}
+          confirmText="Unlink"
+          cancelText="Cancel"
+          icon="link_off"
+          iconBgClass="bg-amber-500/20 text-amber-600 dark:text-amber-400"
+          confirmButtonClass="bg-amber-600 text-white hover:bg-amber-700"
+          onConfirm={() => {
+            const cn = docToUnlink;
+            setDocToUnlink(null);
+            handleUnlinkInvoice(cn);
+          }}
+          onClose={() => setDocToUnlink(null)}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       {docToDelete && (

@@ -1494,6 +1494,7 @@ export const App: React.FC = () => {
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onDeleteInvoice={handleDeleteInvoice}
+            onRefresh={refreshData}
           />
         )}
 

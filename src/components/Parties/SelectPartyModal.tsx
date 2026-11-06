@@ -174,13 +174,14 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   };
 
   if (isPos) {
+    const searchTokens = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const filteredPos = customerParties.filter((p) => {
-      const q = search.toLowerCase();
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.phone.includes(q) ||
-        (p.gstin && p.gstin.toLowerCase().includes(q))
-      );
+      if (searchTokens.length === 0) return true;
+      return searchTokens.every((token) => (
+        p.name.toLowerCase().includes(token) ||
+        p.phone.includes(token) ||
+        (p.gstin && p.gstin.toLowerCase().includes(token))
+      ));
     });
 
     const sortedCustomers = [...filteredPos].sort((a, b) => {
@@ -517,12 +518,16 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
     }
   };
 
+  const searchTokensGeneral = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const filteredGeneral = parties.filter((p) => {
     const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.gstin && p.gstin.toLowerCase().includes(search.toLowerCase())) ||
-      p.phone.includes(search) ||
-      p.billingAddress.toLowerCase().includes(search.toLowerCase());
+      searchTokensGeneral.length === 0 ||
+      searchTokensGeneral.every((token) => (
+        p.name.toLowerCase().includes(token) ||
+        (p.gstin && p.gstin.toLowerCase().includes(token)) ||
+        p.phone.includes(token) ||
+        p.billingAddress.toLowerCase().includes(token)
+      ));
 
     const matchesType = filterType === 'ALL' || p.type === filterType;
     const matchesBalance = filterBalanceOnly ? p.currentBalance !== 0 : true;

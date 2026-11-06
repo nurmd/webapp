@@ -1,5 +1,6 @@
 import { InventoryItem, ItemCategory, DEFAULT_ITEM_CATEGORIES } from '../../models/item.ts';
 import { pouch } from '../pouchdb.ts';
+import { auditTrail } from '../auditTrail.ts';
 import { isLowStock } from '../../core/inventory/stockEngine.ts';
 import { STORAGE_KEYS, DEFAULT_ITEMS } from './storageEngine.ts';
 import { PartyStorage } from './partyStorage.ts';
@@ -17,6 +18,7 @@ export class ItemStorage extends PartyStorage {
   saveItem(item: InventoryItem): void {
     const list = [...this.getItems()];
     const idx = list.findIndex((i) => i.id === item.id);
+    const prevItem = idx >= 0 ? list[idx] : null;
     if (idx >= 0) {
       list[idx] = item;
     } else {
@@ -26,21 +28,72 @@ export class ItemStorage extends PartyStorage {
     this.set(STORAGE_KEYS.ITEMS, list);
     this.backgroundPouchPut('item', item);
     this.broadcastChange('item', 'save', item.id, item);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const actionType = prevItem ? 'ITEM_UPDATE' : 'ITEM_CREATE';
+    const summary = `${prevItem ? 'Updated' : 'Created'} item "${item.name}" (Stock: ${item.currentStock || 0} ${item.unit || 'PCS'})`;
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: item.id,
+        documentType: 'ITEM',
+        previousSnapshot: prevItem ? JSON.parse(JSON.stringify(prevItem)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(item)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for saveItem:', err));
+
     this.notifyListeners();
   }
 
   deleteItem(id: string): void {
+    const prevItem = this.getItems().find((i) => i.id === id);
     const list = this.getItems().filter((i) => i.id !== id);
     this.recordTombstone('item', id);
     this.set(STORAGE_KEYS.ITEMS, list);
     this.backgroundPouchDelete('item', id);
     this.broadcastChange('item', 'delete', id);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'ITEM_DELETE',
+        documentId: id,
+        documentType: 'ITEM',
+        previousSnapshot: prevItem ? JSON.parse(JSON.stringify(prevItem)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted item "${prevItem?.name || id}"`,
+      })
+      .catch((err) => console.error('Audit log failed for deleteItem:', err));
+
     this.notifyListeners();
   }
 
   saveItems(items: InventoryItem[]): void {
     const current = this.getItems();
     this.persistStockUpdates(current, items);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'ITEM_UPDATE',
+        documentId: 'bulk_items',
+        documentType: 'ITEM',
+        summary: `Batch updated ${items.length} inventory items`,
+      })
+      .catch((err) => console.error('Audit log failed for saveItems:', err));
   }
 
   isItemLowStock(item: InventoryItem): boolean {

@@ -1,5 +1,6 @@
 import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { pouch } from '../pouchdb.ts';
+import { auditTrail } from '../auditTrail.ts';
 import { STORAGE_KEYS } from './storageEngine.ts';
 import { SettingsStorage } from './settingsStorage.ts';
 
@@ -12,6 +13,7 @@ export class PartyStorage extends SettingsStorage {
   saveParty(party: Party): void {
     const list = [...this.getParties()];
     const idx = list.findIndex((p) => p.id === party.id);
+    const prevParty = idx >= 0 ? list[idx] : null;
     let partyToSave = party;
     if (idx >= 0) {
       const existing = list[idx];
@@ -52,6 +54,25 @@ export class PartyStorage extends SettingsStorage {
     this.set(STORAGE_KEYS.PARTIES, list);
     this.backgroundPouchPut('party', partyToSave);
     this.broadcastChange('party', 'save', partyToSave.id, partyToSave);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    const actionType = prevParty ? 'PARTY_UPDATE' : 'PARTY_CREATE';
+    const summary = `${prevParty ? 'Updated' : 'Created'} ${partyToSave.type.toLowerCase()} "${partyToSave.name}" (Balance: ₹${partyToSave.currentBalance || 0})`;
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType,
+        documentId: partyToSave.id,
+        documentType: 'PARTY',
+        previousSnapshot: prevParty ? JSON.parse(JSON.stringify(prevParty)) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(partyToSave)),
+        summary,
+      })
+      .catch((err) => console.error('Audit log failed for saveParty:', err));
+
     this.recalculatePartyBalance(partyToSave.id);
     this.notifyListeners();
   }
@@ -95,6 +116,23 @@ export class PartyStorage extends SettingsStorage {
     this.set(STORAGE_KEYS.PARTY_GROUPS, list);
     this.backgroundPouchPut('party_group', savedGroup);
     this.broadcastChange('party_group', 'save', savedGroup.id, savedGroup);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: idx >= 0 ? 'PARTY_UPDATE' : 'PARTY_CREATE',
+        documentId: savedGroup.id,
+        documentType: 'PARTY',
+        previousSnapshot: idx >= 0 ? JSON.parse(JSON.stringify(list[idx])) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(savedGroup)),
+        summary: `${idx >= 0 ? 'Updated' : 'Created'} party group "${savedGroup.name}"`,
+      })
+      .catch((err) => console.error('Audit log failed for savePartyGroup:', err));
+
     this.notifyListeners();
     return savedGroup;
   }
@@ -166,6 +204,23 @@ export class PartyStorage extends SettingsStorage {
     this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
     this.backgroundPouchPut('party_category', savedCat);
     this.broadcastChange('party_category', 'save', savedCat.id, savedCat);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: idx >= 0 ? 'PARTY_UPDATE' : 'PARTY_CREATE',
+        documentId: savedCat.id,
+        documentType: 'PARTY',
+        previousSnapshot: idx >= 0 ? JSON.parse(JSON.stringify(list[idx])) : undefined,
+        newSnapshot: JSON.parse(JSON.stringify(savedCat)),
+        summary: `${idx >= 0 ? 'Updated' : 'Created'} party category "${savedCat.name}"`,
+      })
+      .catch((err) => console.error('Audit log failed for savePartyCategory:', err));
+
     this.notifyListeners();
     return savedCat;
   }
@@ -202,8 +257,9 @@ export class PartyStorage extends SettingsStorage {
     const list = this.getParties();
     const idx = list.findIndex((p) => p.id === id);
     if (idx >= 0) {
+      const prevParty = list[idx];
       const party: Party = {
-        ...list[idx],
+        ...prevParty,
         openingBalance: undefined,
         openingBalanceType: undefined,
         openingBalanceDate: undefined,
@@ -213,17 +269,52 @@ export class PartyStorage extends SettingsStorage {
       this.set(STORAGE_KEYS.PARTIES, list);
       this.backgroundPouchPut('party', party);
       this.broadcastChange('party', 'save', party.id, party);
+
+      // MCA Audit Trail Hook
+      const auditUser = this.getAuditUser();
+      auditTrail
+        .logEvent({
+          userId: auditUser.userId,
+          userName: auditUser.userName,
+          userRole: auditUser.userRole,
+          actionType: 'OPENING_BALANCE_CLEAR',
+          documentId: party.id,
+          documentType: 'PARTY',
+          previousSnapshot: JSON.parse(JSON.stringify(prevParty)),
+          newSnapshot: JSON.parse(JSON.stringify(party)),
+          summary: `Cleared opening balance for ${party.type.toLowerCase()} "${party.name}"`,
+        })
+        .catch((err) => console.error('Audit log failed for clearPartyOpeningBalance:', err));
+
       this.recalculatePartyBalance(id);
       this.notifyListeners();
     }
   }
 
   deleteParty(id: string): void {
+    const prevParty = this.getParties().find((p) => p.id === id);
     const list = this.getParties().filter((p) => p.id !== id);
     this.recordTombstone('party', id);
     this.set(STORAGE_KEYS.PARTIES, list);
     this.backgroundPouchDelete('party', id);
     this.broadcastChange('party', 'delete', id);
+
+    // MCA Audit Trail Hook
+    const auditUser = this.getAuditUser();
+    auditTrail
+      .logEvent({
+        userId: auditUser.userId,
+        userName: auditUser.userName,
+        userRole: auditUser.userRole,
+        actionType: 'PARTY_DELETE',
+        documentId: id,
+        documentType: 'PARTY',
+        previousSnapshot: prevParty ? JSON.parse(JSON.stringify(prevParty)) : { id },
+        newSnapshot: undefined,
+        summary: `Deleted ${prevParty?.type?.toLowerCase() || 'party'} "${prevParty?.name || id}"`,
+      })
+      .catch((err) => console.error('Audit log failed for deleteParty:', err));
+
     this.notifyListeners();
   }
 

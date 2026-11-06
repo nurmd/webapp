@@ -126,6 +126,14 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   };
 
   // Duplicate checks
+  const duplicateNameParty = name.trim()
+    ? parties.find(
+        (p) =>
+          p.id !== editingParty?.id &&
+          p.name.trim().toLowerCase() === name.trim().toLowerCase()
+      )
+    : null;
+
   const duplicatePhoneParty = phone.trim()
     ? parties.find(
         (p) =>
@@ -329,6 +337,19 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
             />
+            {duplicateNameParty && (
+              <div
+                role="alert"
+                className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-fade-in"
+              >
+                <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400 shrink-0">
+                  warning
+                </span>
+                <span>
+                  Another party <strong>{duplicateNameParty.name}</strong> already exists with this name.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Mobile & Email */}
