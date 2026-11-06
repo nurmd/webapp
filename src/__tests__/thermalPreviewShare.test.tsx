@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import * as htmlToImage from 'html-to-image';
 import { ThermalPrintModal } from '../components/Printing/ThermalPrintModal.tsx';
+import { ThermalReceiptPreview } from '../components/Printing/ThermalReceiptPreview.tsx';
 import {
   renderThermalPreviewImage,
   renderThermalReceiptImage,
@@ -461,6 +462,29 @@ describe('Thermal Preview & Receipt Image Share Suite', () => {
         delete (window as any).AndroidBridge;
         nav.share = origShare;
       }
+    });
+  });
+
+  describe('ThermalReceiptPreview Content-Sized Capture Node (No Cropping)', () => {
+    // html-to-image captures the node at its rendered width.
+    // If the node is constrained by w-full or max-w-[...], 48-column text gets clipped on the right.
+    // The node must size to its content (w-max, max-w-none, overflow-visible) so full text is captured.
+    it('renders 48-column thermal receipt preview with content-sized layout preventing cropped image exports', () => {
+      const previewText = buildThermalReceiptText(mockInvoice, mockCompany, 48);
+
+      act(() => {
+        root.render(<ThermalReceiptPreview previewText={previewText} width={48} />);
+      });
+
+      const node = container.querySelector('[data-testid="thermal-receipt-preview"]')!;
+      expect(node).toBeTruthy();
+      expect(node.className).toContain('w-max');
+      expect(node.className).toContain('max-w-none');
+      expect(node.className).toContain('overflow-visible');
+      expect(node.className).not.toContain('w-full');
+      expect(node.className).not.toContain('max-w-[320px]');
+      expect(node.className).not.toContain('max-w-[420px]');
+      expect(node.className).not.toContain('overflow-x-auto');
     });
   });
 });

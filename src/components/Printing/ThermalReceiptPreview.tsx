@@ -16,11 +16,9 @@ export const ThermalReceiptPreview = forwardRef<HTMLDivElement, ThermalReceiptPr
       <div
         ref={ref}
         data-testid="thermal-receipt-preview"
-        className={`w-full ${
-          width === 32 ? 'max-w-[320px]' : 'max-w-[420px]'
-        } bg-[#fefdfb] text-slate-950 p-3.5 sm:p-4 rounded-xl border border-stone-300 shadow-md font-mono ${
+        className={`w-max max-w-none mx-auto bg-[#fefdfb] text-slate-950 p-3.5 sm:p-4 rounded-xl border border-stone-300 shadow-md font-mono ${
           width === 32 ? 'text-[11px]' : 'text-[10px]'
-        } leading-relaxed overflow-x-auto whitespace-pre select-text font-bold transition-all ${className}`}
+        } leading-relaxed overflow-visible whitespace-pre select-text font-bold transition-all ${className}`}
       >
         {previewText}
       </div>

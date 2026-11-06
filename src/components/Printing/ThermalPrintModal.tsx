@@ -354,7 +354,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
                 </button>
               </div>
             ) : (
-              <div className="flex justify-center p-2 bg-surface-container-low/60 rounded-2xl border border-outline-variant/20">
+              <div className="flex justify-start overflow-x-auto p-2 bg-surface-container-low/60 rounded-2xl border border-outline-variant/20">
                 <ThermalReceiptPreview
                   ref={thermalPreviewRef}
                   previewText={previewText}

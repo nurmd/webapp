@@ -574,7 +574,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             {/* Toggle swaps Text preview ↔ Thermal receipt image */}
             {isImageMode ? (
               invoice ? (
-                <div className="max-h-[40vh] overflow-y-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-center shadow-inner">
+                <div className="max-h-[40vh] overflow-y-auto overflow-x-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-start shadow-inner">
                   <ThermalReceiptPreview
                     ref={thermalPreviewRef}
                     previewText={buildThermalReceiptText(invoice, company, paperWidth)}
