@@ -80,6 +80,8 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         const isEligibleLinked = Boolean(parent && isSameParty);
 
         if (isEligibleLinked) {
+          const hasSplitNote =
+            typeof invoice.notes === 'string' && /^\s*Split Payment\b/i.test(invoice.notes.trim());
           invoice = {
             ...invoice,
             paidAmount: invoice.grandTotal,
@@ -87,6 +89,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
             paymentStatus: 'PAID',
             paymentMode: 'CASH',
             paymentSplits: undefined,
+            notes: hasSplitNote ? undefined : invoice.notes,
           };
         } else {
           invoice = {

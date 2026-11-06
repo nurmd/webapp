@@ -3,6 +3,7 @@ import {
   parseSplitsFromInvoice,
   parseSplitsFromPurchase,
   formatSplitNotes,
+  derivePaymentSettlement,
 } from '@/core/accounting/paymentSplitUtils';
 import type { Invoice } from '@/models/invoice';
 import type { PurchaseBill } from '@/models/purchase';
@@ -134,5 +135,48 @@ describe('Suite 4: Multi-Tender Splits & Parsing', () => {
     ];
     const notes = formatSplitNotes(splits, 250);
     expect(notes).toBe('Split Payment — Cash ₹500, Credit ₹250.00');
+  });
+
+  describe('derivePaymentSettlement — Stale Split Notes Protection', () => {
+    it('legacy settled doc with split notes correctly parses structured splits', () => {
+      const res = derivePaymentSettlement({
+        grandTotal: 1000,
+        paymentMode: 'SPLIT',
+        paymentStatus: 'PAID',
+        paidAmount: 1000,
+        balanceAmount: 0,
+        notes: 'Split: CASH: ₹400, UPI: ₹600',
+      });
+      expect(res.paidAmount).toBe(1000);
+      expect(res.balanceAmount).toBe(0);
+      expect(res.paymentMode).toBe('SPLIT');
+      expect(res.paymentSplits?.length).toBe(2);
+    });
+
+    it('unlinked credit doc with split credit notes stays UNPAID, balance = grandTotal, CREDIT mode', () => {
+      const res = derivePaymentSettlement({
+        grandTotal: 720,
+        paymentMode: 'CREDIT',
+        paymentStatus: 'UNPAID',
+        paidAmount: 0,
+        balanceAmount: 720,
+        notes: 'Split Payment — Credit ₹720.00',
+      });
+      expect(res.paymentStatus).toBe('UNPAID');
+      expect(res.balanceAmount).toBe(720);
+      expect(res.paidAmount).toBe(0);
+      expect(res.paymentMode).toBe('CREDIT');
+    });
+
+    it('genuinely partial doc with split notes retains PARTIAL status and correct split amounts', () => {
+      const res = derivePaymentSettlement({
+        grandTotal: 1000,
+        notes: 'Split Payment — Cash ₹400, Credit ₹600.00',
+      });
+      expect(res.paymentStatus).toBe('PARTIAL');
+      expect(res.paidAmount).toBe(400);
+      expect(res.balanceAmount).toBe(600);
+      expect(res.paymentMode).toBe('SPLIT');
+    });
   });
 });

@@ -621,6 +621,8 @@ export function linkCreditNoteToInvoice(
   db.saveInvoice(updatedInvoice, { skipSettlementDerivation: true });
   db.saveInvoice(updatedCn, { skipParentReconciliation: true });
 
+  const persistedCn = db.getInvoices().find((i) => i.id === updatedCn.id) || updatedCn;
+
   // 5. Audit Trail Hook
   const auditUser = getAuditUser();
   auditTrail
@@ -629,11 +631,11 @@ export function linkCreditNoteToInvoice(
       userName: auditUser.userName,
       userRole: auditUser.userRole,
       actionType: 'RETURN_LINK',
-      documentId: updatedCn.id,
+      documentId: persistedCn.id,
       documentType: 'INVOICE',
       previousSnapshot: JSON.parse(JSON.stringify(creditNote)),
-      newSnapshot: JSON.parse(JSON.stringify(updatedCn)),
-      summary: `Linked Credit Note #${updatedCn.invoiceNumber} to Invoice #${invoice.invoiceNumber}`,
+      newSnapshot: JSON.parse(JSON.stringify(persistedCn)),
+      summary: `Linked Credit Note #${persistedCn.invoiceNumber} to Invoice #${invoice.invoiceNumber}`,
     })
     .catch((err) => console.error('Audit log failed for RETURN_LINK:', err));
 
@@ -642,7 +644,7 @@ export function linkCreditNoteToInvoice(
   return {
     success: true,
     updatedInvoice,
-    updatedCreditNote: updatedCn,
+    updatedCreditNote: persistedCn,
   };
 }
 
@@ -695,6 +697,8 @@ export function unlinkCreditNoteFromInvoice(
   db.saveInvoice(revertedInvoice, { skipSettlementDerivation: true });
   db.saveInvoice(updatedCn, { skipParentReconciliation: true });
 
+  const persistedCn = db.getInvoices().find((i) => i.id === updatedCn.id) || updatedCn;
+
   // 5. Audit Trail Hook
   const auditUser = getAuditUser();
   auditTrail
@@ -703,19 +707,19 @@ export function unlinkCreditNoteFromInvoice(
       userName: auditUser.userName,
       userRole: auditUser.userRole,
       actionType: 'RETURN_UNLINK',
-      documentId: updatedCn.id,
+      documentId: persistedCn.id,
       documentType: 'INVOICE',
       previousSnapshot: JSON.parse(JSON.stringify(creditNote)),
-      newSnapshot: JSON.parse(JSON.stringify(updatedCn)),
-      summary: `Unlinked Credit Note #${updatedCn.invoiceNumber} from Invoice #${sourceInvoice.invoiceNumber}`,
+      newSnapshot: JSON.parse(JSON.stringify(persistedCn)),
+      summary: `Unlinked Credit Note #${persistedCn.invoiceNumber} from Invoice #${sourceInvoice.invoiceNumber}`,
     })
     .catch((err) => console.error('Audit log failed for RETURN_UNLINK:', err));
 
-  showAppToast(`Unlinked Credit Note #${updatedCn.invoiceNumber}`);
+  showAppToast(`Unlinked Credit Note #${persistedCn.invoiceNumber}`);
 
   return {
     success: true,
     revertedInvoice,
-    updatedCreditNote: updatedCn,
+    updatedCreditNote: persistedCn,
   };
 }

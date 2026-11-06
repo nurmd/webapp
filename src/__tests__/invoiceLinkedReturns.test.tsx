@@ -1151,4 +1151,158 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
     expect(reLinkBtn).toBeTruthy();
     expect(reLinkBtn?.textContent).toContain('Link to Invoice');
   });
+
+  it('13. Regression: linking a credit note with auto-generated split-credit notes settles to PAID without corruption', () => {
+    const parentInv: Invoice = {
+      id: 'inv-raslia-parent',
+      invoiceNumber: 'INV-RASLIA-001',
+      invoiceType: 'B2B',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 10,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 5000,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 5000,
+        },
+      ],
+      totalGrossAmount: 5000,
+      totalDiscount: 0,
+      totalTaxableAmount: 5000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 5000,
+      paidAmount: 0,
+      balanceAmount: 5000,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(parentInv, { skipSettlementDerivation: true });
+
+    // Unlinked credit note with auto-generated split credit notes (the Raslia corrupt state)
+    const unlinkedCN: Invoice = {
+      id: 'cn-raslia-001',
+      invoiceNumber: 'CN-RASLIA-001',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 3,
+          unit: 'PCS',
+          unitPrice: 500,
+          taxableAmount: 1500,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1500,
+        },
+      ],
+      totalGrossAmount: 1500,
+      totalDiscount: 0,
+      totalTaxableAmount: 1500,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 1500,
+      paidAmount: 0,
+      balanceAmount: 1500,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      paymentSplits: [{ id: 'split-credit', mode: 'CREDIT', amount: 1500 }],
+      notes: 'Split Payment — Credit ₹1500.00',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(unlinkedCN);
+
+    // Initial assertions
+    const savedInitialCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(savedInitialCN.paymentStatus).toBe('UNPAID');
+    expect(savedInitialCN.balanceAmount).toBe(1500);
+
+    // 1. Link to parent invoice
+    const linkRes = linkCreditNoteToInvoice(savedInitialCN, parentInv);
+    expect(linkRes.success).toBe(true);
+    expect(linkRes.updatedCreditNote?.paymentStatus).toBe('PAID');
+    expect(linkRes.updatedCreditNote?.balanceAmount).toBe(0);
+
+    // 2. Assert persisted CN in storage: PAID, balance 0, paidAmount 1500, CASH, notes cleared
+    const persistedCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(persistedCN.paymentStatus).toBe('PAID');
+    expect(persistedCN.balanceAmount).toBe(0);
+    expect(persistedCN.paidAmount).toBe(1500);
+    expect(persistedCN.paymentMode).toBe('CASH');
+    expect(!persistedCN.notes || !persistedCN.notes.includes('Credit ₹1500')).toBe(true);
+
+    // 3. Assert parent invoice balance reduced by 1500: 5000 - 1500 = 3500
+    const persistedParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
+    expect(persistedParent.balanceAmount).toBe(3500);
+
+    // 4. Unlink and assert CN reverts to UNPAID / balance 1500 / CREDIT and parent balance is restored
+    const unlinkRes = unlinkCreditNoteFromInvoice(persistedCN);
+    expect(unlinkRes.success).toBe(true);
+
+    const revertedCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(revertedCN.paymentStatus).toBe('UNPAID');
+    expect(revertedCN.balanceAmount).toBe(1500);
+    expect(revertedCN.paymentMode).toBe('CREDIT');
+    expect(revertedCN.originalInvoiceId).toBeUndefined();
+
+    const restoredParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
+    expect(restoredParent.balanceAmount).toBe(5000);
+
+    // 5. Re-link and assert PAID / balance 0 again (round-trip idempotence)
+    const relinkRes = linkCreditNoteToInvoice(revertedCN, restoredParent);
+    expect(relinkRes.success).toBe(true);
+    expect(relinkRes.updatedCreditNote?.paymentStatus).toBe('PAID');
+    expect(relinkRes.updatedCreditNote?.balanceAmount).toBe(0);
+
+    const reLinkedCN = db.getInvoices().find((i) => i.id === unlinkedCN.id)!;
+    expect(reLinkedCN.paymentStatus).toBe('PAID');
+    expect(reLinkedCN.balanceAmount).toBe(0);
+    expect(reLinkedCN.paidAmount).toBe(1500);
+    expect(reLinkedCN.paymentMode).toBe('CASH');
+    expect(!reLinkedCN.notes || !reLinkedCN.notes.includes('Credit ₹1500')).toBe(true);
+
+    const reReducedParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
+    expect(reReducedParent.balanceAmount).toBe(3500);
+  });
 });
