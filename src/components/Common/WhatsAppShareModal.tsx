@@ -7,6 +7,7 @@ import {
   safeOpenExternalUrl,
   WhatsAppTemplateType,
   WhatsAppLanguage,
+  getPartyTotalBalanceDue,
 } from '../../core/utils/upiAndShare.ts';
 import {
   normalizeWhatsAppPhone,
@@ -36,6 +37,7 @@ export interface WhatsAppShareModalProps {
   initialPhone?: string;
   initialPartyName?: string;
   initialBalance?: number;
+  initialTotalBalanceDue?: number;
   initialTemplate?: WhatsAppTemplateType;
   overdueDays?: number;
   paymentShareText?: string;
@@ -53,6 +55,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   initialPhone,
   initialPartyName,
   initialBalance,
+  initialTotalBalanceDue,
   initialTemplate,
   overdueDays,
   paymentShareText,
@@ -133,6 +136,17 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     if (defaultPhone) setPhone(defaultPhone);
   }, [defaultPhone]);
 
+  const resolvedTotalBalanceDue = useMemo(() => {
+    if (typeof initialTotalBalanceDue === 'number' && Number.isFinite(initialTotalBalanceDue)) {
+      return Math.max(0, initialTotalBalanceDue);
+    }
+    const fromParty = getPartyTotalBalanceDue(party);
+    if (fromParty !== null) {
+      return fromParty;
+    }
+    return undefined;
+  }, [initialTotalBalanceDue, party]);
+
   const { text: builtInvoiceText, whatsappUrl: defaultWhatsappUrl } = useMemo(() => {
     return buildWhatsAppMessage(
       company,
@@ -140,7 +154,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         invoice,
         party,
         balanceAmount: initialBalance,
-        totalBalanceDue: initialBalance,
+        totalBalanceDue: resolvedTotalBalanceDue,
         partyName: initialPartyName,
         partyPhone: phone,
       },
@@ -151,7 +165,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         overdueDays,
       }
     );
-  }, [company, invoice, party, initialBalance, initialPartyName, phone, template, language, customNote, overdueDays]);
+  }, [company, invoice, party, initialBalance, resolvedTotalBalanceDue, initialPartyName, phone, template, language, customNote, overdueDays]);
 
   const text = paymentShareText || builtInvoiceText;
 
@@ -257,10 +271,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         }
 
         const grandTotalVal = invoice.grandTotal ?? 0;
-        const totalBalanceDue =
-          typeof initialBalance === 'number' && Number.isFinite(initialBalance)
-            ? initialBalance
-            : (invoice.balanceAmount ?? 0);
+        const totalBalanceDue = resolvedTotalBalanceDue ?? invoice.balanceAmount ?? 0;
 
         const totalsHeader = `Bill Amount: ₹${grandTotalVal}\nTotal Balance Due: ₹${totalBalanceDue}`;
         captionText = text ? `${totalsHeader}\n\n${text}` : totalsHeader;
@@ -269,6 +280,14 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         const receiptText = buildPaymentReceiptText(paymentReceiptParams, width);
         blob = await renderThermalReceiptImage(receiptText, width);
         fileName = `Receipt-${paymentReceiptParams.docNumber || 'Payment'}.png`;
+
+        const resolvedPartyDue = party ? getPartyTotalBalanceDue(party) : null;
+        const partyBalanceVal =
+          resolvedPartyDue !== null
+            ? resolvedPartyDue
+            : typeof paymentReceiptParams.partyBalance === 'number' && Number.isFinite(paymentReceiptParams.partyBalance)
+            ? Math.max(0, paymentReceiptParams.partyBalance)
+            : undefined;
 
         if (paymentShareText) {
           captionText = paymentShareText;
@@ -279,18 +298,18 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             captionText = `Amount: ₹${paymentReceiptParams.amount}\n${captionText}`;
           }
           if (
-            paymentReceiptParams.partyBalance !== undefined &&
-            !captionText.includes(String(paymentReceiptParams.partyBalance))
+            partyBalanceVal !== undefined &&
+            !captionText.includes(String(partyBalanceVal))
           ) {
-            captionText = `Total Balance Due: ₹${paymentReceiptParams.partyBalance}\n${captionText}`;
+            captionText = `Total Balance Due: ₹${partyBalanceVal}\n${captionText}`;
           }
         } else {
           const parts: string[] = [];
           if (paymentReceiptParams.amount !== undefined) {
             parts.push(`Amount: ₹${paymentReceiptParams.amount}`);
           }
-          if (paymentReceiptParams.partyBalance !== undefined) {
-            parts.push(`Total Balance Due: ₹${paymentReceiptParams.partyBalance}`);
+          if (partyBalanceVal !== undefined) {
+            parts.push(`Total Balance Due: ₹${partyBalanceVal}`);
           }
           captionText = parts.length > 0 ? (text ? `${parts.join('\n')}\n\n${text}` : parts.join('\n')) : text;
         }
@@ -591,7 +610,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             {/* Toggle swaps Text preview ↔ Thermal receipt image */}
             {isImageMode ? (
               invoice ? (
-                <div className="max-h-[40vh] overflow-y-auto overflow-x-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-start shadow-inner">
+                <div className="max-h-[40vh] overflow-y-auto overflow-x-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-start items-start shadow-inner">
                   <ThermalReceiptPreview
                     ref={thermalPreviewRef}
                     previewText={buildThermalReceiptText(invoice, company, paperWidth)}

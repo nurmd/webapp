@@ -261,7 +261,7 @@ export const SimplifiedPurchaseModal: React.FC<SimplifiedPurchaseModalProps> = (
                       .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
                       .map((s, idx) => (
                         <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant">
-                          {s.mode}: {formatINR(s.amount)}
+                          {s.mode === 'CREDIT_NOTE' ? 'Sales Return' : s.mode}: {formatINR(s.amount)}
                         </span>
                       ))
                   : (bill.notes?.replace('Split Payment — ', '') || '').split(', ').map((chunk, idx) => (

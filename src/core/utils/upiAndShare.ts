@@ -126,11 +126,11 @@ export function buildWhatsAppMessage(
         `📄 *क्रमांक:* ${inv.invoiceNumber}\n` +
         `📅 *दिनांक:* ${inv.date}\n` +
         `💰 *कुल राशि:* ₹${inv.grandTotal.toLocaleString('en-IN')}\n` +
-        `⚠️ *बकाया राशि:* ₹${inv.balanceAmount.toLocaleString('en-IN')}\n` +
+        `⚠️ *बकाया राशि:* ₹${balance.toLocaleString('en-IN')}\n` +
         (resolvedTotalDue !== null ? `📊 *कुल बकाया राशि:* ₹${resolvedTotalDue.toLocaleString('en-IN')}\n` : '') +
         `📌 *स्थिति:* ${inv.paymentStatus === 'PAID' ? 'पूर्ण भुगतान' : inv.paymentStatus === 'PARTIAL' ? 'आंशिक भुगतान' : 'लंबित'}\n` +
         `------------------------------` +
-        `${inv.balanceAmount > 0 ? upiDetails + bankDetails : ''}\n\n` +
+        `${balance > 0 ? upiDetails + bankDetails : ''}\n\n` +
         `धन्यवाद! आपका दिन शुभ हो। 🙏`;
     } else {
       text = `Hello ${partyName},\n\nPlease find your ${docTitle} from *${companyName}*.\n` +
@@ -138,11 +138,11 @@ export function buildWhatsAppMessage(
         `📄 *Document No:* ${inv.invoiceNumber}\n` +
         `📅 *Date:* ${inv.date}\n` +
         `💰 *Grand Total:* ₹${inv.grandTotal.toLocaleString('en-IN')}\n` +
-        `⚠️ *Balance Due:* ₹${inv.balanceAmount.toLocaleString('en-IN')}\n` +
+        `⚠️ *Balance Due:* ₹${balance.toLocaleString('en-IN')}\n` +
         (resolvedTotalDue !== null ? `📊 *Total Balance Due:* ₹${resolvedTotalDue.toLocaleString('en-IN')}\n` : '') +
         `📌 *Payment Status:* ${inv.paymentStatus}\n` +
         `------------------------------` +
-        `${inv.balanceAmount > 0 ? upiDetails + bankDetails : ''}\n\n` +
+        `${balance > 0 ? upiDetails + bankDetails : ''}\n\n` +
         `Thank you for your business!`;
     }
   } else if (template === 'OVERDUE_URGENT') {

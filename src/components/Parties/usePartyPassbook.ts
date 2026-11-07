@@ -78,6 +78,16 @@ export function comparePassbookEntries(
   return 0;
 }
 
+// Helper to get actual cash/bank/UPI paid amount on invoice (excluding CREDIT_NOTE tender which is already a passbook doc)
+function getNonCreditNotePaid(inv: Invoice): number {
+  if (inv.paymentSplits && inv.paymentSplits.length > 0) {
+    return inv.paymentSplits
+      .filter((s) => s.mode !== 'CREDIT' && s.mode !== 'CREDIT_NOTE')
+      .reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  }
+  return inv.paidAmount || 0;
+}
+
 export function usePartyPassbook({
   party,
   company,
@@ -172,7 +182,7 @@ export function usePartyPassbook({
     return isCustomer
       ? partyInvoices
           .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
-          .reduce((s, inv) => s + (inv.paidAmount || 0), 0)
+          .reduce((s, inv) => s + getNonCreditNotePaid(inv), 0)
       : partyPurchases
           .filter((pur) => pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
           .reduce((s, pur) => s + (pur.paidAmount || 0), 0);
@@ -306,19 +316,25 @@ export function usePartyPassbook({
     if (isCustomer) {
       const totalPaidOnInvoices = partyInvoices
         .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
-        .reduce((s, inv) => s + (inv.paidAmount || 0), 0);
+        .reduce((s, inv) => s + getNonCreditNotePaid(inv), 0);
       let unvoucheredPaid = Math.max(0, totalPaidOnInvoices - totalVoucherReceipts);
 
       if (unvoucheredPaid > 0) {
         const sortedInvs = [...partyInvoices]
-          .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE' && (inv.paidAmount || 0) > 0)
+          .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE' && getNonCreditNotePaid(inv) > 0)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         for (const inv of sortedInvs) {
           if (unvoucheredPaid <= 0) break;
-          const amt = Math.min(unvoucheredPaid, inv.paidAmount || 0);
-          const hasSplits = inv.paymentSplits && inv.paymentSplits.filter((s) => s.mode !== 'CREDIT').length > 1;
-          const invMode = hasSplits ? 'SPLIT' : (inv.paymentMode || 'Cash');
+          const directPaid = getNonCreditNotePaid(inv);
+          const amt = Math.min(unvoucheredPaid, directPaid);
+          const nonCnSplits = inv.paymentSplits?.filter((s) => s.mode !== 'CREDIT' && s.mode !== 'CREDIT_NOTE') || [];
+          const hasSplits = nonCnSplits.length > 1;
+          const invMode = hasSplits
+            ? 'SPLIT'
+            : nonCnSplits.length === 1
+            ? nonCnSplits[0].mode
+            : (inv.paymentMode || 'Cash');
           rawEntries.push({
             id: `pay-inv-${inv.id}`,
             rawId: inv.id,
@@ -327,7 +343,7 @@ export function usePartyPassbook({
             type: 'PAYMENT_IN',
             description: hasSplits
               ? `Payment (Split on #${inv.invoiceNumber})`
-              : `Payment (${inv.paymentMode || 'Cash'} on #${inv.invoiceNumber})`,
+              : `Payment (${invMode} on #${inv.invoiceNumber})`,
             debit: 0,
             credit: amt,
             status: 'PAID',

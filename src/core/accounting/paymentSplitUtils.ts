@@ -26,7 +26,8 @@ export function parseSplitsFromNotes(
   const cardMatch = notes.match(/Card[:\s]*₹\s*([0-9.]+)/i);
   const bankMatch = notes.match(/(?:Bank|Net\s*Banking)[:\s]*₹\s*([0-9.]+)/i);
   const chequeMatch = notes.match(/Cheque[:\s]*₹\s*([0-9.]+)/i);
-  const creditMatch = notes.match(/Credit[:\s]*₹\s*([0-9.]+)/i);
+  const creditMatch = notes.match(/(?:^|[^\w])Credit[:\s]*₹\s*([0-9.]+)/i);
+  const cnMatch = notes.match(/(?:Sales\s*Return|Credit\s*Note)[:\s]*₹\s*([0-9.]+)/i);
 
   if (cashMatch && Number(cashMatch[1]) > 0) {
     parsed.push({
@@ -75,6 +76,9 @@ export function parseSplitsFromNotes(
   }
   if (creditMatch && Number(creditMatch[1]) > 0) {
     parsed.push({ id: `split-credit-${Date.now()}`, mode: 'CREDIT', amount: Number(creditMatch[1]) });
+  }
+  if (cnMatch && Number(cnMatch[1]) > 0) {
+    parsed.push({ id: `split-cn-${Date.now()}`, mode: 'CREDIT_NOTE', amount: Number(cnMatch[1]) });
   }
 
   return parsed;
@@ -249,7 +253,12 @@ export function formatSplitNotes(splits: PaymentSplit[], balanceDue: number): st
   const parts: string[] = [];
   splits.forEach((s) => {
     if (s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0) {
-      const label = s.mode === 'NET_BANKING' ? 'Bank' : s.mode.charAt(0) + s.mode.slice(1).toLowerCase();
+      const label =
+        s.mode === 'CREDIT_NOTE'
+          ? 'Sales Return'
+          : s.mode === 'NET_BANKING'
+          ? 'Bank'
+          : s.mode.charAt(0) + s.mode.slice(1).toLowerCase();
       parts.push(`${label} ₹${s.amount}`);
     }
   });

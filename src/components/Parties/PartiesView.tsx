@@ -6,7 +6,7 @@ import { BankAccount } from '../../models/bankAccount.ts';
 import { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
-import { getPaymentReminderWhatsAppUrl } from '../../core/utils/upiAndShare.ts';
+import { getPaymentReminderWhatsAppUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
 import { PartyDetailPage } from './PartyDetailPage.tsx';
@@ -982,6 +982,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
           initialPartyName={whatsappParty.name}
           initialPhone={whatsappParty.phone}
           initialBalance={whatsappParty.currentBalance}
+          initialTotalBalanceDue={getPartyTotalBalanceDue(whatsappParty) ?? undefined}
           initialTemplate={whatsappParty.currentBalance > 0 ? 'GENTLE_REMINDER' : 'PARTY_STATEMENT'}
         />
       )}

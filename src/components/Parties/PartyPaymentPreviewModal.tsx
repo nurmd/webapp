@@ -6,6 +6,7 @@ import { InvoiceDocumentModal } from '../Invoicing/InvoiceDocumentModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
+import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import {
   buildPaymentReceiptText,
   PaymentReceiptParams,
@@ -161,7 +162,7 @@ export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> =
       amount: amountVal,
       paymentMode: entry.paymentMode || 'CASH',
       notes,
-      partyBalance: party.currentBalance,
+      partyBalance: getPartyTotalBalanceDue(party) ?? party.currentBalance,
     };
   }, [company, isReceipt, isOpening, entry, party, amountVal, notes]);
 
@@ -375,6 +376,7 @@ export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> =
           party={party}
           initialPhone={party.phone}
           initialBalance={party.currentBalance}
+          initialTotalBalanceDue={getPartyTotalBalanceDue(party) ?? undefined}
           paymentShareText={paymentShareText}
           paymentReceiptParams={paymentParams}
           onPrint={handlePrint}

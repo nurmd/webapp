@@ -1143,7 +1143,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
           invoice={undefined}
           party={linkedParty || undefined}
           initialPhone={linkedParty?.phone}
-          initialBalance={linkedParty ? (getPartyTotalBalanceDue(linkedParty) ?? undefined) : undefined}
+          initialTotalBalanceDue={linkedParty ? (getPartyTotalBalanceDue(linkedParty) ?? undefined) : undefined}
           paymentShareText={(() => {
             const heading = isTransferCategory
               ? 'Cash / Bank Transfer'

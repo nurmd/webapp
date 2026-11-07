@@ -32,6 +32,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string; icon: string }[] = [
   { value: 'NET_BANKING', label: 'Bank', icon: 'account_balance' },
   { value: 'CHEQUE', label: 'Cheque', icon: 'receipt_long' },
   { value: 'CREDIT', label: 'Credit', icon: 'pending_actions' },
+  { value: 'CREDIT_NOTE', label: 'Sales Return', icon: 'assignment_return' },
 ];
 
 export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
@@ -69,6 +70,11 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
   const defaultBank = bankAccounts.find((b) => (b as any).isDefault) || bankAccounts[0];
   const defaultBankId = defaultBank?.id || 'ACC_BANK';
+
+  const availableModes = useMemo(() => {
+    const hasCreditNote = splits.some((s) => s.mode === 'CREDIT_NOTE');
+    return PAYMENT_MODES.filter((pm) => pm.value !== 'CREDIT_NOTE' || hasCreditNote);
+  }, [splits]);
 
   const [paymentRefNotes, setPaymentRefNotes] = useState('');
 
@@ -231,8 +237,8 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
         id: s.id,
         mode: s.mode,
         amount: rawAmount,
-        accountId: s.accountId || (s.mode === 'CASH' ? 'ACC_CASH' : defaultBankId),
-        accountName: s.accountName || (s.mode === 'CASH' ? 'Cash in Hand' : defaultBank?.accountName),
+        accountId: s.accountId || (s.mode === 'CASH' ? 'ACC_CASH' : s.mode === 'CREDIT_NOTE' ? undefined : defaultBankId),
+        accountName: s.accountName || (s.mode === 'CASH' ? 'Cash in Hand' : s.mode === 'CREDIT_NOTE' ? undefined : defaultBank?.accountName),
         reference: s.reference || s.referenceNo,
         referenceNo: s.referenceNo || s.reference,
       };
@@ -331,7 +337,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
 
           {/* Quick Mode Chips (1-tap selection) */}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
-            {PAYMENT_MODES.map((pm) => {
+            {availableModes.map((pm) => {
               const isSelected =
                 splits.length === 1 &&
                 splits[0].mode === pm.value &&
@@ -386,7 +392,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       className="w-full h-8 pl-6 pr-2.5 rounded-lg bg-surface-container-lowest text-right font-tabular-data text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-all"
                     />
                   </div>
-                  {splits[0].mode !== 'CASH' && bankAccounts.length > 0 && (
+                  {splits[0].mode !== 'CASH' && splits[0].mode !== 'CREDIT_NOTE' && bankAccounts.length > 0 && (
                     <div className="relative mt-1.5">
                       <select
                         value={splits[0].accountId || defaultBankId}
@@ -464,7 +470,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                         onChange={(e) => handleUpdateSplitMode(split.id, e.target.value as PaymentMode)}
                         className="w-full h-8 pl-2 pr-5 rounded-lg bg-surface-container-lowest text-[11px] font-bold text-on-surface border border-outline-variant/30 outline-none cursor-pointer appearance-none"
                       >
-                        {PAYMENT_MODES.map((pm) => (
+                        {availableModes.map((pm) => (
                           <option key={pm.value} value={pm.value}>{pm.label}</option>
                         ))}
                       </select>
@@ -473,7 +479,7 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
                       </span>
                     </div>
 
-                    {split.mode !== 'CASH' && split.mode !== 'CREDIT' && bankAccounts.length > 0 && (
+                    {split.mode !== 'CASH' && split.mode !== 'CREDIT' && split.mode !== 'CREDIT_NOTE' && bankAccounts.length > 0 && (
                       <div className="relative flex-1 sm:max-w-[130px]">
                         <select
                           value={split.accountId || defaultBankId}

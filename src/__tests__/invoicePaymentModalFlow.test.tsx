@@ -36,6 +36,7 @@ vi.mock('../services/pouchdb.ts', () => ({
 import { TableGridInvoiceModal } from '../components/Invoicing/TableGridInvoiceModal.tsx';
 import { InvoiceActionDock } from '../components/Invoicing/components/InvoiceActionDock.tsx';
 import { InvoicePaymentModal } from '../components/Invoicing/components/InvoicePaymentModal.tsx';
+import { PaymentSettlementDock } from '../components/Common/Billing/PaymentSettlementDock.tsx';
 import { CompanyProfile } from '../models/company.ts';
 import { Party } from '../models/party.ts';
 import { InventoryItem } from '../models/item.ts';
@@ -750,5 +751,147 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       }),
       false
     );
+  });
+
+  it('TC-MODAL-03: gates CREDIT_NOTE (Sales Return) so new payment modals do not offer it, but existing CREDIT_NOTE splits are preserved and show no bank selector', () => {
+    const onConfirmPayment = vi.fn();
+    const onClose = vi.fn();
+
+    // 1. Fresh payment modal (new tenders)
+    act(() => {
+      root.render(
+        <InvoicePaymentModal
+          key="modal-fresh"
+          isOpen={true}
+          onClose={onClose}
+          finalGrandTotal={1000}
+          invoiceNumber="INV-FRESH-1"
+          partyName="New Customer"
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+    });
+
+    // Verify Sales Return chip is NOT present in quick chips
+    const allButtons = Array.from(container.querySelectorAll('button'));
+    const salesReturnChip = allButtons.find((b) => b.textContent?.includes('Sales Return'));
+    expect(salesReturnChip).toBeUndefined();
+
+    // Switch to split payment
+    const splitToggle = allButtons.find((b) => b.textContent?.includes('Split Payment'));
+    expect(splitToggle).toBeTruthy();
+    act(() => {
+      splitToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    // In split dropdown, verify Sales Return option is NOT available
+    const modeSelects = Array.from(container.querySelectorAll('select'));
+    const options = Array.from(modeSelects[0]?.querySelectorAll('option') || []).map((o) => o.textContent);
+    expect(options).not.toContain('Sales Return');
+
+    // 2. Existing invoice with a CREDIT_NOTE split (linked sales return)
+    const existingSplits = [
+      {
+        id: 'split-cn-1',
+        mode: 'CREDIT_NOTE' as const,
+        amount: 400,
+        reference: 'CN-2026-001',
+      },
+      {
+        id: 'split-cash-1',
+        mode: 'CASH' as const,
+        amount: 600,
+      },
+    ];
+
+    act(() => {
+      root.render(
+        <InvoicePaymentModal
+          key="modal-existing"
+          isOpen={true}
+          onClose={onClose}
+          finalGrandTotal={1000}
+          invoiceNumber="INV-EXISTING-1"
+          partyName="Returned Customer"
+          initialSplits={existingSplits}
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+    });
+
+    // In split mode with existing CREDIT_NOTE, Sales Return IS displayed in the dropdown
+    const existingModeSelects = Array.from(container.querySelectorAll('select'));
+    const splitModeSelect = existingModeSelects.find((s) => s.value === 'CREDIT_NOTE');
+    expect(splitModeSelect).toBeTruthy();
+
+    const existingOptions = Array.from(splitModeSelect?.querySelectorAll('option') || []).map((o) => o.textContent);
+    expect(existingOptions).toContain('Sales Return');
+
+    // Verify NO bank-account selector is rendered for the CREDIT_NOTE split
+    const bankSelects = Array.from(container.querySelectorAll('select[title*="bank account"]'));
+    expect(bankSelects.length).toBe(0);
+
+    // 3. Single-tender with single CREDIT_NOTE
+    act(() => {
+      root.render(
+        <InvoicePaymentModal
+          key="modal-cn-only"
+          isOpen={true}
+          onClose={onClose}
+          finalGrandTotal={400}
+          invoiceNumber="INV-CN-ONLY"
+          partyName="Returned Customer"
+          initialSplits={[{ id: 'split-cn-only', mode: 'CREDIT_NOTE', amount: 400, reference: 'CN-001' }]}
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+    });
+
+    // Quick chip for Sales Return IS rendered when splits already contain CREDIT_NOTE
+    const salesReturnChipSingle = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Sales Return')
+    );
+    expect(salesReturnChipSingle).toBeTruthy();
+
+    // Verify NO bank-account selector is rendered for single CREDIT_NOTE tender
+    const singleBankSelect = container.querySelector('select[title*="bank account"]');
+    expect(singleBankSelect).toBeNull();
+
+    // 4. PaymentSettlementDock: DEFAULT_PAYMENT_MODES does NOT contain Sales Return, but conditionally includes it when splits have CREDIT_NOTE
+    act(() => {
+      root.render(
+        <PaymentSettlementDock
+          paymentSplits={[]}
+          autoPaymentStatus="UNPAID"
+          balanceDue={1000}
+          onAddSplitMode={vi.fn()}
+          onUpdateSplitMode={vi.fn()}
+          onUpdateSplitAmount={vi.fn()}
+          onRemoveSplit={vi.fn()}
+        />
+      );
+    });
+    // Fresh dock without splits does not have Sales Return in mode options
+    const dockOptionsFresh = Array.from(container.querySelectorAll('option')).map((o) => o.textContent);
+    expect(dockOptionsFresh).not.toContain('Sales Return');
+
+    act(() => {
+      root.render(
+        <PaymentSettlementDock
+          paymentSplits={[{ id: 's1', mode: 'CREDIT_NOTE', amount: 500 }]}
+          autoPaymentStatus="PAID"
+          balanceDue={0}
+          onAddSplitMode={vi.fn()}
+          onUpdateSplitMode={vi.fn()}
+          onUpdateSplitAmount={vi.fn()}
+          onRemoveSplit={vi.fn()}
+        />
+      );
+    });
+    const dockOptionsWithCN = Array.from(container.querySelectorAll('option')).map((o) => o.textContent);
+    expect(dockOptionsWithCN).toContain('Sales Return');
+    // And no bank selector is rendered for the CREDIT_NOTE split in the dock
+    const dockBankSelect = container.querySelector('select[title*="bank account"]');
+    expect(dockBankSelect).toBeNull();
   });
 });

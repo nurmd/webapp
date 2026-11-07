@@ -418,19 +418,33 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
         });
       } else if (splitDiff < 0) {
         let remaining = Math.abs(splitDiff);
-        const adjusted: PaymentSplit[] = [];
-        for (let i = nonCredit.length - 1; i >= 0; i--) {
-          const s = nonCredit[i];
+        const cnSplits = nonCredit.filter((s) => (s.mode || '').toUpperCase() === 'CREDIT_NOTE');
+        const regularTenders = nonCredit.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT_NOTE');
+        const adjustedRegular: PaymentSplit[] = [];
+        for (let i = regularTenders.length - 1; i >= 0; i--) {
+          const s = regularTenders[i];
           if (remaining <= 0) {
-            adjusted.unshift(s);
+            adjustedRegular.unshift(s);
           } else if (s.amount <= remaining) {
             remaining = Number((remaining - s.amount).toFixed(2));
           } else {
-            adjusted.unshift({ ...s, amount: Number((s.amount - remaining).toFixed(2)) });
+            adjustedRegular.unshift({ ...s, amount: Number((s.amount - remaining).toFixed(2)) });
             remaining = 0;
           }
         }
-        updatedSplits = adjusted;
+        const adjustedCn: PaymentSplit[] = [];
+        for (let i = cnSplits.length - 1; i >= 0; i--) {
+          const s = cnSplits[i];
+          if (remaining <= 0) {
+            adjustedCn.unshift(s);
+          } else if (s.amount <= remaining) {
+            remaining = Number((remaining - s.amount).toFixed(2));
+          } else {
+            adjustedCn.unshift({ ...s, amount: Number((s.amount - remaining).toFixed(2)) });
+            remaining = 0;
+          }
+        }
+        updatedSplits = [...adjustedCn, ...adjustedRegular];
       } else {
         updatedSplits = nonCredit.map((s) => ({ ...s }));
       }
@@ -542,26 +556,44 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
     if (updatedSplits && updatedSplits.length > 0) {
       let remainingToReduce = allocAmt;
       const nonCredit = updatedSplits.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT');
-      const newNonCredit: typeof nonCredit = [];
-      for (let i = nonCredit.length - 1; i >= 0; i--) {
-        const s = nonCredit[i];
+      const cnSplits = nonCredit.filter((s) => (s.mode || '').toUpperCase() === 'CREDIT_NOTE');
+      const regularTenders = nonCredit.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT_NOTE');
+
+      const newRegular: typeof regularTenders = [];
+      for (let i = regularTenders.length - 1; i >= 0; i--) {
+        const s = regularTenders[i];
         if (remainingToReduce <= 0) {
-          newNonCredit.unshift(s);
+          newRegular.unshift(s);
         } else if (s.amount <= remainingToReduce) {
           remainingToReduce = Number((remainingToReduce - s.amount).toFixed(2));
         } else {
-          newNonCredit.unshift({ ...s, amount: Number((s.amount - remainingToReduce).toFixed(2)) });
+          newRegular.unshift({ ...s, amount: Number((s.amount - remainingToReduce).toFixed(2)) });
           remainingToReduce = 0;
         }
       }
+
+      const newCn: typeof cnSplits = [];
+      for (let i = cnSplits.length - 1; i >= 0; i--) {
+        const s = cnSplits[i];
+        if (remainingToReduce <= 0) {
+          newCn.unshift(s);
+        } else if (s.amount <= remainingToReduce) {
+          remainingToReduce = Number((remainingToReduce - s.amount).toFixed(2));
+        } else {
+          newCn.unshift({ ...s, amount: Number((s.amount - remainingToReduce).toFixed(2)) });
+          remainingToReduce = 0;
+        }
+      }
+
+      const combined = [...newCn, ...newRegular];
       if (newBal > 0) {
-        newNonCredit.push({
+        combined.push({
           id: `split-bal-${Date.now()}`,
           mode: 'CREDIT',
           amount: newBal,
         });
       }
-      updatedSplits = newNonCredit;
+      updatedSplits = combined;
     }
 
     // Derive accurate paymentMode upon reversal

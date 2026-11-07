@@ -1405,7 +1405,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             setWhatsAppInvoiceData(null);
             onClose();
           }}
-          initialBalance={whatsAppPartyTotalDue}
+          initialBalance={whatsAppInvoiceData.balanceAmount}
+          initialTotalBalanceDue={whatsAppPartyTotalDue}
           onPrint={() => setPreviewInvoiceData(whatsAppInvoiceData)}
         />
       )}

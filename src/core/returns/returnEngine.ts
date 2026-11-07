@@ -1,4 +1,4 @@
-import { Invoice, InvoiceItemEntry, PaymentStatus } from '../../models/invoice.ts';
+import { Invoice, InvoiceItemEntry, PaymentStatus, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill, PurchaseItemEntry } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { generateNextDocumentNumber, InvoiceLike } from '../utils/invoiceNumber.ts';
@@ -7,6 +7,7 @@ import { db } from '../../services/db.ts';
 import { auditTrail } from '../../services/auditTrail.ts';
 import { rbac, UserRole } from '../../services/rbac.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { formatSplitNotes } from '../accounting/paymentSplitUtils.ts';
 
 export interface ItemReturnStatus {
   itemId: string;
@@ -251,35 +252,30 @@ export function calculateReturnLineEntries(
 }
 
 /**
- * Updates a source Sales Invoice's balance and paid amounts to reflect the return (reversing returned values).
- * 1. Reduces unpaid balanceAmount first.
- * 2. If the return exceeds unpaid balance (or invoice was paid), reverses paidAmount.
- * 3. Derives the resulting payment status (PAID if balance is 0, PARTIAL if paid > 0, UNPAID if paid is 0).
+ * Updates a source Sales Invoice's balance and paid amounts to reflect the return (treating the return as a payment tender).
+ * 1. Applied amount = min(returnTotal, remaining due = grandTotal - paidAmount), clamped >= 0.
+ * 2. Adds a PaymentSplit { id: 'cn-<creditNoteId>', mode: 'CREDIT_NOTE', amount: applied, reference: <CN number> }.
+ * 3. Increases paidAmount by applied amount; recomputes balanceAmount = max(0, grandTotal - paidAmount) and paymentStatus.
+ * 4. Sets paymentMode = 'SPLIT' when more than one non-zero split, else the single split's mode.
+ * 5. If return exceeds remaining due, keeps excess handling safe (does not overpay; does not produce negative balances).
  */
-export function applyReturnToInvoice(invoice: Invoice, returnTotal: number): Invoice {
-  let remainingReturn = Math.max(0, returnTotal);
-  let newBalance = Math.max(0, invoice.balanceAmount || 0);
-  let newPaid = Math.max(0, invoice.paidAmount || 0);
+export function applyReturnToInvoice(
+  invoice: Invoice,
+  returnTotal: number,
+  creditNote?: { id?: string; invoiceNumber?: string } | Invoice
+): Invoice {
+  const returnAmt = Math.max(0, returnTotal || 0);
+  const grandTotal = Number(Math.max(0, invoice.grandTotal || 0).toFixed(2));
+  const currentPaid = Number(Math.max(0, invoice.paidAmount || 0).toFixed(2));
+  const remainingDue = Number(Math.max(0, grandTotal - currentPaid).toFixed(2));
 
-  // 1. Deduct from unpaid balance first
-  if (newBalance > 0) {
-    const balanceDeduction = Math.min(newBalance, remainingReturn);
-    newBalance -= balanceDeduction;
-    remainingReturn -= balanceDeduction;
-  }
+  // Applied amount = min(returnTotal, remaining due = grandTotal - paidAmount), clamped >= 0
+  const applied = Number(Math.min(returnAmt, remainingDue).toFixed(2));
+  const newPaid = Number((currentPaid + applied).toFixed(2));
+  const newBalance = Number(Math.max(0, grandTotal - newPaid).toFixed(2));
 
-  // 2. Any excess return reverses the paidAmount
-  if (remainingReturn > 0 && newPaid > 0) {
-    const paidDeduction = Math.min(newPaid, remainingReturn);
-    newPaid -= paidDeduction;
-    remainingReturn -= paidDeduction;
-  }
-
-  newBalance = Math.round(newBalance * 100) / 100;
-  newPaid = Math.round(newPaid * 100) / 100;
-
-  let newStatus: PaymentStatus = invoice.paymentStatus;
-  if (newBalance <= 0) {
+  let newStatus: PaymentStatus;
+  if (grandTotal <= 0 || newBalance <= 0.01) {
     newStatus = 'PAID';
   } else if (newPaid > 0) {
     newStatus = 'PARTIAL';
@@ -287,37 +283,207 @@ export function applyReturnToInvoice(invoice: Invoice, returnTotal: number): Inv
     newStatus = 'UNPAID';
   }
 
+  // Preserve existing non-credit splits
+  let existingTenders: PaymentSplit[] = [];
+  if (invoice.paymentSplits && invoice.paymentSplits.length > 0) {
+    existingTenders = invoice.paymentSplits
+      .filter((s) => s.mode !== 'CREDIT')
+      .map((s) => ({ ...s }));
+  } else if (currentPaid > 0) {
+    const origMode =
+      invoice.paymentMode && invoice.paymentMode !== 'CREDIT' && invoice.paymentMode !== 'SPLIT'
+        ? invoice.paymentMode
+        : 'CASH';
+    existingTenders = [
+      {
+        id: 'split-1',
+        mode: origMode,
+        amount: currentPaid,
+      },
+    ];
+  }
+
+  const updatedSplits: PaymentSplit[] = [...existingTenders];
+  if (applied > 0) {
+    const cnId = creditNote?.id ? `cn-${creditNote.id}` : `cn-${Date.now()}`;
+    const cnRef = creditNote?.invoiceNumber || (creditNote as any)?.documentNumber || undefined;
+
+    const existingCnIdx = updatedSplits.findIndex(
+      (s) => s.id === cnId || (cnRef && s.reference === cnRef)
+    );
+    if (existingCnIdx >= 0) {
+      updatedSplits[existingCnIdx] = {
+        ...updatedSplits[existingCnIdx],
+        amount: Number((updatedSplits[existingCnIdx].amount + applied).toFixed(2)),
+        ...(cnRef ? { reference: cnRef } : {}),
+      };
+    } else {
+      updatedSplits.push({
+        id: cnId,
+        mode: 'CREDIT_NOTE',
+        amount: applied,
+        ...(cnRef ? { reference: cnRef } : {}),
+      });
+    }
+  }
+
+  if (newBalance > 0) {
+    updatedSplits.push({
+      id: `split-bal-${Date.now()}`,
+      mode: 'CREDIT',
+      amount: newBalance,
+    });
+  }
+
+  const activeTenders = updatedSplits.filter((s) => s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0);
+  let newPaymentMode: PaymentMode;
+  if (activeTenders.length > 1) {
+    newPaymentMode = 'SPLIT';
+  } else if (activeTenders.length === 1 && newBalance <= 0.01) {
+    newPaymentMode = activeTenders[0].mode;
+  } else if (newBalance > 0) {
+    newPaymentMode = 'SPLIT';
+  } else {
+    newPaymentMode = 'CREDIT';
+  }
+
+  let updatedNotes = invoice.notes;
+  if (updatedSplits && updatedSplits.length > 0) {
+    const splitNote = formatSplitNotes(updatedSplits, newBalance);
+    if (splitNote) {
+      if (updatedNotes && (updatedNotes.includes('Split Payment') || updatedNotes.includes('Split:'))) {
+        const cleanLines = updatedNotes
+          .split('\n')
+          .filter((l) => !l.includes('Split Payment') && !l.includes('Split:'));
+        updatedNotes = [...cleanLines, splitNote].filter(Boolean).join('\n');
+      } else if (!updatedNotes) {
+        updatedNotes = splitNote;
+      } else if (!updatedNotes.includes(splitNote)) {
+        updatedNotes = `${updatedNotes} | ${splitNote}`;
+      }
+    }
+  }
+
   return {
     ...invoice,
     balanceAmount: newBalance,
     paidAmount: newPaid,
     paymentStatus: newStatus,
+    paymentMode: newPaymentMode,
+    paymentSplits: updatedSplits,
+    notes: updatedNotes,
     updatedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Inverts applyReturnToInvoice: restores balance and/or paid amount on a source Sales Invoice
- * when a return is unlinked, deleted, or reduced.
- * 1. remaining = max(0, returnTotal)
- * 2. If the invoice is fully settled (balanceAmount <= 0.005) and paidAmount > 0: restore paid first, min(remaining, grandTotal - paidAmount)
- * 3. Then restore open balance: min(remaining, grandTotal - paidAmount - balanceAmount)
- * 4. Round to 2 decimals, recompute paymentStatus, set updatedAt.
+ * Inverts applyReturnToInvoice: removes the matching CREDIT_NOTE split,
+ * decreases paidAmount by the removed amount, and recomputes balance/status.
  */
-export function revertReturnFromInvoice(invoice: Invoice, returnTotal: number): Invoice {
-  let remaining = Math.max(0, returnTotal);
-  const grandTotal = Math.max(0, invoice.grandTotal || 0);
-  let newBalance = Math.max(0, invoice.balanceAmount || 0);
-  let newPaid = Math.max(0, invoice.paidAmount || 0);
+export function revertReturnFromInvoice(
+  invoice: Invoice,
+  returnTotal: number,
+  creditNoteId?: string
+): Invoice {
+  const returnAmt = Math.max(0, returnTotal || 0);
+  const grandTotal = Number(Math.max(0, invoice.grandTotal || 0).toFixed(2));
+  const currentPaid = Number(Math.max(0, invoice.paidAmount || 0).toFixed(2));
 
-  // 2. If the invoice is fully settled (balanceAmount <= 0.005) and paidAmount > 0: restore paid first
+  const splits = invoice.paymentSplits ? [...invoice.paymentSplits] : undefined;
+  const cnSplitIdx = splits?.findIndex((s) => {
+    if (s.mode !== 'CREDIT_NOTE') return false;
+    if (!creditNoteId) return true;
+    return s.id === `cn-${creditNoteId}` || s.id === creditNoteId || s.reference === creditNoteId;
+  });
+
+  if (splits && cnSplitIdx !== undefined && cnSplitIdx >= 0) {
+    const targetSplit = splits[cnSplitIdx];
+    const splitAmount = Number(targetSplit.amount) || returnAmt;
+    const revertAmount = Number(Math.min(splitAmount, returnAmt).toFixed(2));
+
+    let remainingTenders: PaymentSplit[];
+    if (splitAmount - revertAmount > 0.01) {
+      remainingTenders = splits.filter((s) => s.mode !== 'CREDIT').map((s, idx) => {
+        if (idx === cnSplitIdx) {
+          return {
+            ...s,
+            amount: Number((splitAmount - revertAmount).toFixed(2)),
+          };
+        }
+        return { ...s };
+      });
+    } else {
+      remainingTenders = splits.filter((s, idx) => idx !== cnSplitIdx && s.mode !== 'CREDIT');
+    }
+
+    const newPaid = Number(Math.max(0, currentPaid - revertAmount).toFixed(2));
+    const newBalance = Number(Math.max(0, grandTotal - newPaid).toFixed(2));
+
+    let newStatus: PaymentStatus;
+    if (grandTotal <= 0 || newBalance <= 0.01) {
+      newStatus = 'PAID';
+    } else if (newPaid > 0) {
+      newStatus = 'PARTIAL';
+    } else {
+      newStatus = 'UNPAID';
+    }
+
+    if (newBalance > 0) {
+      remainingTenders.push({
+        id: `split-bal-${Date.now()}`,
+        mode: 'CREDIT',
+        amount: newBalance,
+      });
+    }
+
+    const activeTenders = remainingTenders.filter((s) => s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0);
+    let newPaymentMode: PaymentMode;
+    if (activeTenders.length > 1) {
+      newPaymentMode = 'SPLIT';
+    } else if (activeTenders.length === 1 && newBalance <= 0.01) {
+      newPaymentMode = activeTenders[0].mode;
+    } else if (newBalance > 0) {
+      newPaymentMode = 'SPLIT';
+    } else {
+      newPaymentMode = 'CREDIT';
+    }
+
+    let updatedNotes = invoice.notes;
+    if (remainingTenders.length > 0) {
+      const splitNote = formatSplitNotes(remainingTenders, newBalance);
+      if (updatedNotes && (updatedNotes.includes('Split Payment') || updatedNotes.includes('Split:'))) {
+        const cleanLines = updatedNotes
+          .split('\n')
+          .filter((l) => !l.includes('Split Payment') && !l.includes('Split:'));
+        updatedNotes = [...cleanLines, splitNote].filter(Boolean).join('\n');
+      } else if (!updatedNotes) {
+        updatedNotes = splitNote;
+      }
+    }
+
+    return {
+      ...invoice,
+      balanceAmount: newBalance,
+      paidAmount: newPaid,
+      paymentStatus: newStatus,
+      paymentMode: newPaymentMode,
+      paymentSplits: remainingTenders,
+      notes: updatedNotes,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  // Fallback for legacy documents without structured CREDIT_NOTE splits
+  let remaining = returnAmt;
+  let newBalance = Math.max(0, invoice.balanceAmount || 0);
+  let newPaid = currentPaid;
+
   if (newBalance <= 0.005 && newPaid > 0) {
     const paidRestoration = Math.min(remaining, Math.max(0, grandTotal - newPaid));
     newPaid += paidRestoration;
     remaining -= paidRestoration;
   }
 
-  // 3. Then restore open balance
   if (remaining > 0) {
     const balanceRestoration = Math.min(remaining, Math.max(0, grandTotal - newPaid - newBalance));
     newBalance += balanceRestoration;
@@ -604,8 +770,8 @@ export function linkCreditNoteToInvoice(
     return { success: false, error: errorMsg };
   }
 
-  // 2. updatedInvoice = applyReturnToInvoice(invoice, cn.grandTotal) (from returnEngine)
-  const updatedInvoice = applyReturnToInvoice(invoice, creditNote.grandTotal);
+  // 2. updatedInvoice = applyReturnToInvoice(invoice, cn.grandTotal, creditNote) (from returnEngine)
+  const updatedInvoice = applyReturnToInvoice(invoice, creditNote.grandTotal, creditNote);
 
   // 3. updatedCn = { ...cn, originalInvoiceId: invoice.id, originalInvoiceNumber: invoice.invoiceNumber, originalInvoiceDate: invoice.date, partyId: invoice.partyId || creditNote.partyId, partyName: invoice.partyName || creditNote.partyName }
   const updatedCn: Invoice = {
@@ -682,8 +848,8 @@ export function unlinkCreditNoteFromInvoice(
     return { success: false, error: errorMsg };
   }
 
-  // 2. revertedInvoice = revertReturnFromInvoice(sourceInvoice, cn.grandTotal)
-  const revertedInvoice = revertReturnFromInvoice(sourceInvoice, creditNote.grandTotal);
+  // 2. revertedInvoice = revertReturnFromInvoice(sourceInvoice, cn.grandTotal, creditNote.id)
+  const revertedInvoice = revertReturnFromInvoice(sourceInvoice, creditNote.grandTotal, creditNote.id);
 
   // 3. updatedCn = { ...cn, originalInvoiceId: undefined, originalInvoiceNumber: undefined, originalInvoiceDate: undefined }
   const updatedCn: Invoice = {

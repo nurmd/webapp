@@ -432,6 +432,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
             invoice={{ ...mockInvoice, grandTotal: 2950, balanceAmount: 1500 }}
             company={mockCompany}
             initialBalance={1800}
+            initialTotalBalanceDue={1800}
             onClose={vi.fn()}
           />
         );
@@ -893,6 +894,7 @@ describe('WhatsApp Share Modals Validation & Demo Guardrails', () => {
             invoice={{ ...mockInvoice, grandTotal: 2950, balanceAmount: 1500 }}
             company={mockCompany}
             initialBalance={1800}
+            initialTotalBalanceDue={1800}
             onClose={vi.fn()}
           />
         );

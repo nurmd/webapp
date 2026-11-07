@@ -44,6 +44,14 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
     return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
   }, [passedBankAccounts]);
 
+  const allPaymentModes = useMemo(() => {
+    const modes = [...paymentModes];
+    if (paymentSplits.some((s) => s.mode === 'CREDIT_NOTE') && !modes.some((m) => m.value === 'CREDIT_NOTE')) {
+      modes.push({ value: 'CREDIT_NOTE', label: 'Sales Return' });
+    }
+    return modes;
+  }, [paymentModes, paymentSplits]);
+
   const defaultBank = activeBankAccounts.find((b) => (b as any).isDefault) || activeBankAccounts[0];
   const defaultBankId = defaultBank?.id || 'ACC_BANK';
   return (
@@ -89,7 +97,7 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
                 onChange={(e) => onUpdateSplitMode(split.id, e.target.value as PaymentMode)}
                 className="w-full h-8 pl-2 pr-6 rounded-lg bg-surface-container-low text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-colors cursor-pointer appearance-none"
               >
-                {paymentModes.map((pm) => (
+                {allPaymentModes.map((pm) => (
                   <option key={pm.value} value={pm.value}>
                     {pm.label}
                   </option>
@@ -101,7 +109,7 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
             </div>
 
             {/* Bank Account Selector for non-cash tenders */}
-            {split.mode !== 'CASH' && split.mode !== 'CREDIT' && activeBankAccounts.length > 0 && (
+            {split.mode !== 'CASH' && split.mode !== 'CREDIT' && split.mode !== 'CREDIT_NOTE' && activeBankAccounts.length > 0 && (
               <div className="relative flex-1 sm:max-w-[150px]">
                 <select
                   value={split.accountId || defaultBankId}

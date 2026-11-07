@@ -281,11 +281,12 @@ describe('Sales Return Parent Invoice Linking Specification', () => {
     expect(storedCN.paymentStatus).toBe('PAID');
     expect(storedCN.paymentMode).toBe('CASH');
 
-    // Stored parent invoice balance must be reduced by 2000
+    // Stored parent invoice balance must be reduced by 2000 and paidAmount reflected via CREDIT_NOTE tender
     const storedParent = db.getInvoices().find((i) => i.id === parent.id)!;
     expect(storedParent.balanceAmount).toBe(3000);
-    expect(storedParent.paidAmount).toBe(0);
-    expect(storedParent.paymentStatus).toBe('UNPAID');
+    expect(storedParent.paidAmount).toBe(2000);
+    expect(storedParent.paymentStatus).toBe('PARTIAL');
+    expect(storedParent.paymentSplits?.some((s) => s.mode === 'CREDIT_NOTE' && s.amount === 2000)).toBe(true);
 
     // Also test fully settling a partially paid invoice
     const parentPartiallyPaid = createSalesInvoice({
@@ -309,10 +310,11 @@ describe('Sales Return Parent Invoice Linking Specification', () => {
     db.saveInvoice(cn2);
 
     const storedParent2 = db.getInvoices().find((i) => i.id === parentPartiallyPaid.id)!;
-    // 1000 balance cleared -> 0; remaining 500 reverses paid -> 4000 - 500 = 3500
+    // Remaining 1000 balance cleared -> 0; paid becomes 4000 + 1000 (applied) = 5000 (no overpayment/negative balance)
     expect(storedParent2.balanceAmount).toBe(0);
-    expect(storedParent2.paidAmount).toBe(3500);
+    expect(storedParent2.paidAmount).toBe(5000);
     expect(storedParent2.paymentStatus).toBe('PAID');
+    expect(storedParent2.paymentSplits?.some((s) => s.mode === 'CREDIT_NOTE' && s.amount === 1000)).toBe(true);
   });
 
   it('2. Party balance is reduced exactly once (assert exact expected number, not double-reduced)', () => {

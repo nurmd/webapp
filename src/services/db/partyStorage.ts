@@ -379,7 +379,14 @@ export class PartyStorage extends SettingsStorage {
       const totalReceipts = partyReceipts.reduce((sum, v) => sum + v.totalAmount, 0);
       const totalInvoicePaid = partyInvoices
         .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
-        .reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+        .reduce((sum, inv) => {
+          if (inv.paymentSplits && inv.paymentSplits.length > 0) {
+            return sum + inv.paymentSplits
+              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
+              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0);
+          }
+          return sum + (inv.paidAmount || 0);
+        }, 0);
       if (totalReceipts > totalInvoicePaid) {
         // Customer paid more than total settled on invoices (advance from customer)
         balance -= (totalReceipts - totalInvoicePaid);
@@ -487,7 +494,12 @@ export class PartyStorage extends SettingsStorage {
       if (!acc) continue;
 
       if (inv.invoiceType !== 'CREDIT_NOTE') {
-        acc.totalInvoicePaid += (inv.paidAmount || 0);
+        const directPaid = inv.paymentSplits && inv.paymentSplits.length > 0
+          ? inv.paymentSplits
+              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
+              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0)
+          : (inv.paidAmount || 0);
+        acc.totalInvoicePaid += directPaid;
       }
 
       if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {

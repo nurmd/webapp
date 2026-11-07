@@ -12,7 +12,7 @@ export type InvoiceType =
   | 'CREDIT_NOTE'   // Credit note issued to customer (GSTR-1 Table 9B CDNR/CDNUR)
   | 'DEBIT_NOTE';   // Debit note issued to customer (GSTR-1 Table 9B CDNR/CDNUR)
 
-export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING' | 'CHEQUE' | 'CREDIT' | 'SPLIT' | 'BANK';
+export type PaymentMode = 'CASH' | 'UPI' | 'CARD' | 'NET_BANKING' | 'CHEQUE' | 'CREDIT' | 'SPLIT' | 'BANK' | 'CREDIT_NOTE';
 export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID';
 
 export interface PaymentSplit {

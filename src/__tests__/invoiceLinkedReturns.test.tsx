@@ -31,6 +31,7 @@ import {
   linkCreditNoteToInvoice,
   unlinkCreditNoteFromInvoice,
 } from '../core/returns/returnEngine.ts';
+import { applyAllocations, reverseAllocations } from '../core/accounting/paymentAllocation.ts';
 import { resetBackNavigationForTesting } from '../core/utils/backNavigation.ts';
 import type { Party } from '../models/party.ts';
 import type { Invoice, InvoiceItemEntry } from '../models/invoice.ts';
@@ -320,15 +321,17 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
     expect(creditNote.grandTotal).toBe(1050);
     expect(creditNote.items[0].quantity).toBe(2);
 
-    // 2. Verify source invoice balance was updated (reversed returned values)
+    // 2. Verify source invoice balance was updated (reflecting credit note as tender)
     // 2625 - 1050 = 1575
     expect(updatedSourceInvoice.balanceAmount).toBe(1575);
-    expect(updatedSourceInvoice.paidAmount).toBe(0);
-    expect(updatedSourceInvoice.paymentStatus).toBe('UNPAID');
+    expect(updatedSourceInvoice.paidAmount).toBe(1050);
+    expect(updatedSourceInvoice.paymentStatus).toBe('PARTIAL');
 
-    // 3. Verify source invoice persisted in DB has updated balance
+    // 3. Verify source invoice persisted in DB has updated balance and paidAmount
     const freshSource = db.getInvoices().find((i) => i.id === sourceInvoice.id)!;
     expect(freshSource.balanceAmount).toBe(1575);
+    expect(freshSource.paidAmount).toBe(1050);
+    expect(freshSource.paymentStatus).toBe('PARTIAL');
 
     // 4. Verify inventory stock was restored in DB (45 + 2 = 47)
     const freshItem = db.getItems().find((i) => i.id === item1.id)!;
@@ -437,7 +440,7 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
     expect(summary.isFullyReturned).toBe(true);
   });
 
-  it('4. Reverses paid amounts correctly on fully paid and partially paid invoices', () => {
+  it('4. Handles fully paid, partial CN (CN < due) and excess CN (CN > due) safely without negative balance or overpayment', () => {
     // Fully Paid Invoice: 1000 paid, 0 balance
     const paidInvoice: Invoice = {
       id: 'inv-401',
@@ -470,9 +473,9 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
       updatedAt: '2026-10-25T10:00:00Z',
     };
 
-    // Return 400: should reduce paidAmount to 600
+    // Return 400 on fully paid invoice: remaining due is 0, applied = 0, no overpayment
     const updatedPaid = applyReturnToInvoice(paidInvoice, 400);
-    expect(updatedPaid.paidAmount).toBe(600);
+    expect(updatedPaid.paidAmount).toBe(1000);
     expect(updatedPaid.balanceAmount).toBe(0);
     expect(updatedPaid.paymentStatus).toBe('PAID');
 
@@ -486,11 +489,21 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
       paymentStatus: 'PARTIAL',
     };
 
-    // Return 800: should wipe out 600 balance, and reverse 200 of the 400 paid
-    const updatedPartial = applyReturnToInvoice(partialInvoice, 800);
+    // Partial CN (CN = 300 < due 600): applied = 300, paid becomes 700, balance becomes 300
+    const partialCNResult = applyReturnToInvoice(partialInvoice, 300, { id: 'cn-part-1', invoiceNumber: 'CN-PART-1' });
+    expect(partialCNResult.balanceAmount).toBe(300);
+    expect(partialCNResult.paidAmount).toBe(700);
+    expect(partialCNResult.paymentStatus).toBe('PARTIAL');
+    expect(partialCNResult.paymentMode).toBe('SPLIT');
+    expect(partialCNResult.paymentSplits?.some((s) => s.mode === 'CREDIT_NOTE' && s.amount === 300)).toBe(true);
+
+    // Excess Return (CN = 800 > due 600): applied clamped to 600, paid becomes 1000, balance 0, status PAID
+    const updatedPartial = applyReturnToInvoice(partialInvoice, 800, { id: 'cn-excess-1', invoiceNumber: 'CN-EXCESS-1' });
     expect(updatedPartial.balanceAmount).toBe(0);
-    expect(updatedPartial.paidAmount).toBe(200);
+    expect(updatedPartial.paidAmount).toBe(1000);
     expect(updatedPartial.paymentStatus).toBe('PAID');
+    expect(updatedPartial.paymentMode).toBe('SPLIT');
+    expect(updatedPartial.paymentSplits?.some((s) => s.mode === 'CREDIT_NOTE' && s.amount === 600)).toBe(true);
   });
 
   it('5. Purchase Returns View renders bill selector and handles vendor debit note with stock decrement', async () => {
@@ -1304,5 +1317,224 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
 
     const reReducedParent = db.getInvoices().find((i) => i.id === parentInv.id)!;
     expect(reReducedParent.balanceAmount).toBe(3500);
+  });
+
+  it('14. Raslia case: treats linked Credit Note as split tender, preserves across allocations, and handles partial/excess CNs', () => {
+    // Concrete Raslia case: INV/26-27/0037
+    // grandTotal ₹2,400, cash ₹1,500, UPI ₹180, balance ₹720
+    const rasliaInv: Invoice = {
+      id: 'inv-raslia-0037',
+      invoiceNumber: 'INV/26-27/0037',
+      invoiceType: 'B2CS',
+      date: '2026-10-25',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 2,
+          unit: 'PCS',
+          unitPrice: 1200,
+          taxableAmount: 2400,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 2400,
+        },
+      ],
+      totalGrossAmount: 2400,
+      totalDiscount: 0,
+      totalTaxableAmount: 2400,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 2400,
+      paidAmount: 1680,
+      balanceAmount: 720,
+      amountInWords: '',
+      paymentMode: 'SPLIT',
+      paymentStatus: 'PARTIAL',
+      paymentSplits: [
+        { id: 's1', mode: 'CASH', amount: 1500 },
+        { id: 's2', mode: 'UPI', amount: 180 },
+        { id: 's3', mode: 'CREDIT', amount: 720 },
+      ],
+      notes: 'Split Payment — Cash: ₹1500.00, UPI: ₹180.00, Credit: ₹720.00',
+      createdAt: '2026-10-25T10:00:00Z',
+      updatedAt: '2026-10-25T10:00:00Z',
+    };
+    db.saveInvoice(rasliaInv, { skipSettlementDerivation: true });
+
+    // Unlinked credit note: CN/26-27/0010 for ₹720
+    const rasliaCN: Invoice = {
+      id: 'cn-raslia-0010',
+      invoiceNumber: 'CN/26-27/0010',
+      invoiceType: 'CREDIT_NOTE',
+      noteType: 'C',
+      date: '2026-10-26',
+      partyId: sampleCustomer.id,
+      partyName: sampleCustomer.name,
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [
+        {
+          itemId: item1.id,
+          name: item1.name,
+          hsnSacCode: '',
+          quantity: 1,
+          unit: 'PCS',
+          unitPrice: 720,
+          taxableAmount: 720,
+          gstRate: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 720,
+        },
+      ],
+      totalGrossAmount: 720,
+      totalDiscount: 0,
+      totalTaxableAmount: 720,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 720,
+      paidAmount: 0,
+      balanceAmount: 720,
+      amountInWords: '',
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-10-26T10:00:00Z',
+      updatedAt: '2026-10-26T10:00:00Z',
+    };
+    db.saveInvoice(rasliaCN);
+
+    // 1. Link CN to Raslia invoice
+    const linkRes = linkCreditNoteToInvoice(rasliaCN, rasliaInv);
+    expect(linkRes.success).toBe(true);
+
+    const linkedParent = db.getInvoices().find((i) => i.id === rasliaInv.id)!;
+    expect(linkedParent.paidAmount).toBe(2400); // 1680 + 720
+    expect(linkedParent.balanceAmount).toBe(0);
+    expect(linkedParent.paymentStatus).toBe('PAID');
+    expect(linkedParent.paymentMode).toBe('SPLIT');
+
+    // CREDIT_NOTE split must be present
+    const cnSplit = linkedParent.paymentSplits?.find((s) => s.mode === 'CREDIT_NOTE');
+    expect(cnSplit).toBeDefined();
+    expect(cnSplit?.amount).toBe(720);
+    expect(cnSplit?.reference).toBe('CN/26-27/0010');
+
+    // CN itself becomes PAID with balance 0
+    const linkedCN = db.getInvoices().find((i) => i.id === rasliaCN.id)!;
+    expect(linkedCN.paymentStatus).toBe('PAID');
+    expect(linkedCN.balanceAmount).toBe(0);
+    expect(linkedCN.paidAmount).toBe(720);
+
+    // 2. Allocation preservation: verify reverseAllocations preserves CREDIT_NOTE split
+    // When reversing cash/bank allocations, regular tenders are reduced first, CN tender is preserved
+    const parentWithAllocations = {
+      ...linkedParent,
+      paymentSplits: [
+        { id: 's1', mode: 'CASH' as const, amount: 1500 },
+        { id: 's2', mode: 'UPI' as const, amount: 180 },
+        { id: 'cn-cn-raslia-0010', mode: 'CREDIT_NOTE' as const, amount: 720, reference: 'CN/26-27/0010' },
+      ],
+    };
+    const reversed = reverseAllocations([parentWithAllocations], [
+      {
+        documentType: 'INVOICE',
+        documentId: parentWithAllocations.id,
+        documentNumber: parentWithAllocations.invoiceNumber,
+        amount: 180, // reversing UPI
+        date: '2026-10-26',
+      },
+    ]);
+    expect(reversed[0].paidAmount).toBe(2220);
+    expect(reversed[0].balanceAmount).toBe(180);
+    // CREDIT_NOTE split is preserved intact
+    const preservedCnSplit = reversed[0].paymentSplits?.find((s) => s.mode === 'CREDIT_NOTE');
+    expect(preservedCnSplit).toBeDefined();
+    expect(preservedCnSplit?.amount).toBe(720);
+
+    // 3. Unlink Raslia CN
+    const unlinkRes = unlinkCreditNoteFromInvoice(linkedCN);
+    expect(unlinkRes.success).toBe(true);
+
+    const unlinkedParent = db.getInvoices().find((i) => i.id === rasliaInv.id)!;
+    expect(unlinkedParent.paidAmount).toBe(1680);
+    expect(unlinkedParent.balanceAmount).toBe(720);
+    expect(unlinkedParent.paymentStatus).toBe('PARTIAL');
+    expect(unlinkedParent.paymentSplits?.some((s) => s.mode === 'CREDIT_NOTE')).toBe(false);
+
+    const revertedCN = db.getInvoices().find((i) => i.id === rasliaCN.id)!;
+    expect(revertedCN.paymentStatus).toBe('UNPAID');
+    expect(revertedCN.balanceAmount).toBe(720);
+    expect(revertedCN.paidAmount).toBe(0);
+    expect(revertedCN.originalInvoiceId).toBeUndefined();
+
+    // 4. Re-link CN (idempotence)
+    const relinkRes = linkCreditNoteToInvoice(revertedCN, unlinkedParent);
+    expect(relinkRes.success).toBe(true);
+
+    const reLinkedParent = db.getInvoices().find((i) => i.id === rasliaInv.id)!;
+    expect(reLinkedParent.paidAmount).toBe(2400);
+    expect(reLinkedParent.balanceAmount).toBe(0);
+    expect(reLinkedParent.paymentStatus).toBe('PAID');
+    expect(reLinkedParent.paymentSplits?.find((s) => s.mode === 'CREDIT_NOTE')?.amount).toBe(720);
+
+    // 5. Partial CN (CN < remaining due)
+    const partialInv: Invoice = {
+      ...rasliaInv,
+      id: 'inv-partial-test',
+      invoiceNumber: 'INV/PARTIAL/01',
+      grandTotal: 1000,
+      paidAmount: 200,
+      balanceAmount: 800,
+      paymentSplits: [{ id: 'p1', mode: 'CASH', amount: 200 }],
+    };
+    const partialCN: Invoice = {
+      ...rasliaCN,
+      id: 'cn-partial-test',
+      invoiceNumber: 'CN/PARTIAL/01',
+      grandTotal: 300,
+      paidAmount: 0,
+      balanceAmount: 300,
+    };
+    const partialLink = applyReturnToInvoice(partialInv, partialCN.grandTotal, partialCN);
+    expect(partialLink.paidAmount).toBe(500); // 200 + 300
+    expect(partialLink.balanceAmount).toBe(500); // 1000 - 500
+    expect(partialLink.paymentStatus).toBe('PARTIAL');
+    expect(partialLink.paymentSplits?.find((s) => s.mode === 'CREDIT_NOTE')?.amount).toBe(300);
+
+    // 6. Excess CN (CN > remaining due) - safe clamp without negative balance or overpayment
+    const excessCN: Invoice = {
+      ...rasliaCN,
+      id: 'cn-excess-test',
+      invoiceNumber: 'CN/EXCESS/01',
+      grandTotal: 800, // exceeds remaining due of 500
+    };
+    const excessLink = applyReturnToInvoice(partialLink, excessCN.grandTotal, excessCN);
+    expect(excessLink.paidAmount).toBe(1000); // clamped to grandTotal
+    expect(excessLink.balanceAmount).toBe(0);
+    expect(excessLink.paymentStatus).toBe('PAID');
+    expect(excessLink.paymentSplits?.find((s) => s.id === `cn-${excessCN.id}`)?.amount).toBe(500);
   });
 });

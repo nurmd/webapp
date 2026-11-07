@@ -1732,7 +1732,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           invoice={undefined}
           party={party}
           initialPhone={party?.phone}
-          initialBalance={partyTotalDue ?? undefined}
+          initialTotalBalanceDue={partyTotalDue ?? undefined}
           paymentShareText={(() => {
             const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
             return buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || db.getCompany(), partyTotalDue, {

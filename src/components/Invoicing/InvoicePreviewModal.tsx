@@ -1381,7 +1381,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
                             {invoice.paymentSplits && invoice.paymentSplits.length > 0
                               ? invoice.paymentSplits
                                   .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
-                                  .map((s) => `${s.mode}: ₹${s.amount.toFixed(2)}`)
+                                  .map((s) => `${s.mode === 'CREDIT_NOTE' ? 'Sales Return' : s.mode}: ₹${s.amount.toFixed(2)}`)
                                   .join(' • ')
                               : invoice.notes?.replace('Split Payment — ', '')}
                           </span>
@@ -2149,7 +2149,8 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           company={company}
           onClose={() => setIsWhatsAppModalOpen(false)}
           initialPhone={party?.phone}
-          initialBalance={totalBalanceDue}
+          initialBalance={invoice.balanceAmount}
+          initialTotalBalanceDue={totalBalanceDue}
           onPrintA4={handlePrint}
           onPrint={() => setIsThermalModalOpen(true)}
         />

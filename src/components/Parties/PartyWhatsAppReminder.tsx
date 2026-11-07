@@ -2,7 +2,7 @@ import React from 'react';
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
-import { WhatsAppTemplateType } from '../../core/utils/upiAndShare.ts';
+import { WhatsAppTemplateType, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 
 export interface PartyWhatsAppReminderProps {
   isOpen: boolean;
@@ -35,6 +35,7 @@ export const PartyWhatsAppReminder: React.FC<PartyWhatsAppReminderProps> = ({
       initialPartyName={party.name}
       initialPhone={party.phone}
       initialBalance={balance}
+      initialTotalBalanceDue={getPartyTotalBalanceDue(party) ?? undefined}
       initialTemplate={template}
     />
   );

@@ -6,6 +6,7 @@ import { downloadEWayBillJson, EWAY_BILL_STATUTORY_THRESHOLD } from '../../core/
 import { downloadEInvoiceJson } from '../../core/gst/eInvoiceExport.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
+import { getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
 import { InvoiceDocumentModal } from './InvoiceDocumentModal.tsx';
 import { DocumentLineItemsGrid } from '../Common/Billing/DocumentLineItemsGrid.tsx';
@@ -287,7 +288,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
                     .filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
                     .map((s, idx) => (
                       <span key={idx} className="px-1.5 py-0.5 rounded bg-surface-container-high font-semibold text-on-surface-variant whitespace-nowrap shrink-0">
-                        {s.mode}: {formatINR(s.amount)}
+                        {s.mode === 'CREDIT_NOTE' ? 'Sales Return' : s.mode}: {formatINR(s.amount)}
                       </span>
                     ))
                 : (invoice.notes?.replace('Split Payment — ', '') || '').split(', ').map((chunk, idx) => (
@@ -341,6 +342,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
           initialPartyName={invoice.partyName}
           initialPhone={invoice.partyPhone || party?.phone}
           initialBalance={invoice.balanceAmount}
+          initialTotalBalanceDue={party ? (getPartyTotalBalanceDue(party) ?? undefined) : undefined}
           initialTemplate="INVOICE_DELIVERY"
         />
       )}

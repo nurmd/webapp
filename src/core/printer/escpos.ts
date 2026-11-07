@@ -212,7 +212,8 @@ export function formatThermalReceiptText(
     if (data.paymentSplits && data.paymentSplits.length > 1) {
       data.paymentSplits.forEach((s) => {
         if (s.mode !== 'CREDIT' && s.amount > 0) {
-          lines.push(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+          const modeLabel = s.mode === 'CREDIT_NOTE' ? 'Return' : s.mode;
+          lines.push(padRow(`Paid (${modeLabel}):`, `Rs. ${s.amount.toFixed(2)}`, width));
         }
       });
     } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {

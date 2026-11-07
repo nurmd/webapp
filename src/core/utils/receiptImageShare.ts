@@ -22,7 +22,11 @@ export async function renderThermalPreviewImage(
       throw new Error('Target node is missing for thermal preview capture');
     }
     const blob = await toBlob(node, { cacheBust: true, pixelRatio: 2 });
-    if (!blob) {
+    if (!blob || blob.size < 1024) {
+      if (fallbackText) {
+        console.warn(`[share] dom capture produced suspicious/small blob (${blob?.size ?? 0} bytes), falling back to canvas`);
+        return await renderThermalReceiptImage(fallbackText, paperWidth);
+      }
       throw new Error('html-to-image failed to produce a Blob');
     }
     return blob;
@@ -33,6 +37,37 @@ export async function renderThermalPreviewImage(
     }
     throw err;
   }
+}
+
+/**
+ * Wraps long monospace lines so that no line exceeds paperWidth columns.
+ * Breaks on word boundaries (spaces) when possible, or splits long continuous strings.
+ */
+export function wrapReceiptText(text: string, paperWidth: 32 | 48 = 32): string[] {
+  const rawLines = text.split('\n');
+  const result: string[] = [];
+
+  for (const rawLine of rawLines) {
+    if (rawLine.length <= paperWidth) {
+      result.push(rawLine);
+      continue;
+    }
+
+    let remaining = rawLine;
+    while (remaining.length > paperWidth) {
+      let breakIdx = remaining.lastIndexOf(' ', paperWidth);
+      if (breakIdx <= 0) {
+        breakIdx = paperWidth;
+      }
+      result.push(remaining.substring(0, breakIdx));
+      remaining = remaining.substring(breakIdx).trimStart();
+    }
+    if (remaining.length > 0) {
+      result.push(remaining);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -59,7 +94,7 @@ export function renderThermalReceiptImage(
       const paddingH = 24;
       const paddingV = 24;
       const lineHeight = 26;
-      const lines = text.split('\n');
+      const lines = wrapReceiptText(text, paperWidth);
       const height = paddingV * 2 + lines.length * lineHeight;
 
       const canvas = document.createElement('canvas');

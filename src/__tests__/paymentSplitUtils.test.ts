@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  parseSplitsFromNotes,
   parseSplitsFromInvoice,
   parseSplitsFromPurchase,
   formatSplitNotes,
   derivePaymentSettlement,
 } from '@/core/accounting/paymentSplitUtils';
-import type { Invoice } from '@/models/invoice';
+import type { Invoice, PaymentSplit } from '@/models/invoice';
 import type { PurchaseBill } from '@/models/purchase';
 
 describe('Suite 4: Multi-Tender Splits & Parsing', () => {
@@ -177,6 +178,39 @@ describe('Suite 4: Multi-Tender Splits & Parsing', () => {
       expect(res.paidAmount).toBe(400);
       expect(res.balanceAmount).toBe(600);
       expect(res.paymentMode).toBe('SPLIT');
+    });
+
+    it('treats CREDIT_NOTE tender as non-credit split and includes it in paidAmount and status', () => {
+      const res = derivePaymentSettlement({
+        grandTotal: 2400,
+        paymentSplits: [
+          { id: 's-cash', mode: 'CASH', amount: 1500 },
+          { id: 's-upi', mode: 'UPI', amount: 180 },
+          { id: 's-cn', mode: 'CREDIT_NOTE', amount: 720 },
+        ],
+      });
+      expect(res.paidAmount).toBe(2400);
+      expect(res.balanceAmount).toBe(0);
+      expect(res.paymentStatus).toBe('PAID');
+      expect(res.paymentMode).toBe('SPLIT');
+      expect(res.paymentSplits?.length).toBe(3);
+      expect(res.paymentSplits?.find((s) => s.mode === 'CREDIT_NOTE')?.amount).toBe(720);
+    });
+
+    it('formats CREDIT_NOTE as Sales Return in formatSplitNotes', () => {
+      const splits: PaymentSplit[] = [
+        { id: 's-cash', mode: 'CASH', amount: 1680 },
+        { id: 's-cn', mode: 'CREDIT_NOTE', amount: 720 },
+      ];
+      const notes = formatSplitNotes(splits, 0);
+      expect(notes).toBe('Split Payment — Cash ₹1680, Sales Return ₹720');
+    });
+
+    it('parses Sales Return from notes into CREDIT_NOTE split', () => {
+      const notes = 'Split Payment — Cash ₹1680, Sales Return ₹720.00';
+      const parsed = parseSplitsFromNotes(notes);
+      expect(parsed.length).toBe(2);
+      expect(parsed.find((s) => s.mode === 'CREDIT_NOTE')?.amount).toBe(720);
     });
   });
 });

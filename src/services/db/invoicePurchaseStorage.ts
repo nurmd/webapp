@@ -261,8 +261,8 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
       const adjusted =
         delta > 0
-          ? applyReturnToInvoice(parent, delta)
-          : revertReturnFromInvoice(parent, -delta);
+          ? applyReturnToInvoice(parent, delta, delta > 0 && parentId === currParentId ? creditNote : undefined)
+          : revertReturnFromInvoice(parent, -delta, delta < 0 && parentId === prevParentId ? prevCreditNote?.id || creditNote.id : undefined);
 
       this.saveInvoice(adjusted, { skipSettlementDerivation: true });
     }
@@ -350,7 +350,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         !parent.isCancelled &&
         (!inv.partyId || !parent.partyId || parent.partyId === inv.partyId)
       ) {
-        const adjusted = revertReturnFromInvoice(parent, inv.grandTotal);
+        const adjusted = revertReturnFromInvoice(parent, inv.grandTotal, inv.id);
         this.saveInvoice(adjusted, { skipSettlementDerivation: true });
       }
     }
