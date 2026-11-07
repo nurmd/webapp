@@ -1,13 +1,14 @@
 {
-  "version": "1.2.70",
+  "version": "1.2.71",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-06T05:22:43.102Z",
+  "buildTime": "2026-11-07T03:04:25.727Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "Unlinked sales returns can now be linked to an invoice to reduce its balance",
-    "Critical: audit-trail now covers Party and Item CRUD (MCA Rule 3(1))",
-    "High: duplicate item/party name checks are advisory, not blocking",
-    "High: party search now tokenizes multi-word queries"
+    "stop cropping thermal receipt images on the right edge",
+    "linked credit notes must not stay UNPAID from stale split notes",
+    "single WhatsApp button with text/image preview toggle",
+    "test/fix: adapt payment WhatsApp share tests to modal-based flow",
+    "keep same-date secondary priority in Newest sort"
   ]
 }

@@ -28,9 +28,9 @@ if (notes.length === 0) {
     notes = log.split("\n")
       .map(s => s.trim())
       .filter(s => s && !s.startsWith("Merge") && !s.startsWith("bump") && !s.includes("subagent") && !s.includes("wip"))
-      .slice(0, 6)
       .map(s => s.replace(/^[a-z]+(\([a-z0-9_-]+\))?:\s*/i, "").trim())
-      .filter(Boolean);
+      .filter(s => s && !/^v?\d+\.\d+\.\d+$/i.test(s))
+      .slice(0, 6);
   } catch (e) {
     console.warn("Failed to read git log:", e.message);
   }
