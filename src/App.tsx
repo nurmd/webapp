@@ -497,7 +497,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    const { isNew: isNewInvoice, existingSourceVoucher, otherActiveLinked, otherAllocatedTotal } = validation;
+    const { isNew: isNewInvoice, existingSourceVoucher, existingRefundVoucher, otherActiveLinked, otherAllocatedTotal } = validation;
 
     // Detect a real party change against stored invoice and reassign linked payment vouchers
     const storedInvoice = db.getInvoices().find((i) => i.id === newInvoice.id);
@@ -627,7 +627,7 @@ export const App: React.FC = () => {
           });
           paymentVoucher.partyId = newInvoice.partyId;
           paymentVoucher.partyName = newInvoice.partyName;
-          paymentVoucher.sourceDocumentType = 'INVOICE';
+          paymentVoucher.sourceDocumentType = 'CREDIT_NOTE';
           paymentVoucher.sourceDocumentId = newInvoice.id;
           paymentVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
           paymentVoucher.allocationMode = 'SOURCE_DOCUMENT';
@@ -654,6 +654,18 @@ export const App: React.FC = () => {
           db.saveVoucher(rev);
           db.saveVoucher({
             ...existingSourceVoucher,
+            isReversed: true,
+            reversalVoucherId: rev.id,
+          });
+        }
+        if (existingRefundVoucher && !existingRefundVoucher.isReversed) {
+          const rev = createReversalVoucher({
+            originalVoucher: existingRefundVoucher,
+            reason: `Reversal of refund payment #${existingRefundVoucher.voucherNumber} for cancelled credit note #${newInvoice.invoiceNumber}`,
+          });
+          db.saveVoucher(rev);
+          db.saveVoucher({
+            ...existingRefundVoucher,
             isReversed: true,
             reversalVoucherId: rev.id,
           });

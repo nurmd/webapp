@@ -606,6 +606,7 @@ export interface PreSaveValidationResult {
   error?: string;
   isNew: boolean;
   existingSourceVoucher?: Voucher;
+  existingRefundVoucher?: Voucher;
   otherActiveLinked: Voucher[];
   otherAllocatedTotal: number;
   targetSourceAmount: number;
@@ -668,6 +669,17 @@ export function validateInvoicePreSave(params: {
           v.sourceDocumentId === newInvoice.id
       );
 
+  const existingRefundVoucher = isSpecialDocument
+    ? vouchers.find(
+        (v) =>
+          !v.isCancelled &&
+          !v.isReversed &&
+          v.voucherType === 'PAYMENT' &&
+          v.allocationMode === 'SOURCE_DOCUMENT' &&
+          v.sourceDocumentId === newInvoice.id
+      )
+    : undefined;
+
   const newInvoicePaid = Number(newInvoice.paidAmount) || 0;
   const isOrderOrEstimate =
     newInvoice.invoiceType === 'ESTIMATE' ||
@@ -682,6 +694,14 @@ export function validateInvoicePreSave(params: {
       valid: true,
       isNew: true,
       existingSourceVoucher: undefined,
+      existingRefundVoucher: isSpecialDocument ? vouchers.find(
+        (v) =>
+          !v.isCancelled &&
+          !v.isReversed &&
+          v.voucherType === 'PAYMENT' &&
+          v.allocationMode === 'SOURCE_DOCUMENT' &&
+          v.sourceDocumentId === newInvoice.id
+      ) : undefined,
       otherActiveLinked: [],
       otherAllocatedTotal: 0,
       targetSourceAmount: isUnpaidOrCancelled ? 0 : newInvoicePaid,
@@ -693,7 +713,7 @@ export function validateInvoicePreSave(params: {
       !v.isCancelled &&
       !v.isReversed &&
       (!existingSourceVoucher || v.id !== existingSourceVoucher.id) &&
-      v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === newInvoice.id)
+      v.paymentAllocations?.some((a) => (a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE') && a.documentId === newInvoice.id)
   );
 
   // Check if grand total is less than total amount allocated to this invoice across all active linked vouchers
@@ -701,13 +721,13 @@ export function validateInvoicePreSave(params: {
     (v) =>
       !v.isCancelled &&
       !v.isReversed &&
-      v.paymentAllocations?.some((a) => a.documentType === 'INVOICE' && a.documentId === newInvoice.id)
+      v.paymentAllocations?.some((a) => (a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE') && a.documentId === newInvoice.id)
   );
   const totalAllocatedToInvoice = Number(
     allActiveLinked
       .reduce((sum, v) => {
         const vAllocSum = (v.paymentAllocations || [])
-          .filter((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id)
+          .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
           .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
         return sum + vAllocSum;
       }, 0)
@@ -720,6 +740,7 @@ export function validateInvoicePreSave(params: {
       error: `Cannot reduce invoice grand total (₹${newInvoice.grandTotal.toFixed(2)}) below total linked payment allocations (₹${totalAllocatedToInvoice.toFixed(2)}). Unlink or adjust payments first.`,
       isNew: false,
       existingSourceVoucher,
+      existingRefundVoucher,
       otherActiveLinked,
       otherAllocatedTotal: totalAllocatedToInvoice,
       targetSourceAmount: 0,
@@ -730,7 +751,7 @@ export function validateInvoicePreSave(params: {
     otherActiveLinked
       .reduce((sum, v) => {
         const vAllocSum = (v.paymentAllocations || [])
-          .filter((x) => x.documentType === 'INVOICE' && x.documentId === newInvoice.id)
+          .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
           .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
         return sum + vAllocSum;
       }, 0)
@@ -743,6 +764,7 @@ export function validateInvoicePreSave(params: {
       error: `Cannot reduce paid amount below ₹${otherAllocatedTotal.toFixed(2)}: active party payment vouchers cover that amount. Reverse or edit those payments first.`,
       isNew: false,
       existingSourceVoucher,
+      existingRefundVoucher,
       otherActiveLinked,
       otherAllocatedTotal,
       targetSourceAmount: 0,
@@ -771,6 +793,7 @@ export function validateInvoicePreSave(params: {
     valid: true,
     isNew: false,
     existingSourceVoucher,
+    existingRefundVoucher,
     otherActiveLinked,
     otherAllocatedTotal,
     targetSourceAmount,
