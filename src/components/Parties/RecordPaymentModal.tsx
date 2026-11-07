@@ -158,10 +158,19 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const outstandingDocs: OutstandingDocument[] = useMemo(() => {
     if (!activeParty) return [];
+    const isCustomer = activeParty.type === 'CUSTOMER';
+    let docType: 'INVOICE' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+    if (paymentType === 'IN') {
+      // Collecting money: from customers against invoices, from suppliers against debit notes (purchase returns we owe back)
+      docType = isCustomer ? 'INVOICE' : 'DEBIT_NOTE';
+    } else {
+      // Disbursing money: to suppliers against purchases, to customers against credit notes (refunds)
+      docType = isCustomer ? 'CREDIT_NOTE' : 'PURCHASE';
+    }
     return getOutstandingDocuments({
       partyId: activeParty.id,
       partyName: activeParty.name,
-      documentType: paymentType === 'IN' ? 'INVOICE' : 'PURCHASE',
+      documentType: docType,
       invoices: effectiveInvoices,
       purchases: effectivePurchases,
       parties: allParties,
@@ -486,7 +495,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           >
             <option value="">-- Choose Party --</option>
             {allParties
-              .filter((p) => (paymentType === 'IN' ? p.type !== 'SUPPLIER' : p.type !== 'CUSTOMER'))
+              .filter((p) => (paymentType === 'IN' ? p.type !== 'SUPPLIER' : true))
               .map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} {p.currentBalance !== 0 ? `(Bal: ${formatINR(p.currentBalance)})` : ''}

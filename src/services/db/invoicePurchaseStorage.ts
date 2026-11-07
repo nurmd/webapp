@@ -6,7 +6,7 @@ import { auditTrail } from '../auditTrail.ts';
 import { getFinancialYear } from '../../core/utils/dateFilters.ts';
 import { createRcmJournalVoucher, createReversalVoucher } from '../../core/accounting/ledger.ts';
 import { derivePaymentSettlement } from '../../core/accounting/paymentSplitUtils.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
 import { applyAllocations, reverseAllocations, inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
 import {
   applyInvoiceStockDecrement,
@@ -817,10 +817,10 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     // 0. Pre-validate allocations before modifying state or reversing old allocations
     if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
       const inMemoryInvoices = prevVoucher?.paymentAllocations && !prevVoucher.isReversed && !prevVoucher.isCancelled
-        ? reverseAllocations(this.getInvoices(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE'))
+        ? reverseAllocations(this.getInvoices(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE'))
         : this.getInvoices();
       const inMemoryPurchases = prevVoucher?.paymentAllocations && !prevVoucher.isReversed && !prevVoucher.isCancelled
-        ? reverseAllocations(this.getPurchases(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE'))
+        ? reverseAllocations(this.getPurchases(), prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE'))
         : this.getPurchases();
 
       const seenDocIds = new Set<string>();
@@ -848,7 +848,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
           continue;
         }
 
-        if (alloc.documentType === 'INVOICE') {
+        if (alloc.documentType === 'INVOICE' || alloc.documentType === 'CREDIT_NOTE') {
           const inv = inMemoryInvoices.find((i) => i.id === alloc.documentId);
           if (!inv) {
             const inPur = inMemoryPurchases.find((p) => p.id === alloc.documentId);
@@ -861,12 +861,17 @@ export class InvoicePurchaseStorage extends FinancialStorage {
             throw new Error(`Invoice #${alloc.documentNumber || inv.invoiceNumber} is cancelled and cannot be allocated.`);
           }
           if (
-            inv.invoiceType === 'CREDIT_NOTE' ||
             inv.invoiceType === 'ESTIMATE' ||
             inv.invoiceType === 'SALES_ORDER' ||
             inv.invoiceType === 'DELIVERY_CHALLAN'
           ) {
             throw new Error(`Document #${alloc.documentNumber || inv.invoiceNumber} is a ${inv.invoiceType} and is not an outstanding payable invoice/bill.`);
+          }
+          if (alloc.documentType === 'CREDIT_NOTE' && inv.invoiceType !== 'CREDIT_NOTE') {
+            throw new Error(`Document #${alloc.documentNumber || inv.invoiceNumber} is not a credit note.`);
+          }
+          if (alloc.documentType === 'INVOICE' && inv.invoiceType === 'CREDIT_NOTE') {
+            throw new Error(`Document #${alloc.documentNumber || inv.invoiceNumber} is a credit note; allocate it as a CREDIT_NOTE.`);
           }
           const partyMatches =
             (!voucher.partyId || !inv.partyId || inv.partyId === voucher.partyId) &&
@@ -881,7 +886,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
           if (alloc.amount > bal + 0.01) {
             throw new Error(`Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${bal.toFixed(2)} on invoice #${inv.invoiceNumber}.`);
           }
-        } else if (alloc.documentType === 'PURCHASE') {
+        } else if (alloc.documentType === 'PURCHASE' || alloc.documentType === 'DEBIT_NOTE') {
           const pur = inMemoryPurchases.find((p) => p.id === alloc.documentId);
           if (!pur) {
             const inInv = inMemoryInvoices.find((i) => i.id === alloc.documentId);
@@ -893,15 +898,21 @@ export class InvoicePurchaseStorage extends FinancialStorage {
           if (pur.isCancelled) {
             throw new Error(`Purchase bill #${alloc.documentNumber || pur.billNumber} is cancelled and cannot be allocated.`);
           }
-          if (
-            pur.purchaseType === 'RETURN' ||
-            pur.purchaseType === 'PO' ||
-            pur.purchaseType === 'CHALLAN' ||
-            (pur as any).purchaseType === 'PURCHASE_ORDER' ||
-            (pur as any).purchaseType === 'PURCHASE_CHALLAN' ||
-            (pur as any).purchaseType === 'PURCHASE_RETURN'
-          ) {
-            throw new Error(`Document #${alloc.documentNumber || pur.billNumber} is a ${pur.purchaseType} and is not an outstanding payable invoice/bill.`);
+          const isReturn = pur.purchaseType === 'RETURN' || (pur as any).purchaseType === 'PURCHASE_RETURN' || pur.noteType === 'D';
+          if (alloc.documentType === 'DEBIT_NOTE') {
+            if (!isReturn) {
+              throw new Error(`Document #${alloc.documentNumber || pur.billNumber} is not a debit note.`);
+            }
+          } else {
+            if (
+              isReturn ||
+              pur.purchaseType === 'PO' ||
+              pur.purchaseType === 'CHALLAN' ||
+              (pur as any).purchaseType === 'PURCHASE_ORDER' ||
+              (pur as any).purchaseType === 'PURCHASE_CHALLAN'
+            ) {
+              throw new Error(`Document #${alloc.documentNumber || pur.billNumber} is a ${pur.purchaseType} and is not an outstanding payable invoice/bill.`);
+            }
           }
           const partyMatches =
             (!voucher.partyId || !pur.supplierId || pur.supplierId === voucher.partyId) &&
@@ -929,7 +940,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
 
     // 1. Reverse old allocations if updating an existing voucher
     if (prevVoucher && prevVoucher.paymentAllocations && prevVoucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
-      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE');
       if (invAllocs.length > 0) {
         const invoices = this.getInvoices();
         const updatedInvoices = reverseAllocations(invoices, invAllocs);
@@ -940,7 +951,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         }
       }
 
-      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE');
       if (purAllocs.length > 0) {
         const purchases = this.getPurchases();
         const updatedPurchases = reverseAllocations(purchases, purAllocs);
@@ -958,7 +969,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     // 3. Apply new allocations
     if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0 && !options?.skipDocumentUpdate) {
       const voucherMode = inferVoucherPaymentMode(voucher);
-      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE');
       if (invAllocs.length > 0) {
         const invoices = this.getInvoices();
         const updatedInvoices = applyAllocations(invoices, invAllocs, { paymentMode: voucherMode });
@@ -969,7 +980,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         }
       }
 
-      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE');
       if (purAllocs.length > 0) {
         const purchases = this.getPurchases();
         const updatedPurchases = applyAllocations(purchases, purAllocs, { paymentMode: voucherMode });
@@ -1011,7 +1022,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     });
 
     if (voucher.paymentAllocations && voucher.paymentAllocations.length > 0) {
-      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      const invAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE');
       if (invAllocs.length > 0) {
         const invoices = this.getInvoices();
         const updatedInvoices = reverseAllocations(invoices, invAllocs);
@@ -1022,7 +1033,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         }
       }
 
-      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      const purAllocs = voucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE');
       if (purAllocs.length > 0) {
         const purchases = this.getPurchases();
         const updatedPurchases = reverseAllocations(purchases, purAllocs);
@@ -1052,7 +1063,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
   override deleteVoucher(id: string): void {
     const prevVoucher = this.getVouchers().find((v) => v.id === id);
     if (prevVoucher && prevVoucher.paymentAllocations && prevVoucher.paymentAllocations.length > 0 && !prevVoucher.isReversed && !prevVoucher.isCancelled) {
-      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE');
+      const invAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE');
       if (invAllocs.length > 0) {
         const invoices = this.getInvoices();
         const updatedInvoices = reverseAllocations(invoices, invAllocs);
@@ -1063,7 +1074,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         }
       }
 
-      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE');
+      const purAllocs = prevVoucher.paymentAllocations.filter((a) => a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE');
       if (purAllocs.length > 0) {
         const purchases = this.getPurchases();
         const updatedPurchases = reverseAllocations(purchases, purAllocs);
@@ -1089,7 +1100,7 @@ export class InvoicePurchaseStorage extends FinancialStorage {
    */
   unlinkPaymentAllocation(
     voucherId: string,
-    documentType: 'INVOICE' | 'PURCHASE',
+    documentType: PaymentAllocationDocumentType,
     documentId: string
   ): Voucher {
     const voucher = this.getVouchers().find((v) => v.id === voucherId);

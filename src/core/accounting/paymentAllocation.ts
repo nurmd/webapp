@@ -124,17 +124,22 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
     }
   }
 
-  if (documentType === 'INVOICE') {
+  if (documentType === 'INVOICE' || documentType === 'CREDIT_NOTE') {
+    const wantCredit = documentType === 'CREDIT_NOTE';
     const invoiceDocs = invoices
       .filter((inv) => {
         if (inv.isCancelled) return false;
         if (
           inv.invoiceType === 'ESTIMATE' ||
           inv.invoiceType === 'SALES_ORDER' ||
-          inv.invoiceType === 'DELIVERY_CHALLAN' ||
-          inv.invoiceType === 'CREDIT_NOTE'
+          inv.invoiceType === 'DELIVERY_CHALLAN'
         ) {
           return false;
+        }
+        if (wantCredit) {
+          if (inv.invoiceType !== 'CREDIT_NOTE') return false;
+        } else {
+          if (inv.invoiceType === 'CREDIT_NOTE') return false;
         }
         if (!isPartyMatch(inv.partyId, inv.partyName)) return false;
         const bal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal - (inv.paidAmount || 0);
@@ -150,7 +155,7 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
           grandTotal: round2(inv.grandTotal),
           paidAmount: round2(inv.paidAmount || 0),
           balanceAmount: round2(bal),
-          documentType: 'INVOICE' as const,
+          documentType: (wantCredit ? 'CREDIT_NOTE' : 'INVOICE') as any,
           partyId: inv.partyId,
           partyName: inv.partyName,
           createdAt: inv.createdAt,
@@ -161,18 +166,23 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
     return openingBalanceDoc ? [openingBalanceDoc, ...invoiceDocs] : invoiceDocs;
   }
 
+  const wantDebit = documentType === 'DEBIT_NOTE';
   const purchaseDocs = purchases
     .filter((pur) => {
       if (pur.isCancelled) return false;
-      if (
-        pur.purchaseType === 'PO' ||
-        pur.purchaseType === 'CHALLAN' ||
-        pur.purchaseType === 'RETURN' ||
-        (pur as any).purchaseType === 'PURCHASE_ORDER' ||
-        (pur as any).purchaseType === 'PURCHASE_CHALLAN' ||
-        (pur as any).purchaseType === 'PURCHASE_RETURN'
-      ) {
-        return false;
+      const isReturn = pur.purchaseType === 'RETURN' || (pur as any).purchaseType === 'PURCHASE_RETURN' || pur.noteType === 'D';
+      if (wantDebit) {
+        if (!isReturn) return false;
+      } else {
+        if (
+          pur.purchaseType === 'PO' ||
+          pur.purchaseType === 'CHALLAN' ||
+          isReturn ||
+          (pur as any).purchaseType === 'PURCHASE_ORDER' ||
+          (pur as any).purchaseType === 'PURCHASE_CHALLAN'
+        ) {
+          return false;
+        }
       }
       if (!isPartyMatch(pur.supplierId, pur.supplierName)) return false;
       const bal = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : pur.grandTotal - (pur.paidAmount || 0);
@@ -188,7 +198,7 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
         grandTotal: round2(pur.grandTotal),
         paidAmount: round2(pur.paidAmount || 0),
         balanceAmount: round2(bal),
-        documentType: 'PURCHASE' as const,
+        documentType: (wantDebit ? 'DEBIT_NOTE' : 'PURCHASE') as any,
         partyId: pur.supplierId,
         partyName: pur.supplierName,
         createdAt: pur.createdAt,

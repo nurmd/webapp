@@ -3,7 +3,7 @@ import { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../mode
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -39,7 +39,7 @@ interface CashBankManagementViewProps {
   onOpenAccountStatement?: (accountId: string) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
-  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
+  onUnlinkAllocation?: (voucherId: string, documentType: PaymentAllocationDocumentType, documentId: string) => void;
 }
 
 export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({

@@ -7,7 +7,7 @@ import { InventoryItem, StockAdjustment } from './models/item.ts';
 import { Invoice, PaymentSplit, PaymentMode, InvoiceType } from './models/invoice.ts';
 import { PurchaseBill } from './models/purchase.ts';
 import { Expense } from './models/expense.ts';
-import { Voucher, PaymentAllocation } from './core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocation, PaymentAllocationDocumentType } from './core/accounting/voucherTypes.ts';
 import {
   createSalesInvoiceVoucher,
   createPurchaseInvoiceVoucher,
@@ -612,7 +612,36 @@ export const App: React.FC = () => {
 
         // Save voucher with skipDocumentUpdate since newInvoice already holds the paidAmount/balance
         db.savePaymentVoucher(receiptVoucher, { skipDocumentUpdate: true });
-      }
+      } else if (isSpecialDocument && newInvoice.invoiceType === 'CREDIT_NOTE' && !newInvoice.originalInvoiceId && (newInvoice.paidAmount || 0) > 0) {
+        // Sales Return (Credit Note) / Purchase Return (Debit Note) refund:
+        // record the refund payment so it appears in the cash/bank book and party passbook.
+        const refundAmount = Number((newInvoice.paidAmount || 0).toFixed(2));
+        const paymentVoucher = createPaymentOutVoucher({
+            voucherNumber: `CN-${newInvoice.invoiceNumber}`,
+            date: newInvoice.date,
+            supplierName: newInvoice.partyName,
+            supplierId: newInvoice.partyId || 'ACC_CASH',
+            amount: refundAmount,
+            paymentMode: newInvoice.paymentMode && newInvoice.paymentMode !== 'CREDIT' ? newInvoice.paymentMode : 'CASH',
+            narration: `Refund disbursed for Sales Return #${newInvoice.invoiceNumber}`,
+          });
+          paymentVoucher.partyId = newInvoice.partyId;
+          paymentVoucher.partyName = newInvoice.partyName;
+          paymentVoucher.sourceDocumentType = 'INVOICE';
+          paymentVoucher.sourceDocumentId = newInvoice.id;
+          paymentVoucher.sourceDocumentNumber = newInvoice.invoiceNumber;
+          paymentVoucher.allocationMode = 'SOURCE_DOCUMENT';
+          paymentVoucher.paymentAllocations = [
+            {
+              documentType: 'CREDIT_NOTE',
+              documentId: newInvoice.id,
+              documentNumber: newInvoice.invoiceNumber,
+              amount: refundAmount,
+              date: newInvoice.date,
+            },
+          ];
+          db.savePaymentVoucher(paymentVoucher, { skipDocumentUpdate: true });
+        }
     } else {
       // On EDITING an existing document:
       // Status change: Cancellation or conversion to estimate/order reverses the source voucher
@@ -1266,10 +1295,11 @@ export const App: React.FC = () => {
   }, [activeUser.role]);
 
   const handleUnlinkPaymentAllocation = useCallback(
-    (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => {
+    (voucherId: string, documentType: PaymentAllocationDocumentType, documentId: string) => {
       try {
         db.unlinkPaymentAllocation(voucherId, documentType, documentId);
-        showToast(`Payment allocation for ${documentType === 'INVOICE' ? 'invoice' : 'purchase bill'} unlinked.`);
+        const docLabel = documentType === 'INVOICE' ? 'invoice' : documentType === 'CREDIT_NOTE' ? 'credit note' : documentType === 'DEBIT_NOTE' ? 'debit note' : 'purchase bill';
+        showToast(`Payment allocation for ${docLabel} unlinked.`);
       } catch (err: any) {
         showToast(err.message || 'Failed to unlink payment allocation.');
       }

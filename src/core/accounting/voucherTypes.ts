@@ -36,7 +36,7 @@ export interface JournalEntryLine {
   narration?: string;
 }
 
-export type PaymentAllocationDocumentType = 'INVOICE' | 'PURCHASE';
+export type PaymentAllocationDocumentType = 'INVOICE' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
 
 export interface PaymentAllocation {
   documentType: PaymentAllocationDocumentType;

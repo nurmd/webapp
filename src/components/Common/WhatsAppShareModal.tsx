@@ -114,6 +114,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [phoneError, setPhoneError] = useState<string>('');
   const [isSharingImage, setIsSharingImage] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [paperWidth, setPaperWidth] = useState<32 | 48>(() => {
     try {
       if (typeof localStorage !== 'undefined') {
@@ -399,8 +400,24 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
           </div>
 
               {!paymentShareText && (
+                <button
+                  type="button"
+                  data-testid="whatsapp-advanced-toggle"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl border border-outline-variant/30 bg-surface-container-low text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">tune</span>
+                    <span>Advanced options</span>
+                  </span>
+                  <span className="material-symbols-outlined text-[16px]">
+                    {showAdvanced ? 'expand_less' : 'expand_more'}
+                  </span>
+                </button>
+              )}
+
+              {!paymentShareText && showAdvanced && (
                 <>
-                  {/* Template & Tone Selector */}
                   <div>
                     <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1.5">
                       Message Template

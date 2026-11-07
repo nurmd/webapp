@@ -1979,7 +1979,7 @@ describe('Payment Voucher & Invoice/Bill Link Spec Test Suite', () => {
       },
     ];
     expect(() => db.savePaymentVoucher(badReceiptVoucher)).toThrow(
-      /is not an outstanding payable invoice\/bill/
+      /is a credit note; allocate it as a CREDIT_NOTE/
     );
 
     // Test savePaymentVoucher rejects direct allocation to purchase RETURN

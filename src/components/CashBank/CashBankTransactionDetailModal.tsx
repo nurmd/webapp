@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BankAccount, CashBankTransaction, CashBankTxnType, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
-import { Voucher } from '../../core/accounting/voucherTypes.ts';
+import { Voucher, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -30,7 +30,7 @@ export interface CashBankTransactionDetailModalProps {
   onNavigateTab?: (tab: AppTab) => void;
   onViewInvoice?: (invoice: Invoice) => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
-  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
+  onUnlinkAllocation?: (voucherId: string, documentType: PaymentAllocationDocumentType, documentId: string) => void;
   onEditVoucher?: (voucher: Voucher, options?: { initialEditing?: boolean }) => void;
 }
 
@@ -58,7 +58,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<{
     voucherId: string;
-    documentType: 'INVOICE' | 'PURCHASE';
+    documentType: PaymentAllocationDocumentType;
     documentId: string;
     documentNumber: string;
   } | null>(null);

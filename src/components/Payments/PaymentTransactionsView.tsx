@@ -4,7 +4,7 @@ import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../..
 import type { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
-import type { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
+import type { Voucher, PaymentAllocation, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
 import type { Party } from '../../models/party.ts';
 import type { AppTab } from '../Shell/Drawer.tsx';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -54,7 +54,7 @@ export interface PaymentTransactionsViewProps {
     paymentDate?: string
   ) => boolean | void;
   onOpenPaymentModal?: (flow: 'IN' | 'OUT') => void;
-  onUnlinkAllocation?: (voucherId: string, documentType: 'INVOICE' | 'PURCHASE', documentId: string) => void;
+  onUnlinkAllocation?: (voucherId: string, documentType: PaymentAllocationDocumentType, documentId: string) => void;
 }
 
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
