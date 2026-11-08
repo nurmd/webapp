@@ -545,7 +545,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         }
       }
 
-      let entries: JournalEntryLine[] = [];
+      const entries: JournalEntryLine[] = [];
       if (editMode === 'SPLIT') {
         const c = parseFloat(editSplitCash) || 0;
         const u = parseFloat(editSplitUPI) || 0;

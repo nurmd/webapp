@@ -169,22 +169,22 @@ describe('PouchDB Credential Isolation & Auto-Sync Disarming', () => {
     });
 
     it('clears transient sync error and transitions to synced when paused without error, while retaining push errors', async () => {
-      const listeners: Record<string, Function> = {};
-      const pushListeners: Record<string, Function> = {};
+      const listeners: Record<string, (...args: any[]) => any> = {};
+      const pushListeners: Record<string, (...args: any[]) => any> = {};
       const mockSync = {
         cancel: vi.fn(),
         push: {
-          on: vi.fn((event: string, fn: Function) => {
+          on: vi.fn((event: string, fn: (...args: any[]) => any) => {
             pushListeners[event] = fn;
             return mockSync.push;
           }),
         },
         pull: {
-          on: vi.fn((_event: string, _fn: Function) => {
+          on: vi.fn((_event: string, _fn: (...args: any[]) => any) => {
             return mockSync.pull;
           }),
         },
-        on: vi.fn((event: string, fn: Function) => {
+        on: vi.fn((event: string, fn: (...args: any[]) => any) => {
           listeners[event] = fn;
           return mockSync;
         }),

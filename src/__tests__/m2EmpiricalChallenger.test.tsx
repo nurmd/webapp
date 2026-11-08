@@ -424,7 +424,7 @@ describe('EMPIRICAL CHALLENGER: Milestone 2 Stress Test Suite', () => {
     });
 
     it('EMP-TOG-02: Dynamic toggle: Prop transitioning from true to false instantly unmounts without error', async () => {
-      let isGst = true;
+      const isGst = true;
 
       const TestWrapper = ({ gst }: { gst: boolean }) => (
         <HsnAutocompleteInput

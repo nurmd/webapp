@@ -22,7 +22,9 @@
     "cap:android": "cap open android",
     "cap:ios": "cap open ios",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "lint": "eslint src --cache --cache-location .eslintcache",
+    "lint:fix": "eslint src --fix --cache --cache-location .eslintcache"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.2",
@@ -44,10 +46,14 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.6.1",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "happy-dom": "^15.11.7",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.5.4",
+    "typescript-eslint": "^8.72.1",
     "vite": "^5.4.21",
     "vitest": "^2.1.9"
   }

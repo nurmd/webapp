@@ -25,7 +25,11 @@ export interface PartyPaymentPreviewModalProps {
   onRefresh?: () => void;
 }
 
-export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> = ({
+interface PartyPaymentPreviewModalContentProps extends PartyPaymentPreviewModalProps {
+  entry: PassbookEntry;
+}
+
+const PartyPaymentPreviewModalContent: React.FC<PartyPaymentPreviewModalContentProps> = ({
   entry,
   party,
   company,
@@ -33,12 +37,10 @@ export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> =
   onClose,
   onEdit,
   onDelete,
-  onRefresh,
+  onRefresh: _onRefresh,
 }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
-
-  if (!isOpen || !entry) return null;
 
   const isReceipt = entry.type === 'PAYMENT_IN';
   const isPayment = entry.type === 'PAYMENT_OUT';
@@ -384,4 +386,13 @@ export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> =
       )}
     </>
   );
+};
+
+export const PartyPaymentPreviewModal: React.FC<PartyPaymentPreviewModalProps> = ({
+  isOpen = true,
+  entry,
+  ...props
+}) => {
+  if (!isOpen || !entry) return null;
+  return <PartyPaymentPreviewModalContent isOpen={isOpen} entry={entry} {...props} />;
 };

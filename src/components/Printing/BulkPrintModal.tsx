@@ -211,7 +211,7 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
                             </td>
                             <td className="py-1 px-2 text-right tabular-nums">
                               <div>
-                                {Boolean(isGst && !company.isCompositionScheme)
+                                {isGst && !company.isCompositionScheme
                                   ? `GST ${gstRate}%`
                                   : `${gstRate}%`}
                               </div>

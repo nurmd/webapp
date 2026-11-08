@@ -37,13 +37,13 @@ export function amountInWords(amount: number): string {
 
   if (isNaN(wholePart)) return '';
 
-  let crore = Math.floor(wholePart / 10000000);
+  const crore = Math.floor(wholePart / 10000000);
   let remaining = wholePart % 10000000;
 
-  let lakh = Math.floor(remaining / 100000);
+  const lakh = Math.floor(remaining / 100000);
   remaining %= 100000;
 
-  let thousand = Math.floor(remaining / 1000);
+  const thousand = Math.floor(remaining / 1000);
   remaining %= 1000;
 
   let words = '';

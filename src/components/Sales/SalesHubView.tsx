@@ -308,7 +308,7 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
     if (!paymentModalInvoice) return;
 
     let payAmt = paymentAmount;
-    let splitsToAdd: PaymentSplit[] = [];
+    const splitsToAdd: PaymentSplit[] = [];
     const defaultBank = db.getBankAccounts().find((b) => b.isDefault && b.accountType === 'BANK') || db.getBankAccounts().find((b) => b.accountType === 'BANK');
 
     if (paymentMode === 'SPLIT') {

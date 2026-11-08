@@ -272,7 +272,7 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
       );
     });
 
-    let previewText = container?.textContent || '';
+    const previewText = container?.textContent || '';
     expect(previewText).toContain('118.00');
     expect(previewText).not.toContain('Incl. ₹0.00');
 
@@ -287,7 +287,7 @@ describe('GST Phase 6 — Legacy Normalization, Drafts & Regression Suite', () =
       );
     });
 
-    let simplifiedText = container?.textContent || '';
+    const simplifiedText = container?.textContent || '';
     expect(simplifiedText).toContain('118.00');
     expect(simplifiedText).not.toContain('Incl. ₹0.00');
   });

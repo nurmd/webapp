@@ -685,7 +685,13 @@ npx tsc --noEmit
 
 # Run production build & verify bundle chunks
 npm run build
+
+# Run ESLint (0 errors required; warnings are tracked)
+npm run lint
+npm run lint:fix
 ```
+
+**Lint gate:** `eslint.config.js` uses the flat config with `js.configs.recommended`, `typescript-eslint` recommended, and the classic `react-hooks/rules-of-hooks` + `exhaustive-deps` rules only. The React Compiler diagnostics bundled with `eslint-plugin-react-hooks` v7 are intentionally excluded (not actionable here and prohibitively slow). `@typescript-eslint/no-explicit-any` and `no-unused-vars` are warnings; `--cache` (`.eslintcache`, gitignored) keeps repeat runs fast.
 
 ### Key Test Suites (`src/__tests__/`)
 - `splitBankArchitectureAndMigration.test.ts`: Split-bank tender routing, metadata persistence, overpayment clamping, legacy migration idempotency.

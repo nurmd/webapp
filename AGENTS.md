@@ -115,6 +115,7 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 ## 14. Release Artifact Verification
 - `scripts/verify-release.sh` validates APK versionName/versionCode, SHA-256, signature, and PWA checksum before publishing.
 - Whenever modifying frontend code that changes Vite chunk hashes, run `npm run build` before `npm run test:all`; build the APK before publishing.
+- Run `npm run lint` (0 errors required; warnings are tracked) alongside `npx tsc --noEmit` before release.
 
 
 

@@ -693,7 +693,7 @@ export function computePerformanceTimeSeries(
       }
     }
   } else if (granularity === 'WEEK') {
-    let cur = new Date(dStart);
+    const cur = new Date(dStart);
     while (cur <= dEnd) {
       const wStartStr = cur.toISOString().split('T')[0];
       const nextCur = new Date(cur);
@@ -745,7 +745,7 @@ export function computePerformanceTimeSeries(
       };
     }
 
-    let cur = new Date(dStart);
+    const cur = new Date(dStart);
     while (cur <= dEnd) {
       const dayStr = cur.toISOString().split('T')[0];
       const dNum = cur.getUTCDate();

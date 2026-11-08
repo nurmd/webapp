@@ -39,7 +39,7 @@ function polyMul(p1: number[], p2: number[]): number[] {
 }
 
 function polyRemainder(dividend: number[], divisor: number[]): number[] {
-  let result = [...dividend];
+  const result = [...dividend];
   while (result.length >= divisor.length) {
     const lead = result[0];
     if (lead !== 0) {

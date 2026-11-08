@@ -205,7 +205,7 @@ let activePouchInstance: PouchService | null = null;
 
 export class PouchService {
   private localDB: PouchDB.Database;
-  private syncHandler: PouchDB.Replication.Sync<{}> | null = null;
+  private syncHandler: PouchDB.Replication.Sync<object> | null = null;
   private listeners: Set<SyncListener> = new Set();
   private changeListeners: Set<DataChangeListener> = new Set();
   private explicitConflicts: Map<string, SyncConflict> = new Map();

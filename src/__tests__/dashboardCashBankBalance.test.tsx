@@ -159,7 +159,7 @@ describe('DashboardView Cash & Bank Balance', () => {
     });
 
     const balanceElem = container.querySelector('[data-testid="dashboard-cash-bank-balance"]');
-    expect(balanceElem).not.null;
+    expect(balanceElem).not.toBeNull();
     // Opening (10,000 + 20,000 = 30,000) + Paid Invoice (+5,000) + Direct Inflow (+2,500) = 37,500 => "₹ 37,500.00"
     expect(balanceElem?.textContent).toBe('₹ 37,500.00');
 
@@ -222,7 +222,7 @@ describe('DashboardView Cash & Bank Balance', () => {
     });
 
     const zeroBalanceElem = container.querySelector('[data-testid="dashboard-cash-bank-balance"]');
-    expect(zeroBalanceElem).not.null;
+    expect(zeroBalanceElem).not.toBeNull();
     // Zero state => "₹ 0.00"
     expect(zeroBalanceElem?.textContent).toBe('₹ 0.00');
   });

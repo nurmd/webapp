@@ -28,8 +28,6 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
 
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
-
   const upiId = company.upiId || 'merchant@upi';
   const merchantName = company.tradeName || company.businessName || 'Store';
   const upiUrl = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(
@@ -44,6 +42,8 @@ export const UpiQrModal: React.FC<UpiQrModalProps> = ({
       return '';
     }
   }, [upiUrl]);
+
+  if (!isOpen) return null;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(upiUrl);

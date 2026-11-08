@@ -405,7 +405,7 @@ export function sanitizeDiagnosticsText(
     .replace(/(https?:\/\/)[^/\s@]+@/gi, '$1[REDACTED_CREDENTIALS]@')
     // 4. Remove password/token/key key-value pairs
     .replace(
-      /(?:\b|_)(password|passwd|secret|token|api[_-]?key|auth|access[_-]?token)\s*[:=]\s*[^\s,;'"\]\}]+/gi,
+      /(?:\b|_)(password|passwd|secret|token|api[_-]?key|auth|access[_-]?token)\s*[:=]\s*[^\s,;'"\]}]+/gi,
       '$1=[REDACTED]'
     )
     // 5. Remove file:// URLs
@@ -414,11 +414,11 @@ export function sanitizeDiagnosticsText(
     .replace(/\b[A-Za-z]:\\(?:[^\\/:*?"<>|\r\n]+\\)*[^\\/:*?"<>|\r\n\s]*/g, '[REDACTED_PATH]')
     // 7. Remove local POSIX paths (including /sdcard, /mnt, /run, /proc)
     .replace(
-      /(?:^|[\s"'`(\[])(\/(?:home|Users|data|var|tmp|etc|usr|root|private|opt|storage|sdcard|mnt|run|proc)\/[^\s"'`)\],;]*)/g,
+      /(?:^|[\s"'`([])(\/(?:home|Users|data|var|tmp|etc|usr|root|private|opt|storage|sdcard|mnt|run|proc)\/[^\s"'`)\],;]*)/g,
       (match, p1) => match.replace(p1, '[REDACTED_PATH]')
     )
     // 8. Remove application document IDs (e.g. invoice:INV/26-27/0010, party:PTY-123)
-    .replace(/\b(?:invoice|party|item|purchase|voucher|settings|company):[A-Za-z0-9_.\-\/]+/gi, '[REDACTED_DOC_ID]')
+    .replace(/\b(?:invoice|party|item|purchase|voucher|settings|company):[A-Za-z0-9_.\-/]+/gi, '[REDACTED_DOC_ID]')
     // 9. Remove Indian GSTIN patterns (e.g. 18ADHPL1415E1ZX)
     .replace(/\b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}\b/g, '[REDACTED_GSTIN]');
 

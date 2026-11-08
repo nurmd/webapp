@@ -93,7 +93,7 @@ export function calculateGstinChecksum(input14: string): string {
 
     // Multiplier alternates 1, 2, 1, 2...
     const factor = (i % 2 === 0) ? 1 : 2;
-    let product = charVal * factor;
+    const product = charVal * factor;
     // Quotient + Remainder when divided by 36
     const quotient = Math.floor(product / 36);
     const remainder = product % 36;
