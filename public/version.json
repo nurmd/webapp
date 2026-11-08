@@ -1,14 +1,13 @@
 {
-  "version": "1.2.75",
+  "version": "1.2.76",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-08T05:59:23.207Z",
+  "buildTime": "2026-11-08T17:16:21.382Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "New: item and party names must be unique (case-insensitive); duplicate creation is blocked in forms, quick-add flows, and storage",
-    "New: app-level error boundary with Reload, Copy Error Details, and a local runtime error log",
-    "Improved: paise-safe money rounding across aging, balance sheet, and cash/bank calculations",
-    "Improved: credit-note invoice selector lists only the selected party's invoices",
-    "Fixed: credit notes recorded as split tenders; WhatsApp balance text and receipt image cropping"
+    "New: audit log is paginated (50 per page) with filtered counts for faster loading on large histories",
+    "New: ESLint quality gate (0 errors) now part of the release checklist",
+    "Fixed: invoice and purchase line items use stable React keys, preventing row mix-ups when editing or reordering",
+    "Fixed: Sales/Purchases sort-menu backdrops are keyboard-accessible buttons with a normal cursor"
   ]
 }
