@@ -382,7 +382,12 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
 
             {isSortDropdownOpen && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsSortDropdownOpen(false)} />
+                <button
+                  type="button"
+                  aria-label="Close sort menu"
+                  className="fixed inset-0 z-40 cursor-default"
+                  onClick={() => setIsSortDropdownOpen(false)}
+                />
                 <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface-container-lowest rounded-xl shadow-xl border border-outline-variant/30 py-1 overflow-hidden animate-fade-in">
                   <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 border-b border-outline-variant/20">
                     Sort Purchase Ledger

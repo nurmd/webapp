@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
@@ -69,6 +69,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   );
   const [hasRestoredDraft, setHasRestoredDraft] = useState<boolean>(() => Boolean(initialDraft));
   const effectivePurchaseType: 'BILL' | 'PO' | 'RETURN' | 'CHALLAN' = initialBill?.purchaseType || defaultPurchaseType || 'BILL';
+  const rowCounterRef = useRef(0);
 
   const [suppliers, setSuppliers] = useState<Party[]>(parties);
   useEffect(() => {
@@ -252,7 +253,13 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
       excl = exclusiveFromInclusive(incl, gst);
     }
 
+    const existingId = editingRowIndex !== null && editingRowIndex >= 0 && editingRowIndex < rows.length
+      ? rows[editingRowIndex].id
+      : undefined;
+    const rowId = existingId || `row-${Date.now()}-${++rowCounterRef.current}`;
+
     const purchaseRow: PurchaseGridRow = {
+      id: rowId,
       itemId: itemData.itemId,
       name: itemData.name,
       description: itemData.description,
@@ -301,6 +308,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
                 : inclusiveFromExclusive(excl, gst))
             : inclusiveFromExclusive(excl, gst);
         return {
+          id: it.id || `row-${Date.now()}-${++rowCounterRef.current}`,
           itemId: it.itemId || it.id || '',
           name: it.name,
           description: it.description || '',
@@ -336,6 +344,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         }
         return {
           ...r,
+          id: r.id || `row-${Date.now()}-${++rowCounterRef.current}`,
           unitPrice: excl,
           unitPriceInclusive: incl,
           priceMode: mode,
@@ -559,6 +568,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         setRows([
           ...rows,
           {
+            id: `row-${Date.now()}-${++rowCounterRef.current}`,
             itemId: found.id,
             name: found.name,
             description: '',
@@ -612,6 +622,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
         excl = exclusiveFromInclusive(incl, gst);
       }
       return {
+        id: r.id,
         itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
         name: r.name || 'Purchased Item',
         description: r.description,
@@ -944,6 +955,7 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
           }
           return {
             ...r,
+            id: r.id || `row-${Date.now()}-${++rowCounterRef.current}`,
             unitPrice: excl,
             unitPriceInclusive: incl,
             priceMode: mode,

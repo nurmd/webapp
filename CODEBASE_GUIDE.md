@@ -714,6 +714,7 @@ npm run lint:fix
 - `granularStateDecoupling.test.tsx`: Fine-grained render isolation and `useSyncExternalStore` reactive stability across domain mutations.
 - `scripts/verify-release.sh`: APK badging, versionCode parity, SHA-256, signature, and optional PWA artifact verification.
 - `billIntake.test.ts`: GSTR-2B/2A parsing, printed-vs-computed reconciliation, supplier/item/duplicate matching, model-output coercion, and the auto-post confidence gate.
+- `stableLineItemKeysAndBackdrop.test.tsx`: Stable React keys for editable invoice/purchase line items (no index keys) and accessible button backdrops for the Sales/Purchases sort menus.
 
 ---
 

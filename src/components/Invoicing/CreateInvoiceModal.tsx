@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem, ItemPriceMode } from '../../models/item.ts';
@@ -29,6 +29,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   onSave,
 }) => {
   const initialDraft = React.useMemo(() => draftService.getInvoiceDraft(), []);
+  const lineCounterRef = useRef(0);
 
   const [selectedPartyId, setSelectedPartyId] = useState<string>(
     initialDraft?.selectedParty?.id || parties[0]?.id || ''
@@ -53,6 +54,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
   // Line items state - clean start without dummy placeholders
   const [lines, setLines] = useState<Array<{
+    id: string;
     itemId: string;
     name: string;
     hsnSacCode: string;
@@ -90,6 +92,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         }
 
         return {
+          id: r.id || `line-${Date.now()}-${++lineCounterRef.current}`,
           itemId: r.itemId || 'CUSTOM-' + Date.now(),
           name: r.name,
           hsnSacCode: isGstActive ? (r.hsnSacCode || '998313') : '',
@@ -123,6 +126,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     setLines([
       ...lines,
       {
+        id: `line-${Date.now()}-${++lineCounterRef.current}`,
         itemId: 'CUSTOM-' + Date.now(),
         name: '',
         hsnSacCode: isGstActive ? '998313' : '',
@@ -210,6 +214,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const itemGst = company.isCompositionScheme ? 0 : item.gstRate;
       if (!isGstActive || company.isCompositionScheme) {
         updated[index] = {
+          ...updated[index],
           itemId: item.id,
           name: item.name,
           hsnSacCode: isGstActive ? item.hsnSacCode : '',
@@ -231,6 +236,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           incl = inclusiveFromExclusive(excl, itemGst);
         }
         updated[index] = {
+          ...updated[index],
           itemId: item.id,
           name: item.name,
           hsnSacCode: item.hsnSacCode,
@@ -275,6 +281,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
         ? inclusiveFromExclusive(excl, gst)
         : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
       return {
+        id: l.id,
         itemId: l.itemId,
         name: l.name || 'Custom Item',
         hsnSacCode: isGstActive ? l.hsnSacCode : '',
@@ -495,7 +502,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                 const itemCalc = calcSummary.items[idx];
                 return (
                   <div
-                    key={idx}
+                    key={l.id}
                     className="grid grid-cols-12 gap-2 items-center bg-surface-container-lowest p-2 rounded-xl border border-outline-variant/20 shadow-sm"
                   >
                     <div className={isGstActive ? "col-span-12 sm:col-span-4" : "col-span-12 sm:col-span-6"}>

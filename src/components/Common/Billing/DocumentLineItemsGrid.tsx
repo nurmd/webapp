@@ -6,6 +6,7 @@ import type { PurchaseItemEntry } from '../../../models/purchase.ts';
 import { inclusiveFromExclusive } from '../../../core/gst/calculator.ts';
 
 export interface DocumentGridRow {
+  id?: string;
   itemId: string;
   name: string;
   description?: string;
@@ -85,7 +86,18 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
   onOpenScanner,
 }) => {
   const isPurchase = kind === 'purchase';
-  const effectiveRows = propRows || propItems || [];
+  const effectiveRows = React.useMemo(() => propRows || propItems || [], [propRows, propItems]);
+
+  const rowKeys = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    return effectiveRows.map((row) => {
+      const rowWithId = row as { id?: string; itemId?: string };
+      const base = rowWithId.id || rowWithId.itemId || 'item';
+      const count = (counts.get(base) || 0) + 1;
+      counts.set(base, count);
+      return count === 1 ? String(base) : `${base}-${count}`;
+    });
+  }, [effectiveRows]);
 
   // Compact table view (used in simplified preview modals)
   if (mode === 'compact') {
@@ -118,7 +130,7 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                   const rowTotal = getRowTotal(item, calcItems?.[idx]);
 
                   return (
-                    <tr key={idx} className="hover:bg-surface-container-low/40">
+                    <tr key={rowKeys[idx]} className="hover:bg-surface-container-low/40">
                       <td className="py-1.5 px-2.5 min-w-0 text-left">
                         <div className="font-bold text-on-surface break-words line-clamp-2" title={item.name}>
                           {item.name}
@@ -316,7 +328,7 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                       : inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0);
                   const discPct = Number(row.discountPercent) || 0;
                   const discAmt = Number(row.discountAmount) || 0;
-                  const rowKey = (row as any).itemId ? `${(row as any).itemId}-${idx}` : `row-${idx}`;
+                  const rowKey = rowKeys[idx];
 
                   return (
                     <tr
@@ -447,7 +459,7 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                   : inclusiveFromExclusive(row.unitPrice, Number(row.gstRate) || 0);
               const discPct = Number(row.discountPercent) || 0;
               const discAmt = Number(row.discountAmount) || 0;
-              const rowKey = (row as any).itemId ? `${(row as any).itemId}-${idx}` : `row-${idx}`;
+              const rowKey = rowKeys[idx];
 
               return (
                 <div
