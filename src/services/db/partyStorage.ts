@@ -3,6 +3,11 @@ import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
 import { STORAGE_KEYS } from './storageEngine.ts';
 import { SettingsStorage } from './settingsStorage.ts';
+import {
+  normalizeEntityName,
+  findDuplicateParty,
+  DuplicateEntityNameError,
+} from '../../core/utils/entityUniqueness.ts';
 
 /**
  * Party and Customer/Supplier Accounts domain storage.
@@ -10,10 +15,30 @@ import { SettingsStorage } from './settingsStorage.ts';
  * and individual party balance recalculations.
  */
 export class PartyStorage extends SettingsStorage {
-  saveParty(party: Party): void {
+  saveParty(party: Party, allowDuplicateName?: boolean | { allowDuplicateName?: boolean }): void {
+    const skipDuplicateCheck =
+      typeof allowDuplicateName === 'boolean'
+        ? allowDuplicateName
+        : Boolean(allowDuplicateName?.allowDuplicateName);
+
     const list = [...this.getParties()];
     const idx = list.findIndex((p) => p.id === party.id);
     const prevParty = idx >= 0 ? list[idx] : null;
+
+    if (!skipDuplicateCheck && party.name) {
+      const normNewName = normalizeEntityName(party.name);
+      if (normNewName) {
+        const isNew = idx < 0;
+        const nameChanged = prevParty ? normalizeEntityName(prevParty.name) !== normNewName : true;
+        if (isNew || nameChanged) {
+          const duplicate = findDuplicateParty(party.name, list, party.id);
+          if (duplicate) {
+            throw new DuplicateEntityNameError('party', party.name, duplicate.id);
+          }
+        }
+      }
+    }
+
     let partyToSave = party;
     if (idx >= 0) {
       const existing = list[idx];

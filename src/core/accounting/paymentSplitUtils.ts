@@ -1,5 +1,6 @@
 import type { Invoice, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
+import { roundMoney, subMoney } from '../money.ts';
 
 export interface SplitNotesAccountOptions {
   cashAccountId?: string;
@@ -299,7 +300,7 @@ export function derivePaymentSettlement(doc: {
   bankAccountId?: string;
   bankAccountName?: string;
 }): DerivedPaymentSettlement {
-  const grandTotal = Number(Math.max(0, doc.grandTotal || 0).toFixed(2));
+  const grandTotal = roundMoney(Math.max(0, doc.grandTotal || 0));
 
   // 1. Calculate raw total paid from explicit payment splits if present
   let rawPaid: number;
@@ -340,8 +341,8 @@ export function derivePaymentSettlement(doc: {
 
   // 2. Strict mathematical invariants:
   // Clamp overpayment: paid cannot exceed grandTotal; balance is grandTotal - paid
-  const paidAmount = Number(Math.min(grandTotal, Math.max(0, rawPaid)).toFixed(2));
-  const balanceAmount = Number(Math.max(0, grandTotal - paidAmount).toFixed(2));
+  const paidAmount = roundMoney(Math.min(grandTotal, Math.max(0, rawPaid)));
+  const balanceAmount = subMoney(grandTotal, paidAmount);
 
   // 3. Centralized Payment Status:
   // - PAID when totalPaid >= grandTotal
@@ -380,10 +381,10 @@ export function derivePaymentSettlement(doc: {
       }
       const sAmt = Number(s.amount) || 0;
       const allocated = Math.min(sAmt, remainingPaidToAllocate);
-      remainingPaidToAllocate = Number((remainingPaidToAllocate - allocated).toFixed(2));
+      remainingPaidToAllocate = subMoney(remainingPaidToAllocate, allocated);
       return {
         ...s,
-        amount: Number(allocated.toFixed(2)),
+        amount: roundMoney(allocated),
       };
     });
 

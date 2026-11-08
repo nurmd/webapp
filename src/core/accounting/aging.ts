@@ -3,6 +3,8 @@
  * Part of Milestone 2: Accounting Depth & Statutory Integrity
  */
 
+import { addMoney, sumMoney } from '../money.ts';
+
 export type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
 export interface AgingBracket {
@@ -126,7 +128,7 @@ export function computeAgingBreakdown(
     const diffDays = isNaN(refUtc) ? 0 : Math.floor((asOfUtc - refUtc) / (1000 * 60 * 60 * 24));
     const bucket = getAgingBucket(diffDays);
 
-    summary[bucket] = Number((summary[bucket] + balance).toFixed(2));
+    summary[bucket] = addMoney(summary[bucket], balance);
     counts[bucket] += 1;
 
     const partyKey = item.partyId || item.partyName || 'UNKNOWN';
@@ -148,17 +150,20 @@ export function computeAgingBreakdown(
       partyMap.set(partyKey, partyRow);
     }
 
-    partyRow.brackets[bucket] = Number((partyRow.brackets[bucket] + balance).toFixed(2));
-    partyRow.totalOutstanding = Number((partyRow.totalOutstanding + balance).toFixed(2));
+    partyRow.brackets[bucket] = addMoney(partyRow.brackets[bucket], balance);
+    partyRow.totalOutstanding = addMoney(partyRow.totalOutstanding, balance);
     partyRow.billCount = (partyRow.billCount || 0) + 1;
     if (!partyRow.phone && item.phone) {
       partyRow.phone = item.phone;
     }
   }
 
-  const totalOutstanding = Number(
-    (summary['0-30'] + summary['31-60'] + summary['61-90'] + summary['90+']).toFixed(2)
-  );
+  const totalOutstanding = sumMoney([
+    summary['0-30'],
+    summary['31-60'],
+    summary['61-90'],
+    summary['90+'],
+  ]);
 
   const parties = Array.from(partyMap.values()).sort(
     (a, b) => b.totalOutstanding - a.totalOutstanding

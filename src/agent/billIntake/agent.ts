@@ -29,6 +29,7 @@ import type {
 import { buildPurchaseBill, newBillId, newDraftId } from './toPurchaseBill.ts';
 import { intakeQueue } from './queue.ts';
 import { extractFromFile } from './visionClient.ts';
+import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 
 export interface IntakeContext {
   company: CompanyProfile;
@@ -397,6 +398,12 @@ export function resolveOrCreateSupplier(input: SupplierIdentity, ctx: IntakeCont
     (p) => (gstin && p.gstin && p.gstin.toUpperCase() === gstin) || (input.partyId && p.id === input.partyId)
   );
   if (existing) return existing;
+
+  // Match by normalized name when GSTIN is absent (or not matching)
+  if (input.name) {
+    const existingByName = findDuplicateParty(input.name, ctx.parties);
+    if (existingByName) return existingByName;
+  }
 
   const now = new Date().toISOString();
   const party: Party = {

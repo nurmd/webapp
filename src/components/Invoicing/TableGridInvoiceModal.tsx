@@ -21,6 +21,7 @@ const ThermalPrintModal = React.lazy(() =>
 );
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
+import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 import { db } from '../../services/db.ts';
 import {
   generateNextInvoiceNumber,
@@ -100,19 +101,23 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   };
 
   const handlePartyCreated = (newParty: Party) => {
-    db.saveParty(newParty);
-    setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
-    setSelectedParty(newParty);
-    setPosStateCode(newParty.stateCode);
-    if (!shippingAddress && newParty.shippingAddress) {
-      setShippingAddress(newParty.shippingAddress);
+    const existing = findDuplicateParty(newParty.name, db.getParties());
+    const partyToUse = existing || newParty;
+    if (!existing) {
+      db.saveParty(newParty);
+      setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
     }
-    if (!shippingPincode && newParty.pincode) {
-      setShippingPincode(newParty.pincode);
+    setSelectedParty(partyToUse);
+    setPosStateCode(partyToUse.stateCode);
+    if (!shippingAddress && partyToUse.shippingAddress) {
+      setShippingAddress(partyToUse.shippingAddress);
+    }
+    if (!shippingPincode && partyToUse.pincode) {
+      setShippingPincode(partyToUse.pincode);
     }
     setIsAddPartyModalOpen(false);
     setIsPartyModalOpen(false);
-    onPartyCreated?.(newParty);
+    onPartyCreated?.(partyToUse);
   };
 
   // All invoices in database for uniqueness verification

@@ -202,8 +202,8 @@ describe('Bug Audit Critical & High Fixes Verification', () => {
     });
   });
 
-  describe('BUG-HIGH-01: Non-blocking duplicate item name in ItemFormModal', () => {
-    it('renders amber badge for duplicate name but keeps Save button enabled', () => {
+  describe('BUG-HIGH-01: Blocking duplicate item name in ItemFormModal', () => {
+    it('renders warning badge for duplicate name and disables Save button', () => {
       const existing: InventoryItem = {
         id: 'ITM-1',
         name: 'Fortune Mustard Oil 1L',
@@ -244,11 +244,11 @@ describe('Bug Audit Critical & High Fixes Verification', () => {
         setInputValue(nameInput, 'Fortune Mustard Oil 1L');
       });
 
-      // Submit button should NOT be disabled when duplicate name is entered
+      // Submit button should BE disabled when duplicate name is entered
       const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
-      expect(submitBtn.disabled).toBe(false);
+      expect(submitBtn.disabled).toBe(true);
 
-      // Advisory badge should be rendered
+      // Warning badge should be rendered
       expect(container.textContent).toContain('An item with this name already exists');
 
       act(() => {

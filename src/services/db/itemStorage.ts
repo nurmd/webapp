@@ -4,6 +4,11 @@ import { auditTrail } from '../auditTrail.ts';
 import { isLowStock } from '../../core/inventory/stockEngine.ts';
 import { STORAGE_KEYS, DEFAULT_ITEMS } from './storageEngine.ts';
 import { PartyStorage } from './partyStorage.ts';
+import {
+  normalizeEntityName,
+  findDuplicateItem,
+  DuplicateEntityNameError,
+} from '../../core/utils/entityUniqueness.ts';
 
 /**
  * Inventory Items and Categories domain storage.
@@ -15,10 +20,30 @@ export class ItemStorage extends PartyStorage {
     return this.get<InventoryItem[]>(STORAGE_KEYS.ITEMS, DEFAULT_ITEMS);
   }
 
-  saveItem(item: InventoryItem): void {
+  saveItem(item: InventoryItem, allowDuplicateName?: boolean | { allowDuplicateName?: boolean }): void {
+    const skipDuplicateCheck =
+      typeof allowDuplicateName === 'boolean'
+        ? allowDuplicateName
+        : Boolean(allowDuplicateName?.allowDuplicateName);
+
     const list = [...this.getItems()];
     const idx = list.findIndex((i) => i.id === item.id);
     const prevItem = idx >= 0 ? list[idx] : null;
+
+    if (!skipDuplicateCheck && item.name) {
+      const normNewName = normalizeEntityName(item.name);
+      if (normNewName) {
+        const isNew = idx < 0;
+        const nameChanged = prevItem ? normalizeEntityName(prevItem.name) !== normNewName : true;
+        if (isNew || nameChanged) {
+          const duplicate = findDuplicateItem(item.name, list, item.id);
+          if (duplicate) {
+            throw new DuplicateEntityNameError('item', item.name, duplicate.id);
+          }
+        }
+      }
+    }
+
     if (idx >= 0) {
       list[idx] = item;
     } else {

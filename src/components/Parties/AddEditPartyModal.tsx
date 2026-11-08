@@ -6,6 +6,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
 import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { normalizeEntityName, findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 
 export interface AddEditPartyModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const [openingBalanceDate, setOpeningBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isComposition, setIsComposition] = useState(false);
   const [gstinError, setGstinError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [groupId, setGroupId] = useState('');
   const [categoryId, setCategoryId] = useState('');
 
@@ -126,12 +128,9 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   };
 
   // Duplicate checks
-  const duplicateNameParty = name.trim()
-    ? parties.find(
-        (p) =>
-          p.id !== editingParty?.id &&
-          p.name.trim().toLowerCase() === name.trim().toLowerCase()
-      )
+  const nameChanged = !editingParty || normalizeEntityName(name) !== normalizeEntityName(editingParty.name);
+  const duplicateNameParty = nameChanged
+    ? (findDuplicateParty(name, parties, editingParty?.id) || null)
     : null;
 
   const duplicatePhoneParty = phone.trim()
@@ -162,6 +161,11 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
   const handleSavePartyForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+
+    if (duplicateNameParty) {
+      setNameError(`Another party ${duplicateNameParty.name} already exists with this name.`);
+      return;
+    }
 
     const cleanGstin = gstin.trim().toUpperCase();
     if (cleanGstin && !isValidGstin(cleanGstin)) {
@@ -334,19 +338,26 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
               required
               placeholder="e.g. Ramesh Hardware Store"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(null);
+              }}
               className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
             />
-            {duplicateNameParty && (
+            {(duplicateNameParty || nameError) && (
               <div
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-medium animate-fade-in"
+                className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs font-medium animate-fade-in"
               >
-                <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400 shrink-0">
-                  warning
+                <span className="material-symbols-outlined text-[16px] text-rose-600 dark:text-rose-400 shrink-0">
+                  error
                 </span>
                 <span>
-                  Another party <strong>{duplicateNameParty.name}</strong> already exists with this name.
+                  {nameError || (
+                    <>
+                      Another party <strong>{duplicateNameParty?.name}</strong> already exists with this name.
+                    </>
+                  )}
                 </span>
               </div>
             )}
@@ -616,7 +627,12 @@ export const AddEditPartyModal: React.FC<AddEditPartyModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold shadow-sm cursor-pointer active:scale-95"
+              disabled={Boolean(duplicateNameParty || !name.trim())}
+              className={`px-5 py-2 rounded-xl text-xs font-bold shadow-sm ${
+                duplicateNameParty || !name.trim()
+                  ? 'bg-outline-variant/60 text-outline cursor-not-allowed opacity-50'
+                  : 'bg-secondary text-on-secondary cursor-pointer active:scale-95'
+              }`}
             >
               {editingParty ? 'Update Party' : 'Save Party'}
             </button>

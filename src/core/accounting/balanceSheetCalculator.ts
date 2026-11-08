@@ -7,6 +7,7 @@ import type { Party } from '../../models/party.ts';
 import type { LoanAccount } from '../../models/loan.ts';
 import { computeCashBankSummary } from './cashBankCalculator.ts';
 import { aggregateStockValuation, computeTradingProfitAndStockSummary, aggregateGstr3b } from '../../components/Reports/utils/reportAggregations.ts';
+import { addMoney, subMoney, roundMoney, sumMoney } from '../money.ts';
 
 export interface BalanceSheetItem {
   id: string;
@@ -114,7 +115,7 @@ export function computeBalanceSheetSummary(params: {
   // Fixed Assets (Equipment, Vehicles, Furniture)
   const fixedAssetItems: BalanceSheetItem[] = [];
   const totalFixedAssets = fixedAssetItems.reduce((s, i) => s + i.amount, 0);
-  const totalAssets = Math.round((totalCurrentAssets + totalFixedAssets) * 100) / 100;
+  const totalAssets = addMoney(totalCurrentAssets, totalFixedAssets);
 
   // 5. Current Liabilities
   // Sundry Creditors (Suppliers to Pay)
@@ -159,7 +160,7 @@ export function computeBalanceSheetSummary(params: {
   }
 
   const totalNonCurrentLiabilities = totalLoansOutstanding;
-  const totalLiabilities = Math.round((totalCurrentLiabilities + totalNonCurrentLiabilities) * 100) / 100;
+  const totalLiabilities = addMoney(totalCurrentLiabilities, totalNonCurrentLiabilities);
 
   // 7. Equity & Net Profit
   const tradingSummary = computeTradingProfitAndStockSummary(invoices, purchases, expenses, items);
@@ -167,17 +168,17 @@ export function computeBalanceSheetSummary(params: {
 
   // Baseline owner's equity balances the fundamental accounting equation: Assets = Liabilities + Equity
   const rawEquity = totalAssets - totalLiabilities - netProfit;
-  const ownerCapital = Math.max(0, Math.round(rawEquity * 100) / 100);
+  const ownerCapital = Math.max(0, roundMoney(rawEquity));
 
   const equityItems: BalanceSheetItem[] = [
     { id: 'eq-capital', name: "Owner's Capital / Initial Equity", amount: ownerCapital, note: 'Capital invested in business' },
     { id: 'eq-profit', name: 'Retained Net Profit / (Loss)', amount: netProfit, note: netProfit >= 0 ? 'Surplus from operations' : 'Operating deficit' },
   ];
 
-  const totalEquity = Math.round(equityItems.reduce((s, i) => s + i.amount, 0) * 100) / 100;
-  const totalLiabilitiesAndEquity = Math.round((totalLiabilities + totalEquity) * 100) / 100;
+  const totalEquity = sumMoney(equityItems.map((i) => i.amount));
+  const totalLiabilitiesAndEquity = addMoney(totalLiabilities, totalEquity);
 
-  const variance = Math.round((totalAssets - totalLiabilitiesAndEquity) * 100) / 100;
+  const variance = subMoney(totalAssets, totalLiabilitiesAndEquity);
   const isBalanced = Math.abs(variance) < 1;
 
   return {

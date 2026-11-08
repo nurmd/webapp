@@ -6,6 +6,7 @@ import { validateGstin } from '../../core/gst/validator.ts';
 import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { isSystemParty, createWalkInCustomer } from '../../core/utils/systemParties.ts';
+import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 
 export interface SelectPartyModalProps {
   isOpen?: boolean;
@@ -151,6 +152,15 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
     if (!newName.trim()) return;
 
     if (newGstin && gstinError) {
+      return;
+    }
+
+    // Reuse existing party by name if found
+    const existing = findDuplicateParty(newName.trim(), db.getParties());
+    if (existing) {
+      onSelectParty(existing);
+      setIsAddingNew(false);
+      onClose();
       return;
     }
 

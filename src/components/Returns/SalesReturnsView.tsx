@@ -515,6 +515,8 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
           setCreditNoteToLink(null);
         }}
         invoices={localInvoices}
+        partyId={creditNoteToLink?.partyId}
+        partyName={creditNoteToLink?.partyName}
         onSelectInvoice={handleSelectInvoice}
       />
 

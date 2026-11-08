@@ -8,6 +8,7 @@ import type { HsnItem } from '../../core/gst/hsnCatalog';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { calculateItemGst } from '../../core/gst/calculator.ts';
 import { calculateRateFromTotal, exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
+import { findDuplicateItem } from '../../core/utils/entityUniqueness.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -356,6 +357,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const handleSaveQuickItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
+
+    // Reuse existing catalog item if matching by normalized name
+    const existing = findDuplicateItem(newItemName.trim(), db.getItems());
+    if (existing) {
+      handleSelectCatalogItem(existing);
+      setIsCreateItemModalOpen(false);
+      return;
+    }
+
     if (isDuplicateQuickItemName) {
       showAppToast('An item with this name already exists in inventory');
       return;

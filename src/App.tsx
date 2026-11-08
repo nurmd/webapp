@@ -50,6 +50,7 @@ import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/u
 import { withWalkInCustomer, isSystemParty } from './core/utils/systemParties.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
+import { findDuplicateItem, findDuplicateParty } from './core/utils/entityUniqueness.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
 import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
 import { PaymentModalProvider } from './components/Payments/PaymentModalContext.tsx';
@@ -1084,8 +1085,13 @@ export const App: React.FC = () => {
   }, [activeUser.role]);
 
   const handleSaveParty = useCallback((party: Party) => {
+    const dup = findDuplicateParty(party.name, db.getParties(), party.id);
+    if (dup) {
+      showToast('A party with this name already exists');
+      return;
+    }
     db.saveParty(party);
-  }, []);
+  }, [showToast]);
 
   const handleRecordPartyPayment = useCallback((
     party: Party,
@@ -1211,13 +1217,8 @@ export const App: React.FC = () => {
   const restockCount = React.useMemo(() => getItemsNeedingRestock(activeItems).length, [activeItems]);
 
   const handleSaveItem = useCallback((item: InventoryItem) => {
-    const trimmed = (item.name || '').normalize('NFC').trim().toLowerCase();
-    const isDup = db.getItems().some(
-      (existing) =>
-        String(existing.id) !== String(item.id) &&
-        (existing.name || '').normalize('NFC').trim().toLowerCase() === trimmed
-    );
-    if (isDup) {
+    const dup = findDuplicateItem(item.name, db.getItems(), item.id);
+    if (dup) {
       showToast('An item with this name already exists in inventory');
       return;
     }

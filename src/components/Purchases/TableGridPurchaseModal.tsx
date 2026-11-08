@@ -12,6 +12,7 @@ import { AddEditPartyModal } from '../Parties/AddEditPartyModal.tsx';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from '../Invoicing/InvoiceItemModal.tsx';
+import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 import { db } from '../../services/db.ts';
 import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { roundQuantity } from '../../core/utils/formatters.ts';
@@ -87,16 +88,20 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   };
 
   const handleSupplierCreated = (newParty: Party) => {
-    db.saveParty(newParty);
-    setSuppliers((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
-    setSelectedSupplier(newParty);
-    setSupplierStateCode(newParty.stateCode);
-    if (newParty.isComposition) {
+    const existing = findDuplicateParty(newParty.name, db.getParties());
+    const partyToUse = existing || newParty;
+    if (!existing) {
+      db.saveParty(newParty);
+      setSuppliers((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
+    }
+    setSelectedSupplier(partyToUse);
+    setSupplierStateCode(partyToUse.stateCode);
+    if (partyToUse.isComposition) {
       setItcEligibility('INELIGIBLE_OTHERS');
     }
     setIsAddPartyModalOpen(false);
     setIsPartyModalOpen(false);
-    onPartyCreated?.(newParty);
+    onPartyCreated?.(partyToUse);
   };
 
   // Supplier state

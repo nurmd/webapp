@@ -3,6 +3,7 @@ import type { Invoice } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
 import type { Voucher } from './voucherTypes.ts';
+import { addMoney, subMoney, roundMoney } from '../money.ts';
 
 export interface CashBankFinancialSummary {
   totalLiquidBalance: number;
@@ -81,15 +82,17 @@ export function computeCashBankSummary(params: {
       if (v.paymentAllocations && v.paymentAllocations.length > 0) {
         v.paymentAllocations.forEach((alloc) => {
           if (alloc && alloc.documentType === 'INVOICE' && alloc.documentId) {
-            allocatedReceiptsByInvoice[alloc.documentId] = Number(
-              ((allocatedReceiptsByInvoice[alloc.documentId] || 0) + (alloc.amount || 0)).toFixed(2)
+            allocatedReceiptsByInvoice[alloc.documentId] = addMoney(
+              allocatedReceiptsByInvoice[alloc.documentId] || 0,
+              alloc.amount || 0
             );
           }
         });
       } else if (v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId) {
         // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
-        allocatedReceiptsByInvoice[v.sourceDocumentId] = Number(
-          ((allocatedReceiptsByInvoice[v.sourceDocumentId] || 0) + (v.totalAmount || 0)).toFixed(2)
+        allocatedReceiptsByInvoice[v.sourceDocumentId] = addMoney(
+          allocatedReceiptsByInvoice[v.sourceDocumentId] || 0,
+          v.totalAmount || 0
         );
       } else {
         // Legacy fallback: aggregate voucher receipts per party key only when neither an allocation nor a sourceDocument link exists
@@ -138,7 +141,7 @@ export function computeCashBankSummary(params: {
 
       // Amount covered by vouchers is handled by section 5 (vouchers), only take unvouchered upfront amount here
       const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
-      const unvoucheredPaid = Number((paid - coveredByVoucher).toFixed(2));
+      const unvoucheredPaid = subMoney(paid, coveredByVoucher);
 
       if (unvoucheredPaid > 0) {
         const splits = (inv.paymentSplits && inv.paymentSplits.length > 0)
@@ -150,7 +153,7 @@ export function computeCashBankSummary(params: {
           const ratio = unvoucheredPaid / totalSplitsPaid;
 
           splits.forEach((s, sIdx) => {
-            const splitAmt = Number((s.amount * ratio).toFixed(2));
+            const splitAmt = roundMoney(s.amount * ratio);
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
             const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (inv as any).bankAccountId || defaultBank.id);
@@ -228,15 +231,17 @@ export function computeCashBankSummary(params: {
       if (v.paymentAllocations && v.paymentAllocations.length > 0) {
         v.paymentAllocations.forEach((alloc) => {
           if (alloc && alloc.documentType === 'PURCHASE' && alloc.documentId) {
-            allocatedPaymentsByPurchase[alloc.documentId] = Number(
-              ((allocatedPaymentsByPurchase[alloc.documentId] || 0) + (alloc.amount || 0)).toFixed(2)
+            allocatedPaymentsByPurchase[alloc.documentId] = addMoney(
+              allocatedPaymentsByPurchase[alloc.documentId] || 0,
+              alloc.amount || 0
             );
           }
         });
       } else if (v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId) {
         // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
-        allocatedPaymentsByPurchase[v.sourceDocumentId] = Number(
-          ((allocatedPaymentsByPurchase[v.sourceDocumentId] || 0) + (v.totalAmount || 0)).toFixed(2)
+        allocatedPaymentsByPurchase[v.sourceDocumentId] = addMoney(
+          allocatedPaymentsByPurchase[v.sourceDocumentId] || 0,
+          v.totalAmount || 0
         );
       } else {
         // Legacy fallback: aggregate voucher payments per supplier key only when neither an allocation nor a sourceDocument link exists
@@ -284,7 +289,7 @@ export function computeCashBankSummary(params: {
       }
 
       const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
-      const unvoucheredPaid = Number((paid - coveredByVoucher).toFixed(2));
+      const unvoucheredPaid = subMoney(paid, coveredByVoucher);
 
       if (unvoucheredPaid > 0) {
         const splits = (pur.paymentSplits && pur.paymentSplits.length > 0)
@@ -296,7 +301,7 @@ export function computeCashBankSummary(params: {
           const ratio = unvoucheredPaid / totalSplitsPaid;
 
           splits.forEach((s, sIdx) => {
-            const splitAmt = Number((s.amount * ratio).toFixed(2));
+            const splitAmt = roundMoney(s.amount * ratio);
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
             const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (pur as any).bankAccountId || defaultBank.id);
@@ -777,12 +782,12 @@ export function computeCashBankSummary(params: {
   const totalLiquidBalance = totalCashBalance + totalBankBalance;
 
   return {
-    totalLiquidBalance: Math.round(totalLiquidBalance * 100) / 100,
-    totalCashBalance: Math.round(totalCashBalance * 100) / 100,
-    totalBankBalance: Math.round(totalBankBalance * 100) / 100,
+    totalLiquidBalance: roundMoney(totalLiquidBalance),
+    totalCashBalance: roundMoney(totalCashBalance),
+    totalBankBalance: roundMoney(totalBankBalance),
     accountBalances: balances,
-    todayInflow: Math.round(todayInflow * 100) / 100,
-    todayOutflow: Math.round(todayOutflow * 100) / 100,
+    todayInflow: roundMoney(todayInflow),
+    todayOutflow: roundMoney(todayOutflow),
     ledgerEntries: entries,
   };
 }

@@ -1537,4 +1537,133 @@ describe('Invoice-Linked Returns Specification (Sales & Purchase Returns)', () =
     expect(excessLink.paymentStatus).toBe('PAID');
     expect(excessLink.paymentSplits?.find((s) => s.id === `cn-${excessCN.id}`)?.amount).toBe(500);
   });
+
+  it('15. Restricts InvoiceSelectorModal to credit note party when partyId/partyName is provided', async () => {
+    const baseInvoice: Invoice = {
+      id: 'inv-base',
+      invoiceNumber: 'INV-BASE',
+      invoiceType: 'B2B',
+      date: '2026-11-01',
+      partyName: 'Base Party',
+      partyAddress: 'Mumbai',
+      partyStateCode: '27',
+      placeOfSupplyStateCode: '27',
+      isIntraState: true,
+      items: [],
+      totalGrossAmount: 1000,
+      totalDiscount: 0,
+      totalTaxableAmount: 1000,
+      totalCgst: 0,
+      totalSgst: 0,
+      totalIgst: 0,
+      totalCess: 0,
+      totalTax: 0,
+      roundOff: 0,
+      grandTotal: 1000,
+      amountInWords: '',
+      paidAmount: 0,
+      balanceAmount: 1000,
+      paymentMode: 'CREDIT',
+      paymentStatus: 'UNPAID',
+      createdAt: '2026-11-01T10:00:00Z',
+      updatedAt: '2026-11-01T10:00:00Z',
+    };
+
+    const invA: Invoice = {
+      ...baseInvoice,
+      id: 'inv-party-a-1',
+      invoiceNumber: 'INV-A-101',
+      partyId: 'party-a-id',
+      partyName: 'Alpha Traders',
+      grandTotal: 1200,
+      balanceAmount: 1200,
+    };
+
+    const invB: Invoice = {
+      ...baseInvoice,
+      id: 'inv-party-b-1',
+      invoiceNumber: 'INV-B-202',
+      partyId: 'party-b-id',
+      partyName: 'Beta Logistics',
+      grandTotal: 2500,
+      balanceAmount: 2500,
+    };
+
+    // 1. Render modal with invoices from two parties and partyId of Party A
+    await act(async () => {
+      root.render(
+        <InvoiceSelectorModal
+          isOpen={true}
+          onClose={vi.fn()}
+          invoices={[invA, invB]}
+          partyId="party-a-id"
+          partyName="Alpha Traders"
+          onSelectInvoice={vi.fn()}
+        />
+      );
+    });
+
+    // Only party A invoice shows
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-A-101"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-B-202"]')).toBeNull();
+    expect(container.textContent).toContain('INV-A-101');
+    expect(container.textContent).not.toContain('INV-B-202');
+
+    const searchInput = container.querySelector('[data-testid="invoice-selector-search"]') as HTMLInputElement;
+    expect(searchInput).toBeTruthy();
+
+    const changeInputValue = (val: string) => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(searchInput, val);
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    // 2. Searching party B invoice number does not reveal it
+    await act(async () => {
+      changeInputValue('INV-B-202');
+    });
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-B-202"]')).toBeNull();
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-A-101"]')).toBeNull();
+    expect(container.textContent).toContain('No eligible invoices found for this party.');
+
+    // 3. Searching party B name does not reveal it
+    await act(async () => {
+      changeInputValue('Beta Logistics');
+    });
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-B-202"]')).toBeNull();
+    expect(container.textContent).toContain('No eligible invoices found for this party.');
+
+    // 4. Searching party A invoice number reveals Party A invoice
+    await act(async () => {
+      changeInputValue('INV-A-101');
+    });
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-A-101"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-B-202"]')).toBeNull();
+
+    // 5. Test party name fallback when inv.partyId is missing on invoice
+    const invAMissingPartyId: Invoice = {
+      ...invA,
+      id: 'inv-party-a-missing-id',
+      invoiceNumber: 'INV-A-103',
+      partyId: undefined,
+      partyName: 'alpha traders',
+    };
+    await act(async () => {
+      root.render(
+        <InvoiceSelectorModal
+          key="modal-fallback"
+          isOpen={true}
+          onClose={vi.fn()}
+          invoices={[invA, invAMissingPartyId, invB]}
+          partyId="party-a-id"
+          partyName="Alpha Traders"
+          onSelectInvoice={vi.fn()}
+        />
+      );
+    });
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-A-101"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-A-103"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="select-invoice-item-INV-B-202"]')).toBeNull();
+  });
 });

@@ -54,11 +54,12 @@ This workspace hosts the Vyapar Books GST billing, accounting, and POS platform.
 ---
 
 ## 7. Pre-Flight Duplicate Validation in Entity Forms
-- When creating or editing domain entities (items, parties, categories), form modals must validate name uniqueness in real-time (case-insensitive, trimmed) against existing catalog records.
-- If a match is detected:
-  - In creation mode: Render an immediate, non-blocking warning badge (e.g. amber badge below the input field) advising the user that an item/party with this name already exists.
-  - In edit mode: The entity's own record must be excluded from duplicate checks so that saving unmodified names does not trigger a warning.
-- The validation must remain non-blocking so users can proceed if identical names are intentional across different categories or units.
+- When creating or editing domain entities (items, parties, categories), form modals and storage engines must enforce name uniqueness in real-time (case-insensitive, whitespace-collapsed, NFC-normalized) against existing catalog records.
+- For Inventory Items and Parties:
+  - Name uniqueness is strictly **blocking**: creating a new item/party with an existing name or renaming an existing record to collide with another is rejected with a blocking error, the submit button is disabled, and `db.saveItem` / `db.saveParty` throw `DuplicateEntityNameError` (unless explicitly bypassed via `allowDuplicateName`).
+  - In edit mode, the entity's own record is excluded from duplicate checks so that updating other fields with unmodified names succeeds without error.
+- For other entities (such as categories) and secondary fields (such as phone numbers or GSTINs):
+  - Duplicate warnings remain advisory / non-blocking with an immediate warning badge, allowing users to proceed if identical values are intentional.
 
 ---
 

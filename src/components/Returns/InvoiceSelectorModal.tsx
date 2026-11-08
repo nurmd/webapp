@@ -9,6 +9,8 @@ export interface InvoiceSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   invoices?: Invoice[];
+  partyId?: string;
+  partyName?: string;
   onSelectInvoice: (invoice: Invoice) => void;
 }
 
@@ -16,6 +18,8 @@ export const InvoiceSelectorModal: React.FC<InvoiceSelectorModalProps> = ({
   isOpen,
   onClose,
   invoices,
+  partyId,
+  partyName,
   onSelectInvoice,
 }) => {
   useBackNavigation(() => {
@@ -30,18 +34,39 @@ export const InvoiceSelectorModal: React.FC<InvoiceSelectorModalProps> = ({
 
   const allInvoices = invoices || db.getInvoices();
 
+  const cleanPartyId = partyId?.trim();
+  const normPartyName = partyName?.trim().toLowerCase();
+  const hasPartyFilter = Boolean(cleanPartyId || normPartyName);
+
   // Filter only regular sales invoices (exclude credit notes, debit notes, delivery challans, estimates, cancelled)
   const eligibleInvoices = useMemo(() => {
-    return allInvoices.filter(
-      (inv) =>
-        !inv.isCancelled &&
-        inv.invoiceType !== 'CREDIT_NOTE' &&
-        inv.invoiceType !== 'DEBIT_NOTE' &&
-        inv.invoiceType !== 'ESTIMATE' &&
-        inv.invoiceType !== 'SALES_ORDER' &&
-        inv.invoiceType !== 'DELIVERY_CHALLAN'
-    );
-  }, [allInvoices]);
+    return allInvoices.filter((inv) => {
+      if (
+        inv.isCancelled ||
+        inv.invoiceType === 'CREDIT_NOTE' ||
+        inv.invoiceType === 'DEBIT_NOTE' ||
+        inv.invoiceType === 'ESTIMATE' ||
+        inv.invoiceType === 'SALES_ORDER' ||
+        inv.invoiceType === 'DELIVERY_CHALLAN'
+      ) {
+        return false;
+      }
+
+      if (cleanPartyId) {
+        if (inv.partyId) {
+          if (inv.partyId !== cleanPartyId) return false;
+        } else {
+          const invNorm = (inv.partyName || '').trim().toLowerCase();
+          if (!normPartyName || invNorm !== normPartyName) return false;
+        }
+      } else if (normPartyName) {
+        const invNorm = (inv.partyName || '').trim().toLowerCase();
+        if (invNorm !== normPartyName) return false;
+      }
+
+      return true;
+    });
+  }, [allInvoices, cleanPartyId, normPartyName]);
 
   // Search filter
   const filteredInvoices = useMemo(() => {
@@ -105,7 +130,9 @@ export const InvoiceSelectorModal: React.FC<InvoiceSelectorModalProps> = ({
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2">
           {filteredInvoices.length === 0 ? (
             <div className="p-8 text-center text-on-surface-variant text-xs font-medium">
-              No sales invoices found matching your query.
+              {hasPartyFilter
+                ? 'No eligible invoices found for this party.'
+                : 'No sales invoices found matching your query.'}
             </div>
           ) : (
             filteredInvoices.map((inv) => {

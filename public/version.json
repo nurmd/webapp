@@ -1,14 +1,14 @@
 {
-  "version": "1.2.73",
+  "version": "1.2.75",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-07T08:00:56.491Z",
+  "buildTime": "2026-11-08T05:59:23.207Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "address audit findings - track credit note allocations in pre-save validation; fix sourceDocumentType; handle refund voucher reversal on cancel",
-    "record refund payments against credit notes; simplify WhatsApp share modal",
-    "stop cropping thermal receipt images on the right edge",
-    "linked credit notes must not stay UNPAID from stale split notes",
-    "single WhatsApp button with text/image preview toggle"
+    "New: item and party names must be unique (case-insensitive); duplicate creation is blocked in forms, quick-add flows, and storage",
+    "New: app-level error boundary with Reload, Copy Error Details, and a local runtime error log",
+    "Improved: paise-safe money rounding across aging, balance sheet, and cash/bank calculations",
+    "Improved: credit-note invoice selector lists only the selected party's invoices",
+    "Fixed: credit notes recorded as split tenders; WhatsApp balance text and receipt image cropping"
   ]
 }
