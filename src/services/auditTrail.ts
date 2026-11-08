@@ -87,6 +87,8 @@ export interface AuditTrailFilter {
   sortDirection?: 'asc' | 'desc';
   epochScope?: AuditEpochScope;
   epoch?: number;
+  limit?: number;
+  offset?: number;
 }
 
 export const GENESIS_PREVIOUS_HASH = '0'.repeat(64);
@@ -370,10 +372,9 @@ export class AuditTrailService {
   }
 
   /**
-   * Retrieves audit records matching filter criteria.
+   * Applies common filtering predicates across audit records.
    */
-  public async getAuditTrail(filter?: AuditTrailFilter): Promise<AuditRecord[]> {
-    await this.ensureLoaded();
+  private applyFilters(filter?: AuditTrailFilter): AuditRecord[] {
     let result = [...this.records];
 
     if (filter) {
@@ -425,21 +426,34 @@ export class AuditTrailService {
             r.id.toLowerCase().includes(q)
         );
       }
-      if (filter.sortDirection === 'desc') {
-        result.sort((a, b) => {
-          const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
-          const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
-          if (epochA !== epochB) return epochB - epochA;
-          return b.sequence - a.sequence;
-        });
-      } else {
-        result.sort((a, b) => {
-          const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
-          const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
-          if (epochA !== epochB) return epochA - epochB;
-          return a.sequence - b.sequence;
-        });
-      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Returns total count of audit records matching filter criteria.
+   */
+  public async getAuditTrailCount(filter?: AuditTrailFilter): Promise<number> {
+    await this.ensureLoaded();
+    const filtered = this.applyFilters(filter);
+    return filtered.length;
+  }
+
+  /**
+   * Retrieves audit records matching filter criteria with pagination and sorting.
+   */
+  public async getAuditTrail(filter?: AuditTrailFilter): Promise<AuditRecord[]> {
+    await this.ensureLoaded();
+    const result = this.applyFilters(filter);
+
+    if (filter?.sortDirection === 'desc') {
+      result.sort((a, b) => {
+        const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+        const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+        if (epochA !== epochB) return epochB - epochA;
+        return b.sequence - a.sequence;
+      });
     } else {
       result.sort((a, b) => {
         const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
@@ -449,8 +463,12 @@ export class AuditTrailService {
       });
     }
 
+    const offset = filter?.offset;
+    const limit = filter?.limit;
+    const sliced = result.slice(offset ?? 0, (offset ?? 0) + (limit ?? result.length));
+
     // Return detached copies to preserve immutability
-    return result.map((r) => ({ ...r }));
+    return sliced.map((r) => ({ ...r }));
   }
 
   /**
@@ -680,6 +698,7 @@ export class AuditTrailService {
 
   public _setRecordsForTesting(records: AuditRecord[]): void {
     this.records = records.map((r) => ({ ...r }));
+    this.loaded = true;
   }
 }
 

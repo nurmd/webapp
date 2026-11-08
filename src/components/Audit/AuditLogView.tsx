@@ -9,12 +9,13 @@
  * - Strict read-only enforcement (tamper/deletion controls prohibited by law)
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   auditTrail,
   AuditRecord,
   AuditVerificationResult,
   AuditActionType,
+  AuditTrailFilter,
   GENESIS_PREVIOUS_HASH,
   CURRENT_AUDIT_EPOCH,
   LEGACY_AUDIT_EPOCH,
@@ -103,7 +104,15 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<AuditTab>(initialAuditTab);
   const [records, setRecords] = useState<AuditRecord[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
   const [isLoading, setIsLoading] = useState(true);
+
+  // Counts by epoch
+  const [legacyCount, setLegacyCount] = useState(0);
+  const [currentEpochCount, setCurrentEpochCount] = useState(0);
+  const [allCount, setAllCount] = useState(0);
 
   useEffect(() => {
     const handleSwitchAuditTab = (e: any) => {
@@ -132,6 +141,18 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
   const [selectedAction, setSelectedAction] = useState<string>('ALL');
   const [selectedUser, setSelectedUser] = useState<string>('ALL');
 
+  const filterKey = `${selectedScope}:${startDate}:${endDate}:${selectedAction}:${selectedUser}:${searchTerm}`;
+  const isFirstMountRef = useRef(true);
+
+  // Reset page to 0 whenever any filter criteria change
+  useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      return;
+    }
+    setPage(0);
+  }, [filterKey]);
+
   // Inspection Drawer
   const [inspectRecord, setInspectRecord] = useState<AuditRecord | null>(null);
   const [diffMode, setDiffMode] = useState<'visual' | 'raw'>('visual');
@@ -143,23 +164,55 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     setTimeout(() => setToastMessage(null), 2500);
   };
 
+  const activeFilter = useMemo<AuditTrailFilter>(() => {
+    const filter: AuditTrailFilter = {
+      sortDirection: 'desc',
+      epochScope: selectedScope,
+    };
+    if (startDate) filter.startDate = startDate;
+    if (endDate) filter.endDate = endDate;
+    if (selectedAction !== 'ALL') filter.actionType = selectedAction as AuditActionType;
+    if (selectedUser !== 'ALL') filter.userId = selectedUser;
+    if (searchTerm.trim()) filter.searchTerm = searchTerm.trim();
+    return filter;
+  }, [selectedScope, startDate, endDate, selectedAction, selectedUser, searchTerm]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await auditTrail.getAuditTrail({ sortDirection: 'desc' });
-      setRecords(data);
-      const vResult = await auditTrail.verifyCurrentEpoch();
-      setVerificationResult(vResult);
+      const [count, pageData, legacyC, currentC, allC] = await Promise.all([
+        auditTrail.getAuditTrailCount(activeFilter),
+        auditTrail.getAuditTrail({
+          ...activeFilter,
+          limit: pageSize,
+          offset: page * pageSize,
+        }),
+        auditTrail.getAuditTrailCount({ epochScope: 'LEGACY' }),
+        auditTrail.getAuditTrailCount({ epochScope: 'CURRENT' }),
+        auditTrail.getAuditTrailCount({ epochScope: 'ALL' }),
+      ]);
+      setTotalRecords(count);
+      setRecords(pageData);
+      setLegacyCount(legacyC);
+      setCurrentEpochCount(currentC);
+      setAllCount(allC);
     } catch (err) {
       console.error('Failed to load audit records:', err);
     } finally {
       setIsLoading(false);
     }
+
+    try {
+      const vResult = await auditTrail.verifyCurrentEpoch();
+      setVerificationResult(vResult);
+    } catch (err) {
+      console.error('Audit chain verification failed:', err);
+    }
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [activeFilter, page]);
 
   const handleVerifyChain = async () => {
     setIsVerifying(true);
@@ -178,7 +231,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     } catch (err: any) {
       setVerificationResult({
         valid: false,
-        totalRecords: records.filter((r) => r.epoch === CURRENT_AUDIT_EPOCH).length,
+        totalRecords: currentEpochCount,
         reason: err?.message || 'Verification exception encountered',
       });
     } finally {
@@ -237,12 +290,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     setEndDate('');
     setSelectedAction('ALL');
     setSelectedUser('ALL');
+    setPage(0);
   };
 
   // Distinct users list for filtering
   const distinctUsers = useMemo(() => {
     const map = new Map<string, { id: string; name: string; role: string }>();
-    records.forEach((r) => {
+    auditTrail.getRecordsSync().forEach((r) => {
       if (!map.has(r.userId)) {
         map.set(r.userId, { id: r.userId, name: r.userName, role: r.userRole });
       }
@@ -250,57 +304,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
     return Array.from(map.values());
   }, [records]);
 
-  // Counts by epoch
-  const legacyCount = useMemo(
-    () => records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH).length,
-    [records]
-  );
-  const currentEpochCount = useMemo(
-    () => records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH).length,
-    [records]
-  );
-
-  // Active scope filtering (Current Epoch / Legacy / All)
-  const scopedRecords = useMemo(() => {
-    if (selectedScope === 'CURRENT') {
-      return records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH);
-    }
-    if (selectedScope === 'LEGACY') {
-      return records.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH);
-    }
-    return records;
-  }, [records, selectedScope]);
-
-  // Client-side filtering within the active scope
-  const filteredRecords = useMemo(() => {
-    return scopedRecords.filter((r) => {
-      if (selectedAction !== 'ALL' && r.actionType !== selectedAction) {
-        return false;
-      }
-      if (selectedUser !== 'ALL' && r.userId !== selectedUser) {
-        return false;
-      }
-      if (startDate) {
-        const d = r.timestamp.slice(0, 10);
-        if (d < startDate) return false;
-      }
-      if (endDate) {
-        const d = r.timestamp.slice(0, 10);
-        if (d > endDate) return false;
-      }
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase().trim();
-        const matches =
-          r.documentId.toLowerCase().includes(q) ||
-          r.summary.toLowerCase().includes(q) ||
-          r.userName.toLowerCase().includes(q) ||
-          r.actionType.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q);
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [scopedRecords, selectedAction, selectedUser, startDate, endDate, searchTerm]);
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -540,7 +544,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                     : 'bg-surface-container text-on-surface-variant'
                 }`}
               >
-                {records.length}
+                {allCount}
               </span>
             </button>
           </div>
@@ -650,8 +654,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
         {/* Filter Summary & Reset */}
         <div className="flex items-center justify-between text-xs text-on-surface-variant pt-1 border-t border-outline-variant/15">
           <div>
-            Showing <span className="font-bold text-on-surface">{filteredRecords.length}</span> of{' '}
-            <span className="font-bold text-on-surface">{scopedRecords.length}</span> audit records
+            Showing <span className="font-bold text-on-surface">{records.length}</span> of{' '}
+            <span className="font-bold text-on-surface">{totalRecords}</span> audit records
           </div>
           {(searchTerm || startDate || endDate || selectedAction !== 'ALL' || selectedUser !== 'ALL') && (
             <button
@@ -673,13 +677,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
             <span className="material-symbols-outlined text-[32px] animate-spin text-primary">sync</span>
             <span className="text-xs font-medium">Loading statutory audit ledger...</span>
           </div>
-        ) : filteredRecords.length === 0 ? (
+        ) : records.length === 0 ? (
           <div className="py-16 text-center text-on-surface-variant flex flex-col items-center gap-2">
             <span className="material-symbols-outlined text-[36px] text-outline">
-              {selectedScope === 'CURRENT' && scopedRecords.length === 0 ? 'verified' : 'history'}
+              {selectedScope === 'CURRENT' && currentEpochCount === 0 ? 'verified' : 'history'}
             </span>
             <span className="text-xs font-medium">
-              {selectedScope === 'CURRENT' && scopedRecords.length === 0
+              {selectedScope === 'CURRENT' && currentEpochCount === 0
                 ? 'No current epoch audit records yet. Next event will start sequence #0001 from genesis anchor.'
                 : 'No audit events found matching the selected filters'}
             </span>
@@ -700,7 +704,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/20 text-on-surface">
-                {filteredRecords.map((r) => {
+                {records.map((r) => {
                   const actionCfg = ACTION_COLORS[r.actionType] || {
                     bg: 'bg-surface-container-high',
                     text: 'text-on-surface',
@@ -801,6 +805,40 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
             </table>
           </div>
         )}
+
+        {/* Pagination Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-outline-variant/20 bg-surface-container-low/40 text-xs">
+          <div className="text-on-surface-variant font-medium">
+            Total: <span className="font-bold text-on-surface">{totalRecords}</span> records
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="pagination-prev"
+              aria-label="Previous Page"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || isLoading}
+              className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-all cursor-pointer flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+              <span>Prev</span>
+            </button>
+            <span className="text-on-surface-variant font-medium px-1.5">
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              type="button"
+              data-testid="pagination-next"
+              aria-label="Next Page"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1 || isLoading}
+              className="px-3 py-1.5 rounded-xl border border-outline-variant/30 text-on-surface font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-all cursor-pointer flex items-center gap-1"
+            >
+              <span>Next</span>
+              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Statutory Immutability Footnote */}

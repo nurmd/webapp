@@ -133,6 +133,7 @@ gst-billing-app/
   - **Independent Verification**: `auditTrail.verifyCurrentEpoch()` cryptographically verifies Epoch 2 from genesis to sequence $N$ independently of legacy chain defects. `verifyChainIntegrity()` provides backward-compatible dispatch.
   - **UI Scope & Notices**: `AuditLogView` defaults to the **Current Epoch** scope with an amber/neutral notice indicating the preserved legacy record count (`Legacy archive: X records preserved`), while suppressing false-positive integrity banners on legacy records. Scope selector allows toggling between Current, Legacy (with `Legacy` badges), and All.
   - **Statutory Exports**: CSV and JSON statutory exports explicitly include `epoch` and `epochStatus` (`Current` vs `Legacy`) for complete regulatory traceability.
+  - **Paginated Viewer**: `getAuditTrail(filter)` supports optional `limit`/`offset` (applied after filtering and epoch-aware sorting) and `getAuditTrailCount(filter)` returns the filtered total. `AuditLogView` renders 50 records per page with Prev/Next controls, resets to page 1 on filter changes, and keeps global epoch badge counts independent of the current page. Exports and `getRecordsForDocument` still request the full filtered set.
 
 ### E. PIN Security & RBAC (`src/services/pinSecurity.ts`, `src/core/security/rbac.ts`)
 - PBKDF2/SHA-256 salting for 4-digit staff PINs.
