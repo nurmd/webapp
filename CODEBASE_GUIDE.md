@@ -689,9 +689,14 @@ npm run build
 # Run ESLint (0 errors required; warnings are tracked)
 npm run lint
 npm run lint:fix
+
+# Run full suite with coverage report (coverage/ is gitignored)
+npm run coverage
 ```
 
 **Lint gate:** `eslint.config.js` uses the flat config with `js.configs.recommended`, `typescript-eslint` recommended, and the classic `react-hooks/rules-of-hooks` + `exhaustive-deps` rules only. The React Compiler diagnostics bundled with `eslint-plugin-react-hooks` v7 are intentionally excluded (not actionable here and prohibitively slow). `@typescript-eslint/no-explicit-any` and `no-unused-vars` are warnings; `--cache` (`.eslintcache`, gitignored) keeps repeat runs fast.
+
+**Coverage baseline:** `npm run coverage` runs the full suite under `@vitest/coverage-v8` (v8, `all: true`, reports in `coverage/`, gitignored). Baseline at v1.2.76: **71.17% lines/statements**, **69.87% branches**, **47.36% functions** across `src/`. Lowest-covered areas worth targeting: `core/gst/gstrValidator.ts` (10%), `services/barcodeService.ts` (37%), `services/updateService.ts` (53%), `core/printer/escposBinary.ts` (63%), `services/db/reconcileAndRepair.ts` (66%), `services/pouchdb.ts` (67%).
 
 ### Key Test Suites (`src/__tests__/`)
 - `splitBankArchitectureAndMigration.test.ts`: Split-bank tender routing, metadata persistence, overpayment clamping, legacy migration idempotency.

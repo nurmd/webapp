@@ -45,5 +45,4 @@ lineage.proof
 # Markdown docs: ignore everything except README
 *.md
 !README.md
-
-
+coverage/
