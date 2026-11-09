@@ -6,6 +6,19 @@ import { Invoice } from '../models/invoice.ts';
 import { PurchaseBill } from '../models/purchase.ts';
 import { Expense } from '../models/expense.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
+import {
+  QueuedWrite,
+  QueuedWriteOp,
+  WriteQueueHealth,
+  readQueue,
+  enqueueWrite,
+  removeWrite,
+  recordFailure,
+  getDueWrites,
+  getWriteQueueHealth,
+} from './db/writeQueue.ts';
+
+export type { QueuedWrite, QueuedWriteOp, WriteQueueHealth };
 
 export type SyncStatus = 'offline' | 'connecting' | 'synced' | 'syncing' | 'error';
 
@@ -182,6 +195,7 @@ export interface PouchSyncState {
   pendingChanges: number;
   conflicts?: SyncConflict[];
   conflictsCount?: number;
+  writeQueue?: WriteQueueHealth;
 }
 
 export interface PouchDocChange {
@@ -216,11 +230,18 @@ export class PouchService {
     pendingChanges: 0,
     conflicts: [],
     conflictsCount: 0,
+    writeQueue: { pending: 0, retrying: 0, failed: 0, dropped: 0 },
   };
   private pushError: string | null = null;
   private pullError: string | null = null;
   private syncStartPromise: Promise<void> | null = null;
   private activeDbName: string = DEFAULT_LOCAL_DB_NAME;
+  private isDrainingWriteQueue: boolean = false;
+  private writeQueueTimer: any = null;
+
+  public getWriteQueueHealth(): WriteQueueHealth {
+    return getWriteQueueHealth(this.activeDbName);
+  }
 
   public getActiveDbName(): string {
     return this.activeDbName;
@@ -263,6 +284,10 @@ export class PouchService {
     // Callers in production must perform a window.location.reload() before CRUD operations so
     // that domain caches and PouchDB singletons rehydrate cleanly from the new database.
     if (activePouchInstance) {
+      if (activePouchInstance.writeQueueTimer) {
+        clearTimeout(activePouchInstance.writeQueueTimer);
+        activePouchInstance.writeQueueTimer = null;
+      }
       if (activePouchInstance.syncHandler) {
         activePouchInstance.syncHandler.cancel();
         activePouchInstance.syncHandler = null;
@@ -272,6 +297,8 @@ export class PouchService {
         activePouchInstance.localDB = new PouchDB(localDbName, { auto_compaction: true });
         activePouchInstance.setupChangesListener();
       } catch {}
+      activePouchInstance.scheduleWriteQueueDrain();
+      activePouchInstance.notifySyncState();
     }
 
     if (cleanRemoteUrl) {
@@ -421,6 +448,7 @@ export class PouchService {
       conflicts: [],
       conflictsCount: 0,
       lastSyncedAt: this.getPersistedLastSyncedAt(),
+      writeQueue: getWriteQueueHealth(this.activeDbName),
     };
     try {
       this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
@@ -440,6 +468,7 @@ export class PouchService {
     // Sync runs strictly when shouldSync() is true (activeDb is vyapar_remote_* and URL is saved).
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
+        void this.drainWriteQueue();
         if (!this.shouldSync()) return;
         const saved = this.getStoredRemoteUrl();
         if (saved) {
@@ -450,6 +479,9 @@ export class PouchService {
         this.notifySyncState({ status: 'offline' });
       });
       document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          void this.drainWriteQueue();
+        }
         if (!this.shouldSync()) return;
         if (document.visibilityState === 'visible') {
           const saved = this.getStoredRemoteUrl();
@@ -463,6 +495,7 @@ export class PouchService {
     // Auto-sync gate on startup (50ms deferred).
     // Sync only starts when shouldSync() is true (activeDb is vyapar_remote_* and URL is saved).
     setTimeout(() => {
+      void this.drainWriteQueue();
       if (!this.shouldSync()) {
         console.info(`[PouchDB] Auto-sync disarmed for database '${this.activeDbName}'.`);
         return;
@@ -631,11 +664,12 @@ export class PouchService {
     return () => this.changeListeners.delete(listener);
   }
 
-  private notifySyncState(partial: Partial<PouchSyncState>) {
+  private notifySyncState(partial: Partial<PouchSyncState> = {}) {
     if (partial.lastSyncedAt) {
       this.persistLastSyncedAt(partial.lastSyncedAt);
     }
-    this.currentState = { ...this.currentState, ...partial };
+    const writeQueue = partial.writeQueue ?? getWriteQueueHealth(this.activeDbName);
+    this.currentState = { ...this.currentState, ...partial, writeQueue };
     this.listeners.forEach((l) => l(this.currentState));
   }
 
@@ -875,6 +909,7 @@ export class PouchService {
                 pendingChanges: 0,
               });
               this.refreshConflicts().catch(() => {});
+              void this.drainWriteQueue();
             }
           }
         })
@@ -893,6 +928,8 @@ export class PouchService {
         .on('error', (err: any) => {
           this.notifySyncState({ status: 'error', error: String(err?.message || err) });
         });
+
+      void this.drainWriteQueue();
     } catch (e: any) {
       this.notifySyncState({ status: 'error', error: e.message || 'Invalid CouchDB URL' });
     }
@@ -1057,6 +1094,7 @@ export class PouchService {
         });
         this.notifyDataChange();
         await this.refreshConflicts().catch(() => {});
+        void this.drainWriteQueue();
         return true;
       } catch (err: any) {
         console.warn('Manual syncNow error:', err);
@@ -1097,80 +1135,150 @@ export class PouchService {
     return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
   }
 
-  public async putDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
+  private async drainWriteQueue(): Promise<void> {
+    if (this.isDrainingWriteQueue) return;
+    if (this.isDemoMode()) return;
+
+    this.isDrainingWriteQueue = true;
+    try {
+      const due = getDueWrites(this.activeDbName);
+      for (const entry of due) {
+        try {
+          if (entry.op === 'PUT') {
+            await this.persistDoc(entry.type, entry.doc as any);
+          } else {
+            await this.persistDelete(entry.type, entry.id);
+          }
+          removeWrite(this.activeDbName, entry.key);
+        } catch (err: any) {
+          const is409 = err && (err.status === 409 || err.name === 'conflict');
+          if (is409) {
+            removeWrite(this.activeDbName, entry.key);
+          } else {
+            recordFailure(this.activeDbName, entry.key, err?.message || String(err));
+          }
+        }
+      }
+      this.notifySyncState();
+    } catch (drainErr) {
+      console.warn('[PouchDB] Write queue drain error:', drainErr);
+    } finally {
+      this.isDrainingWriteQueue = false;
+      this.scheduleWriteQueueDrain();
+    }
+  }
+
+  private scheduleWriteQueueDrain(): void {
+    if (this.writeQueueTimer) {
+      clearTimeout(this.writeQueueTimer);
+      this.writeQueueTimer = null;
+    }
+    if (this.isDemoMode()) return;
+
+    const queue = readQueue(this.activeDbName);
+    if (queue.length === 0) return;
+
+    const now = Date.now();
+    const earliest = Math.min(...queue.map((e) => e.nextAttemptAt));
+    const delay = Math.max(500, Math.min(30000, earliest - now));
+
+    this.writeQueueTimer = setTimeout(() => {
+      this.writeQueueTimer = null;
+      void this.drainWriteQueue();
+    }, delay);
+  }
+
+  private async persistDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
     const docId = `${type}:${doc.id}`;
     const tombstoneId = `tombstone:${type}:${doc.id}`;
+
+    // Clear any existing tombstone in PouchDB so entity is live
     try {
-      // Clear any existing tombstone in PouchDB so entity is live
-      try {
-        const existingTomb = await this.localDB.get(tombstoneId);
-        await this.localDB.remove(existingTomb);
-      } catch (e: any) {
-        if (e.status !== 404) {
-          // Ignore
-        }
+      const existingTomb = await this.localDB.get(tombstoneId);
+      await this.localDB.remove(existingTomb);
+    } catch (e: any) {
+      if (e?.status !== 404) {
+        // Ignore
       }
+    }
 
-      let rev: string | undefined;
-      try {
-        const existing = await this.localDB.get(docId);
-        rev = existing._rev;
-      } catch (e: any) {
-        if (e.status !== 404) throw e;
-      }
+    let rev: string | undefined;
+    try {
+      const existing = await this.localDB.get(docId);
+      rev = existing._rev;
+    } catch (e: any) {
+      if (e?.status !== 404) throw e;
+    }
 
-      try {
-        await this.localDB.put({
-          ...doc,
-          _id: docId,
-          _rev: rev,
-          docType: type,
-          syncedAt: new Date().toISOString(),
-        });
-      } catch (putErr: any) {
-        if (putErr && putErr.status === 409) {
-          // 409 conflict: NEVER blind-overwrite latest revision!
-          try {
-            const latest = (await this.localDB.get(docId)) as any;
-            const isDivergent = this.isDocDivergent(doc, latest);
+    try {
+      await this.localDB.put({
+        ...doc,
+        _id: docId,
+        _rev: rev,
+        docType: type,
+        syncedAt: new Date().toISOString(),
+      });
+    } catch (putErr: any) {
+      if (putErr && (putErr.status === 409 || putErr.name === 'conflict')) {
+        // 409 conflict: NEVER blind-overwrite latest revision!
+        try {
+          const latest = (await this.localDB.get(docId)) as any;
+          const isDivergent = this.isDocDivergent(doc, latest);
 
-            if (isDivergent) {
-              // Enqueue conflict into visible queue; preserve both revisions
-              const conflictId = `${docId}#409-${Date.now()}`;
-              const conflict: SyncConflict = {
-                id: conflictId,
-                docId,
-                docType: type,
-                entityId: doc.id,
-                winningRev: latest._rev,
-                conflictingRev: 'local-409',
-                winningDoc: latest,
-                conflictingDoc: doc,
-                detectedAt: new Date().toISOString(),
-              };
-              this.explicitConflicts.set(conflict.id, conflict);
-              await this.refreshConflicts();
-            }
-          } catch (fetchErr) {
-            console.warn(`Error handling 409 conflict for ${docId}:`, fetchErr);
+          if (isDivergent) {
+            // Enqueue conflict into visible queue; preserve both revisions
+            const conflictId = `${docId}#409-${Date.now()}`;
+            const conflict: SyncConflict = {
+              id: conflictId,
+              docId,
+              docType: type,
+              entityId: doc.id,
+              winningRev: latest._rev,
+              conflictingRev: 'local-409',
+              winningDoc: latest,
+              conflictingDoc: doc,
+              detectedAt: new Date().toISOString(),
+            };
+            this.explicitConflicts.set(conflict.id, conflict);
+            await this.refreshConflicts();
           }
-          return;
-        } else {
-          throw putErr;
+        } catch (fetchErr) {
+          console.warn(`Error handling 409 conflict for ${docId}:`, fetchErr);
         }
+        return;
+      } else {
+        throw putErr;
       }
+    }
 
-      this.notifyDataChange({
-        id: docId,
-        doc: { ...doc, docType: type },
-        deleted: false,
-      });
-      this.notifySyncState({
-        pendingChanges: (this.currentState.pendingChanges || 0) + 1,
-      });
-      this.refreshConflicts().catch(() => {});
+    this.notifyDataChange({
+      id: docId,
+      doc: { ...doc, docType: type },
+      deleted: false,
+    });
+    this.notifySyncState({
+      pendingChanges: (this.currentState.pendingChanges || 0) + 1,
+    });
+    this.refreshConflicts().catch(() => {});
+  }
+
+  public async putDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
+    const docId = `${type}:${doc.id}`;
+    try {
+      await this.persistDoc(type, doc);
     } catch (e: any) {
       console.error(`PouchDB putDoc error [${docId}]:`, e);
+      const is409 = e && (e.status === 409 || e.name === 'conflict');
+      if (!is409) {
+        enqueueWrite(this.activeDbName, {
+          op: 'PUT',
+          type,
+          id: doc.id,
+          doc,
+          error: e?.message || String(e),
+        });
+        this.scheduleWriteQueueDrain();
+      }
       this.notifySyncState({
         status: 'error',
         error: `Database write failure [${docId}]: ${e?.message || e}`,
@@ -1179,49 +1287,64 @@ export class PouchService {
     }
   }
 
-  public async deleteDoc(type: string, id: string): Promise<void> {
+  private async persistDelete(type: string, id: string): Promise<void> {
     const docId = `${type}:${id}`;
     const tombstoneId = `tombstone:${type}:${id}`;
     const now = new Date().toISOString();
 
+    // 1. Write replicated tombstone document so deletions propagate across all replicas
+    let tombRev: string | undefined;
     try {
-      // 1. Write replicated tombstone document so deletions propagate across all replicas
-      let tombRev: string | undefined;
-      try {
-        const existingTomb = await this.localDB.get(tombstoneId);
-        tombRev = existingTomb._rev;
-      } catch (e: any) {
-        if (e.status !== 404) throw e;
-      }
+      const existingTomb = await this.localDB.get(tombstoneId);
+      tombRev = existingTomb._rev;
+    } catch (e: any) {
+      if (e?.status !== 404) throw e;
+    }
 
-      await this.localDB.put({
-        _id: tombstoneId,
-        _rev: tombRev,
-        docType: 'tombstone',
-        targetType: type,
-        targetId: id,
-        deletedAt: now,
-        syncedAt: now,
-      });
+    await this.localDB.put({
+      _id: tombstoneId,
+      _rev: tombRev,
+      docType: 'tombstone',
+      targetType: type,
+      targetId: id,
+      deletedAt: now,
+      syncedAt: now,
+    });
 
-      // 2. Remove primary document from local PouchDB
-      try {
-        const existing = await this.localDB.get(docId);
-        await this.localDB.remove(existing);
-      } catch (e: any) {
-        if (e.status !== 404) throw e;
-      }
+    // 2. Remove primary document from local PouchDB
+    try {
+      const existing = await this.localDB.get(docId);
+      await this.localDB.remove(existing);
+    } catch (e: any) {
+      if (e?.status !== 404) throw e;
+    }
 
-      this.notifyDataChange({
-        id: docId,
-        deleted: true,
-      });
-      this.notifySyncState({
-        pendingChanges: (this.currentState.pendingChanges || 0) + 1,
-      });
-      this.refreshConflicts().catch(() => {});
+    this.notifyDataChange({
+      id: docId,
+      deleted: true,
+    });
+    this.notifySyncState({
+      pendingChanges: (this.currentState.pendingChanges || 0) + 1,
+    });
+    this.refreshConflicts().catch(() => {});
+  }
+
+  public async deleteDoc(type: string, id: string): Promise<void> {
+    const docId = `${type}:${id}`;
+    try {
+      await this.persistDelete(type, id);
     } catch (e: any) {
       console.error(`PouchDB deleteDoc error [${docId}]:`, e);
+      const is409 = e && (e.status === 409 || e.name === 'conflict');
+      if (!is409) {
+        enqueueWrite(this.activeDbName, {
+          op: 'DELETE',
+          type,
+          id,
+          error: e?.message || String(e),
+        });
+        this.scheduleWriteQueueDrain();
+      }
       this.notifySyncState({
         status: 'error',
         error: `Database delete failure [${docId}]: ${e?.message || e}`,

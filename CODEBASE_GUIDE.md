@@ -58,6 +58,7 @@ gst-billing-app/
     │   └── company.ts         # CompanyProfile, GSTIN, bank details, thermal settings
     ├── services/              # Stateful platform services & persistence
     │   ├── db.ts              # Primary storage coordinator & repository layer
+    │   ├── db/writeQueue.ts   # Durable write-retry queue with exponential backoff & health
     │   ├── pouchdb.ts         # PouchDB / CouchDB continuous 2-way sync
     │   ├── conflictManifest.ts # Read-only conflict review manifest/backup builder
     │   ├── conflictDiff.ts    # Conflict field diffing and sensitive-value redaction
@@ -213,6 +214,14 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Deletions are persisted across devices using replicated tombstone documents (`_id: 'tombstone:${type}:${id}'`, `docType: 'tombstone'`, `deletedAt: ISOString`).
   - `syncAllFromPouch()` consumes remote tombstones via `getAllTombstones()`, ensuring remote deletions are respected locally and never resurrected during sync handshakes.
   - Local domain stores (`invoicePurchaseStorage`, `partyStorage`, `itemStorage`, `financialStorage`) clear tombstones on save and record tombstones on delete.
+- **Durable Local Write-Retry Queue & Sync Health (`src/services/db/writeQueue.ts`, `src/services/pouchdb.ts`)**:
+  - Transient local write failures (disk quota, busy IndexedDB transactions, temporary storage locks) in `putDoc`/`deleteDoc` are captured in a bounded localStorage-backed queue (`vyapar_pouch_write_queue_v1:${dbName}`) instead of being dropped.
+  - **Deduplication & Op Superseding**: entries are keyed by `${op}:${type}:${id}`. A newer `PUT` supersedes a queued `DELETE` for the same entity (keeping the latest snapshot), and a newer `DELETE` supersedes a queued `PUT`.
+  - **Bounded Capacity**: capped at `MAX_ENTRIES = 500`; overflow drops the oldest entries by `enqueuedAt` and increments a persistent `dropped` counter.
+  - **Backoff**: `min(2000 * 2 ** (attempts - 1), 300000)` ms plus 0-1000 ms jitter.
+  - **Drain Triggers**: startup, `online`, visibility `visible`, successful `startSync`/`syncNow`, and a self-scheduled timer. 409 conflicts and strict writes (`putDocStrict`/`deleteDocStrict`) bypass the queue.
+  - **Isolation**: the queue is per-database and retained across database switches, so retries resume when the user returns to that database; it is never replayed into another database.
+  - **Health**: `PouchSyncState.writeQueue` and `pouch.getWriteQueueHealth()` expose `pending`, `retrying` (`attempts > 0`), `failed` (`attempts >= 3`), `oldestEnqueuedAt`, and `dropped`. `DataSyncTab` appends retry counts to the pending/error descriptions and highlights failing writes.
 - **Read-Only Conflict Manifest & Backup Export (`src/services/conflictManifest.ts`, `scripts/conflict-manifest.ts`)**:
   - `npm run conflict:manifest` reads CouchDB through `COUCHDB_URL` using **GET requests only** (`/`, `/_all_docs?conflicts=true`, and `/{doc}?rev=`). It never PUTs, POSTs, or deletes.
   - Produces a dependency-ordered, credential-redacted manifest, a full-body backup of every winning and conflicting revision, a human summary, and `SHA256SUMS` in `~/conflict-review/<timestamp>/` with directory mode `0700` and files mode `0600`.

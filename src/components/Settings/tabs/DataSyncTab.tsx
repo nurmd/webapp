@@ -112,6 +112,12 @@ export function deriveSyncStatus({
   const pendingChanges = syncState?.pendingChanges || 0;
   const formattedLastSynced = formatLastSyncedTime(syncState?.lastSyncedAt);
 
+  const writeQueue = syncState?.writeQueue;
+  const wqPending = writeQueue?.pending || 0;
+  const queueSuffix = wqPending > 0
+    ? ` · ${wqPending} write${wqPending > 1 ? 's' : ''} awaiting retry`
+    : '';
+
   // 1. Demo Mode Sandbox
   if (isDemoMode) {
     return {
@@ -146,6 +152,7 @@ export function deriveSyncStatus({
 
   // 3. Explicit Error State (when online)
   if (syncState?.status === 'error' || Boolean(syncState?.error)) {
+    const baseDesc = syncState?.error || 'Sync error: check remote CouchDB connection or permissions';
     return {
       state: 'error',
       badgeLabel: 'Sync Error',
@@ -153,7 +160,7 @@ export function deriveSyncStatus({
       iconName: 'cloud_off',
       iconContainerClass: 'bg-error text-on-error',
       isSpinning: false,
-      description: syncState?.error || 'Sync error: check remote CouchDB connection or permissions',
+      description: `${baseDesc}${queueSuffix}`,
       formattedLastSynced,
       pendingChanges,
       conflictsCount,
@@ -235,6 +242,7 @@ export function deriveSyncStatus({
 
   // 7. Pending changes > 0: do NOT claim Cloud Synced
   if (pendingChanges > 0) {
+    const baseDesc = `${pendingChanges} local change${pendingChanges > 1 ? 's' : ''} pending upload. Tap "Sync Now" to synchronize.`;
     return {
       state: 'pending',
       badgeLabel: 'Sync Pending',
@@ -242,7 +250,7 @@ export function deriveSyncStatus({
       iconName: 'cloud_upload',
       iconContainerClass: 'bg-amber-500 text-white',
       isSpinning: false,
-      description: `${pendingChanges} local change${pendingChanges > 1 ? 's' : ''} pending upload. Tap "Sync Now" to synchronize.`,
+      description: `${baseDesc}${queueSuffix}`,
       formattedLastSynced,
       pendingChanges,
       conflictsCount,
@@ -702,6 +710,11 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 </span>
                 <span>•</span>
                 <span className="truncate">{derived.description}</span>
+                {syncState?.writeQueue && syncState.writeQueue.failed > 0 ? (
+                  <span data-testid="sync-write-queue-failing" className="text-error font-semibold">
+                    {` · ${syncState.writeQueue.failed} write${syncState.writeQueue.failed > 1 ? 's' : ''} failing`}
+                  </span>
+                ) : null}
                 {derived.pendingChanges > 0 && (
                   <>
                     <span>•</span>
