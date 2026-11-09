@@ -8,6 +8,12 @@ import {
   computeConflictDiff,
   isHighRiskConflict,
 } from '../../../services/conflictDiff.ts';
+import {
+  runDivergenceCheck,
+  getLastDivergenceReport,
+  subscribeDivergenceReport,
+  DivergenceReport,
+} from '../../../services/db/divergenceReport.ts';
 
 export type TruthfulSyncState = 'syncing' | 'online' | 'offline' | 'error' | 'paused' | 'pending' | 'conflict';
 
@@ -408,6 +414,11 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
     message?: string;
   }>({ state: 'idle' });
 
+  const [divergenceReport, setDivergenceReport] = useState<DivergenceReport | null>(() =>
+    getLastDivergenceReport()
+  );
+  const [isRunningDivergenceCheck, setIsRunningDivergenceCheck] = useState(false);
+
   const isMountedRef = useRef(true);
   useEffect(() => {
     isMountedRef.current = true;
@@ -415,6 +426,30 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
       isMountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    return subscribeDivergenceReport((report) => {
+      if (isMountedRef.current) {
+        setDivergenceReport(report);
+      }
+    });
+  }, []);
+
+  const handleRunDivergenceCheck = async () => {
+    setIsRunningDivergenceCheck(true);
+    try {
+      const rep = await runDivergenceCheck();
+      if (isMountedRef.current) {
+        setDivergenceReport(rep);
+      }
+    } catch (e) {
+      console.warn('[DataSyncTab] Divergence check failed:', e);
+    } finally {
+      if (isMountedRef.current) {
+        setIsRunningDivergenceCheck(false);
+      }
+    }
+  };
 
   const handleDownloadDiagnostics = async () => {
     try {
@@ -1285,6 +1320,97 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
             <span className="font-mono text-[11px]">
               {diagnosticsStatus.message}
             </span>
+          </div>
+        )}
+      </section>
+
+      {/* Read-Only Data Integrity Check Card */}
+      <section
+        data-testid="divergence-check-card"
+        className="p-4 sm:p-5 rounded-2xl bg-surface border border-outline-variant/30 space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-primary">
+                rule
+              </span>
+              <h3 className="text-sm font-bold text-on-surface">Data integrity check</h3>
+            </div>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Last checked: {divergenceReport?.checkedAt ? formatLastSyncedTime(divergenceReport.checkedAt) : 'Not run yet'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            data-testid="divergence-run-button"
+            onClick={handleRunDivergenceCheck}
+            disabled={isRunningDivergenceCheck}
+            className="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest active:scale-[0.98] text-on-surface text-xs font-semibold flex items-center gap-2 border border-outline-variant/20 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <span
+              className={`material-symbols-outlined text-[16px] ${
+                isRunningDivergenceCheck ? 'animate-spin' : ''
+              }`}
+            >
+              {isRunningDivergenceCheck ? 'sync' : 'refresh'}
+            </span>
+            <span>{isRunningDivergenceCheck ? 'Checking…' : 'Run check'}</span>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-on-surface-variant leading-relaxed">
+          Report only. Nothing is modified.
+        </p>
+
+        {divergenceReport && (
+          <div className="space-y-3">
+            <div
+              data-testid="divergence-status"
+              className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                divergenceReport.divergentTypes.length === 0
+                  ? 'bg-emerald-50/50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:text-emerald-300'
+                  : 'bg-amber-50/50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {divergenceReport.divergentTypes.length === 0 ? 'check_circle' : 'warning'}
+              </span>
+              <span className="font-semibold text-xs">
+                {divergenceReport.divergentTypes.length === 0
+                  ? 'All entities match'
+                  : `${divergenceReport.divergentTypes.length} entity type(s) divergent`}
+              </span>
+            </div>
+
+            <div className="divide-y divide-outline-variant/15 border border-outline-variant/20 rounded-xl overflow-hidden bg-surface-container-lowest text-xs">
+              {divergenceReport.entities.map((entity) => (
+                <div
+                  key={entity.type}
+                  className="p-2.5 sm:px-3 flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs font-semibold text-on-surface capitalize">
+                      {entity.type.replace(/_/g, ' ')}
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant">
+                      Local: {entity.localCount} · Cloud: {entity.pouchCount}
+                    </span>
+                  </div>
+
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
+                      entity.divergent
+                        ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30'
+                        : 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30'
+                    }`}
+                  >
+                    {entity.divergent ? 'Divergent' : 'Match'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>

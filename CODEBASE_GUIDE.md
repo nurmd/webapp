@@ -236,6 +236,12 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Resolution remains manual and per-document in the Data & Sync conflict queue. Use the manifest's dependency warnings (company/settings → catalog → parties → financial documents) before accepting any branch.
   - When the source does not expose all documents, the manifest explicitly warns that dependency counts are limited rather than silently under-reporting references.
   - The Data & Sync conflict queue also provides a read-only, collapsed-by-default detail view (`src/services/conflictDiff.ts`, `src/components/Settings/tabs/DataSyncTab.tsx`). It shows full document/revision IDs, changed fields with Version A/B values, recursive redaction for passwords, tokens, API keys, sync URLs, and credentials, plus explicit unavailable-payload and metadata-only warnings. It never resolves a conflict, merges branches, or writes to PouchDB/CouchDB.
+- **Startup Divergence Report (`src/services/db/divergenceReport.ts`, `src/components/Settings/tabs/DataSyncTab.tsx`)**:
+  - Compares per-entity record counts and FNV-1a deterministic content hashes between the browser `localStorage` cache and the local PouchDB replica for all 10 domain entities (`invoice`, `purchase`, `party`, `item`, `expense`, `voucher`, `bank_account`, `cash_bank_txn`, `loan`, `loan_txn`).
+  - **Zero-Mutation Guarantee**: Strictly read-only; it never writes, fixes, merges, or deletes any documents or cache entries.
+  - **Content Normalization & Hashing**: Drops transport metadata (`_id`, `_rev`, `_deleted`, `docType`, `syncedAt`) before hashing, sorts records by `id`, normalizes object keys recursively via `stableStringify`, and computes a 32-bit FNV-1a hex digest. Detects count mismatches and payload divergences.
+  - **Non-Blocking Startup Execution**: `scheduleStartupDivergenceCheck()` runs at most once per session via `requestIdleCallback` (fallback `setTimeout 4000ms`), skips demo mode, and logs a console warning only when divergent types exist.
+  - **UI Diagnostics**: A compact "Data integrity check" card in Data & Sync shows the last-check timestamp, an on-demand "Run check" action, per-entity local/cloud counts, and match/divergent badges. It reports only and offers no repair action.
 
 ### C. Local-Only Support Diagnostics (`src/core/utils/supportDiagnostics.ts`, `src/services/supportDiagnosticsService.ts`)
 - **Schema & Architecture (`SupportDiagnosticsBundle` schemaVersion `1.0.0`)**:

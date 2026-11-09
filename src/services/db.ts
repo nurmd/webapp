@@ -1,4 +1,5 @@
 import { SyncStorage } from './db/syncStorage.ts';
+import { scheduleStartupDivergenceCheck } from './db/divergenceReport.ts';
 
 export * from './db/index.ts';
 
@@ -19,3 +20,8 @@ export * from './db/index.ts';
 export class StorageService extends SyncStorage {}
 
 export const db = new StorageService();
+
+if (typeof window !== 'undefined') {
+  scheduleStartupDivergenceCheck();
+}
+
