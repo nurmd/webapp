@@ -108,6 +108,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
   const [page, setPage] = useState(0);
   const pageSize = 50;
   const [isLoading, setIsLoading] = useState(true);
+  const [retention, setRetention] = useState(() => auditTrail.getRetentionInfo());
 
   // Counts by epoch
   const [legacyCount, setLegacyCount] = useState(0);
@@ -196,6 +197,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       setLegacyCount(legacyC);
       setCurrentEpochCount(currentC);
       setAllCount(allC);
+      setRetention(auditTrail.getRetentionInfo());
     } catch (err) {
       console.error('Failed to load audit records:', err);
     } finally {
@@ -281,6 +283,24 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
       showToast('Exported JSON successfully');
     } catch (err) {
       console.error('Failed to export JSON:', err);
+    }
+  };
+
+  const handleExportLegacyArchive = async () => {
+    try {
+      const res = await auditTrail.archiveLegacyEpoch();
+      const blob = new Blob([res.json], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-legacy-archive-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Exported legacy archive (${res.recordCount} records)`);
+    } catch (err) {
+      console.error('Failed to export legacy archive:', err);
     }
   };
 
@@ -455,6 +475,19 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
           >
             <span className="material-symbols-outlined text-[16px]">data_object</span>
             <span>JSON</span>
+          </button>
+
+          <button
+            type="button"
+            data-testid="audit-export-legacy-archive"
+            onClick={handleExportLegacyArchive}
+            disabled={legacyCount === 0}
+            className="px-3 py-1.5 bg-surface-container-highest hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-bold transition-all flex items-center gap-1 border border-outline-variant/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Archive (export only)"
+            aria-label="Archive (export only)"
+          >
+            <span className="material-symbols-outlined text-[16px]">archive</span>
+            <span>Export legacy archive</span>
           </button>
         </div>
       </div>
@@ -670,6 +703,21 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
         </div>
       </div>
 
+      {/* Retention truncation notice */}
+      {retention.truncatedCount > 0 && (
+        <div
+          data-testid="audit-retention-notice"
+          className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200"
+        >
+          <span className="material-symbols-outlined text-[18px] text-amber-600 dark:text-amber-400 shrink-0">
+            info
+          </span>
+          <span>
+            Showing the most recent {retention.retainedCount} of {retention.totalCount} records. Older records stay in the database and are included in exports and verification.
+          </span>
+        </div>
+      )}
+
       {/* Audit Log Table */}
       <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-hidden shadow-sm">
         {isLoading ? (
@@ -808,8 +856,15 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({
 
         {/* Pagination Controls */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-outline-variant/20 bg-surface-container-low/40 text-xs">
-          <div className="text-on-surface-variant font-medium">
-            Total: <span className="font-bold text-on-surface">{totalRecords}</span> records
+          <div className="text-on-surface-variant font-medium flex items-center gap-3">
+            <span>
+              Total: <span className="font-bold text-on-surface">{totalRecords}</span> records
+            </span>
+            {records.length > 0 && (
+              <span data-testid="audit-sequence-range" className="font-mono text-on-surface-variant">
+                Sequence {Math.min(...records.map((r) => r.sequence))}–{Math.max(...records.map((r) => r.sequence))}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -13,6 +13,7 @@
 import { pouch } from './pouchdb.ts';
 import { rbac, UserRole } from './rbac.ts';
 import { sha256Hex } from '../core/utils/crypto.ts';
+import { getAuditRetentionPolicy, selectRetainedWindow } from './auditRetention.ts';
 
 export type AuditActionType =
   | 'INVOICE_CREATE'
@@ -87,6 +88,8 @@ export interface AuditTrailFilter {
   sortDirection?: 'asc' | 'desc';
   epochScope?: AuditEpochScope;
   epoch?: number;
+  afterSequence?: number;
+  beforeSequence?: number;
   limit?: number;
   offset?: number;
 }
@@ -207,6 +210,8 @@ export class AuditTrailService {
   private records: AuditRecord[] = [];
   private loaded: boolean = false;
   private appendQueue: Promise<any> = Promise.resolve();
+  private truncatedCount: number = 0;
+  private chainAnchor: { sequence: number; recordHash: string } | null = null;
 
   constructor() {
     this.reclaimLegacyLocalStorage();
@@ -278,7 +283,49 @@ export class AuditTrailService {
     } catch (e) {
       // PouchDB unavailable or empty
     }
+
+    const policy = getAuditRetentionPolicy();
+    const { retained, evicted } = selectRetainedWindow(this.records, policy.maxInMemoryRecords);
+    this.records = retained;
+    this.truncatedCount = evicted.length;
+    const lastEvicted = evicted.length > 0 ? evicted[evicted.length - 1] : null;
+    this.chainAnchor = lastEvicted
+      ? { sequence: lastEvicted.sequence, recordHash: lastEvicted.recordHash }
+      : null;
+
     this.loaded = true;
+  }
+
+  /**
+   * Returns full record list by hydrating all persisted records from PouchDB
+   * when in-memory window has been capped/truncated.
+   * Merges with in-memory records (memory wins). Never mutates this.records.
+   */
+  private async getFullRecords(): Promise<AuditRecord[]> {
+    if (this.truncatedCount === 0) {
+      return this.records;
+    }
+    try {
+      const pouchDocs = await pouch.getAllDocs<AuditRecord>('audit_log');
+      const map = new Map<string, AuditRecord>();
+      if (Array.isArray(pouchDocs)) {
+        pouchDocs.forEach((r) => {
+          if (r && r.id) map.set(r.id, r);
+        });
+      }
+      this.records.forEach((r) => {
+        if (r && r.id) map.set(r.id, r);
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        const epochA = a.epoch ?? LEGACY_AUDIT_EPOCH;
+        const epochB = b.epoch ?? LEGACY_AUDIT_EPOCH;
+        if (epochA !== epochB) return epochA - epochB;
+        return a.sequence - b.sequence;
+      });
+    } catch (e) {
+      console.warn('AuditTrailService: Failed to load full records from PouchDB:', e);
+      return this.records;
+    }
   }
 
   /**
@@ -286,6 +333,14 @@ export class AuditTrailService {
    */
   public getRecordsSync(): AuditRecord[] {
     return this.records.map((r) => ({ ...r }));
+  }
+
+  public getTruncatedCount(): number {
+    return this.truncatedCount;
+  }
+
+  public getChainAnchor(): { sequence: number; recordHash: string } | null {
+    return this.chainAnchor ? { ...this.chainAnchor } : null;
   }
 
   /**
@@ -309,9 +364,15 @@ export class AuditTrailService {
   private async internalAppendRecord(
     entry: AuditLogInput
   ): Promise<AuditRecord> {
-    const currentEpochRecords = this.records.filter(
+    let currentEpochRecords = this.records.filter(
       (r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH
     );
+    if (this.truncatedCount > 0 && currentEpochRecords.length === 0) {
+      const full = await this.getFullRecords();
+      currentEpochRecords = full.filter(
+        (r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH
+      );
+    }
     const totalCurrent = currentEpochRecords.length;
     const lastRecord = totalCurrent > 0 ? currentEpochRecords[totalCurrent - 1] : null;
 
@@ -357,6 +418,15 @@ export class AuditTrailService {
 
     this.records.push(record);
 
+    const policy = getAuditRetentionPolicy();
+    if (this.records.length > policy.maxInMemoryRecords) {
+      const { retained, evicted } = selectRetainedWindow(this.records, policy.maxInMemoryRecords);
+      this.records = retained;
+      this.truncatedCount += evicted.length;
+      const lastEvicted = evicted[evicted.length - 1];
+      this.chainAnchor = { sequence: lastEvicted.sequence, recordHash: lastEvicted.recordHash };
+    }
+
     // Keep in memory and persist directly to PouchDB IndexedDB
     try {
       await pouch.putDoc('audit_log', record);
@@ -374,14 +444,20 @@ export class AuditTrailService {
   /**
    * Applies common filtering predicates across audit records.
    */
-  private applyFilters(filter?: AuditTrailFilter): AuditRecord[] {
-    let result = [...this.records];
+  private applyFilters(filter?: AuditTrailFilter, source: AuditRecord[] = this.records): AuditRecord[] {
+    let result = [...source];
 
     if (filter) {
       if (filter.epochScope === 'CURRENT' || filter.epoch === CURRENT_AUDIT_EPOCH) {
         result = result.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === CURRENT_AUDIT_EPOCH);
       } else if (filter.epochScope === 'LEGACY' || filter.epoch === LEGACY_AUDIT_EPOCH) {
         result = result.filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH);
+      }
+      if (filter.afterSequence !== undefined) {
+        result = result.filter((r) => r.sequence > filter.afterSequence!);
+      }
+      if (filter.beforeSequence !== undefined) {
+        result = result.filter((r) => r.sequence < filter.beforeSequence!);
       }
       if (filter.startDate) {
         const s = filter.startDate.trim();
@@ -436,7 +512,8 @@ export class AuditTrailService {
    */
   public async getAuditTrailCount(filter?: AuditTrailFilter): Promise<number> {
     await this.ensureLoaded();
-    const filtered = this.applyFilters(filter);
+    const source = await this.getFullRecords();
+    const filtered = this.applyFilters(filter, source);
     return filtered.length;
   }
 
@@ -445,7 +522,8 @@ export class AuditTrailService {
    */
   public async getAuditTrail(filter?: AuditTrailFilter): Promise<AuditRecord[]> {
     await this.ensureLoaded();
-    const result = this.applyFilters(filter);
+    const source = await this.getFullRecords();
+    const result = this.applyFilters(filter, source);
 
     if (filter?.sortDirection === 'desc') {
       result.sort((a, b) => {
@@ -481,7 +559,8 @@ export class AuditTrailService {
    */
   private async verifyEpochChain(targetEpoch: number): Promise<AuditVerificationResult> {
     await this.ensureLoaded();
-    const epochRecords = this.records
+    const source = await this.getFullRecords();
+    const epochRecords = source
       .filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === targetEpoch)
       .sort((a, b) => a.sequence - b.sequence);
 
@@ -567,8 +646,9 @@ export class AuditTrailService {
     if (epoch !== undefined) {
       return this.verifyEpochChain(epoch);
     }
-    const hasCurrent = this.records.some((r) => r.epoch === CURRENT_AUDIT_EPOCH);
-    const hasLegacy = this.records.some(
+    const allRecords = await this.getFullRecords();
+    const hasCurrent = allRecords.some((r) => r.epoch === CURRENT_AUDIT_EPOCH);
+    const hasLegacy = allRecords.some(
       (r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH
     );
     if (hasCurrent && !hasLegacy) {
@@ -579,12 +659,92 @@ export class AuditTrailService {
 
   public async getAuditRecordById(id: string): Promise<AuditRecord | null> {
     await this.ensureLoaded();
-    const found = this.records.find((r) => r.id === id);
+    const inMemory = this.records.find((r) => r.id === id);
+    if (inMemory) return { ...inMemory };
+    const allRecords = await this.getFullRecords();
+    const found = allRecords.find((r) => r.id === id);
     return found ? { ...found } : null;
   }
 
   public async getAuditTrailForDocument(documentId: string): Promise<AuditRecord[]> {
     return this.getAuditTrail({ documentId });
+  }
+
+  /**
+   * Retrieves diagnostics regarding in-memory window retention, truncation, and anchor.
+   */
+  public getRetentionInfo(): {
+    retainedCount: number;
+    truncatedCount: number;
+    totalCount: number;
+    anchorSequence: number | null;
+    anchorHash: string | null;
+    maxInMemoryRecords: number;
+  } {
+    return {
+      retainedCount: this.records.length,
+      truncatedCount: this.truncatedCount,
+      totalCount: this.records.length + this.truncatedCount,
+      anchorSequence: this.chainAnchor ? this.chainAnchor.sequence : null,
+      anchorHash: this.chainAnchor ? this.chainAnchor.recordHash : null,
+      maxInMemoryRecords: getAuditRetentionPolicy().maxInMemoryRecords,
+    };
+  }
+
+  /**
+   * Generates a self-contained, export-only archive of legacy epoch audit records.
+   * MCA Rule 3(1) Compliance: strictly read-only; never purges, deletes, or compacts records.
+   */
+  public async archiveLegacyEpoch(): Promise<{
+    json: string;
+    recordCount: number;
+    manifest: {
+      exportedAt: string;
+      recordCount: number;
+      firstSequence: number | null;
+      lastSequence: number | null;
+      lastRecordHash: string | null;
+    };
+  }> {
+    await this.ensureLoaded();
+    const allRecords = await this.getFullRecords();
+    const legacyRecords = allRecords
+      .filter((r) => (r.epoch ?? LEGACY_AUDIT_EPOCH) === LEGACY_AUDIT_EPOCH)
+      .sort((a, b) => a.sequence - b.sequence);
+
+    const recordCount = legacyRecords.length;
+    if (recordCount === 0) {
+      const emptyManifest = {
+        exportedAt: new Date().toISOString(),
+        recordCount: 0,
+        firstSequence: null,
+        lastSequence: null,
+        lastRecordHash: null,
+      };
+      return {
+        json: JSON.stringify({ manifest: emptyManifest, records: [] }, null, 2),
+        recordCount: 0,
+        manifest: emptyManifest,
+      };
+    }
+
+    const firstSequence = legacyRecords[0].sequence;
+    const lastSequence = legacyRecords[recordCount - 1].sequence;
+    const lastRecordHash = legacyRecords[recordCount - 1].recordHash;
+
+    const manifest = {
+      exportedAt: new Date().toISOString(),
+      recordCount,
+      firstSequence,
+      lastSequence,
+      lastRecordHash,
+    };
+
+    return {
+      json: JSON.stringify({ manifest, records: legacyRecords }, null, 2),
+      recordCount,
+      manifest,
+    };
   }
 
   /**
@@ -684,6 +844,8 @@ export class AuditTrailService {
   public async reloadFromStorage(): Promise<void> {
     this.loaded = false;
     this.records = [];
+    this.truncatedCount = 0;
+    this.chainAnchor = null;
     await this.ensureLoaded();
   }
 
@@ -691,6 +853,8 @@ export class AuditTrailService {
     await this.waitForIdle();
     this.records = [];
     this.loaded = true;
+    this.truncatedCount = 0;
+    this.chainAnchor = null;
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY_AUDIT_LOGS);
     }
@@ -699,6 +863,8 @@ export class AuditTrailService {
   public _setRecordsForTesting(records: AuditRecord[]): void {
     this.records = records.map((r) => ({ ...r }));
     this.loaded = true;
+    this.truncatedCount = 0;
+    this.chainAnchor = null;
   }
 }
 
