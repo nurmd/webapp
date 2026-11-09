@@ -17,6 +17,10 @@ import {
   getDueWrites,
   getWriteQueueHealth,
 } from './db/writeQueue.ts';
+import {
+  assertManualConflictResolution,
+  type ConflictResolutionChoice,
+} from './conflictPolicy.ts';
 
 export type { QueuedWrite, QueuedWriteOp, WriteQueueHealth };
 
@@ -1591,9 +1595,12 @@ export class PouchService {
 
   public async resolveConflict(
     docId: string,
-    choice: 'keep_winning' | 'keep_conflicting' | 'merge',
-    options?: { winningRev?: string; conflictingRev?: string; mergedDoc?: any }
+    choice: ConflictResolutionChoice,
+    options?: { winningRev?: string; conflictingRev?: string }
   ): Promise<void> {
+    // Policy gate: manual, single-document resolution only. Runs before the
+    // try block so violations reject instead of being logged and swallowed.
+    assertManualConflictResolution(docId, choice);
     try {
       // 1. Check if docId or conflict id is in explicitConflicts
       let explicitKey: string | undefined;
@@ -1639,17 +1646,6 @@ export class PouchService {
             syncedAt: new Date().toISOString(),
           });
           await this.localDB.remove(docId, conflictRev);
-        } else if (choice === 'merge' && options?.mergedDoc) {
-          const { _id, _rev, _conflicts, ...content } = options.mergedDoc;
-          await this.localDB.put({
-            ...content,
-            _id: docId,
-            _rev: existing._rev,
-            syncedAt: new Date().toISOString(),
-          });
-          if (conflictRev) {
-            await this.localDB.remove(docId, conflictRev);
-          }
         } else {
           // 'keep_winning'
           if (conflictRev) {

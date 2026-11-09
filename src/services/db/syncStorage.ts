@@ -1,3 +1,7 @@
+import {
+  assertManualConflictResolution,
+  type ConflictResolutionChoice,
+} from '../conflictPolicy.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
@@ -1025,12 +1029,16 @@ export class SyncStorage extends BackupRestoreStorage {
 
   public async resolveConflict(
     conflictId: string,
-    choice: 'keep_winning' | 'keep_conflicting' | 'merge',
-    options?: { docId?: string; winningRev?: string; conflictingRev?: string; mergedDoc?: any }
+    choice: ConflictResolutionChoice,
+    options?: { docId?: string; winningRev?: string; conflictingRev?: string }
   ): Promise<void> {
+    // Policy gate: manual, single-document resolution only.
+    assertManualConflictResolution(conflictId, choice);
+
     if (typeof (pouch as any)?.resolveConflict === 'function') {
       const docId = options?.docId || conflictId.split('#')[0];
       const conflictingRev = options?.conflictingRev || conflictId.split('#')[1];
+      assertManualConflictResolution(docId, choice);
 
       const conflicts = await this.getConflicts();
       const targetConflict = conflicts.find((c) => c.id === conflictId || c.docId === docId);

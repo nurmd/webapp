@@ -1032,6 +1032,14 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
           )}
         </div>
 
+        <p
+          data-testid="conflict-policy-note"
+          className="text-[11px] text-on-surface-variant leading-relaxed flex items-start gap-1.5"
+        >
+          <span className="material-symbols-outlined text-[14px] mt-[1px] shrink-0">lock</span>
+          <span>Manual, one document at a time. Nothing is auto-resolved, merged, or bulk-resolved.</span>
+        </p>
+
         {activeConflicts.length > 0 ? (
           <div className="flex flex-col gap-3 pt-2 border-t border-outline-variant/15">
             {activeConflicts.map((conflict) => {
