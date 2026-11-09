@@ -179,6 +179,11 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Components subscribe to changes via `db.subscribe(callback)`.
   - DB mutations broadcast changes across browser tabs via `BroadcastChannel('gst_billing_sync')`.
   - PouchDB changes from remote CouchDB instances trigger `db.applyRemoteDoc()`.
+- **Storage Quota Handling & User Awareness (`src/services/db/storageHealth.ts`, `src/components/Common/StorageQuotaBanner.tsx`)**:
+  - When `localStorage` hits quota limits (`QuotaExceededError`), writes are **never silently dropped**: the in-memory heap cache (`memoryCache`/`rawCache`) and the PouchDB replica remain intact.
+  - Quota failures are recorded in-memory via `storageHealth.ts` (`recordQuotaExceeded`) so the recorder itself cannot recurse under quota pressure.
+  - `StorageQuotaBanner` shows the count of uncached changes plus live diagnostics from `navigator.storage.estimate()` (formatted B/KB/MB/GB).
+  - The engine performs a safe one-time-per-session reclaim of the legacy `gst_audit_logs` key and exposes `db.retryQuotaFailedWrites()` for explicit 1-tap recovery; the banner clears reactively once all keys succeed.
 
 ### B. Distributed Sync & Revision Handling (`src/services/pouchdb.ts`, `src/services/db/syncStorage.ts`)
 - **PouchDB `_rev` Conflict Detection**:

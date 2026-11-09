@@ -52,6 +52,7 @@ import { initBackNavigation, useBackNavigation } from './core/utils/backNavigati
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
 import { findDuplicateItem, findDuplicateParty } from './core/utils/entityUniqueness.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
+import { StorageQuotaBanner } from './components/Common/StorageQuotaBanner.tsx';
 import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
 import { PaymentModalProvider } from './components/Payments/PaymentModalContext.tsx';
 
@@ -1411,6 +1412,9 @@ export const App: React.FC = () => {
             hasUpdate={hasUpdate}
           />
         </div>
+
+        {/* Storage Quota Warning Banner - Detached outside scroll container */}
+        <StorageQuotaBanner />
 
         {/* Main Working Screen Area - Rendered strictly below topbar with independent scroll containment */}
         <main id="main-content-scroll" className="flex-1 min-h-0 w-full overflow-y-auto pb-24 md:pb-8 overscroll-contain">

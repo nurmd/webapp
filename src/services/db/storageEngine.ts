@@ -9,6 +9,7 @@ import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { rbac, UserRole } from '../rbac.ts';
 import { pouch } from '../pouchdb.ts';
+import { recordQuotaExceeded, recordQuotaRecovered } from './storageHealth.ts';
 
 export const STORAGE_KEYS = {
   COMPANY: 'gst_company_profile',
@@ -112,6 +113,7 @@ export class StorageEngine {
   protected memoryCache: Map<string, any> = new Map<string, any>();
   protected rawCache: Map<string, string | null> = new Map<string, string | null>();
   protected quotaExceededKeys: Set<string> = new Set<string>();
+  protected quotaReclaimAttempted: boolean = false;
 
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -223,7 +225,10 @@ export class StorageEngine {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(key, raw);
-        this.quotaExceededKeys.delete(key);
+        if (this.quotaExceededKeys.has(key)) {
+          this.quotaExceededKeys.delete(key);
+          recordQuotaRecovered([key]);
+        }
       }
     } catch (e: any) {
       const isQuotaExceeded =
@@ -235,17 +240,77 @@ export class StorageEngine {
 
       if (isQuotaExceeded) {
         this.quotaExceededKeys.add(key);
+        recordQuotaExceeded(key);
         console.warn(`StorageService.set: QuotaExceededError encountered for key "${key}". Write skipped in localStorage without failing unhandled.`, e);
+
+        // Attempt a safe one-time reclaim per session
+        if (!this.quotaReclaimAttempted) {
+          this.quotaReclaimAttempted = true;
+          try {
+            if (typeof localStorage !== 'undefined' && localStorage.getItem('gst_audit_logs') !== null) {
+              localStorage.removeItem('gst_audit_logs');
+              try {
+                localStorage.setItem(key, raw);
+                this.quotaExceededKeys.delete(key);
+                recordQuotaRecovered([key]);
+              } catch {}
+            }
+          } catch {}
+        }
       } else {
         console.error('Local storage write error:', e);
       }
     }
   }
 
+  public getQuotaExceededKeys(): string[] {
+    return Array.from(this.quotaExceededKeys);
+  }
+
+  public retryQuotaFailedWrites(): { retried: number; recovered: number; stillFailing: number } {
+    let retried = 0;
+    let recovered = 0;
+    let stillFailing = 0;
+
+    const keys = Array.from(this.quotaExceededKeys);
+    const recoveredKeys: string[] = [];
+
+    for (const key of keys) {
+      const raw = this.rawCache.get(key);
+      if (typeof raw !== 'string') continue;
+      retried++;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(key, raw);
+          this.quotaExceededKeys.delete(key);
+          recoveredKeys.push(key);
+          recovered++;
+        }
+      } catch {
+        stillFailing++;
+      }
+    }
+
+    if (recoveredKeys.length > 0) {
+      recordQuotaRecovered(recoveredKeys);
+    }
+    if (this.quotaExceededKeys.size === 0) {
+      recordQuotaRecovered();
+    }
+    if (recovered > 0) {
+      this.notifyListeners();
+    }
+
+    return { retried, recovered, stillFailing };
+  }
+
   public remove(key: string): void {
     this.memoryCache.delete(key);
     this.rawCache.delete(key);
-    this.quotaExceededKeys.delete(key);
+    if (this.quotaExceededKeys.has(key)) {
+      this.quotaExceededKeys.delete(key);
+      recordQuotaRecovered([key]);
+    }
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(key);
@@ -257,11 +322,17 @@ export class StorageEngine {
     if (key) {
       this.memoryCache.delete(key);
       this.rawCache.delete(key);
-      this.quotaExceededKeys.delete(key);
+      if (this.quotaExceededKeys.has(key)) {
+        this.quotaExceededKeys.delete(key);
+        recordQuotaRecovered([key]);
+      }
     } else {
       this.memoryCache.clear();
       this.rawCache.clear();
-      this.quotaExceededKeys.clear();
+      if (this.quotaExceededKeys.size > 0) {
+        this.quotaExceededKeys.clear();
+        recordQuotaRecovered();
+      }
     }
   }
 
