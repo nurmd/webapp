@@ -16,8 +16,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
-    testTimeout: 15000,
-    hookTimeout: 15000,
+    // Render-heavy suites can exceed 15s when the full suite saturates the
+    // device CPU; isolated runs of the same tests finish in ~1-2s.
+    testTimeout: 30000,
+    hookTimeout: 30000,
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**'],
     coverage: {
