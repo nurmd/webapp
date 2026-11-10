@@ -1,13 +1,15 @@
 {
-  "version": "1.2.76",
+  "version": "1.2.77",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-08T17:16:21.382Z",
+  "buildTime": "2026-11-10T09:18:39.594Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "New: audit log is paginated (50 per page) with filtered counts for faster loading on large histories",
-    "New: ESLint quality gate (0 errors) now part of the release checklist",
-    "Fixed: invoice and purchase line items use stable React keys, preventing row mix-ups when editing or reordering",
-    "Fixed: Sales/Purchases sort-menu backdrops are keyboard-accessible buttons with a normal cursor"
+    "New: invoice, party and item lists above 100 rows now load in windows of 60 with a Show more button",
+    "New: audit-log retention policy, storage-quota banner and startup data-integrity report",
+    "Improved: payment conflicts are strictly manual per document; bulk merge removed",
+    "Improved: invoice preview, POS catalog and voucher allocation split into focused components",
+    "Improved: tabs no longer re-render when an unrelated collection changes",
+    "Fixed: durable retry queue for failed cloud writes, so saves survive temporary failures"
   ]
 }
