@@ -26,11 +26,17 @@ import {
 import { usePaymentModal } from '../Payments/PaymentModalContext.tsx';
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
-import { db } from '../../services/db.ts';
 import { getOverdueDays } from '../../core/accounting/aging.ts';
 import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
-import { useSettings } from '../../core/store/useDataStore.ts';
+import {
+  useSettings,
+  usePurchases,
+  useVouchers,
+  useExpenses,
+  useBankAccounts,
+  useCashBankTxns,
+} from '../../core/store/useDataStore.ts';
 import {
   DASHBOARD_QUICK_ACTIONS,
   DashboardQuickActionId,
@@ -97,7 +103,7 @@ export interface DashboardViewProps {
   onOpenPaymentModal?: (flow: 'IN' | 'OUT') => void;
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({
+const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   company,
   invoices,
   items,
@@ -120,13 +126,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenPaymentModal,
 }) => {
   const paymentModal = usePaymentModal();
-  // Resolve data sources with graceful fallback to DB if props are omitted or undefined
+  const storePurchases = usePurchases();
+  const storeVouchers = useVouchers();
+  const storeExpenses = useExpenses();
+  const storeBankAccounts = useBankAccounts();
+  const storeCashBankTxns = useCashBankTxns();
+
+  // Resolve data sources with graceful fallback to store if props are omitted or undefined
   const activeInvoices = invoices || [];
   const activeParties = parties || [];
   const activeItems = items || [];
-  const activePurchases = (propPurchases !== undefined && propPurchases !== null ? propPurchases : db.getPurchases()) || [];
-  const activeVouchers = (propVouchers !== undefined && propVouchers !== null ? propVouchers : db.getVouchers()) || [];
-  const activeExpenses = (propExpenses !== undefined && propExpenses !== null ? propExpenses : db.getExpenses()) || [];
+  const activePurchases = (propPurchases !== undefined && propPurchases !== null ? propPurchases : storePurchases) || [];
+  const activeVouchers = (propVouchers !== undefined && propVouchers !== null ? propVouchers : storeVouchers) || [];
+  const activeExpenses = (propExpenses !== undefined && propExpenses !== null ? propExpenses : storeExpenses) || [];
 
   // Configurable dashboard quick actions (max 6)
   const settings = useSettings();
@@ -239,8 +251,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     [activeParties]
   );
 
-  const bankAccounts = db.getBankAccounts() || [];
-  const cashBankTransactions = db.getCashBankTransactions() || [];
+  const bankAccounts = storeBankAccounts;
+  const cashBankTransactions = storeCashBankTxns;
 
   const totalCashBankBalance = useMemo(() => {
     const summary = computeCashBankSummary({
@@ -1484,3 +1496,5 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </div>
   );
 };
+
+export const DashboardView = React.memo(DashboardViewComponent);

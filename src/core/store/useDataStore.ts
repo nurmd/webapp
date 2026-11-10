@@ -18,7 +18,7 @@ import { useSyncExternalStore, useMemo } from 'react';
 import { db, SyncedSettings } from '../../services/db.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
-import { InventoryItem, StockAdjustment } from '../../models/item.ts';
+import { InventoryItem, ItemCategory, StockAdjustment } from '../../models/item.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
@@ -68,6 +68,7 @@ export const getCompanySnapshot = createStableSnapshotGetter((): CompanyProfile 
 export const getPartiesSnapshot = createStableSnapshotGetter((): Party[] => db.getParties());
 export const getPartyGroupsSnapshot = createStableSnapshotGetter((): PartyGroup[] => db.getPartyGroups());
 export const getPartyCategoriesSnapshot = createStableSnapshotGetter((): PartyCategory[] => db.getPartyCategories());
+export const getItemCategoriesSnapshot = createStableSnapshotGetter((): ItemCategory[] => db.getCategories());
 export const getItemsSnapshot = createStableSnapshotGetter((): InventoryItem[] => db.getItems());
 export const getInvoicesSnapshot = createStableSnapshotGetter((): Invoice[] => db.getInvoices());
 export const getPurchasesSnapshot = createStableSnapshotGetter((): PurchaseBill[] => db.getPurchases());
@@ -112,6 +113,14 @@ export function usePartyGroups(): PartyGroup[] {
  */
 export function usePartyCategories(): PartyCategory[] {
   return useSyncExternalStore(subscribeToDataStore, getPartyCategoriesSnapshot, getPartyCategoriesSnapshot);
+}
+
+/**
+ * Subscribes to Item Categories.
+ * Re-renders ONLY when item categories change.
+ */
+export function useItemCategories(): ItemCategory[] {
+  return useSyncExternalStore(subscribeToDataStore, getItemCategoriesSnapshot, getItemCategoriesSnapshot);
 }
 
 /**

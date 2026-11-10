@@ -1373,6 +1373,39 @@ export const App: React.FC = () => {
   const handleCloseRoleSwitch = useCallback(() => setIsRoleSwitchOpen(false), []);
   const handleSearchClick = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
   const handleBarcodeClick = useCallback(() => handleSelectTab('pos'), [handleSelectTab]);
+  const handleDashboardQuickPos = useCallback(() => {
+    previousTabRef.current = 'dashboard';
+    setActiveTab('pos');
+  }, [setActiveTab]);
+  const handleSalesQuickPos = useCallback(() => {
+    previousTabRef.current = 'sales';
+    setActiveTab('pos');
+  }, [setActiveTab]);
+  const handleOpenStandardInvoice = useCallback(() => {
+    setIsStandardInvoiceOpen(true);
+  }, []);
+  const handleOpenTableGridInvoice = useCallback(() => {
+    setEditingInvoice(null);
+    setInvoiceModalDefaultType(undefined);
+    setIsTableGridInvoiceOpen(true);
+  }, []);
+  const handleScanBarcodeClick = useCallback(() => {
+    handleSelectTab('pos');
+  }, [handleSelectTab]);
+  const handleInventoryOpenSettings = useCallback((tab?: 'profile' | 'items' | 'general' | 'print' | 'audit') => {
+    handleSelectTab('settings');
+    if (tab) {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: tab }));
+      }, 50);
+    }
+  }, [handleSelectTab]);
+  const handlePosCompleteSale = useCallback((inv: Invoice) => {
+    handleSaveInvoice(inv, { openPreview: false });
+  }, [handleSaveInvoice]);
+  const handlePrintSettingsBack = useCallback(() => {
+    setActiveTab('settings');
+  }, [setActiveTab]);
 
   return (
     <PaymentModalProvider
@@ -1429,10 +1462,7 @@ export const App: React.FC = () => {
             items={activeItems}
             parties={parties}
             onNewInvoice={handleOpenNewInvoice}
-            onQuickPos={() => {
-              previousTabRef.current = 'dashboard';
-              setActiveTab('pos');
-            }}
+            onQuickPos={handleDashboardQuickPos}
             onViewInvoice={setPreviewInvoice}
             onPrintInvoice={setPrintInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1450,7 +1480,7 @@ export const App: React.FC = () => {
             company={company}
             items={activeItems}
             parties={parties}
-            onCompleteSale={(inv) => handleSaveInvoice(inv, { openPreview: false })}
+            onCompleteSale={handlePosCompleteSale}
             onViewInvoice={setPreviewInvoice}
           />
         )}
@@ -1459,19 +1489,12 @@ export const App: React.FC = () => {
           <SalesHubView
             company={company}
             invoices={invoices}
-            onOpenStandardInvoice={() => setIsStandardInvoiceOpen(true)}
-            onOpenTableGridInvoice={() => {
-              setEditingInvoice(null);
-              setInvoiceModalDefaultType(undefined);
-              setIsTableGridInvoiceOpen(true);
-            }}
+            onOpenStandardInvoice={handleOpenStandardInvoice}
+            onOpenTableGridInvoice={handleOpenTableGridInvoice}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
             onDeleteInvoice={handleDeleteInvoice}
-            onQuickPos={() => {
-              previousTabRef.current = 'sales';
-              setActiveTab('pos');
-            }}
+            onQuickPos={handleSalesQuickPos}
             onRefresh={refreshData}
           />
         )}
@@ -1629,16 +1652,9 @@ export const App: React.FC = () => {
             onSaveItem={handleSaveItem}
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
-            onScanBarcodeClick={() => handleSelectTab('pos')}
+            onScanBarcodeClick={handleScanBarcodeClick}
             onViewInvoice={setPreviewInvoice}
-            onOpenSettings={(tab) => {
-              handleSelectTab('settings');
-              if (tab) {
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('switch_settings_tab', { detail: tab }));
-                }, 50);
-              }
-            }}
+            onOpenSettings={handleInventoryOpenSettings}
           />
         )}
 
@@ -1721,7 +1737,7 @@ export const App: React.FC = () => {
         {activeTab === 'print_settings' && (
           <PrintSettingsView
             company={company}
-            onBack={() => setActiveTab('settings')}
+            onBack={handlePrintSettingsBack}
           />
         )}
 

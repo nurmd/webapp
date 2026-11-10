@@ -145,7 +145,7 @@ export interface CompanySettingsViewProps {
   initialTab?: 'profile' | 'items' | 'general' | 'print' | 'audit' | SettingsCategoryId;
 }
 
-export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
+const CompanySettingsViewComponent: React.FC<CompanySettingsViewProps> = ({
   company,
   onSave,
   initialTab,
@@ -1098,3 +1098,5 @@ export const CompanySettingsView: React.FC<CompanySettingsViewProps> = ({
     </div>
   );
 };
+
+export const CompanySettingsView = React.memo(CompanySettingsViewComponent);

@@ -47,7 +47,7 @@ interface SalesHubViewProps {
   onRefresh?: () => void;
 }
 
-export const SalesHubView: React.FC<SalesHubViewProps> = ({
+const SalesHubViewComponent: React.FC<SalesHubViewProps> = ({
   company,
   invoices,
   onOpenStandardInvoice,
@@ -1283,4 +1283,6 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
     </div>
   );
 };
+
+export const SalesHubView = React.memo(SalesHubViewComponent);
 

@@ -60,7 +60,7 @@ interface PartiesViewProps {
   onRefresh?: () => void;
 }
 
-export const PartiesView: React.FC<PartiesViewProps> = ({
+const PartiesViewComponent: React.FC<PartiesViewProps> = ({
   parties,
   invoices = [],
   purchases = [],
@@ -1031,3 +1031,5 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     </div>
   );
 };
+
+export const PartiesView = React.memo(PartiesViewComponent);

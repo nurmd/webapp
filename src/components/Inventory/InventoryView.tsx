@@ -8,6 +8,7 @@ import {
   useInvoices,
   usePurchases,
   useStockAdjustments,
+  useItemCategories,
 } from '../../core/store/useDataStore.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -46,7 +47,7 @@ interface InventoryViewProps {
   previewPurchase?: (bill: PurchaseBill) => void;
 }
 
-export const InventoryView: React.FC<InventoryViewProps> = ({
+const InventoryViewComponent: React.FC<InventoryViewProps> = ({
   items,
   invoices,
   purchases,
@@ -66,6 +67,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const storeInvoices = useInvoices();
   const storePurchases = usePurchases();
   const storeAdjustments = useStockAdjustments();
+  const itemCategories = useItemCategories();
 
   // Filter & Sort State (Name, Available Stock, Category, Created Date, Disabled Items)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -314,10 +316,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
   const lowStockCount = useMemo(() => countLowStockItems(items), [items]);
   const categories = useMemo(() => {
-    const managed = db.getCategories().map((c) => c.name);
+    const managed = itemCategories.map((c) => c.name);
     const fromItems = items.map((i) => i.category);
     return Array.from(new Set([...managed, ...fromItems])).filter(Boolean);
-  }, [items]);
+  }, [items, itemCategories]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -929,3 +931,5 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     </div>
   );
 };
+
+export const InventoryView = React.memo(InventoryViewComponent);

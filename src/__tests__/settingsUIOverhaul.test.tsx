@@ -485,7 +485,12 @@ describe('Settings UI Overhaul Comprehensive Test Suite (TC-SET-01 to TC-SET-22)
 
   // TC-SET-21: Structural Invariants - Named Export Retention
   it('TC-SET-21: preserves all named exports and category schema normalization', () => {
-    expect(typeof CompanySettingsView).toBe('function');
+    // Phase 2.5 wraps the view in React.memo, so it is a memo object rather
+    // than a plain function component. Both shapes are valid components.
+    expect(
+      typeof CompanySettingsView === 'function' ||
+        (CompanySettingsView as { $$typeof?: symbol }).$$typeof === Symbol.for('react.memo')
+    ).toBe(true);
     expect(typeof CompanyProfileTab).toBe('function');
     expect(typeof GeneralSettingsTab).toBe('function');
     expect(typeof BillingInvoicesTab).toBe('function');

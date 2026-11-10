@@ -46,7 +46,7 @@ interface PurchasesHubViewProps {
   onAddNewParty?: () => void;
 }
 
-export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
+const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
   purchases,
   parties,
   company,
@@ -734,3 +734,5 @@ export const PurchasesHubView: React.FC<PurchasesHubViewProps> = ({
     </div>
   );
 };
+
+export const PurchasesHubView = React.memo(PurchasesHubViewComponent);

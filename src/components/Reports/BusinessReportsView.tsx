@@ -173,7 +173,7 @@ const CATEGORY_META: Record<
   },
 };
 
-export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
+const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
   company,
   invoices,
   purchases,
@@ -626,5 +626,7 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     </div>
   );
 };
+
+export const BusinessReportsView = React.memo(BusinessReportsViewComponent);
 
 export default BusinessReportsView;
