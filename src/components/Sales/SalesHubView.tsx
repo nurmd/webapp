@@ -22,6 +22,7 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { useBulkSelection } from '../../core/utils/useBulkSelection.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
 import {
   useModalPreloadOnMount,
@@ -192,6 +193,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
       }
     });
   }, [statusFiltered, sortBy]);
+
+  const invoiceWindow = useProgressiveWindow(sortedInvoices.length);
 
   // Bulk selection and batch operations
   const {
@@ -745,7 +748,8 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
             )}
           </div>
         ) : (
-          sortedInvoices.map((inv) => {
+          <>
+            {sortedInvoices.slice(0, invoiceWindow.visibleCount).map((inv) => {
             const isPaid = inv.paymentStatus === 'PAID';
 
             return (
@@ -901,8 +905,30 @@ export const SalesHubView: React.FC<SalesHubViewProps> = ({
                 </div>
               </div>
             );
-          })
-        )}
+          })}
+          {invoiceWindow.enabled && (
+            <div className="pt-2 pb-4 flex flex-col items-center gap-2">
+              <div ref={invoiceWindow.sentinelRef} className="h-1 w-full" />
+              {invoiceWindow.hasMore && (
+                <button
+                  type="button"
+                  data-testid="invoices-show-more"
+                  onClick={invoiceWindow.loadMore}
+                  className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Show more ({invoiceWindow.remaining} remaining)
+                </button>
+              )}
+              <p
+                data-testid="invoices-window-status"
+                className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+              >
+                Showing {invoiceWindow.visibleCount} of {sortedInvoices.length} invoices
+              </p>
+            </div>
+          )}
+        </>
+      )}
       </div>
 
       {/* Floating Action Button for New Bill */}

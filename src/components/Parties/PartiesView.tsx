@@ -27,6 +27,7 @@ import { isSystemParty } from '../../core/utils/systemParties.ts';
 import { createPaymentReceiptVoucher, createPaymentOutVoucher } from '../../core/accounting/ledger.ts';
 import { getDocumentSeriesConfig, formatDocumentNumberPreview } from '../../core/utils/invoiceNumber.ts';
 import { getOutstandingDocuments, allocateOldestFirst } from '../../core/accounting/paymentAllocation.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 
 interface PartiesViewProps {
   parties: Party[];
@@ -337,6 +338,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
       return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
   }, [filtered, sortMode, partyLatestTxMap, activeSegment]);
+
+  const partyWindow = useProgressiveWindow(sortedParties.length);
 
   const handleOpenAddModal = () => {
     setEditingParty(null);
@@ -796,7 +799,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
             </p>
           </div>
         ) : (
-          sortedParties.map((party) => {
+          <>
+            {sortedParties.slice(0, partyWindow.visibleCount).map((party) => {
             const isReceivable = party.currentBalance > 0;
             const isPayable = party.currentBalance < 0;
             const isSettled = party.currentBalance === 0;
@@ -948,8 +952,30 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
                 </div>
               </div>
             );
-          })
-        )}
+          })}
+          {partyWindow.enabled && (
+            <div className="pt-2 pb-4 flex flex-col items-center gap-2">
+              <div ref={partyWindow.sentinelRef} className="h-1 w-full" />
+              {partyWindow.hasMore && (
+                <button
+                  type="button"
+                  data-testid="parties-show-more"
+                  onClick={partyWindow.loadMore}
+                  className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Show more ({partyWindow.remaining} remaining)
+                </button>
+              )}
+              <p
+                data-testid="parties-window-status"
+                className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+              >
+                Showing {partyWindow.visibleCount} of {sortedParties.length} parties
+              </p>
+            </div>
+          )}
+        </>
+      )}
       </section>
 
       {/* 5. Minimal Bottom Floating Action Button */}

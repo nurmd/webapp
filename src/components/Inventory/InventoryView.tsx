@@ -12,6 +12,7 @@ import {
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { countLowStockItems, isItemNeedingRestock } from '../../core/utils/itemStatus.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 import { InventoryItemCard } from './InventoryItemCard.tsx';
 import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
@@ -411,6 +412,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       });
   }, [items, search, filterCategory, filterStockStatus, filterCreatedTimeframe, sortOption, showDisabled]);
 
+  const itemWindow = useProgressiveWindow(filtered.length);
+
   const handleToggleItemStatus = (item: InventoryItem) => {
     const currentlyDisabled = isItemDisabled(item);
     const updated: InventoryItem = {
@@ -748,15 +751,38 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <p className="text-body-sm text-slate-600 mt-1">Tap + Add New Item to create an inventory item.</p>
             </div>
           ) : (
-            filtered.map((item) => (
-              <InventoryItemCard
-                key={item.id}
-                item={item}
-                isBuyPriceVisible={isBuyPriceVisible(item.id)}
-                onToggleBuyPrice={(e) => toggleBuyPrice(item.id, e)}
-                onClick={() => setActiveItemDetail(item)}
-              />
-            ))
+            <>
+              {filtered.slice(0, itemWindow.visibleCount).map((item) => (
+                <InventoryItemCard
+                  key={item.id}
+                  item={item}
+                  isBuyPriceVisible={isBuyPriceVisible(item.id)}
+                  onToggleBuyPrice={(e) => toggleBuyPrice(item.id, e)}
+                  onClick={() => setActiveItemDetail(item)}
+                />
+              ))}
+              {itemWindow.enabled && (
+                <div className="md:col-span-2 pt-2 pb-4 flex flex-col items-center gap-2">
+                  <div ref={itemWindow.sentinelRef} className="h-1 w-full" />
+                  {itemWindow.hasMore && (
+                    <button
+                      type="button"
+                      data-testid="items-show-more"
+                      onClick={itemWindow.loadMore}
+                      className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                    >
+                      Show more ({itemWindow.remaining} remaining)
+                    </button>
+                  )}
+                  <p
+                    data-testid="items-window-status"
+                    className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+                  >
+                    Showing {itemWindow.visibleCount} of {filtered.length} items
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </section>
 
