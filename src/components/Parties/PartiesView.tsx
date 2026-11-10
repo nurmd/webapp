@@ -8,7 +8,14 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import { getPaymentReminderWhatsAppUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
-import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
+import {
+  useCompany,
+  usePartyGroups,
+  usePartyCategories,
+  useVouchers,
+  useInvoices,
+  usePurchases,
+} from '../../core/store/useDataStore.ts';
 import { PartyDetailPage } from './PartyDetailPage.tsx';
 import { AddEditPartyModal } from './AddEditPartyModal.tsx';
 import { PartyGroupsCategoriesModal } from './modals/PartyGroupsCategoriesModal.tsx';
@@ -70,9 +77,12 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   onCreatePurchase,
   onRefresh,
 }) => {
-  const company = db.getCompany();
+  const company = useCompany();
   const isGstActive = company.isGstEnabled !== false;
-  const allVouchers = vouchers || db.getVouchers();
+  const storeVouchers = useVouchers();
+  const allVouchers = vouchers ?? storeVouchers;
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
   const allStates = getStateList();
 
   // Segmented switch: Customers vs Suppliers (Simplified clean layout)
@@ -115,8 +125,8 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
   // Precomputed lookup map of latest transaction timestamp against each party
   const partyLatestTxMap = useMemo(() => {
     const map = new Map<string, number>();
-    const invList = invoices && invoices.length > 0 ? invoices : db.getInvoices();
-    const purList = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+    const invList = invoices && invoices.length > 0 ? invoices : storeInvoices;
+    const purList = purchases && purchases.length > 0 ? purchases : storePurchases;
     const vchList = allVouchers;
 
     for (const p of parties) {
@@ -168,7 +178,7 @@ export const PartiesView: React.FC<PartiesViewProps> = ({
     }
 
     return map;
-  }, [parties, invoices, purchases, allVouchers]);
+  }, [parties, invoices, purchases, allVouchers, storeInvoices, storePurchases]);
 
   // Click handlers for Customer & Supplier selectors with loop sorting when active
   const handleCustomersClick = () => {

@@ -453,6 +453,7 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Full backups include an optional `syncRemoteUrl` so a restore after reinstall restores the cloud link. Backups containing this field must be stored securely because it may include CouchDB credentials.
 - **Reactive State & UI Integration (`src/core/store/useDataStore.ts`, `src/components/Parties/`)**:
   - `usePartyGroups()` and `usePartyCategories()` hooks provide selective reactive updates via `useSyncExternalStore`.
+  - Phase 2.1 Batch 1: Migrated render-time `db.get*()` calls in `InventoryView`, `PartiesView`, and `BusinessReportsView` to granular store hooks (`useCompany`, `useInvoices`, `usePurchases`, `useStockAdjustments`, `useVouchers`, `useBankAccounts`, `useCashBankTxns`); remaining direct `db.get*` calls under `src/components` dropped from 152 to 141 (grep-measured). Handler-time reads stay direct by design.
   - `PartiesView`: Includes "Groups & Categories" management launcher, Group and Category filter dropdowns with auto-reset for stale IDs, and search token matching on group/category names.
   - `PartyGroupsCategoriesModal`: Tabbed palette editor for groups and categories with duplicate name validation and RBAC deletion protection (`rbac.canDeleteParty()`).
   - `AddEditPartyModal`: Live group and category assignment dropdowns with "Unassigned" default and "Party Type" classification.

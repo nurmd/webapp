@@ -21,6 +21,7 @@ import type { Voucher } from '../../core/accounting/voucherTypes.ts';
 import type { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import type { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { db } from '../../services/db.ts';
+import { useBankAccounts, useCashBankTxns } from '../../core/store/useDataStore.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -225,14 +226,17 @@ export const BusinessReportsView: React.FC<BusinessReportsViewProps> = ({
     }
   }, [initialDatePreset]);
 
+  const storeBankAccounts = useBankAccounts();
+  const storeCashBankTxns = useCashBankTxns();
+
   // Fallbacks for bank accounts and loans if not provided in props
   const resolvedBankAccounts = useMemo(() => {
-    return bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts();
-  }, [bankAccounts]);
+    return bankAccounts && bankAccounts.length > 0 ? bankAccounts : storeBankAccounts;
+  }, [bankAccounts, storeBankAccounts]);
 
   const resolvedCashBankTxns = useMemo(() => {
-    return cashBankTxns && cashBankTxns.length > 0 ? cashBankTxns : db.getCashBankTransactions();
-  }, [cashBankTxns]);
+    return cashBankTxns && cashBankTxns.length > 0 ? cashBankTxns : storeCashBankTxns;
+  }, [cashBankTxns, storeCashBankTxns]);
 
   const [localLoans, setLocalLoans] = useState<LoanAccount[]>(() => {
     return loans && loans.length > 0 ? loans : db.getLoans();

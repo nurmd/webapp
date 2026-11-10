@@ -3,6 +3,12 @@ import { InventoryItem, StockAdjustment, isItemDisabled } from '../../models/ite
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { db } from '../../services/db.ts';
+import {
+  useCompany,
+  useInvoices,
+  usePurchases,
+  useStockAdjustments,
+} from '../../core/store/useDataStore.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { countLowStockItems, isItemNeedingRestock } from '../../core/utils/itemStatus.ts';
@@ -54,7 +60,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onViewPurchase,
   previewPurchase: previewPurchaseProp,
 }) => {
-  const isGstActive = db.getCompany().isGstEnabled !== false;
+  const companyProfile = useCompany();
+  const isGstActive = companyProfile.isGstEnabled !== false;
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeAdjustments = useStockAdjustments();
 
   // Filter & Sort State (Name, Available Stock, Category, Created Date, Disabled Items)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -75,7 +85,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [barcodeModalInitialItem, setBarcodeModalInitialItem] = useState<InventoryItem | undefined>(undefined);
-  const company = useMemo(() => db.getCompany(), []);
+  const company = companyProfile;
 
   const handleViewInvoice = (inv: Invoice) => {
     const viewInv = onViewInvoice || previewInvoiceProp;
@@ -183,9 +193,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   // Transactions aggregation (Sales, Purchases, Stock Adjustments)
-  const allInvoices = useMemo(() => invoices || db.getInvoices(), [invoices]);
-  const allPurchases = useMemo(() => purchases || db.getPurchases(), [purchases]);
-  const allAdjustments = useMemo(() => adjustments || db.getStockAdjustments(), [adjustments]);
+  const allInvoices = useMemo(() => invoices ?? storeInvoices, [invoices, storeInvoices]);
+  const allPurchases = useMemo(() => purchases ?? storePurchases, [purchases, storePurchases]);
+  const allAdjustments = useMemo(() => adjustments ?? storeAdjustments, [adjustments, storeAdjustments]);
 
   // Find all items with stock discrepancies where transactions exist
   const itemsWithDiscrepancy = useMemo(() => {
