@@ -335,7 +335,10 @@ export const ReturnItemPickerModal: React.FC<ReturnItemPickerModalProps> = ({
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                        <span
+                          title={item.name}
+                          className="font-bold text-xs sm:text-sm text-on-surface leading-tight break-words line-clamp-2"
+                        >
                           {item.name}
                         </span>
                         {item.hsnSacCode && (

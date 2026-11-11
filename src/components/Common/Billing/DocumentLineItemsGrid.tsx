@@ -469,11 +469,14 @@ export const DocumentLineItemsGrid: React.FC<DocumentLineItemsGridProps> = ({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 py-0.5">
                         <span className="text-[10px] font-mono text-outline font-bold whitespace-nowrap shrink-0">
                           #{idx + 1}
                         </span>
-                        <h4 className="font-bold text-xs text-on-surface truncate whitespace-nowrap shrink-0">
+                        <h4
+                          title={row.name}
+                          className="font-bold text-xs text-on-surface leading-tight break-words line-clamp-2 min-w-0 flex-1"
+                        >
                           {row.name}
                         </h4>
                         {isGstActive && (

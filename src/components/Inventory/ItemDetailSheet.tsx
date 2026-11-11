@@ -293,7 +293,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
         <div className="flex items-center justify-between pb-2.5 border-b border-outline-variant/20 flex-shrink-0">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-headline-sm text-base font-bold text-on-surface truncate">
+              <h3
+                title={item.name}
+                className="font-headline-sm text-base font-bold text-on-surface leading-tight break-words line-clamp-2"
+              >
                 {item.name}
               </h3>
               <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] font-bold flex-shrink-0 ${

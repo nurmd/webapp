@@ -48,7 +48,10 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
 
       {/* Item Details (Clean, NO HSN) */}
       <div className="min-w-0">
-        <p className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-secondary transition-colors">
+        <p
+          title={item.name}
+          className="text-xs sm:text-sm font-bold text-slate-900 leading-tight break-words line-clamp-2 min-h-[2.4em] group-hover:text-secondary transition-colors"
+        >
           {item.name}
         </p>
         <p className="text-[11px] text-slate-500 truncate mt-0.5">
@@ -93,12 +96,15 @@ export const PosCatalogListRow: React.FC<PosCatalogCardProps> = ({
       }`}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-900 truncate">
+        <div className="flex items-start gap-2">
+          <span
+            title={item.name}
+            className="text-xs font-bold text-slate-900 leading-tight break-words line-clamp-2 min-w-0"
+          >
             {item.name}
           </span>
           {isGstActive && item.gstRate > 0 && (
-            <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono">
+            <span className="text-[10px] bg-secondary-container/40 text-on-secondary-container px-1 rounded font-bold font-mono shrink-0 mt-0.5">
               {item.gstRate}%
             </span>
           )}

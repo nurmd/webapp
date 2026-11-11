@@ -1214,7 +1214,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 {/* Line 1: Clean Name, Unit/GST, Delete */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-slate-900 truncate block">
+                    <span
+                      title={item.name}
+                      className="text-xs font-bold text-slate-900 leading-tight break-words line-clamp-2 block"
+                    >
                       {item.name}
                     </span>
                     <span className="text-[10px] text-slate-500">
@@ -1604,7 +1607,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   className="bg-surface-container-low/70 p-2.5 rounded-xl border border-outline-variant/30 flex items-center justify-between gap-2 shadow-sm"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-900 truncate">
+                    <div
+                      title={item.name}
+                      className="text-xs font-bold text-slate-900 leading-tight break-words line-clamp-2"
+                    >
                       {item.name}
                     </div>
                     <div className="text-[11px] text-slate-500 mt-0.5">

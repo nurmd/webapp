@@ -50,7 +50,9 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
         {/* Top Row: Item Name (left) & Available Stock Badge (right) */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <h3 className={`font-headline-sm text-sm sm:text-base truncate font-semibold ${
+            <h3
+              title={item.name}
+              className={`font-headline-sm text-sm sm:text-base leading-tight break-words line-clamp-2 font-semibold ${
               itemDisabled ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-on-surface'
             }`}>
               {item.name}

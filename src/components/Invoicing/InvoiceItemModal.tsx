@@ -844,7 +844,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                         className="p-2.5 flex items-center justify-between gap-2 hover:bg-surface-container-low cursor-pointer transition-colors"
                       >
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold text-on-surface truncate">
+                          <span
+                            title={item.name}
+                            className="text-xs font-bold text-on-surface leading-tight break-words line-clamp-2"
+                          >
                             {item.name}
                           </span>
                           <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">

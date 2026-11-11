@@ -507,6 +507,11 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Each purchase transaction row links to `purchaseId` and opens the purchase bill preview.
 - **`ItemFormModal.tsx`**: Add/Edit item modal. Displays a real-time warning banner if the typed name already exists in the catalog (excluding the current item in edit mode).
 
+#### Item Name Display Invariant (all item surfaces)
+- Item names must **never** be hidden behind an ellipsis due to narrow viewports. Every surface that renders an item name (`PosCatalogCard` grid + list rows, `QuickBillingView` cart rows, `InventoryItemCard`, `ItemDetailSheet`, `InvoiceItemModal` picker, `ReturnItemPickerModal`, `DocumentLineItemsGrid` card/compact views) uses `line-clamp-2 break-words leading-tight` and carries `title={item.name}` for the full value.
+- Avoid `truncate`/`whitespace-nowrap` on item names, and avoid wrapping the name in horizontally scrolling (`overflow-x-auto`) containers.
+- Regression guard: `src/__tests__/itemNameWrapping.test.tsx`.
+
 ### C. Parties & Ledger Architecture (`PartyDetailPage.tsx`)
 - **Responsive Layout**:
   - **Tablet & Wide (`md:` and above)**: Split into non-scrolling Left Column (fixed Party Info Card, Record Payment, New Invoice / New Bill) and Right Column (Transaction Ledger table).
