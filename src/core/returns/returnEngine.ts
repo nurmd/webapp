@@ -204,10 +204,10 @@ export function calculateReturnLineEntries(
       const ratio = sel.returnQuantity / origQty;
 
       const taxable = Math.round((orig.taxableAmount || 0) * ratio * 100) / 100;
-      const cgst = Math.round(((orig as any).cgstAmount || (orig as any).cgst || 0) * ratio * 100) / 100;
-      const sgst = Math.round(((orig as any).sgstAmount || (orig as any).sgst || 0) * ratio * 100) / 100;
-      const igst = Math.round(((orig as any).igstAmount || (orig as any).igst || 0) * ratio * 100) / 100;
-      const cess = Math.round(((orig as any).cessAmount || (orig as any).cess || 0) * ratio * 100) / 100;
+      const cgst = Math.round((((orig as { cgstAmount?: number; cgst?: number }).cgstAmount || (orig as { cgstAmount?: number; cgst?: number }).cgst || 0)) * ratio * 100) / 100;
+      const sgst = Math.round((((orig as { sgstAmount?: number; sgst?: number }).sgstAmount || (orig as { sgstAmount?: number; sgst?: number }).sgst || 0)) * ratio * 100) / 100;
+      const igst = Math.round((((orig as { igstAmount?: number; igst?: number }).igstAmount || (orig as { igstAmount?: number; igst?: number }).igst || 0)) * ratio * 100) / 100;
+      const cess = Math.round((((orig as { cessAmount?: number; cess?: number }).cessAmount || (orig as { cessAmount?: number; cess?: number }).cess || 0)) * ratio * 100) / 100;
       const lineTotal = Math.round((taxable + cgst + sgst + igst + cess) * 100) / 100;
 
       subtotal += taxable;
@@ -220,7 +220,7 @@ export function calculateReturnLineEntries(
         itemId: orig.itemId || '',
         name: orig.name,
         description: orig.description,
-        hsnSacCode: orig.hsnSacCode || (orig as any).hsnCode || '',
+        hsnSacCode: orig.hsnSacCode || (orig as { hsnCode?: string }).hsnCode || '',
         quantity: sel.returnQuantity,
         unit: orig.unit || 'PCS',
         unitPrice: orig.unitPrice || 0,
@@ -306,7 +306,7 @@ export function applyReturnToInvoice(
   const updatedSplits: PaymentSplit[] = [...existingTenders];
   if (applied > 0) {
     const cnId = creditNote?.id ? `cn-${creditNote.id}` : `cn-${Date.now()}`;
-    const cnRef = creditNote?.invoiceNumber || (creditNote as any)?.documentNumber || undefined;
+    const cnRef = creditNote?.invoiceNumber || (creditNote as { documentNumber?: string } | undefined)?.documentNumber || undefined;
 
     const existingCnIdx = updatedSplits.findIndex(
       (s) => s.id === cnId || (cnRef && s.reference === cnRef)

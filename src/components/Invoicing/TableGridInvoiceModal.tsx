@@ -3,6 +3,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
+import { normalizeInvoiceLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
 import { SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
@@ -677,43 +678,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   }): Invoice => {
     const invoiceItems: InvoiceItemEntry[] = rows.map((r, idx) => {
       const calcItem = calcSummary.items[idx];
-      const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (r.priceMode ?? 'EXCLUSIVE');
-      const gst = isGstActive && !company.isCompositionScheme ? (r.gstRate || 0) : 0;
-      let excl = Number(r.unitPrice) || 0;
-      let incl = Number(r.unitPriceInclusive);
-      if (!isGstActive || company.isCompositionScheme) {
-        incl = excl;
-      } else if (mode === 'EXCLUSIVE') {
-        incl = inclusiveFromExclusive(excl, gst);
-      } else {
-        if (!Number.isFinite(incl) || incl <= 0) {
-          incl = inclusiveFromExclusive(excl, gst);
-        }
-        excl = exclusiveFromInclusive(incl, gst);
-      }
-      return {
-        itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
-        name: r.name || 'Billed Product / Service',
-        description: r.description,
-        hsnSacCode: isGstActive ? (r.hsnSacCode || '998313') : '',
-        unit: (r.unit as any) || 'PCS',
-        quantity: r.quantity,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        mrp: r.mrp,
-        discountPercent: r.discountPercent,
-        discountAmount: calcItem?.discountAmount || 0,
-        taxableAmount: calcItem?.taxableAmount || 0,
-        gstRate: gst,
-        cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
-        sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
-        utgstAmount: isGstActive ? (calcItem?.utgstAmount || 0) : 0,
-        igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
-        cessRate: isGstActive ? (Number(r.cessRate) || 0) : 0,
-        cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
-        totalAmount: calcItem?.totalAmount || 0,
-      };
+      const item = normalizeInvoiceLineItem(r as RawLineItem, calcItem, { isGstActive, isComposition: !!company.isCompositionScheme }, idx);
+      if (isGstActive && !item.hsnSacCode) item.hsnSacCode = '998313';
+      return item;
     });
 
     const hasPaymentOverride = paymentOverride !== undefined;

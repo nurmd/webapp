@@ -29,4 +29,10 @@ export interface Expense {
   notes?: string;
   itcEligible: boolean; // Input Tax Credit eligibility
   createdAt: string;
+
+  // --- Bank/Cash account attribution ---
+  cashAccountId?: string;
+  cashAccountName?: string;
+  bankAccountId?: string;
+  bankAccountName?: string;
 }

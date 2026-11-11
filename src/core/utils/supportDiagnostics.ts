@@ -8,6 +8,8 @@
  * - Robust: malformed URLs or errors never throw; returns safe fallbacks.
  */
 
+import { getAndroidBridge } from './androidBridge.ts';
+
 export const SUPPORT_DIAGNOSTICS_SCHEMA_VERSION = '1.0.0';
 
 export interface SupportDiagnosticsConflictSummary {
@@ -81,8 +83,8 @@ export interface SupportDiagnosticsConflictItem {
   entityId?: string;
   winningRev?: string;
   conflictingRev?: string;
-  winningDoc?: any;
-  conflictingDoc?: any;
+  winningDoc?: unknown;
+  conflictingDoc?: unknown;
   detectedAt?: string;
 }
 
@@ -549,7 +551,7 @@ export function buildSupportDiagnostics(
       name: appInput.name || 'Vyapar Books',
       version: appInput.version || '0.0.0',
       buildTime: appInput.buildTime || generatedAt,
-      platform: appInput.platform || (typeof window !== 'undefined' && (window as any).AndroidBridge ? 'android' : 'web'),
+      platform: appInput.platform || (typeof window !== 'undefined' && getAndroidBridge() ? 'android' : 'web'),
     },
     environment: {
       online,

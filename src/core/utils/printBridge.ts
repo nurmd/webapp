@@ -6,6 +6,8 @@
  * and provides robust browser fallbacks (popup window -> hidden iframe -> window.print).
  */
 
+import { getAndroidBridge } from './androidBridge.ts';
+
 export type PrintPaperSize = 'A4' | 'A4-landscape' | 'default';
 
 /**
@@ -32,7 +34,7 @@ export function printHtmlNative(
   paperSize: PrintPaperSize = 'A4'
 ): boolean {
   if (typeof window === 'undefined') return false;
-  const bridge = (window as any).AndroidBridge;
+  const bridge = getAndroidBridge();
   if (!bridge) return false;
 
   try {
@@ -72,7 +74,7 @@ export function printCurrentPageNative(
   paperSize: PrintPaperSize = 'A4'
 ): boolean {
   if (typeof window === 'undefined') return false;
-  const bridge = (window as any).AndroidBridge;
+  const bridge = getAndroidBridge();
   if (!bridge) return false;
 
   try {
@@ -109,7 +111,7 @@ export function printCurrentPageNative(
  */
 export function generatePdfNative(jobName: string): boolean {
   if (typeof window === 'undefined') return false;
-  const bridge = (window as any).AndroidBridge;
+  const bridge = getAndroidBridge();
   if (!bridge) return false;
 
   try {
@@ -139,7 +141,7 @@ export function generatePdfFromHtmlNative(
   paperSize: PrintPaperSize = 'A4'
 ): boolean {
   if (typeof window === 'undefined') return false;
-  const bridge = (window as any).AndroidBridge;
+  const bridge = getAndroidBridge();
   if (!bridge) return false;
 
   try {

@@ -461,7 +461,15 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     const paymentRow = container.querySelector('[data-testid="passbook-entry-vchr-pay-in-1"]');
     expect(paymentRow).not.toBeNull();
 
-    // Find the Line 1 container
+    // Status badge moved above the transaction amount (right column)
+    const badgeEl = Array.from(paymentRow?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === 'PAID'
+    );
+    expect(badgeEl).toBeDefined();
+    expect(badgeEl?.className).toContain('rounded-full');
+    expect(badgeEl?.className).not.toContain('absolute');
+
+    // Line 1 (first line): voucher type with invoice number (freed of date & badge)
     const voucherTypeEl = Array.from(paymentRow?.querySelectorAll('span') || []).find(
       (el) => el.textContent?.trim() === 'Payment In'
     );
@@ -469,43 +477,27 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(voucherTypeEl?.className).toContain('whitespace-nowrap');
     expect(voucherTypeEl?.className).toContain('shrink-0');
 
-    const line1Container = voucherTypeEl?.parentElement;
-    expect(line1Container).toBeDefined();
-    expect(line1Container?.className).toContain('flex');
-    expect(line1Container?.className).toContain('items-center');
-    expect(line1Container?.className).toContain('flex-nowrap');
-    expect(line1Container?.className).toContain('min-w-0');
-    expect(line1Container?.className).not.toContain('flex-wrap');
+    // Invoice number moved to top line
+    const invNoEl = Array.from(paymentRow?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.includes('RCPT-2026-0045')
+    );
+    expect(invNoEl).not.toBeNull();
 
-    // Date inside Line 1
-    const dateEl = line1Container?.querySelector('span.text-slate-500');
+    // Middle line: date
+    const dateEl = Array.from(paymentRow?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === '2026-10-28'
+    );
     expect(dateEl).not.toBeNull();
     expect(dateEl?.textContent).toContain('2026-10-28');
-    expect(dateEl?.className).toContain('whitespace-nowrap');
-    expect(dateEl?.className).toContain('truncate');
-    expect(dateEl?.className).toContain('min-w-0');
 
-    // Status badge inside Line 1
-    const badgeEl = Array.from(line1Container?.querySelectorAll('span') || []).find(
-      (el) => el.textContent?.trim() === 'PAID'
-    );
-    expect(badgeEl).toBeDefined();
-    expect(badgeEl?.className).toContain('shrink-0');
-    expect(badgeEl?.className).toContain('whitespace-nowrap');
-    expect(badgeEl?.className).toContain('rounded-full');
-    expect(badgeEl?.parentElement).toBe(line1Container);
-
-    // Partial badge on invoice row
+    // Partial badge on invoice row also in top-left corner
     const invoiceRow = container.querySelector('[data-testid="passbook-entry-sale-inv-long-1"]');
     expect(invoiceRow).not.toBeNull();
     const partialBadge = Array.from(invoiceRow?.querySelectorAll('span') || []).find(
       (el) => el.textContent?.trim() === 'PARTIAL'
     );
     expect(partialBadge).toBeDefined();
-    expect(partialBadge?.className).toContain('shrink-0');
-    expect(partialBadge?.className).toContain('whitespace-nowrap');
-    const invoiceLine1 = partialBadge?.parentElement;
-    expect(invoiceLine1?.className).toContain('flex-nowrap');
-    expect(invoiceLine1?.className).not.toContain('flex-wrap');
+    expect(partialBadge?.className).toContain('rounded-full');
+    expect(partialBadge?.className).not.toContain('absolute');
   });
 });

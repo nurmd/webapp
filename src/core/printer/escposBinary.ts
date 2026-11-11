@@ -351,29 +351,29 @@ export async function printViaWebBluetooth(binaryData: Uint8Array): Promise<{ su
       throw new Error('Web Bluetooth is not supported on this browser/device.');
     }
 
-    const device = await (navigator as any).bluetooth.requestDevice({
+    const device = (await (navigator as unknown as { bluetooth: { requestDevice: (opts: unknown) => Promise<unknown> } }).bluetooth.requestDevice({
       acceptAllDevices: true,
       optionalServices: [
         '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS Service
         'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Star Micronics
         '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent
       ],
-    });
+    })) as { gatt: { connect: () => Promise<unknown> } };
 
     if (!device.gatt) {
       throw new Error('Bluetooth GATT server unavailable.');
     }
 
-    const server = await device.gatt.connect();
+    const server = await device.gatt.connect() as { getPrimaryServices: () => Promise<unknown[]> }
 
     // Look for writable characteristic across available services
-    let targetChar: any = null;
-    const services = await server.getPrimaryServices();
+    let targetChar: unknown = null;
+    const services = await server.getPrimaryServices() as Array<{ getCharacteristics: () => Promise<unknown[]> }>;
 
     for (const service of services) {
-      const chars = await service.getCharacteristics();
+      const chars = await service.getCharacteristics() as Array<{ properties: { write: boolean; writeWithoutResponse: boolean }; writeValue: (d: Uint8Array) => Promise<void>; writeValueWithoutResponse: (d: Uint8Array) => Promise<void> }>;
       for (const ch of chars) {
-        if (ch.properties.write || ch.properties.writeWithoutResponse) {
+        if ((ch as { properties: { write: boolean; writeWithoutResponse: boolean } }).properties.write || (ch as { properties: { write: boolean; writeWithoutResponse: boolean } }).properties.writeWithoutResponse) {
           targetChar = ch;
           break;
         }
@@ -389,18 +389,18 @@ export async function printViaWebBluetooth(binaryData: Uint8Array): Promise<{ su
     const CHUNK_SIZE = 128;
     for (let i = 0; i < binaryData.length; i += CHUNK_SIZE) {
       const chunk = binaryData.slice(i, i + CHUNK_SIZE);
-      if (targetChar.properties.writeWithoutResponse) {
-        await targetChar.writeValueWithoutResponse(chunk);
+      if ((targetChar as { properties: { writeWithoutResponse: boolean } }).properties.writeWithoutResponse) {
+        await (targetChar as { writeValueWithoutResponse: (d: Uint8Array) => Promise<void> }).writeValueWithoutResponse(chunk);
       } else {
-        await targetChar.writeValue(chunk);
+        await (targetChar as { writeValue: (d: Uint8Array) => Promise<void> }).writeValue(chunk);
       }
       // Pacing delay between BLE packets to prevent buffer overflow
       await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Web Bluetooth ESC/POS Print Error:', err);
-    return { success: false, error: err.message || 'Bluetooth connection failed.' };
+    return { success: false, error: (err as { message?: string })?.message || 'Bluetooth connection failed.' };
   }
 }

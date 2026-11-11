@@ -4,6 +4,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { isSystemParty, SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
+import { normalizeInvoiceLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
@@ -661,36 +662,20 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const invoiceItems: InvoiceItemEntry[] = cart.map((c, idx) => {
       const itemCalc = calcSummary.items[idx];
-      const excl = Number(c.unitPrice) || 0;
-      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (c.item.gstRate || 0);
-      const rawIncl = Number(c.unitPriceInclusive) || 0;
-      const mode: ItemPriceMode = isGstActive && !company.isCompositionScheme ? (c.priceMode ?? 'EXCLUSIVE') : 'EXCLUSIVE';
-      const incl = (!isGstActive || company.isCompositionScheme)
-        ? excl
-        : mode === 'EXCLUSIVE'
-        ? inclusiveFromExclusive(excl, gst)
-        : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
-      return {
+      const raw: RawLineItem = {
         itemId: c.item.id,
         name: c.item.name,
-        hsnSacCode: isGstActive ? c.item.hsnSacCode : '',
+        hsnSacCode: c.item.hsnSacCode,
         unit: c.item.unit,
         quantity: c.qty,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        cessRate: isGstActive && !company.isCompositionScheme ? (c.cessRate || 0) : 0,
-        taxableAmount: itemCalc.taxableAmount,
+        unitPrice: c.unitPrice,
+        unitPriceInclusive: c.unitPriceInclusive,
+        priceMode: c.priceMode,
         discountPercent: c.discountPercent,
-        discountAmount: itemCalc.discountAmount,
-        gstRate: (!isGstActive || company.isCompositionScheme) ? 0 : c.item.gstRate,
-        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.cgstAmount,
-        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.sgstAmount,
-        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.utgstAmount,
-        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.igstAmount,
-        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : itemCalc.cessAmount,
-        totalAmount: (!isGstActive || company.isCompositionScheme) ? itemCalc.taxableAmount : itemCalc.totalAmount,
+        cessRate: c.cessRate || c.item.cessRate,
+        gstRate: c.item.gstRate,
       };
+      return normalizeInvoiceLineItem(raw, itemCalc, { isGstActive, isComposition: !!company.isCompositionScheme }, idx);
     });
 
     const isB2bInvoice = isGstActive && !!customer.gstin;

@@ -156,10 +156,10 @@ export function computeCashBankSummary(params: {
             const splitAmt = roundMoney(s.amount * ratio);
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
-            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (inv as any).bankAccountId || defaultBank.id);
+            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || inv.bankAccountId || defaultBank.id);
             const targetAccName = isCash
               ? 'Cash in Hand'
-              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || (inv as any).bankAccountName || defaultBank.accountName);
+              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || inv.bankAccountName || defaultBank.accountName);
 
             balances[targetAccId] = (balances[targetAccId] || 0) + splitAmt;
 
@@ -186,10 +186,10 @@ export function computeCashBankSummary(params: {
           });
         } else {
           const isCash = inv.paymentMode === 'CASH';
-          const targetAccId = isCash ? 'ACC_CASH' : ((inv as any).bankAccountId || defaultBank.id);
+          const targetAccId = isCash ? 'ACC_CASH' : (inv.bankAccountId || defaultBank.id);
           const targetAccName = isCash
             ? 'Cash in Hand'
-            : (accounts.find((a) => a.id === targetAccId)?.accountName || (inv as any).bankAccountName || defaultBank.accountName);
+            : (accounts.find((a) => a.id === targetAccId)?.accountName || inv.bankAccountName || defaultBank.accountName);
 
           balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
 
@@ -304,10 +304,10 @@ export function computeCashBankSummary(params: {
             const splitAmt = roundMoney(s.amount * ratio);
             if (splitAmt <= 0) return;
             const isCash = s.mode === 'CASH';
-            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || (pur as any).bankAccountId || defaultBank.id);
+            const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || pur.bankAccountId || defaultBank.id);
             const targetAccName = isCash
               ? 'Cash in Hand'
-              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || (pur as any).bankAccountName || defaultBank.accountName);
+              : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || pur.bankAccountName || defaultBank.accountName);
 
             balances[targetAccId] = (balances[targetAccId] || 0) - splitAmt;
 
@@ -334,10 +334,10 @@ export function computeCashBankSummary(params: {
           });
         } else {
           const isCash = pur.paymentMode === 'CASH';
-          const targetAccId = isCash ? 'ACC_CASH' : ((pur as any).bankAccountId || defaultBank.id);
+          const targetAccId = isCash ? 'ACC_CASH' : (pur.bankAccountId || defaultBank.id);
           const targetAccName = isCash
             ? 'Cash in Hand'
-            : (accounts.find((a) => a.id === targetAccId)?.accountName || (pur as any).bankAccountName || defaultBank.accountName);
+            : (accounts.find((a) => a.id === targetAccId)?.accountName || pur.bankAccountName || defaultBank.accountName);
 
           balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
 
@@ -370,10 +370,10 @@ export function computeCashBankSummary(params: {
   expenses.forEach((exp) => {
     if (exp && exp.amount > 0) {
       const isCash = exp.paymentMode === 'CASH';
-      const targetAccId = isCash ? 'ACC_CASH' : ((exp as any).bankAccountId || defaultBank.id);
+      const targetAccId = isCash ? 'ACC_CASH' : (exp.bankAccountId || defaultBank.id);
       const targetAccName = isCash
         ? 'Cash in Hand'
-        : (accounts.find((a) => a && a.id === targetAccId)?.accountName || (exp as any).bankAccountName || defaultBank.accountName);
+        : (accounts.find((a) => a && a.id === targetAccId)?.accountName || exp.bankAccountName || defaultBank.accountName);
 
       balances[targetAccId] = (balances[targetAccId] || 0) - exp.amount;
 

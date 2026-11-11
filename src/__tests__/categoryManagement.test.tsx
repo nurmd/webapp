@@ -212,7 +212,7 @@ describe('Category Management System', () => {
 
       const backup = db.createDatabaseBackup();
       expect(backup.data.categories).toBeDefined();
-      expect(backup.data.categories!.some((c) => c.name === 'Bakery')).toBe(true);
+      expect(backup.data.categories!.some((c) => (c as { name?: string }).name === 'Bakery')).toBe(true);
       expect(backup.counts.categories).toBeGreaterThan(0);
 
       // Clear DB

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type PreloadableComponent<T extends React.ComponentType<any>> = React.LazyExoticComponent<T> & {
+export type PreloadableComponent<T extends React.ComponentType<Record<string, unknown>>> = React.LazyExoticComponent<T> & {
   preload: () => Promise<{ default: T }>;
 };
 
@@ -8,7 +8,7 @@ export type PreloadableComponent<T extends React.ComponentType<any>> = React.Laz
  * Creates a React.lazy component equipped with a `.preload()` method.
  * Calling `.preload()` initiates the dynamic import immediately and caches the promise.
  */
-export function lazyWithPreload<T extends React.ComponentType<any>>(
+export function lazyWithPreload<T extends React.ComponentType<Record<string, unknown>>>(
   factory: () => Promise<{ default: T }>
 ): PreloadableComponent<T> {
   let loadedPromise: Promise<{ default: T }> | null = null;
@@ -26,7 +26,7 @@ export function lazyWithPreload<T extends React.ComponentType<any>>(
 
 // ── Explicit Modal Preloaders ──────────────────────────────────────────
 
-let invoicePreviewPromise: Promise<any> | null = null;
+let invoicePreviewPromise: Promise<unknown> | null = null;
 export function preloadInvoicePreviewModal() {
   if (!invoicePreviewPromise) {
     invoicePreviewPromise = import('../../components/Invoicing/InvoicePreviewModal.tsx');
@@ -34,7 +34,7 @@ export function preloadInvoicePreviewModal() {
   return invoicePreviewPromise;
 }
 
-let tableGridInvoicePromise: Promise<any> | null = null;
+let tableGridInvoicePromise: Promise<unknown> | null = null;
 export function preloadTableGridInvoiceModal() {
   if (!tableGridInvoicePromise) {
     tableGridInvoicePromise = import('../../components/Invoicing/TableGridInvoiceModal.tsx');
@@ -42,7 +42,7 @@ export function preloadTableGridInvoiceModal() {
   return tableGridInvoicePromise;
 }
 
-let simplifiedInvoicePromise: Promise<any> | null = null;
+let simplifiedInvoicePromise: Promise<unknown> | null = null;
 export function preloadSimplifiedInvoiceModal() {
   if (!simplifiedInvoicePromise) {
     simplifiedInvoicePromise = import('../../components/Invoicing/SimplifiedInvoiceModal.tsx');
@@ -50,7 +50,7 @@ export function preloadSimplifiedInvoiceModal() {
   return simplifiedInvoicePromise;
 }
 
-let simplifiedPurchasePromise: Promise<any> | null = null;
+let simplifiedPurchasePromise: Promise<unknown> | null = null;
 export function preloadSimplifiedPurchaseModal() {
   if (!simplifiedPurchasePromise) {
     simplifiedPurchasePromise = import('../../components/Purchases/SimplifiedPurchaseModal.tsx');
@@ -58,7 +58,7 @@ export function preloadSimplifiedPurchaseModal() {
   return simplifiedPurchasePromise;
 }
 
-let tableGridPurchasePromise: Promise<any> | null = null;
+let tableGridPurchasePromise: Promise<unknown> | null = null;
 export function preloadTableGridPurchaseModal() {
   if (!tableGridPurchasePromise) {
     tableGridPurchasePromise = import('../../components/Purchases/TableGridPurchaseModal.tsx');
@@ -66,7 +66,7 @@ export function preloadTableGridPurchaseModal() {
   return tableGridPurchasePromise;
 }
 
-let cashBankDetailPromise: Promise<any> | null = null;
+let cashBankDetailPromise: Promise<unknown> | null = null;
 export function preloadCashBankTransactionDetailModal() {
   if (!cashBankDetailPromise) {
     cashBankDetailPromise = import('../../components/CashBank/CashBankTransactionDetailModal.tsx');
@@ -74,7 +74,7 @@ export function preloadCashBankTransactionDetailModal() {
   return cashBankDetailPromise;
 }
 
-let voucherEditorPromise: Promise<any> | null = null;
+let voucherEditorPromise: Promise<unknown> | null = null;
 export function preloadVoucherEditorModal() {
   if (!voucherEditorPromise) {
     voucherEditorPromise = import('../../components/Parties/VoucherEditorModal.tsx');
@@ -82,7 +82,7 @@ export function preloadVoucherEditorModal() {
   return voucherEditorPromise;
 }
 
-let reportPdfPreviewPromise: Promise<any> | null = null;
+let reportPdfPreviewPromise: Promise<unknown> | null = null;
 export function preloadReportPdfPreviewModal() {
   if (!reportPdfPreviewPromise) {
     reportPdfPreviewPromise = import('../../components/Reports/ReportPdfPreviewModal.tsx');
@@ -90,7 +90,7 @@ export function preloadReportPdfPreviewModal() {
   return reportPdfPreviewPromise;
 }
 
-let thermalPrintPromise: Promise<any> | null = null;
+let thermalPrintPromise: Promise<unknown> | null = null;
 export function preloadThermalPrintModal() {
   if (!thermalPrintPromise) {
     thermalPrintPromise = import('../../components/Printing/ThermalPrintModal.tsx');
@@ -98,7 +98,7 @@ export function preloadThermalPrintModal() {
   return thermalPrintPromise;
 }
 
-let bulkPrintPromise: Promise<any> | null = null;
+let bulkPrintPromise: Promise<unknown> | null = null;
 export function preloadBulkPrintModal() {
   if (!bulkPrintPromise) {
     bulkPrintPromise = import('../../components/Printing/BulkPrintModal.tsx');
@@ -106,7 +106,7 @@ export function preloadBulkPrintModal() {
   return bulkPrintPromise;
 }
 
-let invoiceDocumentPromise: Promise<any> | null = null;
+let invoiceDocumentPromise: Promise<unknown> | null = null;
 export function preloadInvoiceDocumentModal() {
   if (!invoiceDocumentPromise) {
     invoiceDocumentPromise = import('../../components/Invoicing/InvoiceDocumentModal.tsx');
@@ -114,7 +114,7 @@ export function preloadInvoiceDocumentModal() {
   return invoiceDocumentPromise;
 }
 
-let purchaseDocumentPromise: Promise<any> | null = null;
+let purchaseDocumentPromise: Promise<unknown> | null = null;
 export function preloadPurchaseDocumentModal() {
   if (!purchaseDocumentPromise) {
     purchaseDocumentPromise = import('../../components/Purchases/PurchaseDocumentModal.tsx');
@@ -122,7 +122,7 @@ export function preloadPurchaseDocumentModal() {
   return purchaseDocumentPromise;
 }
 
-let partyDetailPromise: Promise<any> | null = null;
+let partyDetailPromise: Promise<unknown> | null = null;
 export function preloadPartyDetailModal() {
   if (!partyDetailPromise) {
     partyDetailPromise = import('../../components/Parties/PartyDetailModal.tsx');
@@ -130,7 +130,7 @@ export function preloadPartyDetailModal() {
   return partyDetailPromise;
 }
 
-let reportPreviewPromise: Promise<any> | null = null;
+let reportPreviewPromise: Promise<unknown> | null = null;
 export function preloadReportPreviewModal() {
   if (!reportPreviewPromise) {
     reportPreviewPromise = import('../../components/Reports/ReportPreviewModal.tsx');
@@ -162,10 +162,10 @@ export function preloadAllModalsOnIdle(): void {
 
   const scheduleIdle =
     typeof window !== 'undefined' && 'requestIdleCallback' in window
-      ? (window as any).requestIdleCallback
+      ? (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback
       : (cb: () => void) => setTimeout(cb, 2000);
 
-  scheduleIdle(() => {
+  (scheduleIdle ?? ((cb: () => void) => setTimeout(cb, 2000))) (() => {
     // Run sequentially with microtask pauses to prevent CPU spike
     let index = 0;
     function next() {
@@ -188,7 +188,7 @@ export function preloadAllModalsOnIdle(): void {
 /**
  * Hook to preload specified modals on view mount.
  */
-export function useModalPreloadOnMount(preloaders: Array<() => Promise<any>>): void {
+export function useModalPreloadOnMount(preloaders: Array<() => Promise<unknown>>): void {
   React.useEffect(() => {
     preloaders.forEach((p) => {
       try {

@@ -290,7 +290,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 key={entry.id}
                 data-testid={`passbook-entry-${entry.id}`}
                 onClick={() => onTransactionClick(entry)}
-                className="p-3 sm:p-3.5 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-3 cursor-pointer"
+                className="relative p-3 sm:p-3.5 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-3 cursor-pointer"
               >
                 {/* Left Icon and 3-Line Details */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -303,33 +303,21 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                   </div>
 
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
-                    {/* Line 1: Voucher type (invoice, return, payment) and date */}
+
+                    {/* Line 1: Voucher type with invoice number (freed of date & badge) */}
                     <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
                       <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm whitespace-nowrap shrink-0">
                         {voucherTypeLabel}
                       </span>
-                      <span className="text-slate-500 text-[11px] sm:text-xs whitespace-nowrap truncate min-w-0">
-                        • {entry.date}
+                      <span className="text-slate-600 text-[11px] sm:text-xs font-mono font-medium whitespace-nowrap truncate min-w-0">
+                        {voucherNumber}
                       </span>
-                      {entry.status && entry.status !== 'OPENING' && (
-                        <span
-                          className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap ${
-                            entry.status === 'PAID'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : entry.status === 'PARTIAL'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}
-                        >
-                          {entry.status}
-                        </span>
-                      )}
                     </div>
 
-                    {/* Line 2: Voucher number in slate-600 text */}
-                    <div className="text-xs text-slate-600 font-mono font-medium truncate tracking-tight">
-                      {voucherNumber}
-                    </div>
+                    {/* Line 2 (middle): transaction date */}
+                    <span className="text-[11px] sm:text-xs text-slate-500 font-medium whitespace-nowrap truncate block">
+                      {entry.date}
+                    </span>
 
                     {/* Line 3: Voucher balance amount for invoice, linked voucherno for payment voucher */}
                     <div className="min-w-0 truncate">
@@ -339,7 +327,20 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 </div>
 
                 {/* Right Amount & Chevron */}
-                <div className="flex items-center gap-2 flex-shrink-0 text-right">
+                <div className="flex flex-col items-end gap-1 flex-shrink-0 text-right">
+                  {entry.status && entry.status !== 'OPENING' && (
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap ${
+                        entry.status === 'PAID'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : entry.status === 'PARTIAL'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}
+                    >
+                      {entry.status}
+                    </span>
+                  )}
                   <div>
                     <span
                       className={`font-currency-display-mobile text-xs sm:text-sm font-black block ${

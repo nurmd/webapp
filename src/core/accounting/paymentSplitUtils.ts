@@ -113,10 +113,10 @@ export function parseSplitsFromInvoice(
   // 2. Parse from notes (e.g. "Split Payment — Cash ₹500, UPI ₹500" or "Split: Cash ₹500, ...")
   if (inv.notes) {
     const fromNotes = parseSplitsFromNotes(inv.notes, {
-      cashAccountId: (inv as any).cashAccountId,
-      cashAccountName: (inv as any).cashAccountName,
-      bankAccountId: (inv as any).bankAccountId,
-      bankAccountName: (inv as any).bankAccountName,
+      cashAccountId: inv.cashAccountId,
+      cashAccountName: inv.cashAccountName,
+      bankAccountId: inv.bankAccountId,
+      bankAccountName: inv.bankAccountName,
     });
     if (fromNotes.length > 0) {
       return fromNotes;
@@ -131,8 +131,8 @@ export function parseSplitsFromInvoice(
     const paidMode: PaymentMode =
       inv.paymentMode === 'CREDIT' || inv.paymentMode === 'SPLIT' ? 'CASH' : inv.paymentMode || 'CASH';
     const isCash = paidMode === 'CASH';
-    const targetAccountId = isCash ? (inv as any).cashAccountId : (inv as any).bankAccountId;
-    const targetAccountName = isCash ? (inv as any).cashAccountName : (inv as any).bankAccountName;
+    const targetAccountId = isCash ? inv.cashAccountId : inv.bankAccountId;
+    const targetAccountName = isCash ? inv.cashAccountName : inv.bankAccountName;
     return [
       {
         id: '1',
@@ -153,8 +153,8 @@ export function parseSplitsFromInvoice(
   // 5. Normal single mode
   const singleMode: PaymentMode = inv.paymentMode === 'SPLIT' ? 'CASH' : inv.paymentMode || 'CASH';
   const isCash = singleMode === 'CASH';
-  const targetAccountId = isCash ? (inv as any).cashAccountId : (inv as any).bankAccountId;
-  const targetAccountName = isCash ? (inv as any).cashAccountName : (inv as any).bankAccountName;
+  const targetAccountId = isCash ? inv.cashAccountId : inv.bankAccountId;
+  const targetAccountName = isCash ? inv.cashAccountName : inv.bankAccountName;
   return [
     {
       id: '1',
@@ -194,10 +194,10 @@ export function parseSplitsFromPurchase(
   // 2. Parse from notes
   if (bill.notes) {
     const fromNotes = parseSplitsFromNotes(bill.notes, {
-      cashAccountId: (bill as any).cashAccountId,
-      cashAccountName: (bill as any).cashAccountName,
-      bankAccountId: (bill as any).bankAccountId,
-      bankAccountName: (bill as any).bankAccountName,
+      cashAccountId: bill.cashAccountId,
+      cashAccountName: bill.cashAccountName,
+      bankAccountId: bill.bankAccountId,
+      bankAccountName: bill.bankAccountName,
     });
     if (fromNotes.length > 0) {
       return fromNotes;
@@ -212,8 +212,8 @@ export function parseSplitsFromPurchase(
     const paidMode: PaymentMode =
       bill.paymentMode === 'CREDIT' || bill.paymentMode === 'SPLIT' ? 'NET_BANKING' : bill.paymentMode || 'NET_BANKING';
     const isCash = paidMode === 'CASH';
-    const targetAccountId = isCash ? (bill as any).cashAccountId : (bill as any).bankAccountId;
-    const targetAccountName = isCash ? (bill as any).cashAccountName : (bill as any).bankAccountName;
+    const targetAccountId = isCash ? bill.cashAccountId : bill.bankAccountId;
+    const targetAccountName = isCash ? bill.cashAccountName : bill.bankAccountName;
     return [
       {
         id: '1',
@@ -234,8 +234,8 @@ export function parseSplitsFromPurchase(
   // 5. Normal single mode
   const singleMode: PaymentMode = bill.paymentMode === 'SPLIT' ? 'NET_BANKING' : bill.paymentMode || 'NET_BANKING';
   const isCash = singleMode === 'CASH';
-  const targetAccountId = isCash ? (bill as any).cashAccountId : (bill as any).bankAccountId;
-  const targetAccountName = isCash ? (bill as any).cashAccountName : (bill as any).bankAccountName;
+  const targetAccountId = isCash ? bill.cashAccountId : bill.bankAccountId;
+  const targetAccountName = isCash ? bill.cashAccountName : bill.bankAccountName;
   return [
     {
       id: '1',

@@ -2,6 +2,7 @@ import { Invoice, PaymentSplit, PaymentMode } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Party } from '../../models/party.ts';
 import { Voucher, PaymentAllocation, PaymentAllocationDocumentType } from './voucherTypes.ts';
+import { toPaise, fromPaise, subPaise } from '../money.ts';
 import { formatSplitNotes } from './paymentSplitUtils.ts';
 
 export function inferVoucherPaymentMode(voucher: Voucher): string {
@@ -70,14 +71,14 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
     return false;
   };
 
-  const round2 = (num: number) => Number(Math.round(num * 100) / 100);
+  const round2 = (num: number) => fromPaise(toPaise(num));
 
   let openingBalanceDoc: OutstandingDocument | undefined;
   if (matchedParty) {
     const isCustomer = matchedParty.type === 'CUSTOMER';
     const isSupplier = matchedParty.type === 'SUPPLIER';
     const rawOpBal = typeof matchedParty.openingBalance === 'number' ? matchedParty.openingBalance : 0;
-    const absOpBal = round2(Math.abs(rawOpBal));
+    const absOpBal = fromPaise(Math.abs(toPaise(rawOpBal)));
 
     let inferredType = matchedParty.openingBalanceType;
     if (!inferredType && absOpBal > 0.01) {
@@ -142,20 +143,25 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
           if (inv.invoiceType === 'CREDIT_NOTE') return false;
         }
         if (!isPartyMatch(inv.partyId, inv.partyName)) return false;
-        const bal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal - (inv.paidAmount || 0);
+        const bal = typeof inv.balanceAmount === 'number'
+          ? fromPaise(toPaise(inv.balanceAmount))
+          : fromPaise(subPaise(toPaise(inv.grandTotal), toPaise(inv.paidAmount || 0)));
         return bal > 0.01;
       })
       .map((inv) => {
-        const bal = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal - (inv.paidAmount || 0);
+        const balPaise = typeof inv.balanceAmount === 'number'
+          ? toPaise(inv.balanceAmount)
+          : subPaise(toPaise(inv.grandTotal), toPaise(inv.paidAmount || 0));
+        const bal = fromPaise(balPaise);
         return {
           id: inv.id,
           documentNumber: inv.invoiceNumber,
           number: inv.invoiceNumber,
           date: inv.date,
-          grandTotal: round2(inv.grandTotal),
-          paidAmount: round2(inv.paidAmount || 0),
-          balanceAmount: round2(bal),
-          documentType: (wantCredit ? 'CREDIT_NOTE' : 'INVOICE') as any,
+          grandTotal: fromPaise(toPaise(inv.grandTotal)),
+          paidAmount: fromPaise(toPaise(inv.paidAmount || 0)),
+          balanceAmount: fromPaise(balPaise),
+          documentType: (wantCredit ? 'CREDIT_NOTE' : 'INVOICE') as PaymentAllocationDocumentType,
           partyId: inv.partyId,
           partyName: inv.partyName,
           createdAt: inv.createdAt,
@@ -170,7 +176,7 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
   const purchaseDocs = purchases
     .filter((pur) => {
       if (pur.isCancelled) return false;
-      const isReturn = pur.purchaseType === 'RETURN' || (pur as any).purchaseType === 'PURCHASE_RETURN' || pur.noteType === 'D';
+      const isReturn = pur.purchaseType === 'RETURN' || (pur.purchaseType as string) === 'PURCHASE_RETURN' || pur.noteType === 'D';
       if (wantDebit) {
         if (!isReturn) return false;
       } else {
@@ -178,27 +184,32 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
           pur.purchaseType === 'PO' ||
           pur.purchaseType === 'CHALLAN' ||
           isReturn ||
-          (pur as any).purchaseType === 'PURCHASE_ORDER' ||
-          (pur as any).purchaseType === 'PURCHASE_CHALLAN'
+          (pur.purchaseType as string) === 'PURCHASE_ORDER' ||
+          (pur.purchaseType as string) === 'PURCHASE_CHALLAN'
         ) {
           return false;
         }
       }
       if (!isPartyMatch(pur.supplierId, pur.supplierName)) return false;
-      const bal = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : pur.grandTotal - (pur.paidAmount || 0);
+      const bal = typeof pur.balanceAmount === 'number'
+        ? fromPaise(toPaise(pur.balanceAmount))
+        : fromPaise(subPaise(toPaise(pur.grandTotal), toPaise(pur.paidAmount || 0)));
       return bal > 0.01;
     })
     .map((pur) => {
-      const bal = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : pur.grandTotal - (pur.paidAmount || 0);
+      const balPaise = typeof pur.balanceAmount === 'number'
+        ? toPaise(pur.balanceAmount)
+        : subPaise(toPaise(pur.grandTotal), toPaise(pur.paidAmount || 0));
+      const bal = fromPaise(balPaise);
       return {
         id: pur.id,
         documentNumber: pur.billNumber,
         number: pur.billNumber,
         date: pur.date,
-        grandTotal: round2(pur.grandTotal),
-        paidAmount: round2(pur.paidAmount || 0),
-        balanceAmount: round2(bal),
-        documentType: (wantDebit ? 'DEBIT_NOTE' : 'PURCHASE') as any,
+        grandTotal: fromPaise(toPaise(pur.grandTotal)),
+        paidAmount: fromPaise(toPaise(pur.paidAmount || 0)),
+        balanceAmount: fromPaise(balPaise),
+        documentType: (wantDebit ? 'DEBIT_NOTE' : 'PURCHASE') as PaymentAllocationDocumentType,
         partyId: pur.supplierId,
         partyName: pur.supplierName,
         createdAt: pur.createdAt,

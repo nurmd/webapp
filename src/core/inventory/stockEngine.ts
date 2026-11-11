@@ -11,7 +11,7 @@ export interface StockLineItem {
   name: string;
   quantity: number;
   unitPrice?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

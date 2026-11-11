@@ -49,5 +49,14 @@ export default tseslint.config(
       ],
       'no-empty': ['warn', { allowEmptyCatch: true }],
     },
-  }
+  },
+
+  // Phase 3.3: ban `any` in core. All `as any` casts in src/core have been
+  // replaced with typed access (or `as <Type>`), so this is now enforceable.
+  {
+    files: ['src/core/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
 );

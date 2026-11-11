@@ -1,4 +1,5 @@
 import { Invoice } from '../../models/invoice.ts';
+import { getAndroidBridge } from './androidBridge.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import {
@@ -262,7 +263,7 @@ export function safeOpenExternalUrl(url: string, target: string = '_blank'): Ope
 
   // Route WhatsApp links directly through AndroidBridge chooser when running inside native app
   if (isWhatsAppIntentUrl(url)) {
-    const bridge = (window as any).AndroidBridge;
+    const bridge = getAndroidBridge();
     if (bridge && typeof bridge.openWhatsAppUrl === 'function') {
       try {
         bridge.openWhatsAppUrl(url);

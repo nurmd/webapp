@@ -30,7 +30,7 @@ export async function renderThermalPreviewImage(
       throw new Error('html-to-image failed to produce a Blob');
     }
     return blob;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('[share] dom capture failed:', err);
     if (fallbackText) {
       return await renderThermalReceiptImage(fallbackText, paperWidth);
@@ -202,8 +202,8 @@ export async function shareReceiptImage(
           text: options?.text,
         });
         return 'shared';
-      } catch (err: any) {
-        if (err?.name === 'AbortError' || err?.name === 'NotAllowedError') {
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name === 'AbortError' || (err as { name?: string })?.name === 'NotAllowedError') {
           return 'cancelled';
         }
         return 'failed';
@@ -211,10 +211,11 @@ export async function shareReceiptImage(
     }
 
     // 2a. Try copying the image to the clipboard (works in some WebViews)
-    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof (navigator.clipboard as any).write === 'function' && typeof (window as any).ClipboardItem === 'function') {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof (navigator.clipboard as unknown as { write: (items: unknown[]) => Promise<void> }).write === 'function' && typeof (window as unknown as { ClipboardItem?: new (data: Record<string, Blob>) => unknown }).ClipboardItem === 'function') {
       try {
-        const item = new (window as any).ClipboardItem({ 'image/png': blob });
-        await (navigator.clipboard as any).write([item]);
+        const ClipboardItemCtor = (window as unknown as { ClipboardItem: new (data: Record<string, Blob>) => unknown }).ClipboardItem;
+        const item = new ClipboardItemCtor({ 'image/png': blob });
+        await (navigator.clipboard as unknown as { write: (items: unknown[]) => Promise<void> }).write([item]);
         return 'copied';
       } catch (_clipErr) {
         // fall through to download

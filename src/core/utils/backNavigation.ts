@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getAndroidBridge } from './androidBridge.ts';
 import { App } from '@capacitor/app';
 
 export type BackHandler = () => boolean | void;
@@ -31,7 +32,7 @@ export function registerBackHandler(handler: BackHandler, priority: number = 0):
   };
   backHandlerStack.push(entry);
 
-  const isCustomAndroid = typeof window !== 'undefined' && !!(window as any).AndroidBridge;
+  const isCustomAndroid = typeof window !== 'undefined' && !!getAndroidBridge();
   let pushedHistory = false;
   // Only push history state for overlays and modals (priority > 0) to prevent tab pollution
   if (!isCustomAndroid && typeof window !== 'undefined' && window.history && priority > 0) {
@@ -117,8 +118,9 @@ export function handleExitOrToast(): boolean {
   const now = Date.now();
   if (now - lastBackPressTime < 2000) {
     try {
-      if ((window as any).AndroidBridge?.exitApp) {
-        (window as any).AndroidBridge.exitApp();
+      const bridge = getAndroidBridge();
+      if (typeof bridge?.exitApp === 'function') {
+        (bridge.exitApp as () => void)();
       } else {
         const p = App.exitApp();
         if (p && typeof p.catch === 'function') {
@@ -166,7 +168,7 @@ let globalRootBackHandler: RootBackHandler | undefined;
 
 // Expose global system back handler for Android native WebView container
 if (typeof window !== 'undefined') {
-  (window as any).__handleAndroidBack = () => {
+  (window as unknown as { __handleAndroidBack?: () => void }).__handleAndroidBack = () => {
     const handled = triggerBack();
     if (handled) {
       return true;
@@ -251,8 +253,9 @@ export function initBackNavigation(onRootBack?: RootBackHandler) {
  * Returns true if handled, false otherwise.
  */
 export function handleSystemBack(): boolean {
-  if (typeof window !== 'undefined' && typeof (window as any).__handleAndroidBack === 'function') {
-    return (window as any).__handleAndroidBack();
+  if (typeof window !== 'undefined' && typeof (window as unknown as { __handleAndroidBack?: () => void }).__handleAndroidBack === 'function') {
+    (window as unknown as { __handleAndroidBack?: () => void }).__handleAndroidBack?.();
+    return true;
   }
   const handled = triggerBack();
   if (handled) return true;

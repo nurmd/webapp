@@ -19,7 +19,9 @@ import { db } from '../../services/db.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
+import { PaymentReceiptSlipModal } from './PaymentReceiptSlipModal.tsx';
 import { VoucherAllocationRow } from './voucher/VoucherAllocationRow.tsx';
+import { printSettingsService } from '../../services/printSettingsService.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
 export interface VoucherEditorModalProps {
@@ -71,6 +73,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
+  const [isPrintSlipOpen, setIsPrintSlipOpen] = useState(false);
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editMode, setEditMode] = useState('UPI');
@@ -1226,6 +1229,19 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               ) : <div />}
 
               <div className="flex items-center gap-2">
+                {company && (editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
+                  <button
+                    type="button"
+                    data-testid="voucher-print-slip"
+                    onClick={() => setIsPrintSlipOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-outline-variant/30"
+                    title="Print slip"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">print</span>
+                    <span>Print slip</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   data-testid="voucher-share-whatsapp"
@@ -1724,6 +1740,17 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
             partyBalance: partyTotalDue ?? undefined,
           }}
+        />
+      )}
+
+      {/* Payment Receipt / Voucher Slip Modal */}
+      {isPrintSlipOpen && company && editingLedgerEntry && (
+        <PaymentReceiptSlipModal
+          entry={editingLedgerEntry}
+          party={party}
+          company={company}
+          defaultWidth={printSettingsService.getSettings()?.thermal?.paperWidth === 48 ? 48 : 32}
+          onClose={() => setIsPrintSlipOpen(false)}
         />
       )}
     </div>

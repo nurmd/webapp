@@ -92,7 +92,7 @@ export async function convertDocumentToTaxInvoice(
     createdAt: now,
     updatedAt: now,
     isConverted: false,
-    convertedFromDocType: sourceDoc.invoiceType as any,
+    convertedFromDocType: sourceDoc.invoiceType as Invoice['convertedFromDocType'],
     convertedFromDocId: sourceDoc.id,
     convertedFromDocNumber: sourceDoc.invoiceNumber,
   };

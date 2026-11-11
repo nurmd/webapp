@@ -242,7 +242,7 @@ export class BackupRestoreStorage extends InvoicePurchaseStorage {
     const finalBankAccounts = mergeCollection(snapshot.bankAccounts, data.bankAccounts);
     const finalCashBankTxns = mergeCollection(snapshot.cashBankTxns, data.cashBankTransactions);
     const finalCategories = Array.isArray(data.categories)
-      ? mergeCollection(snapshot.categories, data.categories)
+      ? mergeCollection(snapshot.categories, (data.categories as { id: string }[]))
       : snapshot.categories;
     const finalPartyGroups = Array.isArray(data.partyGroups)
       ? (mode === 'REPLACE' ? data.partyGroups : mergeCollection(snapshot.partyGroups, data.partyGroups))

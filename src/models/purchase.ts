@@ -76,6 +76,12 @@ export interface PurchaseBill {
   balanceAmount: number;
   paymentSplits?: PaymentSplit[];
 
+  // --- Bank/Cash account attribution (used by cash/bank calculators) ---
+  cashAccountId?: string;
+  cashAccountName?: string;
+  bankAccountId?: string;
+  bankAccountName?: string;
+
   notes?: string;
   createdAt: string;
   updatedAt: string;

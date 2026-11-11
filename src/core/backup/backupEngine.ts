@@ -36,10 +36,10 @@ export interface DatabaseBackupData {
   adjustments: StockAdjustment[];
   bankAccounts: BankAccount[];
   cashBankTransactions: CashBankTransaction[];
-  categories?: any[];
+  categories?: unknown[];
   partyGroups?: PartyGroup[];
   partyCategories?: PartyCategory[];
-  auditLogs?: any[];
+  auditLogs?: unknown[];
   allowNegativeStock?: boolean;
   hideBuyPrices?: boolean;
   /**
@@ -124,7 +124,7 @@ export function generateBackupFilename(businessName?: string, date: Date = new D
  * Verifies headers, data presence, collection arrays, and checksum.
  */
 export function validateBackupBundle(input: unknown): BackupValidationResult {
-  let parsed: any = input;
+  let parsed: unknown = input;
 
   if (typeof input === 'string') {
     try {
@@ -138,22 +138,26 @@ export function validateBackupBundle(input: unknown): BackupValidationResult {
     return { isValid: false, error: 'Malformed backup: Expected a JSON object.' };
   }
 
-  if (parsed.format !== 'GST_BILLING_BACKUP') {
+  const bundle = parsed as Record<string, unknown>;
+
+  if (bundle.format !== 'GST_BILLING_BACKUP') {
     return { isValid: false, error: 'Invalid backup format. File is not a recognized GST Billing backup.' };
   }
 
-  if (typeof parsed.version !== 'number' || parsed.version < 1) {
+  if (typeof bundle.version !== 'number' || bundle.version < 1) {
     return { isValid: false, error: 'Unsupported backup version.' };
   }
 
-  if (!parsed.data || typeof parsed.data !== 'object') {
+  if (!bundle.data || typeof bundle.data !== 'object') {
     return { isValid: false, error: 'Corrupt backup file: Missing database payload data.' };
   }
 
-  const { data } = parsed;
+  const data = bundle.data as DatabaseBackupData;
 
   // Validate critical collections exist as arrays or objects
-  if (!data.company || typeof data.company !== 'object') {
+  if (!data || typeof data !== 'object') { return { isValid: false, error: 'Malformed backup: Expected a JSON object.' }; }
+  const dataObj = data as unknown as Record<string, unknown>;
+  if (!dataObj.company || typeof dataObj.company !== 'object') {
     return { isValid: false, error: 'Corrupt backup file: Missing company profile data.' };
   }
 
@@ -170,15 +174,15 @@ export function validateBackupBundle(input: unknown): BackupValidationResult {
   ];
 
   for (const key of expectedArrayKeys) {
-    if (data[key] !== undefined && !Array.isArray(data[key])) {
+    if (dataObj[key] !== undefined && !Array.isArray(dataObj[key])) {
       return { isValid: false, error: `Invalid backup data structure: "${key}" must be a list.` };
     }
   }
 
   // Validate Checksum if provided
-  if (parsed.checksum) {
+  if (bundle.checksum) {
     const computed = computeBackupChecksum(data);
-    if (computed !== parsed.checksum) {
+    if (computed !== bundle.checksum) {
       return {
         isValid: false,
         error: 'Data integrity verification failed: Checksum does not match. The file may have been modified or corrupted.',
@@ -188,6 +192,6 @@ export function validateBackupBundle(input: unknown): BackupValidationResult {
 
   return {
     isValid: true,
-    bundle: parsed as DatabaseBackupBundle,
+    bundle: bundle as unknown as DatabaseBackupBundle,
   };
 }

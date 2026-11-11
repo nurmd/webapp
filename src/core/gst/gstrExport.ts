@@ -235,7 +235,7 @@ export function generateGstr1Json(
   );
 
   // 1. Table 4: B2B Grouped by CTIN
-  const b2bGrouped: Record<string, any[]> = {};
+  const b2bGrouped: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
   b2bInvoices.forEach((inv) => {
     const ctin = inv.partyGstin!.trim().toUpperCase();
     if (!b2bGrouped[ctin]) {
@@ -271,7 +271,7 @@ export function generateGstr1Json(
   }));
 
   // 2. Table 5: B2CL Grouped by POS
-  const b2clMap: Record<string, any[]> = {};
+  const b2clMap: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
   b2clInvoices.forEach((inv) => {
     const pos = inv.placeOfSupplyStateCode || '00';
     if (!b2clMap[pos]) b2clMap[pos] = [];
@@ -356,8 +356,8 @@ export function generateGstr1Json(
   }));
 
   // 4. Table 9B: CDNR (Registered) & CDNUR (Unregistered Large / Export)
-  const cdnrMap: Record<string, any[]> = {};
-  const cdnurList: any[] = [];
+  const cdnrMap: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const cdnurList: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
   creditNotes.forEach((cn) => {
     if (cn.partyGstin) {
       const ctin = cn.partyGstin.trim().toUpperCase();
@@ -414,7 +414,7 @@ export function generateGstr1Json(
   }));
 
   // 5. Table 6A: Exports
-  const expMap: Record<string, any[]> = {};
+  const expMap: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
   expInvoices.forEach((exp) => {
     const expTyp = exp.exportType || (exp.totalIgst > 0 ? 'WPAY' : 'WOPAY');
     if (!expMap[expTyp]) expMap[expTyp] = [];
@@ -496,7 +496,7 @@ export function generateGstr1Json(
   const cnSeries = periodInvoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
   const dnSeries = periodInvoices.filter((i) => i.invoiceType === 'DEBIT_NOTE');
 
-  const doc_det: any[] = [];
+  const doc_det: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
   if (invSeries.length > 0) {
     const sorted = [...invSeries].sort((a, b) => a.invoiceNumber.localeCompare(b.invoiceNumber));
     const cancelCount = sorted.filter((i) => i.isCancelled).length;

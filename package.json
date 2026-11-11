@@ -1,6 +1,6 @@
 {
   "name": "gst-billing-app",
-  "version": "1.2.77",
+  "version": "1.2.78",
   "private": true,
   "description": "Cross-platform GST Billing & Accounting Application (Web, Android, iOS, Windows, Linux)",
   "type": "module",
@@ -50,6 +50,7 @@
     "autoprefixer": "^10.6.1",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "^6.2.8",
     "globals": "^17.14.0",
     "happy-dom": "^15.11.7",
     "postcss": "^8.5.28",

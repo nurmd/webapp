@@ -5,6 +5,7 @@ import { InventoryItem, ItemPriceMode } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode } from '../../models/invoice.ts';
 import { calculateInvoice, InvoiceItemCalculationInput } from '../../core/gst/calculator.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
+import { normalizeInvoiceLineItem, finalizeTotals, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { GST_STATES, getStateList } from '../../core/gst/stateCodes.ts';
@@ -269,39 +270,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const lineCtx = { isGstActive, isComposition: !!company.isCompositionScheme };
     const invoiceItems: InvoiceItemEntry[] = lines.map((l, idx) => {
       const calcItem = calcSummary.items[idx];
-      const excl = Number(l.unitPrice) || 0;
-      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.gstRate) || 0);
-      const rawIncl = Number(l.unitPriceInclusive) || 0;
-      const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (l.priceMode ?? 'EXCLUSIVE');
-      const incl = (!isGstActive || company.isCompositionScheme)
-        ? excl
-        : mode === 'EXCLUSIVE'
-        ? inclusiveFromExclusive(excl, gst)
-        : (rawIncl > 0 ? rawIncl : inclusiveFromExclusive(excl, gst));
-      return {
-        id: l.id,
-        itemId: l.itemId,
-        name: l.name || 'Custom Item',
-        hsnSacCode: isGstActive ? l.hsnSacCode : '',
-        unit: 'PCS',
-        quantity: l.quantity,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        cessRate: (!isGstActive || company.isCompositionScheme) ? 0 : (Number(l.cessRate) || 0),
-        discountPercent: l.discountPercent,
-        discountAmount: calcItem?.discountAmount || 0,
-        taxableAmount: calcItem?.taxableAmount || 0,
-        gstRate: gst,
-        cgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.cgstAmount || 0),
-        sgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.sgstAmount || 0),
-        utgstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.utgstAmount || 0),
-        igstAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.igstAmount || 0),
-        cessAmount: (!isGstActive || company.isCompositionScheme) ? 0 : (calcItem?.cessAmount || 0),
-        totalAmount: (!isGstActive || company.isCompositionScheme) ? (calcItem?.taxableAmount || 0) : (calcItem?.totalAmount || 0),
-      };
+      const item = normalizeInvoiceLineItem(l as RawLineItem, calcItem, lineCtx, idx);
+      item.name = l.name || 'Custom Item';
+      return item;
     });
 
     const docType: DocumentSeriesType =
@@ -319,6 +293,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       (p) => p.id === selectedPartyId || (customerName && p.name.trim().toLowerCase() === customerName.trim().toLowerCase())
     );
 
+    const finalizedTotals = finalizeTotals(calcSummary, { ...lineCtx, shippingAmount: 0, overallDiscountAmount: 0 });
+
     const newInvoice: Invoice = {
       id: 'INV-' + Date.now(),
       invoiceNumber: generateNextDocumentNumber(docType, company, db.getInvoices()),
@@ -333,22 +309,22 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       placeOfSupplyStateCode: posStateCode,
       isIntraState: calcSummary.isIntraState,
       items: invoiceItems,
-      totalGrossAmount: calcSummary.totalGrossAmount,
-      totalDiscount: calcSummary.totalDiscount,
-      totalTaxableAmount: calcSummary.totalTaxableAmount,
-      totalCgst: calcSummary.totalCgst,
-      totalSgst: calcSummary.totalSgst,
-      totalUtgst: calcSummary.totalUtgst,
-      isUtgst: calcSummary.isUtgst,
-      totalIgst: calcSummary.totalIgst,
-      totalCess: calcSummary.totalCess,
-      totalTax: calcSummary.totalTax,
-      roundOff: calcSummary.roundOff,
-      grandTotal: calcSummary.grandTotal,
-      amountInWords: amountInWords(calcSummary.grandTotal),
+      totalGrossAmount: finalizedTotals.totalGrossAmount,
+      totalDiscount: finalizedTotals.totalDiscount,
+      totalTaxableAmount: finalizedTotals.totalTaxableAmount,
+      totalCgst: finalizedTotals.totalCgst,
+      totalSgst: finalizedTotals.totalSgst,
+      totalUtgst: finalizedTotals.totalUtgst,
+      isUtgst: finalizedTotals.isUtgst,
+      totalIgst: finalizedTotals.totalIgst,
+      totalCess: finalizedTotals.totalCess,
+      totalTax: finalizedTotals.totalTax,
+      roundOff: finalizedTotals.roundOff,
+      grandTotal: finalizedTotals.grandTotal,
+      amountInWords: amountInWords(finalizedTotals.grandTotal),
       paymentMode,
       paymentStatus: 'PAID',
-      paidAmount: calcSummary.grandTotal,
+      paidAmount: finalizedTotals.grandTotal,
       balanceAmount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

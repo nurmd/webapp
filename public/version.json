@@ -1,15 +1,15 @@
 {
-  "version": "1.2.77",
+  "version": "1.2.78",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-10T09:18:39.594Z",
+  "buildTime": "2026-11-11T13:46:41.462Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "New: invoice, party and item lists above 100 rows now load in windows of 60 with a Show more button",
-    "New: audit-log retention policy, storage-quota banner and startup data-integrity report",
-    "Improved: payment conflicts are strictly manual per document; bulk merge removed",
-    "Improved: invoice preview, POS catalog and voucher allocation split into focused components",
-    "Improved: tabs no longer re-render when an unrelated collection changes",
-    "Fixed: durable retry queue for failed cloud writes, so saves survive temporary failures"
+    "memoize tab-level views and stabilize App handlers",
+    "extract allocation row into VoucherAllocationRow",
+    "extract POS catalog tiles into PosCatalogCard",
+    "raise vitest timeouts to 30s for full-suite CPU contention",
+    "split InvoicePreviewModal into model hook + templates",
+    "progressive windowing for invoices, parties, items"
   ]
 }

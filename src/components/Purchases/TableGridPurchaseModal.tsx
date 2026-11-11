@@ -3,6 +3,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { PurchaseBill, PurchaseItemEntry, ItcEligibility } from '../../models/purchase.ts';
+import { normalizePurchaseLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import { parseSplitsFromPurchase, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
@@ -607,44 +608,10 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
     const purchaseItems: PurchaseItemEntry[] = rows.map((r, idx) => {
       const calcItem = calcSummary.items[idx];
-      const mode = (!isGstActive || company.isCompositionScheme) ? 'EXCLUSIVE' : (r.priceMode ?? 'EXCLUSIVE');
-      const gst = isGstActive && !company.isCompositionScheme ? (r.gstRate || 0) : 0;
-      let excl = Number(r.unitPrice) || 0;
-      let incl = Number(r.unitPriceInclusive);
-      if (!isGstActive || company.isCompositionScheme) {
-        incl = excl;
-      } else if (mode === 'EXCLUSIVE') {
-        incl = inclusiveFromExclusive(excl, gst);
-      } else {
-        if (!Number.isFinite(incl) || incl <= 0) {
-          incl = inclusiveFromExclusive(excl, gst);
-        }
-        excl = exclusiveFromInclusive(incl, gst);
-      }
-      return {
-        id: r.id,
-        itemId: r.itemId || `CUSTOM-${Date.now()}-${idx}`,
-        name: r.name || 'Purchased Item',
-        description: r.description,
-        hsnSacCode: isGstActive ? (r.hsnSacCode || '844332') : '',
-        unit: (r.unit as any) || 'PCS',
-        quantity: r.quantity,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        mrp: r.mrp,
-        discountPercent: r.discountPercent,
-        discountAmount: calcItem?.discountAmount || 0,
-        taxableAmount: calcItem?.taxableAmount || 0,
-        gstRate: gst,
-        cgstAmount: isGstActive ? (calcItem?.cgstAmount || 0) : 0,
-        sgstAmount: isGstActive ? (calcItem?.sgstAmount || 0) : 0,
-        utgstAmount: isGstActive ? (calcItem?.utgstAmount || 0) : 0,
-        igstAmount: isGstActive ? (calcItem?.igstAmount || 0) : 0,
-        cessRate: isGstActive ? (Number(r.cessRate) || 0) : 0,
-        cessAmount: isGstActive ? (calcItem?.cessAmount || 0) : 0,
-        totalAmount: calcItem?.totalAmount || (r.quantity * excl * (1 - (r.discountPercent || 0) / 100)),
-      };
+      const item = normalizePurchaseLineItem(r as RawLineItem, calcItem, { isGstActive, isComposition: !!company.isCompositionScheme }, idx);
+      item.name = r.name || 'Purchased Item';
+      if (isGstActive && !item.hsnSacCode) item.hsnSacCode = '844332';
+      return item;
     });
 
     const nonCreditSplits = paymentSplits.filter((s) => s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0);
