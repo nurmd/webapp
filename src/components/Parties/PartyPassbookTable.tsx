@@ -2,6 +2,32 @@ import React from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { PassbookEntry, TxnFilterType, TxnSortOrderType } from './usePartyPassbook.ts';
 
+/**
+ * Extracts an HH:mm clock label for a passbook entry.
+ * Prefers a time component embedded in the entry date, then falls back to the
+ * source document timestamp (voucher / invoice / purchase createdAt).
+ * Returns an empty string when no usable timestamp exists (e.g. opening balance).
+ */
+function getEntryTimeLabel(entry: PassbookEntry): string {
+  const candidates: Array<string | undefined> = [
+    entry.date,
+    entry.rawVoucher?.createdAt,
+    entry.rawInvoice?.createdAt,
+    entry.rawPurchase?.createdAt,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value !== 'string' || !/[T ]\d{1,2}:\d{2}/.test(value)) continue;
+    const parsed = new Date(value);
+    if (isNaN(parsed.getTime())) continue;
+    const hours = String(parsed.getHours()).padStart(2, '0');
+    const minutes = String(parsed.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  return '';
+}
+
 export interface PartyPassbookTableProps {
   filteredPassbook: PassbookEntry[];
   txnFilter: TxnFilterType;
@@ -314,9 +340,12 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                       </span>
                     </div>
 
-                    {/* Line 2 (middle): transaction date */}
+                    {/* Line 2 (middle): transaction date with clock time in brackets */}
                     <span className="text-[11px] sm:text-xs leading-tight text-slate-500 font-medium whitespace-nowrap truncate block">
-                      {entry.date}
+                      <span>{entry.date}</span>
+                      {getEntryTimeLabel(entry) && (
+                        <span className="ml-1 text-slate-400 font-normal">({getEntryTimeLabel(entry)})</span>
+                      )}
                     </span>
 
                     {/* Line 3: Voucher balance amount for invoice, linked voucherno for payment voucher */}

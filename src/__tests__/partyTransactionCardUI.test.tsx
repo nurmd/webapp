@@ -500,4 +500,75 @@ describe('Party Details Transaction Card UI Enhancements', () => {
     expect(partialBadge?.className).toContain('rounded-full');
     expect(partialBadge?.className).not.toContain('absolute');
   });
+
+  it('renders the transaction clock time in brackets next to the date when a timestamp is available', () => {
+    const createdAt = new Date(2026, 9, 28, 14, 5, 0).toISOString();
+    const mockEntries: any[] = [
+      {
+        id: 'vchr-time-1',
+        date: '2026-10-28',
+        type: 'PAYMENT_IN',
+        description: 'Payment In via cash',
+        debit: 0,
+        credit: 2500,
+        runningBalance: 2500,
+        docNumber: 'RCPT-2026-0100',
+        status: 'PAID',
+        rawVoucher: {
+          id: 'vchr-time-1',
+          voucherNumber: 'RCPT-2026-0100',
+          voucherType: 'RECEIPT',
+          totalAmount: 2500,
+          date: '2026-10-28',
+          createdAt,
+        },
+      },
+      {
+        id: 'opening-time-1',
+        date: '2026-04-01',
+        type: 'OPENING',
+        description: 'Opening Balance',
+        debit: 1000,
+        credit: 0,
+        runningBalance: 1000,
+        docNumber: 'OPENING',
+        status: 'OPENING',
+      },
+    ];
+
+    act(() => {
+      root.render(
+        <PartyPassbookTable
+          filteredPassbook={mockEntries}
+          txnFilter="ALL"
+          setTxnFilter={vi.fn()}
+          txnSortOrder="NEWEST"
+          setTxnSortOrder={vi.fn()}
+          searchTxn=""
+          setSearchTxn={vi.fn()}
+          onTransactionClick={vi.fn()}
+        />
+      );
+    });
+
+    const row = container.querySelector('[data-testid="passbook-entry-vchr-time-1"]');
+    expect(row).not.toBeNull();
+
+    // Date stays intact as its own span
+    const dateSpan = Array.from(row?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === '2026-10-28'
+    );
+    expect(dateSpan).toBeDefined();
+
+    // Clock time is rendered in brackets next to the date
+    const timeSpan = Array.from(row?.querySelectorAll('span') || []).find(
+      (el) => el.textContent?.trim() === '(14:05)'
+    );
+    expect(timeSpan).toBeDefined();
+
+    // Opening balance has no source timestamp, so no bracketed time is shown
+    const openingRow = container.querySelector('[data-testid="passbook-entry-opening-time-1"]');
+    expect(openingRow).not.toBeNull();
+    expect(openingRow?.textContent).not.toMatch(/\(\d{1,2}:\d{2}\)/);
+  });
 });
