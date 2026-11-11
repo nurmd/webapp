@@ -29,7 +29,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
       <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-0.5">
         <div className="flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span className="text-xs font-bold text-on-surface">Transactions</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-container font-bold text-on-surface-variant">
+          <span className="text-[10px] leading-none px-1.5 py-0.5 rounded-full bg-surface-container font-bold text-on-surface-variant">
             {filteredPassbook.length}
           </span>
         </div>
@@ -263,7 +263,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                   <div className="text-[11px] text-slate-600 font-medium truncate flex items-center gap-1.5">
                     <span className="truncate">Linked: {linkedVouchersStr}</span>
                     {unallocatedAmt > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
+                      <span className="text-[9px] leading-none px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium whitespace-nowrap">
                         Advance: {formatINR(unallocatedAmt)}
                       </span>
                     )}
@@ -290,12 +290,12 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 key={entry.id}
                 data-testid={`passbook-entry-${entry.id}`}
                 onClick={() => onTransactionClick(entry)}
-                className="relative p-3 sm:p-3.5 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-3 cursor-pointer"
+                className="relative px-3 py-2.5 sm:px-3.5 sm:py-3 rounded-xl bg-white dark:bg-surface-container-lowest hover:bg-slate-100/70 border border-outline-variant/30 hover:border-outline-variant/60 shadow-xs hover:shadow-sm active:scale-[0.99] transition-all flex items-center justify-between gap-2.5 cursor-pointer"
               >
                 {/* Left Icon and 3-Line Details */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${iconColorClasses}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconColorClasses}`}
                   >
                     <span className="material-symbols-outlined text-[16px] sm:text-[18px]">
                       {iconName}
@@ -306,7 +306,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
 
                     {/* Line 1: Voucher type with invoice number (freed of date & badge) */}
                     <div className="flex items-center gap-1.5 min-w-0 flex-nowrap">
-                      <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm whitespace-nowrap shrink-0">
+                      <span className="font-bold text-slate-900 dark:text-on-surface text-xs sm:text-sm leading-tight whitespace-nowrap shrink-0">
                         {voucherTypeLabel}
                       </span>
                       <span className="text-slate-600 text-[11px] sm:text-xs font-mono font-medium whitespace-nowrap truncate min-w-0">
@@ -315,7 +315,7 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                     </div>
 
                     {/* Line 2 (middle): transaction date */}
-                    <span className="text-[11px] sm:text-xs text-slate-500 font-medium whitespace-nowrap truncate block">
+                    <span className="text-[11px] sm:text-xs leading-tight text-slate-500 font-medium whitespace-nowrap truncate block">
                       {entry.date}
                     </span>
 
@@ -326,24 +326,24 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                   </div>
                 </div>
 
-                {/* Right Amount & Chevron */}
-                <div className="flex flex-col items-end gap-1 flex-shrink-0 text-right">
-                  {entry.status && entry.status !== 'OPENING' && (
+                {/* Right Amount Column + Chevron (chevron vertically centred) */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex flex-col items-end justify-center gap-0.5 text-right min-w-0">
+                    {entry.status && entry.status !== 'OPENING' && (
+                      <span
+                        className={`text-[9px] leading-none font-bold px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                          entry.status === 'PAID'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : entry.status === 'PARTIAL'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        }`}
+                      >
+                        {entry.status}
+                      </span>
+                    )}
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap ${
-                        entry.status === 'PAID'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : entry.status === 'PARTIAL'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                      }`}
-                    >
-                      {entry.status}
-                    </span>
-                  )}
-                  <div>
-                    <span
-                      className={`font-currency-display-mobile text-xs sm:text-sm font-black block ${
+                      className={`font-currency-display-mobile text-xs sm:text-sm font-black block whitespace-nowrap leading-tight ${
                         entry.type === 'PURCHASE'
                           ? (entry.rawPurchase?.purchaseType === 'RETURN' || entry.rawPurchase?.noteType === 'D')
                             ? 'text-emerald-700'
@@ -373,12 +373,12 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                         ? `- ${formatINR(entry.debit)}`
                         : '₹0'}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-500 block mt-0.5">
+                    <span className="text-[10px] leading-none font-mono text-slate-500 block whitespace-nowrap">
                       Bal: {formatINR(Math.abs(entry.runningBalance))}
                     </span>
                   </div>
 
-                  <span className="material-symbols-outlined text-[18px] text-slate-400 ml-0.5">
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">
                     chevron_right
                   </span>
                 </div>
