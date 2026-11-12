@@ -227,8 +227,8 @@ export function allocateOldestFirst(
   documents: OutstandingDocument[],
   amount: number
 ): PaymentAllocation[] {
-  let remaining = Number(Math.max(0, amount).toFixed(2));
-  if (remaining <= 0.005) return [];
+  let remainingPaise = Math.max(0, toPaise(amount));
+  if (remainingPaise <= 0) return [];
 
   // Deterministic sort: opening balance pseudo-documents first, then date ascending, then createdAt, then id
   const sorted = [...documents].sort((a, b) => {
@@ -247,17 +247,18 @@ export function allocateOldestFirst(
   const allocations: PaymentAllocation[] = [];
 
   for (const doc of sorted) {
-    if (remaining <= 0.005) break;
-    const allocAmt = Number(Math.min(remaining, doc.balanceAmount).toFixed(2));
-    if (allocAmt > 0) {
+    if (remainingPaise <= 0) break;
+    const docBalPaise = Math.max(0, toPaise(doc.balanceAmount));
+    const allocAmtPaise = Math.min(remainingPaise, docBalPaise);
+    if (allocAmtPaise > 0) {
       allocations.push({
         documentType: doc.documentType,
         documentId: doc.id,
         documentNumber: doc.documentNumber,
-        amount: allocAmt,
+        amount: fromPaise(allocAmtPaise),
         date: doc.date,
       });
-      remaining = Number((remaining - allocAmt).toFixed(2));
+      remainingPaise -= allocAmtPaise;
     }
   }
 
@@ -288,7 +289,7 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
   }
 
   const seenIds = new Set<string>();
-  let sumAllocated = 0;
+  let sumAllocatedPaise = 0;
   const docMap = new Map<string, OutstandingDocument>();
   documents.forEach((d) => docMap.set(d.id, d));
 
@@ -309,14 +310,15 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     seenIds.add(alloc.documentId);
 
     // 2. Reject non-positive allocation amounts
-    if (typeof alloc.amount !== 'number' || alloc.amount <= 0) {
+    if (typeof alloc.amount !== 'number' || alloc.amount <= 0 || toPaise(alloc.amount) <= 0) {
       return {
         valid: false,
         error: `Allocation amount for ${docLabel} must be greater than zero.`,
       };
     }
 
-    sumAllocated = Number((sumAllocated + alloc.amount).toFixed(2));
+    const allocAmtPaise = toPaise(alloc.amount);
+    sumAllocatedPaise += allocAmtPaise;
 
     // 3. Match against outstanding documents
     const doc = docMap.get(alloc.documentId);
@@ -350,20 +352,21 @@ export function validateAllocations(params: ValidateAllocationsParams): Validati
     }
 
     // 5. Reject allocation above document's current balance (tolerance 0.01)
-    if (alloc.amount > doc.balanceAmount + 0.01) {
+    const docBalPaise = toPaise(doc.balanceAmount);
+    if (allocAmtPaise > docBalPaise + 1) {
       return {
         valid: false,
-        error: `Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${doc.balanceAmount.toFixed(2)} on ${docLabel}.`,
+        error: `Allocation amount ₹${fromPaise(allocAmtPaise).toFixed(2)} exceeds balance ₹${fromPaise(docBalPaise).toFixed(2)} on ${docLabel}.`,
       };
     }
   }
 
   // 6. Reject allocated sum above totalSettled (tolerance 0.01)
-  const maxAllowed = Number((totalSettled + 0.01).toFixed(2));
-  if (sumAllocated > maxAllowed) {
+  const totalSettledPaise = toPaise(totalSettled);
+  if (sumAllocatedPaise > totalSettledPaise + 1) {
     return {
       valid: false,
-      error: `Total allocated amount (₹${sumAllocated.toFixed(2)}) exceeds payment amount (₹${totalSettled.toFixed(2)}).`,
+      error: `Total allocated amount (₹${fromPaise(sumAllocatedPaise).toFixed(2)}) exceeds payment amount (₹${fromPaise(totalSettledPaise).toFixed(2)}).`,
     };
   }
 
@@ -393,7 +396,7 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
     if (a.documentId?.startsWith('OPENING-BALANCE-')) {
       continue;
     }
-    allocMap.set(a.documentId, Number(((allocMap.get(a.documentId) || 0) + a.amount).toFixed(2)));
+    allocMap.set(a.documentId, (allocMap.get(a.documentId) || 0) + toPaise(a.amount));
   }
 
   if (allocMap.size === 0) {
@@ -403,70 +406,78 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
   const effectiveAllocMode: PaymentMode = (options?.paymentMode || 'CASH') as PaymentMode;
 
   return documents.map((doc) => {
-    const allocAmt = allocMap.get(doc.id);
-    if (!allocAmt || allocAmt <= 0) {
+    const allocAmtPaise = allocMap.get(doc.id);
+    if (!allocAmtPaise || allocAmtPaise <= 0) {
       return doc;
     }
 
-    const currentPaid = typeof doc.paidAmount === 'number' ? doc.paidAmount : (doc.paymentStatus === 'PAID' ? doc.grandTotal : 0);
-    const newPaid = Number(Math.min(doc.grandTotal, Math.max(0, currentPaid + allocAmt)).toFixed(2));
-    const newBal = Number(Math.max(0, doc.grandTotal - newPaid).toFixed(2));
+    const grandTotalPaise = toPaise(doc.grandTotal);
+    const currentPaidPaise = typeof doc.paidAmount === 'number'
+      ? toPaise(doc.paidAmount)
+      : (doc.paymentStatus === 'PAID' ? grandTotalPaise : 0);
+    const newPaidPaise = Math.min(grandTotalPaise, Math.max(0, currentPaidPaise + allocAmtPaise));
+    const newBalPaise = Math.max(0, grandTotalPaise - newPaidPaise);
     const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' =
-      newPaid <= 0.005 ? 'UNPAID' : newBal <= 0.01 ? 'PAID' : 'PARTIAL';
+      newPaidPaise <= 0 ? 'UNPAID' : newBalPaise <= 1 ? 'PAID' : 'PARTIAL';
+
+    const newPaid = fromPaise(newPaidPaise);
+    const newBal = fromPaise(newBalPaise);
 
     // Maintain and synchronize splits to strictly match newPaid and newBal
     let updatedSplits: PaymentSplit[] | undefined = doc.paymentSplits ? [...doc.paymentSplits] : undefined;
     if (updatedSplits && updatedSplits.length > 0) {
       const nonCredit = updatedSplits.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT');
-      const nonCreditTotal = nonCredit.reduce((s, x) => s + (Number(x.amount) || 0), 0);
-      const splitDiff = Number((newPaid - nonCreditTotal).toFixed(2));
-      if (splitDiff > 0) {
+      const nonCreditTotalPaise = nonCredit.reduce((s, x) => s + toPaise(Number(x.amount) || 0), 0);
+      const splitDiffPaise = newPaidPaise - nonCreditTotalPaise;
+      if (splitDiffPaise > 0) {
         updatedSplits = nonCredit.map((s) => ({ ...s }));
         updatedSplits.push({
           id: `alloc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           mode: effectiveAllocMode,
-          amount: splitDiff,
+          amount: fromPaise(splitDiffPaise),
         });
-      } else if (splitDiff < 0) {
-        let remaining = Math.abs(splitDiff);
+      } else if (splitDiffPaise < 0) {
+        let remainingPaise = Math.abs(splitDiffPaise);
         const cnSplits = nonCredit.filter((s) => (s.mode || '').toUpperCase() === 'CREDIT_NOTE');
         const regularTenders = nonCredit.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT_NOTE');
         const adjustedRegular: PaymentSplit[] = [];
         for (let i = regularTenders.length - 1; i >= 0; i--) {
           const s = regularTenders[i];
-          if (remaining <= 0) {
+          const sAmtPaise = toPaise(s.amount);
+          if (remainingPaise <= 0) {
             adjustedRegular.unshift(s);
-          } else if (s.amount <= remaining) {
-            remaining = Number((remaining - s.amount).toFixed(2));
+          } else if (sAmtPaise <= remainingPaise) {
+            remainingPaise -= sAmtPaise;
           } else {
-            adjustedRegular.unshift({ ...s, amount: Number((s.amount - remaining).toFixed(2)) });
-            remaining = 0;
+            adjustedRegular.unshift({ ...s, amount: fromPaise(sAmtPaise - remainingPaise) });
+            remainingPaise = 0;
           }
         }
         const adjustedCn: PaymentSplit[] = [];
         for (let i = cnSplits.length - 1; i >= 0; i--) {
           const s = cnSplits[i];
-          if (remaining <= 0) {
+          const sAmtPaise = toPaise(s.amount);
+          if (remainingPaise <= 0) {
             adjustedCn.unshift(s);
-          } else if (s.amount <= remaining) {
-            remaining = Number((remaining - s.amount).toFixed(2));
+          } else if (sAmtPaise <= remainingPaise) {
+            remainingPaise -= sAmtPaise;
           } else {
-            adjustedCn.unshift({ ...s, amount: Number((s.amount - remaining).toFixed(2)) });
-            remaining = 0;
+            adjustedCn.unshift({ ...s, amount: fromPaise(sAmtPaise - remainingPaise) });
+            remainingPaise = 0;
           }
         }
         updatedSplits = [...adjustedCn, ...adjustedRegular];
       } else {
         updatedSplits = nonCredit.map((s) => ({ ...s }));
       }
-      if (newBal > 0) {
+      if (newBalPaise > 0) {
         updatedSplits.push({
           id: `split-bal-${Date.now()}`,
           mode: 'CREDIT',
           amount: newBal,
         });
       }
-    } else if (newPaid > 0 && (doc.paymentSplits !== undefined || (doc.notes && (doc.notes.includes('Split Payment') || doc.notes.includes('Split:'))))) {
+    } else if (newPaidPaise > 0 && (doc.paymentSplits !== undefined || (doc.notes && (doc.notes.includes('Split Payment') || doc.notes.includes('Split:'))))) {
       // If splits or split notes were active, initialize explicit split breakdown
       updatedSplits = [
         {
@@ -475,7 +486,7 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
           amount: newPaid,
         },
       ];
-      if (newBal > 0) {
+      if (newBalPaise > 0) {
         updatedSplits.push({
           id: `split-bal-${Date.now()}`,
           mode: 'CREDIT',
@@ -488,11 +499,11 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
     let newPaymentMode: PaymentMode;
     if (updatedSplits && updatedSplits.length > 0) {
       const activeNonCredit = updatedSplits.filter(
-        (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (Number(s.amount) || 0) > 0
+        (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && toPaise(Number(s.amount) || 0) > 0
       );
       if (newStatus === 'UNPAID' || activeNonCredit.length === 0) {
         newPaymentMode = 'CREDIT';
-      } else if (activeNonCredit.length === 1 && newBal <= 0.01) {
+      } else if (activeNonCredit.length === 1 && newBalPaise <= 1) {
         newPaymentMode = activeNonCredit[0].mode as PaymentMode;
       } else {
         newPaymentMode = 'SPLIT';
@@ -500,7 +511,7 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
     } else {
       if (newStatus === 'UNPAID') {
         newPaymentMode = 'CREDIT';
-      } else if (newBal > 0) {
+      } else if (newBalPaise > 0) {
         newPaymentMode = 'SPLIT';
       } else {
         newPaymentMode = effectiveAllocMode !== 'CREDIT' ? effectiveAllocMode : 'CASH';
@@ -544,7 +555,7 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
     if (a.documentId?.startsWith('OPENING-BALANCE-')) {
       continue;
     }
-    allocMap.set(a.documentId, Number(((allocMap.get(a.documentId) || 0) + a.amount).toFixed(2)));
+    allocMap.set(a.documentId, (allocMap.get(a.documentId) || 0) + toPaise(a.amount));
   }
 
   if (allocMap.size === 0) {
@@ -552,20 +563,26 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
   }
 
   return documents.map((doc) => {
-    const allocAmt = allocMap.get(doc.id);
-    if (!allocAmt || allocAmt <= 0) {
+    const allocAmtPaise = allocMap.get(doc.id);
+    if (!allocAmtPaise || allocAmtPaise <= 0) {
       return doc;
     }
 
-    const currentPaid = typeof doc.paidAmount === 'number' ? doc.paidAmount : (doc.paymentStatus === 'PAID' ? doc.grandTotal : 0);
-    const newPaid = Number(Math.max(0, currentPaid - allocAmt).toFixed(2));
-    const newBal = Number(Math.max(0, doc.grandTotal - newPaid).toFixed(2));
+    const grandTotalPaise = toPaise(doc.grandTotal);
+    const currentPaidPaise = typeof doc.paidAmount === 'number'
+      ? toPaise(doc.paidAmount)
+      : (doc.paymentStatus === 'PAID' ? grandTotalPaise : 0);
+    const newPaidPaise = Math.max(0, currentPaidPaise - allocAmtPaise);
+    const newBalPaise = Math.max(0, grandTotalPaise - newPaidPaise);
     const newStatus: 'PAID' | 'PARTIAL' | 'UNPAID' =
-      newPaid <= 0.005 ? 'UNPAID' : newBal <= 0.01 ? 'PAID' : 'PARTIAL';
+      newPaidPaise <= 0 ? 'UNPAID' : newBalPaise <= 1 ? 'PAID' : 'PARTIAL';
+
+    const newPaid = fromPaise(newPaidPaise);
+    const newBal = fromPaise(newBalPaise);
 
     let updatedSplits = doc.paymentSplits ? [...doc.paymentSplits] : undefined;
     if (updatedSplits && updatedSplits.length > 0) {
-      let remainingToReduce = allocAmt;
+      let remainingToReducePaise = allocAmtPaise;
       const nonCredit = updatedSplits.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT');
       const cnSplits = nonCredit.filter((s) => (s.mode || '').toUpperCase() === 'CREDIT_NOTE');
       const regularTenders = nonCredit.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT_NOTE');
@@ -573,31 +590,33 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
       const newRegular: typeof regularTenders = [];
       for (let i = regularTenders.length - 1; i >= 0; i--) {
         const s = regularTenders[i];
-        if (remainingToReduce <= 0) {
+        const sAmtPaise = toPaise(s.amount);
+        if (remainingToReducePaise <= 0) {
           newRegular.unshift(s);
-        } else if (s.amount <= remainingToReduce) {
-          remainingToReduce = Number((remainingToReduce - s.amount).toFixed(2));
+        } else if (sAmtPaise <= remainingToReducePaise) {
+          remainingToReducePaise -= sAmtPaise;
         } else {
-          newRegular.unshift({ ...s, amount: Number((s.amount - remainingToReduce).toFixed(2)) });
-          remainingToReduce = 0;
+          newRegular.unshift({ ...s, amount: fromPaise(sAmtPaise - remainingToReducePaise) });
+          remainingToReducePaise = 0;
         }
       }
 
       const newCn: typeof cnSplits = [];
       for (let i = cnSplits.length - 1; i >= 0; i--) {
         const s = cnSplits[i];
-        if (remainingToReduce <= 0) {
+        const sAmtPaise = toPaise(s.amount);
+        if (remainingToReducePaise <= 0) {
           newCn.unshift(s);
-        } else if (s.amount <= remainingToReduce) {
-          remainingToReduce = Number((remainingToReduce - s.amount).toFixed(2));
+        } else if (sAmtPaise <= remainingToReducePaise) {
+          remainingToReducePaise -= sAmtPaise;
         } else {
-          newCn.unshift({ ...s, amount: Number((s.amount - remainingToReduce).toFixed(2)) });
-          remainingToReduce = 0;
+          newCn.unshift({ ...s, amount: fromPaise(sAmtPaise - remainingToReducePaise) });
+          remainingToReducePaise = 0;
         }
       }
 
       const combined = [...newCn, ...newRegular];
-      if (newBal > 0) {
+      if (newBalPaise > 0) {
         combined.push({
           id: `split-bal-${Date.now()}`,
           mode: 'CREDIT',
@@ -611,17 +630,17 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
     let newPaymentMode: PaymentMode;
     if (updatedSplits && updatedSplits.length > 0) {
       const activeNonCredit = updatedSplits.filter(
-        (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (Number(s.amount) || 0) > 0
+        (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && toPaise(Number(s.amount) || 0) > 0
       );
       if (newStatus === 'UNPAID' || activeNonCredit.length === 0) {
         newPaymentMode = 'CREDIT';
-      } else if (activeNonCredit.length === 1 && newBal <= 0.01) {
+      } else if (activeNonCredit.length === 1 && newBalPaise <= 1) {
         newPaymentMode = activeNonCredit[0].mode as PaymentMode;
       } else {
         newPaymentMode = 'SPLIT';
       }
     } else {
-      newPaymentMode = newStatus === 'UNPAID' ? 'CREDIT' : newBal > 0 ? 'SPLIT' : (doc.paymentMode || 'CASH');
+      newPaymentMode = newStatus === 'UNPAID' ? 'CREDIT' : newBalPaise > 0 ? 'SPLIT' : (doc.paymentMode || 'CASH');
     }
 
     let updatedNotes = doc.notes;
@@ -661,13 +680,15 @@ export function resolveSourceVoucherSplits(
   mode?: string
 ): { paymentSplits?: PaymentSplit[]; paymentMode: string } {
   const nonCreditSplits = (splits || []).filter(
-    (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && Number(s.amount) > 0
+    (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && toPaise(Number(s.amount) || 0) > 0
   );
-  const nonCreditTotal = Number(
-    nonCreditSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0).toFixed(2)
+  const nonCreditTotalPaise = nonCreditSplits.reduce(
+    (sum, s) => sum + toPaise(Number(s.amount) || 0),
+    0
   );
+  const intendedAmountPaise = toPaise(intendedAmount);
 
-  if (nonCreditSplits.length > 0 && Math.abs(nonCreditTotal - intendedAmount) <= 0.01) {
+  if (nonCreditSplits.length > 0 && Math.abs(nonCreditTotalPaise - intendedAmountPaise) <= 1) {
     return {
       paymentSplits: splits,
       paymentMode: mode || (splits && splits.length > 1 ? 'SPLIT' : splits?.[0]?.mode || 'CASH'),
@@ -723,14 +744,15 @@ export function validateInvoicePreSave(params: {
       )
     : undefined;
 
-  const newInvoicePaid = Number(newInvoice.paidAmount) || 0;
+  const newInvoicePaidPaise = Math.max(0, toPaise(Number(newInvoice.paidAmount) || 0));
+  const newInvoicePaid = fromPaise(newInvoicePaidPaise);
   const isOrderOrEstimate =
     newInvoice.invoiceType === 'ESTIMATE' ||
     newInvoice.invoiceType === 'SALES_ORDER' ||
     newInvoice.invoiceType === 'DELIVERY_CHALLAN';
   const isCredit = newInvoice.paymentMode === 'CREDIT';
   const isUnpaidOrCancelled =
-    isSpecialDocument || isOrderOrEstimate || newInvoice.isCancelled || newInvoicePaid <= 0 || isCredit;
+    isSpecialDocument || isOrderOrEstimate || newInvoice.isCancelled || newInvoicePaidPaise <= 0 || isCredit;
 
   if (isNew) {
     return {
@@ -766,21 +788,19 @@ export function validateInvoicePreSave(params: {
       !v.isReversed &&
       v.paymentAllocations?.some((a) => (a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE') && a.documentId === newInvoice.id)
   );
-  const totalAllocatedToInvoice = Number(
-    allActiveLinked
-      .reduce((sum, v) => {
-        const vAllocSum = (v.paymentAllocations || [])
-          .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
-          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
-        return sum + vAllocSum;
-      }, 0)
-      .toFixed(2)
-  );
+  const totalAllocatedToInvoicePaise = allActiveLinked.reduce((sum, v) => {
+    const vAllocSumPaise = (v.paymentAllocations || [])
+      .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
+      .reduce((aSum, a) => aSum + toPaise(Number(a.amount) || 0), 0);
+    return sum + vAllocSumPaise;
+  }, 0);
+  const totalAllocatedToInvoice = fromPaise(totalAllocatedToInvoicePaise);
+  const grandTotalPaise = toPaise(newInvoice.grandTotal);
 
-  if (newInvoice.grandTotal < totalAllocatedToInvoice - 0.01) {
+  if (grandTotalPaise < totalAllocatedToInvoicePaise - 1) {
     return {
       valid: false,
-      error: `Cannot reduce invoice grand total (₹${newInvoice.grandTotal.toFixed(2)}) below total linked payment allocations (₹${totalAllocatedToInvoice.toFixed(2)}). Unlink or adjust payments first.`,
+      error: `Cannot reduce invoice grand total (₹${fromPaise(grandTotalPaise).toFixed(2)}) below total linked payment allocations (₹${totalAllocatedToInvoice.toFixed(2)}). Unlink or adjust payments first.`,
       isNew: false,
       existingSourceVoucher,
       existingRefundVoucher,
@@ -790,18 +810,15 @@ export function validateInvoicePreSave(params: {
     };
   }
 
-  const otherAllocatedTotal = Number(
-    otherActiveLinked
-      .reduce((sum, v) => {
-        const vAllocSum = (v.paymentAllocations || [])
-          .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
-          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
-        return sum + vAllocSum;
-      }, 0)
-      .toFixed(2)
-  );
+  const otherAllocatedTotalPaise = otherActiveLinked.reduce((sum, v) => {
+    const vAllocSumPaise = (v.paymentAllocations || [])
+      .filter((x) => (x.documentType === 'INVOICE' || x.documentType === 'CREDIT_NOTE') && x.documentId === newInvoice.id)
+      .reduce((aSum, a) => aSum + toPaise(Number(a.amount) || 0), 0);
+    return sum + vAllocSumPaise;
+  }, 0);
+  const otherAllocatedTotal = fromPaise(otherAllocatedTotalPaise);
 
-  if (newInvoicePaid < otherAllocatedTotal) {
+  if (newInvoicePaidPaise < otherAllocatedTotalPaise) {
     return {
       valid: false,
       error: `Cannot reduce paid amount below ₹${otherAllocatedTotal.toFixed(2)}: active party payment vouchers cover that amount. Reverse or edit those payments first.`,
@@ -814,9 +831,9 @@ export function validateInvoicePreSave(params: {
     };
   }
 
-  const targetSourceAmount = (isSpecialDocument || isUnpaidOrCancelled || newInvoicePaid <= otherAllocatedTotal)
+  const targetSourceAmount = (isSpecialDocument || isUnpaidOrCancelled || newInvoicePaidPaise <= otherAllocatedTotalPaise)
     ? 0
-    : Number((newInvoicePaid - otherAllocatedTotal).toFixed(2));
+    : fromPaise(newInvoicePaidPaise - otherAllocatedTotalPaise);
 
   if (!isSpecialDocument && existingSourceVoucher && otherActiveLinked.length > 0) {
     if (targetSourceAmount !== existingSourceVoucher.totalAmount) {
@@ -867,12 +884,13 @@ export function validatePurchasePreSave(params: {
           v.sourceDocumentId === newBill.id
       );
 
-  const newBillPaid = Number(newBill.paidAmount) || 0;
+  const newBillPaidPaise = Math.max(0, toPaise(Number(newBill.paidAmount) || 0));
+  const newBillPaid = fromPaise(newBillPaidPaise);
   const isPurchaseOrder = newBill.purchaseType === 'PO';
   const isPurchaseChallan = newBill.purchaseType === 'CHALLAN';
   const isPurCredit = newBill.paymentMode === 'CREDIT';
   const isPurUnpaidOrCancelled =
-    isPurchaseReturn || isPurchaseOrder || isPurchaseChallan || newBill.isCancelled || newBillPaid <= 0 || isPurCredit;
+    isPurchaseReturn || isPurchaseOrder || isPurchaseChallan || newBill.isCancelled || newBillPaidPaise <= 0 || isPurCredit;
 
   if (isNew) {
     return {
@@ -908,18 +926,15 @@ export function validatePurchasePreSave(params: {
     }
   }
 
-  const otherAllocatedTotal = Number(
-    otherActiveLinked
-      .reduce((sum, v) => {
-        const vAllocSum = (v.paymentAllocations || [])
-          .filter((x) => x.documentType === 'PURCHASE' && x.documentId === newBill.id)
-          .reduce((aSum, a) => aSum + (Number(a.amount) || 0), 0);
-        return sum + vAllocSum;
-      }, 0)
-      .toFixed(2)
-  );
+  const otherAllocatedTotalPaise = otherActiveLinked.reduce((sum, v) => {
+    const vAllocSumPaise = (v.paymentAllocations || [])
+      .filter((x) => x.documentType === 'PURCHASE' && x.documentId === newBill.id)
+      .reduce((aSum, a) => aSum + toPaise(Number(a.amount) || 0), 0);
+    return sum + vAllocSumPaise;
+  }, 0);
+  const otherAllocatedTotal = fromPaise(otherAllocatedTotalPaise);
 
-  if (newBillPaid < otherAllocatedTotal) {
+  if (newBillPaidPaise < otherAllocatedTotalPaise) {
     return {
       valid: false,
       error: `Cannot reduce paid amount below ₹${otherAllocatedTotal.toFixed(2)}: active party payment vouchers cover that amount. Reverse or edit those payments first.`,
@@ -931,9 +946,9 @@ export function validatePurchasePreSave(params: {
     };
   }
 
-  const targetSourceAmount = (isPurchaseReturn || isPurUnpaidOrCancelled || newBillPaid <= otherAllocatedTotal)
+  const targetSourceAmount = (isPurchaseReturn || isPurUnpaidOrCancelled || newBillPaidPaise <= otherAllocatedTotalPaise)
     ? 0
-    : Number((newBillPaid - otherAllocatedTotal).toFixed(2));
+    : fromPaise(newBillPaidPaise - otherAllocatedTotalPaise);
 
   if (!isPurchaseReturn && existingSourcePaymentVoucher && otherActiveLinked.length > 0) {
     if (targetSourceAmount !== existingSourcePaymentVoucher.totalAmount) {

@@ -1,12 +1,13 @@
-import type { Voucher, JournalEntryLine, LedgerAccount } from './voucherTypes.ts';
+import type { Voucher, JournalEntryLine } from './voucherTypes.ts';
+import { toPaise, fromPaise, absPaise } from '../money.ts';
 
 /**
  * Validates that debit and credit amounts in a voucher match exactly.
  */
 export function validateVoucherBalance(entries: JournalEntryLine[]): { isBalanced: boolean; diff: number } {
-  const totalDebit = entries.reduce((sum, e) => sum + e.debit, 0);
-  const totalCredit = entries.reduce((sum, e) => sum + e.credit, 0);
-  const diff = Number(Math.abs(totalDebit - totalCredit).toFixed(2));
+  const debitPaise = entries.reduce((sum, e) => sum + toPaise(e.debit), 0);
+  const creditPaise = entries.reduce((sum, e) => sum + toPaise(e.credit), 0);
+  const diff = fromPaise(absPaise(debitPaise - creditPaise));
   return {
     isBalanced: diff === 0,
     diff,
@@ -115,34 +116,36 @@ export function createSalesInvoiceVoucher(params: {
   paymentSplits?: VoucherPaymentSplit[];
 }): Voucher {
   const entries: JournalEntryLine[] = [];
-  const cgst = params.cgstAmount || 0;
-  const sgst = params.sgstAmount || 0;
-  const igst = params.igstAmount || 0;
-  const cess = params.cessAmount || 0;
-  const totalTax = Number((cgst + sgst + igst + cess).toFixed(2));
-  const netAmount = Number((params.taxableAmount + totalTax).toFixed(2));
+  const cgstPaise = toPaise(params.cgstAmount || 0);
+  const sgstPaise = toPaise(params.sgstAmount || 0);
+  const igstPaise = toPaise(params.igstAmount || 0);
+  const cessPaise = toPaise(params.cessAmount || 0);
+  const totalTaxPaise = cgstPaise + sgstPaise + igstPaise + cessPaise;
+  const taxableAmountPaise = toPaise(params.taxableAmount);
+  const netAmountPaise = taxableAmountPaise + totalTaxPaise;
+  const grandTotalPaise = toPaise(params.grandTotal);
 
   // Determine round-off delta
-  const roundOff =
+  const roundOffPaise =
     params.roundOff !== undefined
-      ? Number(params.roundOff.toFixed(2))
-      : Number((params.grandTotal - netAmount).toFixed(2));
+      ? toPaise(params.roundOff)
+      : grandTotalPaise - netAmountPaise;
 
   // 1. Debits: Cash, Bank, or Customer Accounts (Split Tenders or Single Account)
   const activeSplits = (params.paymentSplits || []).filter((s) => Number(s.amount) > 0);
 
   if (activeSplits.length > 0) {
-    let totalSplitDebit = 0;
+    let totalSplitDebitPaise = 0;
 
     activeSplits.forEach((split) => {
-      const splitAmount = Number(split.amount);
-      totalSplitDebit = Number((totalSplitDebit + splitAmount).toFixed(2));
+      const splitAmountPaise = toPaise(Number(split.amount));
+      totalSplitDebitPaise += splitAmountPaise;
 
       if (split.mode === 'CREDIT') {
         entries.push({
           accountId: params.customerId,
           accountName: params.customerName,
-          debit: splitAmount,
+          debit: fromPaise(splitAmountPaise),
           credit: 0,
           narration: `Sales Bill #${params.invoiceNumber} (On Credit)`,
         });
@@ -151,7 +154,7 @@ export function createSalesInvoiceVoucher(params: {
         entries.push({
           accountId,
           accountName,
-          debit: splitAmount,
+          debit: fromPaise(splitAmountPaise),
           credit: 0,
           narration: `Sales Bill #${params.invoiceNumber} (${split.mode})`,
         });
@@ -160,12 +163,12 @@ export function createSalesInvoiceVoucher(params: {
 
     // Allocate unassigned remainder to customer receivable if no explicit credit split exists
     const hasCreditSplit = activeSplits.some((s) => s.mode === 'CREDIT');
-    const remainingBalance = Number((params.grandTotal - totalSplitDebit).toFixed(2));
-    if (remainingBalance > 0 && !hasCreditSplit) {
+    const remainingBalancePaise = grandTotalPaise - totalSplitDebitPaise;
+    if (remainingBalancePaise > 0 && !hasCreditSplit) {
       entries.push({
         accountId: params.customerId,
         accountName: params.customerName,
-        debit: remainingBalance,
+        debit: fromPaise(remainingBalancePaise),
         credit: 0,
         narration: `Sales Bill #${params.invoiceNumber} (Balance Due)`,
       });
@@ -175,18 +178,18 @@ export function createSalesInvoiceVoucher(params: {
     entries.push({
       accountId: params.isCashSale ? 'ACC_CASH' : params.customerId,
       accountName: params.isCashSale ? 'Cash-in-hand' : params.customerName,
-      debit: params.grandTotal,
+      debit: fromPaise(grandTotalPaise),
       credit: 0,
       narration: `Sales Bill #${params.invoiceNumber}`,
     });
   }
 
   // 2. Round-off Debit (when roundOff < 0: discount/expense on sales)
-  if (roundOff < 0) {
+  if (roundOffPaise < 0) {
     entries.push({
       accountId: 'ACC_ROUND_OFF',
       accountName: 'Round Off Account',
-      debit: Math.abs(roundOff),
+      debit: fromPaise(absPaise(roundOffPaise)),
       credit: 0,
       narration: `Round off adjustment for #${params.invoiceNumber}`,
     });
@@ -197,54 +200,54 @@ export function createSalesInvoiceVoucher(params: {
     accountId: 'ACC_SALES',
     accountName: 'GST Sales Account',
     debit: 0,
-    credit: params.taxableAmount,
+    credit: fromPaise(taxableAmountPaise),
     narration: `Sales Revenue against #${params.invoiceNumber}`,
   });
 
   // 4. Credits: Output Taxes
-  if (cgst > 0) {
+  if (cgstPaise > 0) {
     entries.push({
       accountId: 'ACC_OUTPUT_CGST',
       accountName: 'Output CGST Account',
       debit: 0,
-      credit: cgst,
+      credit: fromPaise(cgstPaise),
     });
   }
 
-  if (sgst > 0) {
+  if (sgstPaise > 0) {
     entries.push({
       accountId: 'ACC_OUTPUT_SGST',
       accountName: 'Output SGST Account',
       debit: 0,
-      credit: sgst,
+      credit: fromPaise(sgstPaise),
     });
   }
 
-  if (igst > 0) {
+  if (igstPaise > 0) {
     entries.push({
       accountId: 'ACC_OUTPUT_IGST',
       accountName: 'Output IGST Account',
       debit: 0,
-      credit: igst,
+      credit: fromPaise(igstPaise),
     });
   }
 
-  if (cess > 0) {
+  if (cessPaise > 0) {
     entries.push({
       accountId: 'ACC_OUTPUT_CESS',
       accountName: 'Output GST Cess Account',
       debit: 0,
-      credit: cess,
+      credit: fromPaise(cessPaise),
     });
   }
 
   // 5. Round-off Credit (when roundOff > 0: income on sales)
-  if (roundOff > 0) {
+  if (roundOffPaise > 0) {
     entries.push({
       accountId: 'ACC_ROUND_OFF',
       accountName: 'Round Off Account',
       debit: 0,
-      credit: roundOff,
+      credit: fromPaise(roundOffPaise),
       narration: `Round off adjustment for #${params.invoiceNumber}`,
     });
   }
@@ -257,7 +260,7 @@ export function createSalesInvoiceVoucher(params: {
     referenceNo: params.invoiceNumber,
     entries,
     narration: `Being goods/services sold vide invoice #${params.invoiceNumber}`,
-    totalAmount: params.grandTotal,
+    totalAmount: fromPaise(grandTotalPaise),
     createdAt: new Date().toISOString(),
   };
 }
@@ -288,71 +291,73 @@ export function createPurchaseInvoiceVoucher(params: {
   paymentSplits?: VoucherPaymentSplit[];
 }): Voucher {
   const entries: JournalEntryLine[] = [];
-  const cgst = params.cgstAmount || 0;
-  const sgst = params.sgstAmount || 0;
-  const igst = params.igstAmount || 0;
-  const cess = params.cessAmount || 0;
-  const totalTax = Number((cgst + sgst + igst + cess).toFixed(2));
-  const netAmount = Number((params.taxableAmount + totalTax).toFixed(2));
+  const cgstPaise = toPaise(params.cgstAmount || 0);
+  const sgstPaise = toPaise(params.sgstAmount || 0);
+  const igstPaise = toPaise(params.igstAmount || 0);
+  const cessPaise = toPaise(params.cessAmount || 0);
+  const totalTaxPaise = cgstPaise + sgstPaise + igstPaise + cessPaise;
+  const taxableAmountPaise = toPaise(params.taxableAmount);
+  const netAmountPaise = taxableAmountPaise + totalTaxPaise;
+  const grandTotalPaise = toPaise(params.grandTotal);
 
   // Determine round-off delta
-  const roundOff =
+  const roundOffPaise =
     params.roundOff !== undefined
-      ? Number(params.roundOff.toFixed(2))
-      : Number((params.grandTotal - netAmount).toFixed(2));
+      ? toPaise(params.roundOff)
+      : grandTotalPaise - netAmountPaise;
 
   // 1. Debits: Purchase Account (Taxable Value)
   entries.push({
     accountId: 'ACC_PURCHASE',
     accountName: 'GST Purchase Account',
-    debit: params.taxableAmount,
+    debit: fromPaise(taxableAmountPaise),
     credit: 0,
     narration: `Purchases against bill #${params.billNumber}`,
   });
 
   // 2. Debits: Input Taxes (ITC Asset Claims)
-  if (cgst > 0) {
+  if (cgstPaise > 0) {
     entries.push({
       accountId: 'ACC_INPUT_CGST',
       accountName: 'Input CGST (ITC) Account',
-      debit: cgst,
+      debit: fromPaise(cgstPaise),
       credit: 0,
     });
   }
 
-  if (sgst > 0) {
+  if (sgstPaise > 0) {
     entries.push({
       accountId: 'ACC_INPUT_SGST',
       accountName: 'Input SGST (ITC) Account',
-      debit: sgst,
+      debit: fromPaise(sgstPaise),
       credit: 0,
     });
   }
 
-  if (igst > 0) {
+  if (igstPaise > 0) {
     entries.push({
       accountId: 'ACC_INPUT_IGST',
       accountName: 'Input IGST (ITC) Account',
-      debit: igst,
+      debit: fromPaise(igstPaise),
       credit: 0,
     });
   }
 
-  if (cess > 0) {
+  if (cessPaise > 0) {
     entries.push({
       accountId: 'ACC_INPUT_CESS',
       accountName: 'Input GST Cess (ITC) Account',
-      debit: cess,
+      debit: fromPaise(cessPaise),
       credit: 0,
     });
   }
 
   // 3. Round-off Debit (when roundOff > 0: expense on purchase)
-  if (roundOff > 0) {
+  if (roundOffPaise > 0) {
     entries.push({
       accountId: 'ACC_ROUND_OFF',
       accountName: 'Round Off Account',
-      debit: roundOff,
+      debit: fromPaise(roundOffPaise),
       credit: 0,
       narration: `Round off expense for bill #${params.billNumber}`,
     });
@@ -362,18 +367,18 @@ export function createPurchaseInvoiceVoucher(params: {
   const activeSplits = (params.paymentSplits || []).filter((s) => Number(s.amount) > 0);
 
   if (activeSplits.length > 0) {
-    let totalSplitCredit = 0;
+    let totalSplitCreditPaise = 0;
 
     activeSplits.forEach((split) => {
-      const splitAmount = Number(split.amount);
-      totalSplitCredit = Number((totalSplitCredit + splitAmount).toFixed(2));
+      const splitAmountPaise = toPaise(Number(split.amount));
+      totalSplitCreditPaise += splitAmountPaise;
 
       if (split.mode === 'CREDIT') {
         entries.push({
           accountId: params.supplierId,
           accountName: params.supplierName,
           debit: 0,
-          credit: splitAmount,
+          credit: fromPaise(splitAmountPaise),
           narration: `Payable for bill #${params.billNumber} (On Credit)`,
         });
       } else {
@@ -382,7 +387,7 @@ export function createPurchaseInvoiceVoucher(params: {
           accountId,
           accountName,
           debit: 0,
-          credit: splitAmount,
+          credit: fromPaise(splitAmountPaise),
           narration: `Paid bill #${params.billNumber} (${split.mode})`,
         });
       }
@@ -390,13 +395,13 @@ export function createPurchaseInvoiceVoucher(params: {
 
     // Allocate unassigned remainder to supplier liability if no explicit credit split exists
     const hasCreditSplit = activeSplits.some((s) => s.mode === 'CREDIT');
-    const remainingBalance = Number((params.grandTotal - totalSplitCredit).toFixed(2));
-    if (remainingBalance > 0 && !hasCreditSplit) {
+    const remainingBalancePaise = grandTotalPaise - totalSplitCreditPaise;
+    if (remainingBalancePaise > 0 && !hasCreditSplit) {
       entries.push({
         accountId: params.supplierId,
         accountName: params.supplierName,
         debit: 0,
-        credit: remainingBalance,
+        credit: fromPaise(remainingBalancePaise),
         narration: `Payable for bill #${params.billNumber} (Balance Due)`,
       });
     }
@@ -406,18 +411,18 @@ export function createPurchaseInvoiceVoucher(params: {
       accountId: params.isCashPurchase ? 'ACC_CASH' : params.supplierId,
       accountName: params.isCashPurchase ? 'Cash-in-hand' : params.supplierName,
       debit: 0,
-      credit: params.grandTotal,
+      credit: fromPaise(grandTotalPaise),
       narration: `Payable for bill #${params.billNumber}`,
     });
   }
 
   // 5. Round-off Credit (when roundOff < 0: discount/income on purchase)
-  if (roundOff < 0) {
+  if (roundOffPaise < 0) {
     entries.push({
       accountId: 'ACC_ROUND_OFF',
       accountName: 'Round Off Account',
       debit: 0,
-      credit: Math.abs(roundOff),
+      credit: fromPaise(absPaise(roundOffPaise)),
       narration: `Round off income/discount for bill #${params.billNumber}`,
     });
   }
@@ -430,7 +435,7 @@ export function createPurchaseInvoiceVoucher(params: {
     referenceNo: params.billNumber,
     entries,
     narration: `Being goods/services purchased vide bill #${params.billNumber}`,
-    totalAmount: params.grandTotal,
+    totalAmount: fromPaise(grandTotalPaise),
     createdAt: new Date().toISOString(),
   };
 }
@@ -460,14 +465,15 @@ export function createPaymentReceiptVoucher(params: {
   const receiptNum = params.receiptNumber || params.voucherNumber || `RCPT-${Date.now().toString().slice(-6)}`;
   const activeSplits = (params.paymentSplits || []).filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && Number(s.amount) > 0);
   const entries: JournalEntryLine[] = [];
-  const discount = Number(Number(params.discount || 0).toFixed(2));
+  const discountPaise = toPaise(params.discount || 0);
+  const discount = fromPaise(discountPaise);
 
-  let totalCashBank = 0;
+  let totalCashBankPaise = 0;
 
   if (activeSplits.length > 0) {
     activeSplits.forEach((split) => {
-      const splitAmt = Number(Number(split.amount).toFixed(2));
-      totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
+      const splitAmtPaise = toPaise(Number(split.amount));
+      totalCashBankPaise += splitAmtPaise;
       const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
       const splitRef = split.reference || split.referenceNo;
       const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
@@ -475,14 +481,14 @@ export function createPaymentReceiptVoucher(params: {
       entries.push({
         accountId,
         accountName,
-        debit: splitAmt,
+        debit: fromPaise(splitAmtPaise),
         credit: 0,
         narration: `Payment received via ${split.mode}${refSuffix}`,
       });
     });
   } else {
     const singleMode = params.paymentMode || params.mode || 'CASH';
-    totalCashBank = Number(Number(params.amount || 0).toFixed(2));
+    totalCashBankPaise = toPaise(Number(params.amount || 0));
     const { accountId, accountName } = resolveAccountForSplit({
       mode: singleMode,
       accountId: params.bankAccountId,
@@ -492,13 +498,13 @@ export function createPaymentReceiptVoucher(params: {
     entries.push({
       accountId,
       accountName,
-      debit: totalCashBank,
+      debit: fromPaise(totalCashBankPaise),
       credit: 0,
       narration: `Payment received via ${singleMode}${params.bankAccountName ? ` (${params.bankAccountName})` : ''}`,
     });
   }
 
-  if (discount > 0) {
+  if (discountPaise > 0) {
     entries.push({
       accountId: 'ACC_EXPENSE_DISCOUNT',
       accountName: 'Discount Allowed',
@@ -508,7 +514,8 @@ export function createPaymentReceiptVoucher(params: {
     });
   }
 
-  const effectiveCredit = Number((totalCashBank + discount).toFixed(2));
+  const effectiveCreditPaise = totalCashBankPaise + discountPaise;
+  const effectiveCredit = fromPaise(effectiveCreditPaise);
   entries.push({
     accountId: params.customerId,
     accountName: params.customerName,
@@ -524,7 +531,7 @@ export function createPaymentReceiptVoucher(params: {
     date: params.date,
     referenceNo: params.referenceNo || receiptNum,
     entries,
-    narration: params.narration || `Payment received from ${params.customerName} via ${params.paymentMode || params.mode || 'SPLIT'}${discount > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
+    narration: params.narration || `Payment received from ${params.customerName} via ${params.paymentMode || params.mode || 'SPLIT'}${discountPaise > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
     totalAmount: effectiveCredit,
     createdAt: new Date().toISOString(),
   };
@@ -555,15 +562,16 @@ export function createPaymentOutVoucher(params: {
   const vouchNum = params.voucherNumber || params.receiptNumber || `PYMT-${Date.now().toString().slice(-6)}`;
   const activeSplits = (params.paymentSplits || []).filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && Number(s.amount) > 0);
   const entries: JournalEntryLine[] = [];
-  const discount = Number(Number(params.discount || 0).toFixed(2));
+  const discountPaise = toPaise(params.discount || 0);
+  const discount = fromPaise(discountPaise);
 
-  let totalCashBank = 0;
+  let totalCashBankPaise = 0;
   const splitEntries: JournalEntryLine[] = [];
 
   if (activeSplits.length > 0) {
     activeSplits.forEach((split) => {
-      const splitAmt = Number(Number(split.amount).toFixed(2));
-      totalCashBank = Number((totalCashBank + splitAmt).toFixed(2));
+      const splitAmtPaise = toPaise(Number(split.amount));
+      totalCashBankPaise += splitAmtPaise;
       const { accountId, accountName } = resolveAccountForSplit(split, params.bankAccountId, params.bankAccountName);
       const splitRef = split.reference || split.referenceNo;
       const refSuffix = splitRef ? ` (Ref: ${splitRef})` : '';
@@ -572,13 +580,13 @@ export function createPaymentOutVoucher(params: {
         accountId,
         accountName,
         debit: 0,
-        credit: splitAmt,
+        credit: fromPaise(splitAmtPaise),
         narration: `Paid via ${split.mode}${refSuffix}`,
       });
     });
   } else {
     const singleMode = params.paymentMode || params.mode || 'CASH';
-    totalCashBank = Number(Number(params.amount || 0).toFixed(2));
+    totalCashBankPaise = toPaise(Number(params.amount || 0));
     const { accountId, accountName } = resolveAccountForSplit({
       mode: singleMode,
       accountId: params.bankAccountId,
@@ -589,12 +597,13 @@ export function createPaymentOutVoucher(params: {
       accountId,
       accountName,
       debit: 0,
-      credit: totalCashBank,
+      credit: fromPaise(totalCashBankPaise),
       narration: `Paid via ${singleMode}${params.bankAccountName ? ` (${params.bankAccountName})` : ''}`,
     });
   }
 
-  const effectiveDebit = Number((totalCashBank + discount).toFixed(2));
+  const effectiveDebitPaise = totalCashBankPaise + discountPaise;
+  const effectiveDebit = fromPaise(effectiveDebitPaise);
   entries.push({
     accountId: params.supplierId,
     accountName: params.supplierName,
@@ -604,7 +613,7 @@ export function createPaymentOutVoucher(params: {
   });
   entries.push(...splitEntries);
 
-  if (discount > 0) {
+  if (discountPaise > 0) {
     entries.push({
       accountId: 'ACC_INCOME_DISCOUNT',
       accountName: 'Discount Received',
@@ -621,7 +630,7 @@ export function createPaymentOutVoucher(params: {
     date: params.date,
     referenceNo: params.referenceNo || vouchNum,
     entries,
-    narration: params.narration || `Payment disbursed to ${params.supplierName} via ${params.paymentMode || params.mode || 'SPLIT'}${discount > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
+    narration: params.narration || `Payment disbursed to ${params.supplierName} via ${params.paymentMode || params.mode || 'SPLIT'}${discountPaise > 0 ? ` (Discount: ₹${discount.toFixed(2)})` : ''}`,
     totalAmount: effectiveDebit,
     createdAt: new Date().toISOString(),
   };

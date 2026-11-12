@@ -1,4 +1,5 @@
 import { Party } from '../../models/party.ts';
+import { absPaise, addPaise, fromPaise, toPaise } from '../money.ts';
 
 export interface PartyDuesSummary {
   totalReceivables: number;
@@ -19,8 +20,8 @@ export interface PartyDuesSummary {
  * complete.
  */
 export function computePartyDues(parties: Party[] = []): PartyDuesSummary {
-  let totalReceivables = 0;
-  let totalPayables = 0;
+  let totalReceivablesPaise = 0;
+  let totalPayablesPaise = 0;
   const debtorParties: Party[] = [];
   const creditorParties: Party[] = [];
   const creditCustomers: Party[] = [];
@@ -29,26 +30,28 @@ export function computePartyDues(parties: Party[] = []): PartyDuesSummary {
   for (const party of parties) {
     if (!party) continue;
 
+    const balPaise = toPaise(party.currentBalance);
+
     if (party.type === 'CUSTOMER') {
-      if (party.currentBalance > 0) {
-        totalReceivables += party.currentBalance;
+      if (balPaise > 0) {
+        totalReceivablesPaise = addPaise(totalReceivablesPaise, balPaise);
         debtorParties.push(party);
-      } else if (party.currentBalance < 0) {
+      } else if (balPaise < 0) {
         creditCustomers.push(party);
       }
     } else if (party.type === 'SUPPLIER') {
-      if (party.currentBalance < 0) {
-        totalPayables += Math.abs(party.currentBalance);
+      if (balPaise < 0) {
+        totalPayablesPaise = addPaise(totalPayablesPaise, absPaise(balPaise));
         creditorParties.push(party);
-      } else if (party.currentBalance > 0) {
+      } else if (balPaise > 0) {
         advanceSuppliers.push(party);
       }
     }
   }
 
   return {
-    totalReceivables,
-    totalPayables,
+    totalReceivables: fromPaise(totalReceivablesPaise),
+    totalPayables: fromPaise(totalPayablesPaise),
     debtorParties,
     creditorParties,
     creditCustomers,

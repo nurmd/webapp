@@ -1,9 +1,14 @@
+/**
+ * Cash & Bank financial summary calculator and ledger generator.
+ * All amounts accumulate in integer paise; rupee values are emitted only at the return boundary.
+ */
+
 import type { BankAccount, CashBankTransaction, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
 import type { Invoice } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
 import type { Voucher } from './voucherTypes.ts';
-import { addMoney, subMoney, roundMoney } from '../money.ts';
+import { toPaise, fromPaise, addPaise, subPaise, comparePaise } from '../money.ts';
 
 export interface CashBankFinancialSummary {
   totalLiquidBalance: number;
@@ -41,22 +46,22 @@ export function computeCashBankSummary(params: {
       updatedAt: '',
     };
 
-  // 1. Initialize balances with opening balances
-  const balances: Record<string, number> = {};
+  // 1. Initialize balances with opening balances (in paise)
+  const balancesPaise: Record<string, number> = {};
   accounts.forEach((acc) => {
     if (!acc) return;
-    balances[acc.id] = acc.openingBalance || 0;
+    balancesPaise[acc.id] = toPaise(acc.openingBalance || 0);
   });
 
-  if (balances['ACC_CASH'] === undefined) {
+  if (balancesPaise['ACC_CASH'] === undefined) {
     const cashAcc = accounts.find((a) => a && a.accountType === 'CASH');
-    balances['ACC_CASH'] = cashAcc ? (cashAcc.openingBalance || 0) : 0;
+    balancesPaise['ACC_CASH'] = cashAcc ? toPaise(cashAcc.openingBalance || 0) : 0;
   }
 
   const entries: UnifiedLedgerEntry[] = [];
   const todayStr = new Date().toISOString().split('T')[0];
-  let todayInflow = 0;
-  let todayOutflow = 0;
+  let todayInflowPaise = 0;
+  let todayOutflowPaise = 0;
 
   // Voucher credit offsets are allocated per party. Process documents in
   // chronological order so the allocation is deterministic and does not depend
@@ -71,7 +76,7 @@ export function computeCashBankSummary(params: {
 
   // 2. Process Sales Invoices (Inflow from upfront payments without vouchers)
   // Build a per-document map of active receipt-voucher allocations:
-  // allocatedReceiptsByInvoice[documentId] += allocation.amount
+  // allocatedReceiptsByInvoice[documentId] += allocation.amount (in paise)
   // Only use the old party-aggregate fallback for legacy vouchers that have no paymentAllocations.
   const allocatedReceiptsByInvoice: Record<string, number> = {};
   const legacyPartyVoucherReceipts: Record<string, number> = {};
@@ -82,17 +87,17 @@ export function computeCashBankSummary(params: {
       if (v.paymentAllocations && v.paymentAllocations.length > 0) {
         v.paymentAllocations.forEach((alloc) => {
           if (alloc && alloc.documentType === 'INVOICE' && alloc.documentId) {
-            allocatedReceiptsByInvoice[alloc.documentId] = addMoney(
+            allocatedReceiptsByInvoice[alloc.documentId] = addPaise(
               allocatedReceiptsByInvoice[alloc.documentId] || 0,
-              alloc.amount || 0
+              toPaise(alloc.amount || 0)
             );
           }
         });
       } else if (v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId) {
         // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
-        allocatedReceiptsByInvoice[v.sourceDocumentId] = addMoney(
+        allocatedReceiptsByInvoice[v.sourceDocumentId] = addPaise(
           allocatedReceiptsByInvoice[v.sourceDocumentId] || 0,
-          v.totalAmount || 0
+          toPaise(v.totalAmount || 0)
         );
       } else {
         // Legacy fallback: aggregate voucher receipts per party key only when neither an allocation nor a sourceDocument link exists
@@ -108,8 +113,9 @@ export function computeCashBankSummary(params: {
             partyKeys.add(e.accountName.trim().toLowerCase());
           }
         });
+        const vTotalPaise = toPaise(v.totalAmount || 0);
         partyKeys.forEach((key) => {
-          legacyPartyVoucherReceipts[key] = (legacyPartyVoucherReceipts[key] || 0) + (v.totalAmount || 0);
+          legacyPartyVoucherReceipts[key] = addPaise(legacyPartyVoucherReceipts[key] || 0, vTotalPaise);
         });
       }
     }
@@ -121,51 +127,50 @@ export function computeCashBankSummary(params: {
   const orderedInvoices = [...invoices].sort(chronological);
   orderedInvoices.forEach((inv) => {
     if (!inv) return;
-    const paid = typeof inv.paidAmount === 'number'
-      ? inv.paidAmount
-      : (inv.paymentStatus === 'PAID' ? inv.grandTotal : 0);
+    const paidPaise = typeof inv.paidAmount === 'number'
+      ? toPaise(inv.paidAmount)
+      : (inv.paymentStatus === 'PAID' ? toPaise(inv.grandTotal || 0) : 0);
 
-    if (paid > 0 && inv.paymentMode !== 'CREDIT') {
+    if (comparePaise(paidPaise, 0) > 0 && inv.paymentMode !== 'CREDIT') {
       // 1. Direct document allocation suppression
-      const directAlloc = allocatedReceiptsByInvoice[inv.id] || 0;
-      const coveredByDirectAlloc = Math.min(paid, directAlloc);
-      const remainingPaidToCover = paid - coveredByDirectAlloc;
+      const directAllocPaise = allocatedReceiptsByInvoice[inv.id] || 0;
+      const coveredByDirectAllocPaise = comparePaise(paidPaise, directAllocPaise) <= 0 ? paidPaise : directAllocPaise;
+      const remainingPaidToCoverPaise = subPaise(paidPaise, coveredByDirectAllocPaise);
 
       // 2. Legacy party-aggregate fallback only for vouchers without paymentAllocations
       const partyKey = (inv.partyId || inv.partyName || '').trim().toLowerCase();
-      const legacyAvail = remainingLegacyCredit[partyKey] || 0;
-      const coveredByLegacy = Math.min(remainingPaidToCover, legacyAvail);
-      if (partyKey && coveredByLegacy > 0) {
-        remainingLegacyCredit[partyKey] -= coveredByLegacy;
+      const legacyAvailPaise = remainingLegacyCredit[partyKey] || 0;
+      const coveredByLegacyPaise = comparePaise(remainingPaidToCoverPaise, legacyAvailPaise) <= 0 ? remainingPaidToCoverPaise : legacyAvailPaise;
+      if (partyKey && comparePaise(coveredByLegacyPaise, 0) > 0) {
+        remainingLegacyCredit[partyKey] = subPaise(remainingLegacyCredit[partyKey], coveredByLegacyPaise);
       }
 
       // Amount covered by vouchers is handled by section 5 (vouchers), only take unvouchered upfront amount here
-      const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
-      const unvoucheredPaid = subMoney(paid, coveredByVoucher);
+      const coveredByVoucherPaise = addPaise(coveredByDirectAllocPaise, coveredByLegacyPaise);
+      const unvoucheredPaidPaise = subPaise(paidPaise, coveredByVoucherPaise);
 
-      if (unvoucheredPaid > 0) {
+      if (comparePaise(unvoucheredPaidPaise, 0) > 0) {
         const splits = (inv.paymentSplits && inv.paymentSplits.length > 0)
-          ? inv.paymentSplits.filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+          ? inv.paymentSplits.filter((s) => s.mode !== 'CREDIT' && comparePaise(toPaise(s.amount), 0) > 0)
           : [];
 
         if (splits.length > 0) {
-          const totalSplitsPaid = splits.reduce((sum, s) => sum + s.amount, 0) || unvoucheredPaid;
-          const ratio = unvoucheredPaid / totalSplitsPaid;
+          const totalSplitsPaise = splits.reduce((s, x) => addPaise(s, toPaise(x.amount)), 0) || unvoucheredPaidPaise;
 
           splits.forEach((s, sIdx) => {
-            const splitAmt = roundMoney(s.amount * ratio);
-            if (splitAmt <= 0) return;
+            const splitPaise = Math.round((toPaise(s.amount) * unvoucheredPaidPaise) / totalSplitsPaise);
+            if (comparePaise(splitPaise, 0) <= 0) return;
             const isCash = s.mode === 'CASH';
             const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || inv.bankAccountId || defaultBank.id);
             const targetAccName = isCash
               ? 'Cash in Hand'
               : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || inv.bankAccountName || defaultBank.accountName);
 
-            balances[targetAccId] = (balances[targetAccId] || 0) + splitAmt;
+            balancesPaise[targetAccId] = addPaise(balancesPaise[targetAccId] || 0, splitPaise);
 
             const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
             if (dateStr === todayStr) {
-              todayInflow += splitAmt;
+              todayInflowPaise = addPaise(todayInflowPaise, splitPaise);
             }
 
             entries.push({
@@ -179,8 +184,8 @@ export function computeCashBankSummary(params: {
               referenceNo: inv.invoiceNumber,
               mode: s.mode,
               flow: 'IN',
-              amount: splitAmt,
-              description: `Sale Receipt #${inv.invoiceNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+              amount: fromPaise(splitPaise),
+              description: `Sale Receipt #${inv.invoiceNumber} (${s.mode})${comparePaise(coveredByVoucherPaise, 0) > 0 ? ' (Upfront)' : ''}`,
               rawInvoiceId: inv.id,
             });
           });
@@ -191,11 +196,11 @@ export function computeCashBankSummary(params: {
             ? 'Cash in Hand'
             : (accounts.find((a) => a.id === targetAccId)?.accountName || inv.bankAccountName || defaultBank.accountName);
 
-          balances[targetAccId] = (balances[targetAccId] || 0) + unvoucheredPaid;
+          balancesPaise[targetAccId] = addPaise(balancesPaise[targetAccId] || 0, unvoucheredPaidPaise);
 
           const dateStr = inv.date || inv.createdAt?.split('T')[0] || todayStr;
           if (dateStr === todayStr) {
-            todayInflow += unvoucheredPaid;
+            todayInflowPaise = addPaise(todayInflowPaise, unvoucheredPaidPaise);
           }
 
           entries.push({
@@ -209,8 +214,8 @@ export function computeCashBankSummary(params: {
             referenceNo: inv.invoiceNumber,
             mode: inv.paymentMode || (isCash ? 'CASH' : 'UPI'),
             flow: 'IN',
-            amount: unvoucheredPaid,
-            description: `Sale Receipt #${inv.invoiceNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            amount: fromPaise(unvoucheredPaidPaise),
+            description: `Sale Receipt #${inv.invoiceNumber}${comparePaise(coveredByVoucherPaise, 0) > 0 ? ' (Upfront)' : ''}`,
             rawInvoiceId: inv.id,
           });
         }
@@ -220,7 +225,7 @@ export function computeCashBankSummary(params: {
 
   // 3. Process Purchases (Outflow from upfront payments without vouchers)
   // Build a per-document map of active payment-voucher allocations:
-  // allocatedPaymentsByPurchase[documentId] += allocation.amount
+  // allocatedPaymentsByPurchase[documentId] += allocation.amount (in paise)
   // Only use the old supplier-aggregate fallback for legacy vouchers that have no paymentAllocations.
   const allocatedPaymentsByPurchase: Record<string, number> = {};
   const legacySupplierVoucherPayments: Record<string, number> = {};
@@ -231,17 +236,17 @@ export function computeCashBankSummary(params: {
       if (v.paymentAllocations && v.paymentAllocations.length > 0) {
         v.paymentAllocations.forEach((alloc) => {
           if (alloc && alloc.documentType === 'PURCHASE' && alloc.documentId) {
-            allocatedPaymentsByPurchase[alloc.documentId] = addMoney(
+            allocatedPaymentsByPurchase[alloc.documentId] = addPaise(
               allocatedPaymentsByPurchase[alloc.documentId] || 0,
-              alloc.amount || 0
+              toPaise(alloc.amount || 0)
             );
           }
         });
       } else if (v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId) {
         // Direct-link fallback: legacy source voucher with sourceDocumentId but no paymentAllocations
-        allocatedPaymentsByPurchase[v.sourceDocumentId] = addMoney(
+        allocatedPaymentsByPurchase[v.sourceDocumentId] = addPaise(
           allocatedPaymentsByPurchase[v.sourceDocumentId] || 0,
-          v.totalAmount || 0
+          toPaise(v.totalAmount || 0)
         );
       } else {
         // Legacy fallback: aggregate voucher payments per supplier key only when neither an allocation nor a sourceDocument link exists
@@ -257,8 +262,9 @@ export function computeCashBankSummary(params: {
             supKeys.add(e.accountName.trim().toLowerCase());
           }
         });
+        const vTotalPaise = toPaise(v.totalAmount || 0);
         supKeys.forEach((key) => {
-          legacySupplierVoucherPayments[key] = (legacySupplierVoucherPayments[key] || 0) + (v.totalAmount || 0);
+          legacySupplierVoucherPayments[key] = addPaise(legacySupplierVoucherPayments[key] || 0, vTotalPaise);
         });
       }
     }
@@ -270,50 +276,49 @@ export function computeCashBankSummary(params: {
   const orderedPurchases = [...purchases].sort(chronological);
   orderedPurchases.forEach((pur) => {
     if (!pur) return;
-    const paid = typeof pur.paidAmount === 'number'
-      ? pur.paidAmount
-      : (pur.paymentStatus === 'PAID' ? pur.grandTotal : 0);
+    const paidPaise = typeof pur.paidAmount === 'number'
+      ? toPaise(pur.paidAmount)
+      : (pur.paymentStatus === 'PAID' ? toPaise(pur.grandTotal || 0) : 0);
 
-    if (paid > 0 && pur.paymentMode !== 'CREDIT') {
+    if (comparePaise(paidPaise, 0) > 0 && pur.paymentMode !== 'CREDIT') {
       // 1. Direct document allocation suppression
-      const directAlloc = allocatedPaymentsByPurchase[pur.id] || 0;
-      const coveredByDirectAlloc = Math.min(paid, directAlloc);
-      const remainingPaidToCover = paid - coveredByDirectAlloc;
+      const directAllocPaise = allocatedPaymentsByPurchase[pur.id] || 0;
+      const coveredByDirectAllocPaise = comparePaise(paidPaise, directAllocPaise) <= 0 ? paidPaise : directAllocPaise;
+      const remainingPaidToCoverPaise = subPaise(paidPaise, coveredByDirectAllocPaise);
 
       // 2. Legacy supplier-aggregate fallback only for vouchers without paymentAllocations
       const supKey = (pur.supplierId || pur.supplierName || '').trim().toLowerCase();
-      const legacyAvail = remainingLegacyDebit[supKey] || 0;
-      const coveredByLegacy = Math.min(remainingPaidToCover, legacyAvail);
-      if (supKey && coveredByLegacy > 0) {
-        remainingLegacyDebit[supKey] -= coveredByLegacy;
+      const legacyAvailPaise = remainingLegacyDebit[supKey] || 0;
+      const coveredByLegacyPaise = comparePaise(remainingPaidToCoverPaise, legacyAvailPaise) <= 0 ? remainingPaidToCoverPaise : legacyAvailPaise;
+      if (supKey && comparePaise(coveredByLegacyPaise, 0) > 0) {
+        remainingLegacyDebit[supKey] = subPaise(remainingLegacyDebit[supKey], coveredByLegacyPaise);
       }
 
-      const coveredByVoucher = coveredByDirectAlloc + coveredByLegacy;
-      const unvoucheredPaid = subMoney(paid, coveredByVoucher);
+      const coveredByVoucherPaise = addPaise(coveredByDirectAllocPaise, coveredByLegacyPaise);
+      const unvoucheredPaidPaise = subPaise(paidPaise, coveredByVoucherPaise);
 
-      if (unvoucheredPaid > 0) {
+      if (comparePaise(unvoucheredPaidPaise, 0) > 0) {
         const splits = (pur.paymentSplits && pur.paymentSplits.length > 0)
-          ? pur.paymentSplits.filter((s) => s.mode !== 'CREDIT' && s.amount > 0)
+          ? pur.paymentSplits.filter((s) => s.mode !== 'CREDIT' && comparePaise(toPaise(s.amount), 0) > 0)
           : [];
 
         if (splits.length > 0) {
-          const totalSplitsPaid = splits.reduce((sum, s) => sum + s.amount, 0) || unvoucheredPaid;
-          const ratio = unvoucheredPaid / totalSplitsPaid;
+          const totalSplitsPaise = splits.reduce((s, x) => addPaise(s, toPaise(x.amount)), 0) || unvoucheredPaidPaise;
 
           splits.forEach((s, sIdx) => {
-            const splitAmt = roundMoney(s.amount * ratio);
-            if (splitAmt <= 0) return;
+            const splitPaise = Math.round((toPaise(s.amount) * unvoucheredPaidPaise) / totalSplitsPaise);
+            if (comparePaise(splitPaise, 0) <= 0) return;
             const isCash = s.mode === 'CASH';
             const targetAccId = isCash ? 'ACC_CASH' : (s.accountId || pur.bankAccountId || defaultBank.id);
             const targetAccName = isCash
               ? 'Cash in Hand'
               : (s.accountName || accounts.find((a) => a.id === targetAccId)?.accountName || pur.bankAccountName || defaultBank.accountName);
 
-            balances[targetAccId] = (balances[targetAccId] || 0) - splitAmt;
+            balancesPaise[targetAccId] = subPaise(balancesPaise[targetAccId] || 0, splitPaise);
 
             const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
             if (dateStr === todayStr) {
-              todayOutflow += splitAmt;
+              todayOutflowPaise = addPaise(todayOutflowPaise, splitPaise);
             }
 
             entries.push({
@@ -327,8 +332,8 @@ export function computeCashBankSummary(params: {
               referenceNo: pur.billNumber,
               mode: s.mode,
               flow: 'OUT',
-              amount: splitAmt,
-              description: `Purchase Payment #${pur.billNumber} (${s.mode})${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+              amount: fromPaise(splitPaise),
+              description: `Purchase Payment #${pur.billNumber} (${s.mode})${comparePaise(coveredByVoucherPaise, 0) > 0 ? ' (Upfront)' : ''}`,
               rawPurchaseId: pur.id,
             });
           });
@@ -339,11 +344,11 @@ export function computeCashBankSummary(params: {
             ? 'Cash in Hand'
             : (accounts.find((a) => a.id === targetAccId)?.accountName || pur.bankAccountName || defaultBank.accountName);
 
-          balances[targetAccId] = (balances[targetAccId] || 0) - unvoucheredPaid;
+          balancesPaise[targetAccId] = subPaise(balancesPaise[targetAccId] || 0, unvoucheredPaidPaise);
 
           const dateStr = pur.date || pur.createdAt?.split('T')[0] || todayStr;
           if (dateStr === todayStr) {
-            todayOutflow += unvoucheredPaid;
+            todayOutflowPaise = addPaise(todayOutflowPaise, unvoucheredPaidPaise);
           }
 
           entries.push({
@@ -357,8 +362,8 @@ export function computeCashBankSummary(params: {
             referenceNo: pur.billNumber,
             mode: pur.paymentMode || (isCash ? 'CASH' : 'NET_BANKING'),
             flow: 'OUT',
-            amount: unvoucheredPaid,
-            description: `Purchase Payment #${pur.billNumber}${coveredByVoucher > 0 ? ' (Upfront)' : ''}`,
+            amount: fromPaise(unvoucheredPaidPaise),
+            description: `Purchase Payment #${pur.billNumber}${comparePaise(coveredByVoucherPaise, 0) > 0 ? ' (Upfront)' : ''}`,
             rawPurchaseId: pur.id,
           });
         }
@@ -368,18 +373,20 @@ export function computeCashBankSummary(params: {
 
   // 4. Process Expenses (Outflow)
   expenses.forEach((exp) => {
-    if (exp && exp.amount > 0) {
+    if (!exp) return;
+    const expPaise = toPaise(exp.amount || 0);
+    if (comparePaise(expPaise, 0) > 0) {
       const isCash = exp.paymentMode === 'CASH';
       const targetAccId = isCash ? 'ACC_CASH' : (exp.bankAccountId || defaultBank.id);
       const targetAccName = isCash
         ? 'Cash in Hand'
         : (accounts.find((a) => a && a.id === targetAccId)?.accountName || exp.bankAccountName || defaultBank.accountName);
 
-      balances[targetAccId] = (balances[targetAccId] || 0) - exp.amount;
+      balancesPaise[targetAccId] = subPaise(balancesPaise[targetAccId] || 0, expPaise);
 
       const dateStr = exp.date || exp.createdAt?.split('T')[0] || todayStr;
       if (dateStr === todayStr) {
-        todayOutflow += exp.amount;
+        todayOutflowPaise = addPaise(todayOutflowPaise, expPaise);
       }
 
       entries.push({
@@ -393,7 +400,7 @@ export function computeCashBankSummary(params: {
         referenceNo: exp.voucherNumber,
         mode: exp.paymentMode || (isCash ? 'CASH' : 'UPI'),
         flow: 'OUT',
-        amount: exp.amount,
+        amount: fromPaise(expPaise),
         description: `${exp.category} Expense: ${exp.title}`,
         rawExpenseId: exp.id,
       });
@@ -412,18 +419,18 @@ export function computeCashBankSummary(params: {
       bankIds.add('ACC_BANK_DEFAULT');
 
       const cashOrBankEntries = vEntries.filter(
-        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.debit > 0
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(toPaise(e.debit || 0), 0) > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
         const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
-        const amt = entry.debit;
+        const amtPaise = toPaise(entry.debit || 0);
 
-        balances[targetAccId] = (balances[targetAccId] || 0) + amt;
+        balancesPaise[targetAccId] = addPaise(balancesPaise[targetAccId] || 0, amtPaise);
         const dateStr = v.date || todayStr;
-        if (dateStr === todayStr) todayInflow += amt;
+        if (dateStr === todayStr) todayInflowPaise = addPaise(todayInflowPaise, amtPaise);
 
         entries.push({
           id: `LEDGER-VCH-${v.id}-${idx}`,
@@ -436,7 +443,7 @@ export function computeCashBankSummary(params: {
           referenceNo: v.voucherNumber,
           mode: isCash ? 'CASH' : 'BANK',
           flow: 'IN',
-          amount: amt,
+          amount: fromPaise(amtPaise),
           description: v.narration || `Receipt Voucher #${v.voucherNumber}`,
           rawVoucherId: v.id,
           partyId: v.partyId,
@@ -449,18 +456,18 @@ export function computeCashBankSummary(params: {
       bankIds.add('ACC_BANK_DEFAULT');
 
       const cashOrBankEntries = vEntries.filter(
-        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && e.credit > 0
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(toPaise(e.credit || 0), 0) > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
         const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
-        const amt = entry.credit;
+        const amtPaise = toPaise(entry.credit || 0);
 
-        balances[targetAccId] = (balances[targetAccId] || 0) - amt;
+        balancesPaise[targetAccId] = subPaise(balancesPaise[targetAccId] || 0, amtPaise);
         const dateStr = v.date || todayStr;
-        if (dateStr === todayStr) todayOutflow += amt;
+        if (dateStr === todayStr) todayOutflowPaise = addPaise(todayOutflowPaise, amtPaise);
 
         entries.push({
           id: `LEDGER-VCH-${v.id}-${idx}`,
@@ -473,15 +480,15 @@ export function computeCashBankSummary(params: {
           referenceNo: v.voucherNumber,
           mode: isCash ? 'CASH' : 'BANK',
           flow: 'OUT',
-          amount: amt,
+          amount: fromPaise(amtPaise),
           description: v.narration || `Payment Voucher #${v.voucherNumber}`,
           rawVoucherId: v.id,
           partyId: v.partyId,
         });
       });
     } else if (v.voucherType === 'CONTRA') {
-      const creditEntry = vEntries.find((e) => e && e.credit > 0);
-      const debitEntry = vEntries.find((e) => e && e.debit > 0);
+      const creditEntry = vEntries.find((e) => e && comparePaise(toPaise(e.credit || 0), 0) > 0);
+      const debitEntry = vEntries.find((e) => e && comparePaise(toPaise(e.debit || 0), 0) > 0);
       if (creditEntry && debitEntry) {
         const fromAccId = creditEntry.accountId || 'ACC_CASH';
         const toAccId = debitEntry.accountId || defaultBank.id;
@@ -489,11 +496,11 @@ export function computeCashBankSummary(params: {
         const toAcc = accounts.find((a) => a.id === toAccId);
         const fromName = fromAcc?.accountName || creditEntry.accountName || (fromAccId === 'ACC_CASH' ? 'Cash in Hand' : 'Cash');
         const toName = toAcc?.accountName || debitEntry.accountName || defaultBank.accountName;
-        const amt = debitEntry.debit || creditEntry.credit || v.totalAmount;
+        const amtPaise = toPaise(debitEntry.debit || creditEntry.credit || v.totalAmount || 0);
         const dateStr = v.date || todayStr;
 
-        balances[fromAccId] = (balances[fromAccId] || 0) - amt;
-        balances[toAccId] = (balances[toAccId] || 0) + amt;
+        balancesPaise[fromAccId] = subPaise(balancesPaise[fromAccId] || 0, amtPaise);
+        balancesPaise[toAccId] = addPaise(balancesPaise[toAccId] || 0, amtPaise);
 
         const contraType = fromAccId === 'ACC_CASH' ? 'DEPOSIT' : (toAccId === 'ACC_CASH' ? 'WITHDRAWAL' : 'TRANSFER');
 
@@ -508,7 +515,7 @@ export function computeCashBankSummary(params: {
           referenceNo: v.voucherNumber,
           mode: 'CONTRA',
           flow: 'OUT',
-          amount: amt,
+          amount: fromPaise(amtPaise),
           description: v.narration || `Contra Transfer: ${fromName} ➔ ${toName}`,
           fromAccountId: fromAccId,
           fromAccountName: fromName,
@@ -529,7 +536,7 @@ export function computeCashBankSummary(params: {
           referenceNo: v.voucherNumber,
           mode: 'CONTRA',
           flow: 'IN',
-          amount: amt,
+          amount: fromPaise(amtPaise),
           description: v.narration || `Contra Transfer: ${fromName} ➔ ${toName}`,
           fromAccountId: fromAccId,
           fromAccountName: fromName,
@@ -545,8 +552,8 @@ export function computeCashBankSummary(params: {
   // 6. Process Explicit Cash & Bank Transactions (Contra transfers, Direct In/Out)
   transactions.forEach((txn) => {
     if (!txn) return;
-    const amt = txn.amount || 0;
-    if (amt <= 0) return;
+    const amtPaise = toPaise(txn.amount || 0);
+    if (comparePaise(amtPaise, 0) <= 0) return;
 
     const dateStr = txn.date || txn.createdAt?.split('T')[0] || todayStr;
 
@@ -555,8 +562,8 @@ export function computeCashBankSummary(params: {
       const fromId = txn.fromAccountId || 'ACC_CASH';
       const toId = txn.toAccountId || defaultBank.id;
 
-      balances[fromId] = (balances[fromId] || 0) - amt;
-      balances[toId] = (balances[toId] || 0) + amt;
+      balancesPaise[fromId] = subPaise(balancesPaise[fromId] || 0, amtPaise);
+      balancesPaise[toId] = addPaise(balancesPaise[toId] || 0, amtPaise);
 
       const fromAcc = accounts.find((a) => a.id === fromId);
       const toAcc = accounts.find((a) => a.id === toId);
@@ -574,7 +581,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'OUT',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Cash deposited into ${toName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -595,7 +602,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'IN',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Cash deposit received from ${fromName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -609,8 +616,8 @@ export function computeCashBankSummary(params: {
       const fromId = txn.fromAccountId || defaultBank.id;
       const toId = txn.toAccountId || 'ACC_CASH';
 
-      balances[fromId] = (balances[fromId] || 0) - amt;
-      balances[toId] = (balances[toId] || 0) + amt;
+      balancesPaise[fromId] = subPaise(balancesPaise[fromId] || 0, amtPaise);
+      balancesPaise[toId] = addPaise(balancesPaise[toId] || 0, amtPaise);
 
       const fromAcc = accounts.find((a) => a.id === fromId);
       const toAcc = accounts.find((a) => a.id === toId);
@@ -628,7 +635,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'OUT',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Cash withdrawal for ${toName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -649,7 +656,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'CONTRA',
         flow: 'IN',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Cash received from ${fromName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -663,8 +670,8 @@ export function computeCashBankSummary(params: {
       const fromId = txn.fromAccountId || defaultBank.id;
       const toId = txn.toAccountId || defaultBank.id;
 
-      balances[fromId] = (balances[fromId] || 0) - amt;
-      balances[toId] = (balances[toId] || 0) + amt;
+      balancesPaise[fromId] = subPaise(balancesPaise[fromId] || 0, amtPaise);
+      balancesPaise[toId] = addPaise(balancesPaise[toId] || 0, amtPaise);
 
       const fromAcc = accounts.find((a) => a.id === fromId);
       const toAcc = accounts.find((a) => a.id === toId);
@@ -682,7 +689,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'NEFT/RTGS',
         flow: 'OUT',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Inter-bank fund transfer to ${toName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -703,7 +710,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: 'NEFT/RTGS',
         flow: 'IN',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || `Inter-bank fund transfer from ${fromName}`,
         fromAccountId: fromId,
         fromAccountName: fromName,
@@ -718,8 +725,8 @@ export function computeCashBankSummary(params: {
       const toAcc = accounts.find((a) => a.id === toId);
       const isCash = toId === 'ACC_CASH' || toAcc?.accountType === 'CASH';
 
-      balances[toId] = (balances[toId] || 0) + amt;
-      if (dateStr === todayStr) todayInflow += amt;
+      balancesPaise[toId] = addPaise(balancesPaise[toId] || 0, amtPaise);
+      if (dateStr === todayStr) todayInflowPaise = addPaise(todayInflowPaise, amtPaise);
 
       entries.push({
         id: `LEDGER-TXN-${txn.id}`,
@@ -732,7 +739,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: isCash ? 'CASH' : 'BANK',
         flow: 'IN',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || 'Direct Inflow to Account',
         txnId: txn.id,
       });
@@ -742,8 +749,8 @@ export function computeCashBankSummary(params: {
       const fromAcc = accounts.find((a) => a.id === fromId);
       const isCash = fromId === 'ACC_CASH' || fromAcc?.accountType === 'CASH';
 
-      balances[fromId] = (balances[fromId] || 0) - amt;
-      if (dateStr === todayStr) todayOutflow += amt;
+      balancesPaise[fromId] = subPaise(balancesPaise[fromId] || 0, amtPaise);
+      if (dateStr === todayStr) todayOutflowPaise = addPaise(todayOutflowPaise, amtPaise);
 
       entries.push({
         id: `LEDGER-TXN-${txn.id}`,
@@ -756,7 +763,7 @@ export function computeCashBankSummary(params: {
         referenceNo: txn.referenceNo || txn.txnNumber,
         mode: isCash ? 'CASH' : 'BANK',
         flow: 'OUT',
-        amount: amt,
+        amount: fromPaise(amtPaise),
         description: txn.description || 'Direct Outflow from Account',
         txnId: txn.id,
       });
@@ -766,28 +773,30 @@ export function computeCashBankSummary(params: {
   // 7. Sort entries descending by date & compute running balances
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  // Aggregate total cash and total bank balances
-  let totalCashBalance = 0;
-  let totalBankBalance = 0;
+  // Aggregate total cash and total bank balances (summing paise)
+  let totalCashBalancePaise = 0;
+  let totalBankBalancePaise = 0;
 
-  Object.entries(balances).forEach(([accId, bal]) => {
+  Object.entries(balancesPaise).forEach(([accId, balPaise]) => {
     const acc = accounts.find((a) => a.id === accId);
     if (accId === 'ACC_CASH' || acc?.accountType === 'CASH') {
-      totalCashBalance += bal;
+      totalCashBalancePaise = addPaise(totalCashBalancePaise, balPaise);
     } else {
-      totalBankBalance += bal;
+      totalBankBalancePaise = addPaise(totalBankBalancePaise, balPaise);
     }
   });
 
-  const totalLiquidBalance = totalCashBalance + totalBankBalance;
+  const totalLiquidBalancePaise = addPaise(totalCashBalancePaise, totalBankBalancePaise);
 
   return {
-    totalLiquidBalance: roundMoney(totalLiquidBalance),
-    totalCashBalance: roundMoney(totalCashBalance),
-    totalBankBalance: roundMoney(totalBankBalance),
-    accountBalances: balances,
-    todayInflow: roundMoney(todayInflow),
-    todayOutflow: roundMoney(todayOutflow),
+    totalLiquidBalance: fromPaise(totalLiquidBalancePaise),
+    totalCashBalance: fromPaise(totalCashBalancePaise),
+    totalBankBalance: fromPaise(totalBankBalancePaise),
+    accountBalances: Object.fromEntries(
+      Object.entries(balancesPaise).map(([id, p]) => [id, fromPaise(p)])
+    ),
+    todayInflow: fromPaise(todayInflowPaise),
+    todayOutflow: fromPaise(todayOutflowPaise),
     ledgerEntries: entries,
   };
 }

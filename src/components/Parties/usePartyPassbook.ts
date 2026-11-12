@@ -7,11 +7,13 @@ import { Voucher } from '../../core/accounting/voucherTypes.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { printPartyLedgerStatement } from '../../core/utils/ledgerStatementPrinter.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
+import { toPaise, fromPaise } from '../../core/money.ts';
 
 export interface PassbookEntry {
   id: string;
   rawId?: string;
   date: string;
+  createdAt?: string;
   docNumber: string;
   type: 'SALE' | 'PURCHASE' | 'PAYMENT_IN' | 'PAYMENT_OUT' | 'OPENING';
   description: string;
@@ -73,6 +75,20 @@ export function comparePassbookEntries(
     const bIsCN = b.rawInvoice?.invoiceType === 'CREDIT_NOTE';
     if (!aIsCN && bIsCN) return -1;
     if (aIsCN && !bIsCN) return 1;
+  }
+
+  const createdA = a.createdAt || '';
+  const createdB = b.createdAt || '';
+  if (createdA !== createdB) {
+    const createdDiff = createdA < createdB ? -1 : 1;
+    return descending ? -createdDiff : createdDiff;
+  }
+
+  const idA = a.id || '';
+  const idB = b.id || '';
+  if (idA !== idB) {
+    const idDiff = idA < idB ? -1 : 1;
+    return descending ? -idDiff : idDiff;
   }
 
   return 0;
@@ -178,16 +194,6 @@ export function usePartyPassbook({
       : partyPurchases.reduce((s, pur) => s + (pur.purchaseType === 'RETURN' || pur.noteType === 'D' ? -pur.grandTotal : pur.grandTotal), 0);
   }, [isCustomer, partyInvoices, partyPurchases]);
 
-  const totalPaid = useMemo(() => {
-    return isCustomer
-      ? partyInvoices
-          .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
-          .reduce((s, inv) => s + getNonCreditNotePaid(inv), 0)
-      : partyPurchases
-          .filter((pur) => pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
-          .reduce((s, pur) => s + (pur.paidAmount || 0), 0);
-  }, [isCustomer, partyInvoices, partyPurchases]);
-
   // Build Chronological Passbook with Running Balance
   const passbook: PassbookEntry[] = useMemo(() => {
     const rawEntries: Omit<PassbookEntry, 'runningBalance'>[] = [];
@@ -199,6 +205,7 @@ export function usePartyPassbook({
         id: `sale-${inv.id}`,
         rawId: inv.id,
         date: inv.date,
+        createdAt: inv.createdAt,
         docNumber: inv.invoiceNumber,
         type: 'SALE',
         description: isCreditNote
@@ -222,6 +229,7 @@ export function usePartyPassbook({
         id: `pur-${pur.id}`,
         rawId: pur.id,
         date: pur.date,
+        createdAt: pur.createdAt,
         docNumber: pur.billNumber,
         type: 'PURCHASE',
         description: isReturn
@@ -280,6 +288,7 @@ export function usePartyPassbook({
               id: `vchr-${v.id}`,
               rawId: v.id,
               date: v.date,
+              createdAt: v.createdAt,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_IN',
               description: desc,
@@ -298,6 +307,7 @@ export function usePartyPassbook({
               id: `vchr-${v.id}`,
               rawId: v.id,
               date: v.date,
+              createdAt: v.createdAt,
               docNumber: v.voucherNumber,
               type: 'PAYMENT_OUT',
               description: desc,
@@ -339,6 +349,7 @@ export function usePartyPassbook({
             id: `pay-inv-${inv.id}`,
             rawId: inv.id,
             date: inv.date,
+            createdAt: inv.createdAt,
             docNumber: `PAY-${inv.invoiceNumber}`,
             type: 'PAYMENT_IN',
             description: hasSplits
@@ -373,6 +384,7 @@ export function usePartyPassbook({
             id: `pay-pur-${pur.id}`,
             rawId: pur.id,
             date: pur.date,
+            createdAt: pur.createdAt,
             docNumber: `PAY-${pur.billNumber}`,
             type: 'PAYMENT_OUT',
             description: hasSplits
@@ -401,6 +413,7 @@ export function usePartyPassbook({
         id: `opening-${party.id}`,
         rawId: party.id,
         date: openingDate,
+        createdAt: party.createdAt,
         docNumber: 'OPENING',
         type: 'OPENING',
         description: `Opening Balance (${isRec ? "You'll Get" : "You'll Give"})`,
@@ -423,6 +436,19 @@ export function usePartyPassbook({
       return { ...entry, runningBalance: Math.round(running * 100) / 100 };
     });
   }, [party, partyInvoices, partyPurchases, vouchers, isCustomer]);
+
+  // Derived total paid from passbook payment entries (customers: PAYMENT_IN credit, suppliers: PAYMENT_OUT debit)
+  const totalPaid = useMemo(() => {
+    let totalPaise = 0;
+    for (const entry of passbook) {
+      if (isCustomer && entry.type === 'PAYMENT_IN') {
+        totalPaise += toPaise(entry.credit);
+      } else if (!isCustomer && entry.type === 'PAYMENT_OUT') {
+        totalPaise += toPaise(entry.debit);
+      }
+    }
+    return fromPaise(totalPaise);
+  }, [passbook, isCustomer]);
 
   // Derived current net balance directly from passbook running balance
   const liveNetBalance = useMemo(() => {

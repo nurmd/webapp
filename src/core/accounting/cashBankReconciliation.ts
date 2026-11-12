@@ -1,6 +1,13 @@
 import type { BankAccount, UnifiedLedgerEntry } from '../../models/bankAccount.ts';
 import type { CashBankFinancialSummary } from './cashBankCalculator.ts';
 import { formatINR } from '../utils/formatters.ts';
+import {
+  toPaise,
+  fromPaise,
+  addPaise,
+  subPaise,
+  isZeroPaise,
+} from '../money.ts';
 
 export interface ReconciliationIssue {
   code:
@@ -87,10 +94,6 @@ const ORDERED_SOURCES: Array<ReconciliationBreakdown['source']> = [
   'OTHER',
 ];
 
-function round2(val: number): number {
-  return Math.round((val + Number.EPSILON) * 100) / 100;
-}
-
 export function buildCashBankReconciliation(params: {
   accounts: BankAccount[];
   summary: Pick<
@@ -119,7 +122,7 @@ export function buildCashBankReconciliation(params: {
     // computeCashBankSummary always creates a zero ACC_CASH placeholder when
     // no cash account is configured. Do not report that empty placeholder as
     // an unconfigured account; only include balances that actually hold money.
-    if (accId && Math.abs(Number(balance) || 0) >= 0.005) {
+    if (accId && !isZeroPaise(toPaise(balance || 0))) {
       allAccountIds.add(accId);
     }
   }
@@ -129,7 +132,7 @@ export function buildCashBankReconciliation(params: {
 
   // Detect duplicate outflow candidates across ledger entries:
   // Only OUT entries that are not CONTRA, where at least two entries share the same
-  // accountId, date, amount (2-decimal), and a non-empty normalized referenceNo.
+  // accountId, date, amount (exact paise), and a non-empty normalized referenceNo.
   const duplicateCandidates: DuplicateOutflowCandidate[] = [];
   const duplicateCandidatesByAccount = new Map<string, DuplicateOutflowCandidate[]>();
 
@@ -139,7 +142,7 @@ export function buildCashBankReconciliation(params: {
     if (entry.flow === 'OUT' && entry.type !== 'CONTRA') {
       const ref = (entry.referenceNo || '').trim();
       if (!ref) continue; // Do not flag groups without a reference number
-      const amtStr = round2(entry.amount || 0).toFixed(2);
+      const amtStr = String(toPaise(entry.amount || 0));
       const groupKey = `${entry.accountId}||${entry.date || ''}||${amtStr}||${ref.toLowerCase()}`;
       const existing = outGroupMap.get(groupKey);
       if (existing) {
@@ -155,11 +158,12 @@ export function buildCashBankReconciliation(params: {
       const first = group[0];
       const configured = configuredAccountMap.get(first.accountId);
       const accountName = first.accountName || configured?.accountName || first.accountId;
+      const firstAmountPaise = toPaise(first.amount || 0);
       const candidate: DuplicateOutflowCandidate = {
         accountId: first.accountId,
         accountName,
         date: first.date || '',
-        amount: round2(first.amount || 0),
+        amount: fromPaise(firstAmountPaise),
         referenceNo: (first.referenceNo || '').trim(),
         entryIds: group.map((e) => e.id),
         descriptions: group.map((e) => e.description || e.counterpartyOrTitle || ''),
@@ -221,39 +225,41 @@ export function buildCashBankReconciliation(params: {
       accountType = 'BANK';
     }
 
-    const openingBalance = round2(isConfigured ? (configuredAcc?.openingBalance || 0) : 0);
+    const openingBalancePaise = isConfigured ? toPaise(configuredAcc?.openingBalance || 0) : 0;
 
-    let totalInflow = 0;
-    let totalOutflow = 0;
-    const breakdownAgg: Record<string, { inflow: number; outflow: number; count: number }> = {};
+    let totalInflowPaise = 0;
+    let totalOutflowPaise = 0;
+    const breakdownAgg: Record<string, { inflowPaise: number; outflowPaise: number; count: number }> = {};
 
     for (const e of entries) {
-      const amt = e.amount || 0;
+      const amtPaise = toPaise(e.amount || 0);
       const typeKey = (e.type && SOURCE_LABELS[e.type]) ? e.type : 'OTHER';
       if (!breakdownAgg[typeKey]) {
-        breakdownAgg[typeKey] = { inflow: 0, outflow: 0, count: 0 };
+        breakdownAgg[typeKey] = { inflowPaise: 0, outflowPaise: 0, count: 0 };
       }
       breakdownAgg[typeKey].count += 1;
 
       if (e.flow === 'IN') {
-        totalInflow += amt;
-        breakdownAgg[typeKey].inflow += amt;
+        totalInflowPaise = addPaise(totalInflowPaise, amtPaise);
+        breakdownAgg[typeKey].inflowPaise = addPaise(breakdownAgg[typeKey].inflowPaise, amtPaise);
       } else if (e.flow === 'OUT') {
-        totalOutflow += amt;
-        breakdownAgg[typeKey].outflow += amt;
+        totalOutflowPaise = addPaise(totalOutflowPaise, amtPaise);
+        breakdownAgg[typeKey].outflowPaise = addPaise(breakdownAgg[typeKey].outflowPaise, amtPaise);
       }
     }
 
-    totalInflow = round2(totalInflow);
-    totalOutflow = round2(totalOutflow);
-    const netMovement = round2(totalInflow - totalOutflow);
-    const computedClosing = round2(openingBalance + totalInflow - totalOutflow);
-    const ledgerClosing = round2(accountBalances[accId] ?? 0);
+    const netMovementPaise = subPaise(totalInflowPaise, totalOutflowPaise);
+    const computedClosingPaise = subPaise(addPaise(openingBalancePaise, totalInflowPaise), totalOutflowPaise);
+    const ledgerClosingPaise = toPaise(accountBalances[accId] ?? 0);
+    const differencePaise = subPaise(ledgerClosingPaise, computedClosingPaise);
 
-    let difference = round2(ledgerClosing - computedClosing);
-    if (Math.abs(difference) < 0.005) {
-      difference = 0;
-    }
+    const openingBalance = fromPaise(openingBalancePaise);
+    const totalInflow = fromPaise(totalInflowPaise);
+    const totalOutflow = fromPaise(totalOutflowPaise);
+    const netMovement = fromPaise(netMovementPaise);
+    const computedClosing = fromPaise(computedClosingPaise);
+    const ledgerClosing = fromPaise(ledgerClosingPaise);
+    const difference = fromPaise(differencePaise);
 
     const issues: ReconciliationIssue[] = [];
 
@@ -266,7 +272,7 @@ export function buildCashBankReconciliation(params: {
       });
     }
 
-    if (openingBalance < 0) {
+    if (openingBalancePaise < 0) {
       issues.push({
         code: 'NEGATIVE_OPENING_BALANCE',
         severity: 'warning',
@@ -274,7 +280,7 @@ export function buildCashBankReconciliation(params: {
       });
     }
 
-    if (ledgerClosing < 0) {
+    if (ledgerClosingPaise < 0) {
       negativeAccountIds.push(accId);
       issues.push({
         code: 'NEGATIVE_LEDGER_BALANCE',
@@ -282,7 +288,7 @@ export function buildCashBankReconciliation(params: {
         message: `Closing balance is negative (${formatINR(ledgerClosing)}). This reflects net recorded outflows exceeding opening funds, not a calculation error.`,
       });
 
-      if (totalInflow === 0) {
+      if (totalInflowPaise === 0) {
         issues.push({
           code: 'NO_RECORDED_INFLOW',
           severity: 'info',
@@ -291,7 +297,7 @@ export function buildCashBankReconciliation(params: {
       }
     }
 
-    if (Math.abs(difference) >= 0.005) {
+    if (differencePaise !== 0) {
       issues.push({
         code: 'LEDGER_MISMATCH',
         severity: 'critical',
@@ -310,9 +316,9 @@ export function buildCashBankReconciliation(params: {
 
     // Status: negative when ledgerClosing < 0; otherwise review when there is a ledger mismatch or unconfigured account; otherwise balanced
     let status: 'balanced' | 'negative' | 'review' = 'balanced';
-    if (ledgerClosing < 0) {
+    if (ledgerClosingPaise < 0) {
       status = 'negative';
-    } else if (Math.abs(difference) >= 0.005 || !isConfigured || (accCandidates && accCandidates.length > 0)) {
+    } else if (differencePaise !== 0 || !isConfigured || (accCandidates && accCandidates.length > 0)) {
       status = 'review';
     } else {
       status = 'balanced';
@@ -321,9 +327,9 @@ export function buildCashBankReconciliation(params: {
     // Explanation
     let explanation: string;
     const equationStr = `Opening (${formatINR(openingBalance)}) + Inflows (${formatINR(totalInflow)}) − Outflows (${formatINR(totalOutflow)}) = Closing (${formatINR(ledgerClosing)})`;
-    if (ledgerClosing < 0) {
+    if (ledgerClosingPaise < 0) {
       explanation = `${equationStr}. This is a real ledger position from recorded entries, not a calculation error. Possible causes include unrecorded funding or receipts, duplicate payment entries, or genuine overspend.`;
-    } else if (Math.abs(difference) >= 0.005) {
+    } else if (differencePaise !== 0) {
       explanation = `${equationStr}. Ledger closing differs from computed equation by ${formatINR(difference)}. Review ledger transactions.`;
     } else {
       explanation = `${equationStr}. Ledger is balanced.`;
@@ -337,9 +343,9 @@ export function buildCashBankReconciliation(params: {
         breakdown.push({
           source: src,
           label: SOURCE_LABELS[src] || 'Other entries',
-          inflow: round2(agg.inflow),
-          outflow: round2(agg.outflow),
-          net: round2(agg.inflow - agg.outflow),
+          inflow: fromPaise(agg.inflowPaise),
+          outflow: fromPaise(agg.outflowPaise),
+          net: fromPaise(subPaise(agg.inflowPaise, agg.outflowPaise)),
           count: agg.count,
         });
       }
@@ -371,9 +377,9 @@ export function buildCashBankReconciliation(params: {
     negativeAccountIds,
     unconfiguredAccountIds,
     duplicateCandidates,
-    totalLiquidBalance: round2(params.summary?.totalLiquidBalance || 0),
-    totalCashBalance: round2(params.summary?.totalCashBalance || 0),
-    totalBankBalance: round2(params.summary?.totalBankBalance || 0),
+    totalLiquidBalance: fromPaise(toPaise(params.summary?.totalLiquidBalance || 0)),
+    totalCashBalance: fromPaise(toPaise(params.summary?.totalCashBalance || 0)),
+    totalBankBalance: fromPaise(toPaise(params.summary?.totalBankBalance || 0)),
   };
 }
 

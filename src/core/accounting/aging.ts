@@ -3,7 +3,7 @@
  * Part of Milestone 2: Accounting Depth & Statutory Integrity
  */
 
-import { addMoney, sumMoney } from '../money.ts';
+import { addPaise, fromPaise, toPaise } from '../money.ts';
 
 export type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
@@ -92,6 +92,20 @@ export function getOverdueDays(dueDateStr?: string, asOfDate: Date = new Date())
   return diffDays > 0 ? diffDays : 0;
 }
 
+interface PartyAgingAccumulator {
+  partyId: string;
+  partyName: string;
+  phone?: string;
+  totalOutstanding: number;
+  brackets: {
+    '0-30': number;
+    '31-60': number;
+    '61-90': number;
+    '90+': number;
+  };
+  billCount?: number;
+}
+
 /**
  * Computes receivables or payables aging breakdown across all parties and aging buckets.
  * Filters out settled documents (balanceDue <= 0.01).
@@ -101,7 +115,7 @@ export function computeAgingBreakdown(
   items: AgingItemInput[],
   asOfDate: Date = new Date()
 ): AgingBreakdownResult {
-  const summary: Record<AgingBucket, number> = {
+  const summaryPaise: Record<AgingBucket, number> = {
     '0-30': 0,
     '31-60': 0,
     '61-90': 0,
@@ -115,20 +129,20 @@ export function computeAgingBreakdown(
     '90+': 0,
   };
 
-  const partyMap: Map<string, PartyAgingRow> = new Map();
+  const partyMap: Map<string, PartyAgingAccumulator> = new Map();
   const asOfUtc = getAsOfUtcMidnight(asOfDate);
 
   for (const item of items) {
-    const balance = Number(item.balanceDue || 0);
-    // Ignore settled documents
-    if (balance <= 0.01) continue;
+    const balancePaise = toPaise(item.balanceDue || 0);
+    // Ignore settled documents (<= 1 paise)
+    if (balancePaise <= 1) continue;
 
     const refDateStr = item.dueDate || item.date;
     const refUtc = parseUtcMidnight(refDateStr);
     const diffDays = isNaN(refUtc) ? 0 : Math.floor((asOfUtc - refUtc) / (1000 * 60 * 60 * 24));
     const bucket = getAgingBucket(diffDays);
 
-    summary[bucket] = addMoney(summary[bucket], balance);
+    summaryPaise[bucket] = addPaise(summaryPaise[bucket], balancePaise);
     counts[bucket] += 1;
 
     const partyKey = item.partyId || item.partyName || 'UNKNOWN';
@@ -150,29 +164,46 @@ export function computeAgingBreakdown(
       partyMap.set(partyKey, partyRow);
     }
 
-    partyRow.brackets[bucket] = addMoney(partyRow.brackets[bucket], balance);
-    partyRow.totalOutstanding = addMoney(partyRow.totalOutstanding, balance);
+    partyRow.brackets[bucket] = addPaise(partyRow.brackets[bucket], balancePaise);
+    partyRow.totalOutstanding = addPaise(partyRow.totalOutstanding, balancePaise);
     partyRow.billCount = (partyRow.billCount || 0) + 1;
     if (!partyRow.phone && item.phone) {
       partyRow.phone = item.phone;
     }
   }
 
-  const totalOutstanding = sumMoney([
-    summary['0-30'],
-    summary['31-60'],
-    summary['61-90'],
-    summary['90+'],
-  ]);
-
-  const parties = Array.from(partyMap.values()).sort(
-    (a, b) => b.totalOutstanding - a.totalOutstanding
+  const totalOutstandingPaise = addPaise(
+    addPaise(summaryPaise['0-30'], summaryPaise['31-60']),
+    addPaise(summaryPaise['61-90'], summaryPaise['90+'])
   );
+
+  const summary: Record<AgingBucket, number> = {
+    '0-30': fromPaise(summaryPaise['0-30']),
+    '31-60': fromPaise(summaryPaise['31-60']),
+    '61-90': fromPaise(summaryPaise['61-90']),
+    '90+': fromPaise(summaryPaise['90+']),
+  };
+
+  const parties: PartyAgingRow[] = Array.from(partyMap.values())
+    .sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+    .map((row) => ({
+      partyId: row.partyId,
+      partyName: row.partyName,
+      phone: row.phone,
+      totalOutstanding: fromPaise(row.totalOutstanding),
+      brackets: {
+        '0-30': fromPaise(row.brackets['0-30']),
+        '31-60': fromPaise(row.brackets['31-60']),
+        '61-90': fromPaise(row.brackets['61-90']),
+        '90+': fromPaise(row.brackets['90+']),
+      },
+      billCount: row.billCount,
+    }));
 
   return {
     summary,
     parties,
-    totalOutstanding,
+    totalOutstanding: fromPaise(totalOutstandingPaise),
     counts,
   };
 }

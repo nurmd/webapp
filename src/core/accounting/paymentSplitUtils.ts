@@ -1,6 +1,6 @@
 import type { Invoice, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
-import { roundMoney, subMoney } from '../money.ts';
+import { toPaise, fromPaise, addPaise, subPaise, clampPaise } from '../money.ts';
 
 export interface SplitNotesAccountOptions {
   cashAccountId?: string;
@@ -30,56 +30,77 @@ export function parseSplitsFromNotes(
   const creditMatch = notes.match(/(?:^|[^\w])Credit[:\s]*₹\s*([0-9.]+)/i);
   const cnMatch = notes.match(/(?:Sales\s*Return|Credit\s*Note)[:\s]*₹\s*([0-9.]+)/i);
 
-  if (cashMatch && Number(cashMatch[1]) > 0) {
-    parsed.push({
-      id: `split-cash-${Date.now()}`,
-      mode: 'CASH',
-      amount: Number(cashMatch[1]),
-      ...(options?.cashAccountId ? { accountId: options.cashAccountId } : {}),
-      ...(options?.cashAccountName ? { accountName: options.cashAccountName } : {}),
-    });
+  if (cashMatch) {
+    const cashPaise = toPaise(Number(cashMatch[1]));
+    if (cashPaise > 0) {
+      parsed.push({
+        id: `split-cash-${Date.now()}`,
+        mode: 'CASH',
+        amount: fromPaise(cashPaise),
+        ...(options?.cashAccountId ? { accountId: options.cashAccountId } : {}),
+        ...(options?.cashAccountName ? { accountName: options.cashAccountName } : {}),
+      });
+    }
   }
-  if (upiMatch && Number(upiMatch[1]) > 0) {
-    parsed.push({
-      id: `split-upi-${Date.now()}`,
-      mode: 'UPI',
-      amount: Number(upiMatch[1]),
-      ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
-      ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
-    });
+  if (upiMatch) {
+    const upiPaise = toPaise(Number(upiMatch[1]));
+    if (upiPaise > 0) {
+      parsed.push({
+        id: `split-upi-${Date.now()}`,
+        mode: 'UPI',
+        amount: fromPaise(upiPaise),
+        ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
+        ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
+      });
+    }
   }
-  if (cardMatch && Number(cardMatch[1]) > 0) {
-    parsed.push({
-      id: `split-card-${Date.now()}`,
-      mode: 'CARD',
-      amount: Number(cardMatch[1]),
-      ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
-      ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
-    });
+  if (cardMatch) {
+    const cardPaise = toPaise(Number(cardMatch[1]));
+    if (cardPaise > 0) {
+      parsed.push({
+        id: `split-card-${Date.now()}`,
+        mode: 'CARD',
+        amount: fromPaise(cardPaise),
+        ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
+        ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
+      });
+    }
   }
-  if (bankMatch && Number(bankMatch[1]) > 0) {
-    parsed.push({
-      id: `split-bank-${Date.now()}`,
-      mode: 'NET_BANKING',
-      amount: Number(bankMatch[1]),
-      ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
-      ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
-    });
+  if (bankMatch) {
+    const bankPaise = toPaise(Number(bankMatch[1]));
+    if (bankPaise > 0) {
+      parsed.push({
+        id: `split-bank-${Date.now()}`,
+        mode: 'NET_BANKING',
+        amount: fromPaise(bankPaise),
+        ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
+        ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
+      });
+    }
   }
-  if (chequeMatch && Number(chequeMatch[1]) > 0) {
-    parsed.push({
-      id: `split-cheque-${Date.now()}`,
-      mode: 'CHEQUE',
-      amount: Number(chequeMatch[1]),
-      ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
-      ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
-    });
+  if (chequeMatch) {
+    const chequePaise = toPaise(Number(chequeMatch[1]));
+    if (chequePaise > 0) {
+      parsed.push({
+        id: `split-cheque-${Date.now()}`,
+        mode: 'CHEQUE',
+        amount: fromPaise(chequePaise),
+        ...(options?.bankAccountId ? { accountId: options.bankAccountId } : {}),
+        ...(options?.bankAccountName ? { accountName: options.bankAccountName } : {}),
+      });
+    }
   }
-  if (creditMatch && Number(creditMatch[1]) > 0) {
-    parsed.push({ id: `split-credit-${Date.now()}`, mode: 'CREDIT', amount: Number(creditMatch[1]) });
+  if (creditMatch) {
+    const creditPaise = toPaise(Number(creditMatch[1]));
+    if (creditPaise > 0) {
+      parsed.push({ id: `split-credit-${Date.now()}`, mode: 'CREDIT', amount: fromPaise(creditPaise) });
+    }
   }
-  if (cnMatch && Number(cnMatch[1]) > 0) {
-    parsed.push({ id: `split-cn-${Date.now()}`, mode: 'CREDIT_NOTE', amount: Number(cnMatch[1]) });
+  if (cnMatch) {
+    const cnPaise = toPaise(Number(cnMatch[1]));
+    if (cnPaise > 0) {
+      parsed.push({ id: `split-cn-${Date.now()}`, mode: 'CREDIT_NOTE', amount: fromPaise(cnPaise) });
+    }
   }
 
   return parsed;
@@ -93,8 +114,9 @@ export function parseSplitsFromInvoice(
   inv: Invoice | null | undefined,
   currentGrandTotal: number
 ): PaymentSplit[] {
+  const currentGrandTotalPaise = toPaise(currentGrandTotal);
   if (!inv) {
-    return [{ id: '1', mode: 'CASH', amount: currentGrandTotal }];
+    return [{ id: '1', mode: 'CASH', amount: fromPaise(currentGrandTotalPaise) }];
   }
 
   // 1. Explicit array
@@ -102,7 +124,7 @@ export function parseSplitsFromInvoice(
     return inv.paymentSplits.map((s, idx) => ({
       id: s.id || `split-${idx}-${Date.now()}`,
       mode: s.mode,
-      amount: Number(s.amount) || 0,
+      amount: fromPaise(toPaise(Number(s.amount) || 0)),
       accountId: s.accountId,
       accountName: s.accountName,
       reference: s.reference,
@@ -124,10 +146,13 @@ export function parseSplitsFromInvoice(
   }
 
   // 3. Partial invoice (with non-zero paid amount and non-zero balance)
-  const paid = typeof inv.paidAmount === 'number' ? inv.paidAmount : 0;
-  const balance = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - paid);
+  const paidPaise = typeof inv.paidAmount === 'number' ? toPaise(inv.paidAmount) : 0;
+  const balancePaise =
+    typeof inv.balanceAmount === 'number'
+      ? toPaise(inv.balanceAmount)
+      : Math.max(0, toPaise(inv.grandTotal) - paidPaise);
 
-  if (inv.paymentStatus === 'PARTIAL' || (paid > 0 && balance > 0)) {
+  if (inv.paymentStatus === 'PARTIAL' || (paidPaise > 0 && balancePaise > 0)) {
     const paidMode: PaymentMode =
       inv.paymentMode === 'CREDIT' || inv.paymentMode === 'SPLIT' ? 'CASH' : inv.paymentMode || 'CASH';
     const isCash = paidMode === 'CASH';
@@ -137,11 +162,11 @@ export function parseSplitsFromInvoice(
       {
         id: '1',
         mode: paidMode,
-        amount: paid,
+        amount: fromPaise(paidPaise),
         ...(targetAccountId ? { accountId: targetAccountId } : {}),
         ...(targetAccountName ? { accountName: targetAccountName } : {}),
       },
-      { id: '2', mode: 'CREDIT', amount: balance },
+      { id: '2', mode: 'CREDIT', amount: fromPaise(balancePaise) },
     ];
   }
 
@@ -159,7 +184,7 @@ export function parseSplitsFromInvoice(
     {
       id: '1',
       mode: singleMode,
-      amount: paid > 0 ? paid : currentGrandTotal,
+      amount: fromPaise(paidPaise > 0 ? paidPaise : currentGrandTotalPaise),
       ...(targetAccountId ? { accountId: targetAccountId } : {}),
       ...(targetAccountName ? { accountName: targetAccountName } : {}),
     },
@@ -174,8 +199,9 @@ export function parseSplitsFromPurchase(
   bill: PurchaseBill | null | undefined,
   currentGrandTotal: number
 ): PaymentSplit[] {
+  const currentGrandTotalPaise = toPaise(currentGrandTotal);
   if (!bill) {
-    return [{ id: '1', mode: 'NET_BANKING', amount: currentGrandTotal }];
+    return [{ id: '1', mode: 'NET_BANKING', amount: fromPaise(currentGrandTotalPaise) }];
   }
 
   // 1. Explicit array
@@ -183,7 +209,7 @@ export function parseSplitsFromPurchase(
     return bill.paymentSplits.map((s, idx) => ({
       id: s.id || `split-${idx}-${Date.now()}`,
       mode: s.mode,
-      amount: Number(s.amount) || 0,
+      amount: fromPaise(toPaise(Number(s.amount) || 0)),
       accountId: s.accountId,
       accountName: s.accountName,
       reference: s.reference,
@@ -205,10 +231,13 @@ export function parseSplitsFromPurchase(
   }
 
   // 3. Partial bill
-  const paid = typeof bill.paidAmount === 'number' ? bill.paidAmount : 0;
-  const balance = typeof bill.balanceAmount === 'number' ? bill.balanceAmount : Math.max(0, bill.grandTotal - paid);
+  const paidPaise = typeof bill.paidAmount === 'number' ? toPaise(bill.paidAmount) : 0;
+  const balancePaise =
+    typeof bill.balanceAmount === 'number'
+      ? toPaise(bill.balanceAmount)
+      : Math.max(0, toPaise(bill.grandTotal) - paidPaise);
 
-  if (bill.paymentStatus === 'PARTIAL' || (paid > 0 && balance > 0)) {
+  if (bill.paymentStatus === 'PARTIAL' || (paidPaise > 0 && balancePaise > 0)) {
     const paidMode: PaymentMode =
       bill.paymentMode === 'CREDIT' || bill.paymentMode === 'SPLIT' ? 'NET_BANKING' : bill.paymentMode || 'NET_BANKING';
     const isCash = paidMode === 'CASH';
@@ -218,11 +247,11 @@ export function parseSplitsFromPurchase(
       {
         id: '1',
         mode: paidMode,
-        amount: paid,
+        amount: fromPaise(paidPaise),
         ...(targetAccountId ? { accountId: targetAccountId } : {}),
         ...(targetAccountName ? { accountName: targetAccountName } : {}),
       },
-      { id: '2', mode: 'CREDIT', amount: balance },
+      { id: '2', mode: 'CREDIT', amount: fromPaise(balancePaise) },
     ];
   }
 
@@ -240,7 +269,7 @@ export function parseSplitsFromPurchase(
     {
       id: '1',
       mode: singleMode,
-      amount: paid > 0 ? paid : currentGrandTotal,
+      amount: fromPaise(paidPaise > 0 ? paidPaise : currentGrandTotalPaise),
       ...(targetAccountId ? { accountId: targetAccountId } : {}),
       ...(targetAccountName ? { accountName: targetAccountName } : {}),
     },
@@ -253,7 +282,7 @@ export function parseSplitsFromPurchase(
 export function formatSplitNotes(splits: PaymentSplit[], balanceDue: number): string {
   const parts: string[] = [];
   splits.forEach((s) => {
-    if (s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0) {
+    if (s.mode !== 'CREDIT' && toPaise(Number(s.amount) || 0) > 0) {
       const label =
         s.mode === 'CREDIT_NOTE'
           ? 'Sales Return'
@@ -263,7 +292,7 @@ export function formatSplitNotes(splits: PaymentSplit[], balanceDue: number): st
       parts.push(`${label} ₹${s.amount}`);
     }
   });
-  if (balanceDue > 0) {
+  if (toPaise(balanceDue) > 0) {
     parts.push(`Credit ₹${balanceDue.toFixed(2)}`);
   }
   return parts.length > 0 ? `Split Payment — ${parts.join(', ')}` : '';
@@ -300,10 +329,10 @@ export function derivePaymentSettlement(doc: {
   bankAccountId?: string;
   bankAccountName?: string;
 }): DerivedPaymentSettlement {
-  const grandTotal = roundMoney(Math.max(0, doc.grandTotal || 0));
+  const grandTotalPaise = toPaise(Math.max(0, doc.grandTotal || 0));
 
   // 1. Calculate raw total paid from explicit payment splits if present
-  let rawPaid: number;
+  let rawPaidPaise: number;
   let splits = doc.paymentSplits && doc.paymentSplits.length > 0
     ? doc.paymentSplits.map((s) => ({ ...s }))
     : undefined;
@@ -321,39 +350,42 @@ export function derivePaymentSettlement(doc: {
 
   if (splits && splits.length > 0) {
     const nonCreditSplits = splits.filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT');
-    rawPaid = nonCreditSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+    rawPaidPaise = nonCreditSplits.reduce(
+      (sum, s) => addPaise(sum, toPaise(Number(s.amount) || 0)),
+      0
+    );
   } else {
     const modeUpper = (doc.paymentMode || '').toUpperCase();
-    if (typeof doc.paidAmount === 'number' && doc.paidAmount > 0) {
-      rawPaid = doc.paidAmount;
+    if (typeof doc.paidAmount === 'number' && toPaise(doc.paidAmount) > 0) {
+      rawPaidPaise = toPaise(doc.paidAmount);
     } else if (doc.paymentStatus === 'UNPAID' || (modeUpper === 'CREDIT' && doc.paymentStatus !== 'PARTIAL')) {
-      rawPaid = 0;
+      rawPaidPaise = 0;
     } else if (typeof doc.paidAmount === 'number') {
-      rawPaid = doc.paidAmount;
+      rawPaidPaise = toPaise(doc.paidAmount);
     } else if (doc.paymentStatus === 'PAID') {
-      rawPaid = grandTotal;
+      rawPaidPaise = grandTotalPaise;
     } else if (typeof doc.balanceAmount === 'number') {
-      rawPaid = Math.max(0, grandTotal - doc.balanceAmount);
+      rawPaidPaise = Math.max(0, grandTotalPaise - toPaise(doc.balanceAmount));
     } else {
-      rawPaid = grandTotal;
+      rawPaidPaise = grandTotalPaise;
     }
   }
 
   // 2. Strict mathematical invariants:
   // Clamp overpayment: paid cannot exceed grandTotal; balance is grandTotal - paid
-  const paidAmount = roundMoney(Math.min(grandTotal, Math.max(0, rawPaid)));
-  const balanceAmount = subMoney(grandTotal, paidAmount);
+  const paidPaise = clampPaise(rawPaidPaise, 0, grandTotalPaise);
+  const balancePaise = subPaise(grandTotalPaise, paidPaise);
 
   // 3. Centralized Payment Status:
   // - PAID when totalPaid >= grandTotal
   // - PARTIAL when 0 < totalPaid < grandTotal
   // - UNPAID when totalPaid <= 0, including CREDIT-only
   let paymentStatus: PaymentStatus;
-  if (grandTotal <= 0) {
+  if (grandTotalPaise <= 0) {
     paymentStatus = 'PAID';
-  } else if (paidAmount >= grandTotal) {
+  } else if (paidPaise >= grandTotalPaise) {
     paymentStatus = 'PAID';
-  } else if (paidAmount > 0) {
+  } else if (paidPaise > 0) {
     paymentStatus = 'PARTIAL';
   } else {
     paymentStatus = 'UNPAID';
@@ -363,63 +395,63 @@ export function derivePaymentSettlement(doc: {
   let paymentMode: PaymentMode;
   if (splits && splits.length > 0) {
     const activeNonCredit = splits.filter(
-      (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (Number(s.amount) || 0) > 0
+      (s) => (s.mode || '').toUpperCase() !== 'CREDIT' && toPaise(Number(s.amount) || 0) > 0
     );
     if (paymentStatus === 'UNPAID' || activeNonCredit.length === 0) {
       paymentMode = 'CREDIT';
-    } else if (activeNonCredit.length === 1 && balanceAmount <= 0.01) {
+    } else if (activeNonCredit.length === 1 && balancePaise <= 1) {
       paymentMode = activeNonCredit[0].mode;
     } else {
       paymentMode = 'SPLIT';
     }
 
     // Normalize splits amounts to match clamped paidAmount and balanceAmount
-    let remainingPaidToAllocate = paidAmount;
+    let remainingPaidToAllocatePaise = paidPaise;
     splits = splits.map((s) => {
       if ((s.mode || '').toUpperCase() === 'CREDIT') {
-        return { ...s, amount: balanceAmount };
+        return { ...s, amount: fromPaise(balancePaise) };
       }
       const sAmt = Number(s.amount) || 0;
-      const allocated = Math.min(sAmt, remainingPaidToAllocate);
-      remainingPaidToAllocate = subMoney(remainingPaidToAllocate, allocated);
+      const allocatedPaise = Math.min(toPaise(sAmt), remainingPaidToAllocatePaise);
+      remainingPaidToAllocatePaise = subPaise(remainingPaidToAllocatePaise, allocatedPaise);
       return {
         ...s,
-        amount: roundMoney(allocated),
+        amount: fromPaise(allocatedPaise),
       };
     });
 
     // Ensure credit split is present if balanceAmount > 0
-    if (balanceAmount > 0 && !splits.some((s) => (s.mode || '').toUpperCase() === 'CREDIT')) {
+    if (balancePaise > 0 && !splits.some((s) => (s.mode || '').toUpperCase() === 'CREDIT')) {
       splits.push({
         id: `split-bal-${Date.now()}`,
         mode: 'CREDIT',
-        amount: balanceAmount,
+        amount: fromPaise(balancePaise),
       });
     }
   } else {
     if (paymentStatus === 'UNPAID') {
       paymentMode = 'CREDIT';
-    } else if (balanceAmount > 0 && paidAmount > 0) {
+    } else if (balancePaise > 0 && paidPaise > 0) {
       paymentMode = doc.paymentMode === 'CREDIT' ? 'SPLIT' : doc.paymentMode || 'SPLIT';
     } else {
       paymentMode = doc.paymentMode && doc.paymentMode !== 'CREDIT' ? doc.paymentMode : 'CASH';
     }
 
-    if (paidAmount > 0) {
+    if (paidPaise > 0) {
       const isCash = paymentMode === 'CASH';
       const mainSplit: PaymentSplit = {
         id: 'split-1',
         mode: paymentMode === 'SPLIT' ? 'CASH' : paymentMode,
-        amount: paidAmount,
+        amount: fromPaise(paidPaise),
         accountId: isCash ? 'ACC_CASH' : doc.bankAccountId,
         accountName: isCash ? 'Cash-in-hand' : doc.bankAccountName,
       };
       splits = [mainSplit];
-      if (balanceAmount > 0) {
+      if (balancePaise > 0) {
         splits.push({
           id: `split-bal-${Date.now()}`,
           mode: 'CREDIT',
-          amount: balanceAmount,
+          amount: fromPaise(balancePaise),
         });
       }
     }
@@ -428,15 +460,15 @@ export function derivePaymentSettlement(doc: {
   // 5. Notes formatting for audit trail
   let notes = doc.notes;
   if (splits && splits.length > 0 && (doc.paymentSplits || splits.length > 1 || notes?.includes('Split Payment'))) {
-    const splitNote = formatSplitNotes(splits, balanceAmount);
+    const splitNote = formatSplitNotes(splits, fromPaise(balancePaise));
     if (splitNote && (!notes || !notes.includes('Split Payment'))) {
       notes = notes ? `${notes} | ${splitNote}` : splitNote;
     }
   }
 
   return {
-    paidAmount,
-    balanceAmount,
+    paidAmount: fromPaise(paidPaise),
+    balanceAmount: fromPaise(balancePaise),
     paymentStatus,
     paymentMode,
     paymentSplits: splits,

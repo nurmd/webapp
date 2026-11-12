@@ -4,6 +4,7 @@ import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
 import type { Voucher } from './voucherTypes.ts';
 import type { LoanTransaction } from '../../models/loan.ts';
+import { addPaise, fromPaise, subPaise, toPaise } from '../money.ts';
 
 export interface CashFlowLineItem {
   id: string;
@@ -56,7 +57,7 @@ export function computeCashFlowStatement(params: {
   } = params;
 
   // 1. Opening balance from all cash and bank accounts
-  const openingLiquidBalance = accounts.reduce((sum, a) => sum + (a.openingBalance || 0), 0);
+  const openingLiquidBalancePaise = accounts.reduce((s, a) => addPaise(s, toPaise(a.openingBalance || 0)), 0);
 
   const operatingItems: CashFlowLineItem[] = [];
   const financingItems: CashFlowLineItem[] = [];
@@ -226,35 +227,49 @@ export function computeCashFlowStatement(params: {
   const buildSection = (title: string, items: CashFlowLineItem[]): CashFlowSection => {
     // Sort items by date descending
     items.sort((a, b) => b.date.localeCompare(a.date));
-    let totalInflow = 0;
-    let totalOutflow = 0;
+    let totalInflowPaise = 0;
+    let totalOutflowPaise = 0;
     for (const item of items) {
-      if (item.flow === 'INFLOW') totalInflow += item.amount;
-      else totalOutflow += item.amount;
+      const amountPaise = toPaise(item.amount);
+      if (item.flow === 'INFLOW') {
+        totalInflowPaise = addPaise(totalInflowPaise, amountPaise);
+      } else {
+        totalOutflowPaise = addPaise(totalOutflowPaise, amountPaise);
+      }
     }
-    totalInflow = Math.round(totalInflow * 100) / 100;
-    totalOutflow = Math.round(totalOutflow * 100) / 100;
-    const netCashFlow = Math.round((totalInflow - totalOutflow) * 100) / 100;
-    return { title, totalInflow, totalOutflow, netCashFlow, items };
+    const netCashFlowPaise = subPaise(totalInflowPaise, totalOutflowPaise);
+    return {
+      title,
+      totalInflow: fromPaise(totalInflowPaise),
+      totalOutflow: fromPaise(totalOutflowPaise),
+      netCashFlow: fromPaise(netCashFlowPaise),
+      items,
+    };
   };
 
   const opSection = buildSection('Cash Flow from Operating Activities', operatingItems);
   const finSection = buildSection('Cash Flow from Financing Activities', financingItems);
   const invSection = buildSection('Cash Flow from Investing / Bank Transfers', investingItems);
 
-  const totalInflows = Math.round((opSection.totalInflow + finSection.totalInflow + invSection.totalInflow) * 100) / 100;
-  const totalOutflows = Math.round((opSection.totalOutflow + finSection.totalOutflow + invSection.totalOutflow) * 100) / 100;
-  const netCashFlow = Math.round((totalInflows - totalOutflows) * 100) / 100;
-  const closingLiquidBalance = Math.round((openingLiquidBalance + netCashFlow) * 100) / 100;
+  const totalInflowsPaise = addPaise(
+    addPaise(toPaise(opSection.totalInflow), toPaise(finSection.totalInflow)),
+    toPaise(invSection.totalInflow)
+  );
+  const totalOutflowsPaise = addPaise(
+    addPaise(toPaise(opSection.totalOutflow), toPaise(finSection.totalOutflow)),
+    toPaise(invSection.totalOutflow)
+  );
+  const netCashFlowPaise = subPaise(totalInflowsPaise, totalOutflowsPaise);
+  const closingLiquidBalancePaise = addPaise(openingLiquidBalancePaise, netCashFlowPaise);
 
   return {
-    openingLiquidBalance: Math.round(openingLiquidBalance * 100) / 100,
+    openingLiquidBalance: fromPaise(openingLiquidBalancePaise),
     operatingActivities: opSection,
     financingActivities: finSection,
     investingActivities: invSection,
-    totalInflows,
-    totalOutflows,
-    netCashFlow,
-    closingLiquidBalance,
+    totalInflows: fromPaise(totalInflowsPaise),
+    totalOutflows: fromPaise(totalOutflowsPaise),
+    netCashFlow: fromPaise(netCashFlowPaise),
+    closingLiquidBalance: fromPaise(closingLiquidBalancePaise),
   };
 }
