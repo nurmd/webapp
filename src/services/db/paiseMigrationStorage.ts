@@ -60,6 +60,7 @@ type MigratableDoc = object & {
   id?: string;
   _id?: string;
   _rev?: string;
+  paiseSchema?: number;
   __paiseSchema?: number;
 };
 

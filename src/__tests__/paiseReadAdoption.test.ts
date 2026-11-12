@@ -15,8 +15,8 @@ import type { InventoryItem } from '../models/item.ts';
 
 describe('paiseReadAdoption', () => {
   describe('readPaiseOr unit semantics', () => {
-    // 1. readPaiseOr returns the rupee-derived paise when the doc has no __paiseSchema.
-    it('returns rupee-derived paise when doc has no __paiseSchema', () => {
+    // 1. readPaiseOr returns the rupee-derived paise when the doc has no paiseSchema.
+    it('returns rupee-derived paise when doc has no paiseSchema', () => {
       const doc = { grandTotal: 1171, currentBalance: 50.25 };
       expect(readPaiseOr(doc, 'grandTotal')).toBe(117100);
       expect(readPaiseOr(doc, 'currentBalance')).toBe(5025);
@@ -34,21 +34,21 @@ describe('paiseReadAdoption', () => {
         'party'
       );
 
-      expect(party.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(party.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
       expect(readPaiseOr(party, 'currentBalance')).toBe(25075);
       expect(readPaiseOr(party, 'openingBalance')).toBe(10000);
 
       const explicitDoc = {
         amount: -500,
         amountPaise: -50000,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(explicitDoc, 'amount')).toBe(-50000);
 
       const zeroDoc = {
         balance: 0,
         balancePaise: 0,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(zeroDoc, 'balance')).toBe(0);
     });
@@ -58,21 +58,21 @@ describe('paiseReadAdoption', () => {
       const tamperedInvoice = {
         grandTotal: 1171,
         grandTotalPaise: 9999,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(tamperedInvoice, 'grandTotal')).toBe(117100);
 
       const tamperedParty = {
         currentBalance: 500,
         currentBalancePaise: 12345,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(tamperedParty, 'currentBalance')).toBe(50000);
 
       const tamperedLoan = {
         currentPrincipalOutstanding: 10000,
         currentPrincipalOutstandingPaise: 0,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(tamperedLoan, 'currentPrincipalOutstanding')).toBe(1000000);
     });
@@ -82,34 +82,34 @@ describe('paiseReadAdoption', () => {
       const nonIntegerTwin = {
         grandTotal: 1171,
         grandTotalPaise: 1171.5,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(nonIntegerTwin, 'grandTotal')).toBe(117100);
 
       const nanTwin = {
         grandTotal: 1171,
         grandTotalPaise: NaN,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(nanTwin, 'grandTotal')).toBe(117100);
 
       const infinityTwin = {
         grandTotal: 1171,
         grandTotalPaise: Infinity,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(infinityTwin, 'grandTotal')).toBe(117100);
 
       const missingTwin = {
         grandTotal: 1171,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(missingTwin, 'grandTotal')).toBe(117100);
 
       const stringTwin = {
         grandTotal: 1171,
         grandTotalPaise: '117100' as unknown as number,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readPaiseOr(stringTwin, 'grandTotal')).toBe(117100);
     });
@@ -147,7 +147,7 @@ describe('paiseReadAdoption', () => {
         id: 'doc-1',
         currentBalance: 150.25,
         currentBalancePaise: 15025,
-        __paiseSchema: 1,
+        paiseSchema: 1,
         nested: { key: 'value' },
       };
       const beforeWithTwins = JSON.stringify(docWithTwins);

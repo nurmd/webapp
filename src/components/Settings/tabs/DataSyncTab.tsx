@@ -31,6 +31,25 @@ export interface TruthfulSyncStatusInfo {
   conflictsCount: number;
 }
 
+export function formatRelativeAge(timestampMs: number, now: number = Date.now()): string {
+  const diffSec = Math.max(0, Math.floor((now - timestampMs) / 1000));
+  if (diffSec < 60) {
+    return `${diffSec}s`;
+  }
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) {
+    return `${diffMin}m`;
+  }
+  const diffHours = Math.floor(diffMin / 60);
+  const remainingMin = diffMin % 60;
+  if (diffHours < 24) {
+    return remainingMin > 0 ? `${diffHours}h ${remainingMin}m` : `${diffHours}h`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+  return remainingHours > 0 ? `${diffDays}d ${remainingHours}h` : `${diffDays}d`;
+}
+
 export function formatLastSyncedTime(timestamp?: string | null): string {
   if (!timestamp || !timestamp.trim()) {
     return 'Never';
@@ -347,6 +366,8 @@ export interface DataSyncTabProps {
   setSyncUrlInput: (url: string) => void;
   handleConnectSync: () => void;
   handleStopSync: () => void;
+  handleRetryFailedWrites?: () => void;
+  handleResetLocalDbAndRetry?: () => void;
   copiedSyncCode?: boolean;
   handleCopySyncCode?: () => void;
   onOpenDatabaseBackup?: () => void;
@@ -382,6 +403,8 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
   setSyncUrlInput,
   handleConnectSync,
   handleStopSync,
+  handleRetryFailedWrites,
+  handleResetLocalDbAndRetry,
   copiedSyncCode,
   handleCopySyncCode,
   onOpenDatabaseBackup,
@@ -746,11 +769,6 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                 </span>
                 <span>•</span>
                 <span className="truncate">{derived.description}</span>
-                {syncState?.writeQueue && syncState.writeQueue.failed > 0 ? (
-                  <span data-testid="sync-write-queue-failing" className="text-error font-semibold">
-                    {` · ${syncState.writeQueue.failed} write${syncState.writeQueue.failed > 1 ? 's' : ''} failing`}
-                  </span>
-                ) : null}
                 {derived.pendingChanges > 0 && (
                   <>
                     <span>•</span>
@@ -759,6 +777,58 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                     </span>
                   </>
                 )}
+                {syncState?.writeQueue && syncState.writeQueue.failed > 0 ? (
+                  <div className="w-full mt-2 p-3 rounded-xl bg-error/10 border border-error/20 flex flex-col gap-2 text-xs">
+                    <div data-testid="sync-write-queue-failing" className="text-error font-semibold">
+                      {`${syncState.writeQueue.failed} writes failing · ${syncState.writeQueue.pending} queued · ${syncState.writeQueue.dropped} dropped${
+                        syncState.writeQueue.oldestEnqueuedAt
+                          ? ` · oldest ${formatRelativeAge(syncState.writeQueue.oldestEnqueuedAt)}`
+                          : ''
+                      }`}
+                    </div>
+                    {syncState.writeQueue.dropped > 0 && (
+                      <div className="text-error text-[11px] font-medium">
+                        Oldest queued writes were dropped at the 500-entry cap — re-enter them or restore a backup.
+                      </div>
+                    )}
+                    {syncState.writeQueue.errors && syncState.writeQueue.errors.length > 0 && (
+                      <div className="flex flex-col gap-1">
+                        {syncState.writeQueue.errors.slice(0, 3).map((err, idx) => {
+                          const label = `${err.type}: ${err.message} ×${err.count}`;
+                          return (
+                            <div
+                              key={`${err.type}:${err.message}:${idx}`}
+                              title={label}
+                              className="truncate text-[11px] text-error/90 font-mono"
+                            >
+                              {label}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        data-testid="sync-write-queue-retry"
+                        onClick={handleRetryFailedWrites}
+                        disabled={isSyncStarting}
+                        className="px-3 py-1.5 rounded-xl bg-secondary/15 hover:bg-secondary/25 text-on-secondary-container font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                      >
+                        Retry now
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="sync-write-queue-reset"
+                        onClick={handleResetLocalDbAndRetry}
+                        disabled={isSyncStarting}
+                        className="px-3 py-1.5 rounded-xl bg-secondary/15 hover:bg-secondary/25 text-on-secondary-container font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                      >
+                        Reset connection & retry
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

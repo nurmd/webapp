@@ -249,7 +249,7 @@ describe('paisePrintAdapters', () => {
 
   describe('1. readRupeeOr unit table', () => {
     // 1. no schema -> raw rupee
-    it('returns raw rupee unchanged when doc has no __paiseSchema', () => {
+    it('returns raw rupee unchanged when doc has no paiseSchema', () => {
       const doc = { amount: 123.45, grandTotal: 5000 };
       expect(readRupeeOr(doc, 'amount')).toBe(123.45);
       expect(readRupeeOr(doc, 'grandTotal')).toBe(5000);
@@ -258,14 +258,14 @@ describe('paisePrintAdapters', () => {
     // 2. current schema + matching twin -> same value (fromPaise(twin))
     it('returns fromPaise(twin) when doc is current and twin matches rupee field', () => {
       const doc = attachPaiseFields({ amount: 150.5, grandTotal: 3000 }, 'invoice');
-      expect(doc.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(doc.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
       expect(readRupeeOr(doc, 'amount')).toBe(150.5);
       expect(readRupeeOr(doc, 'grandTotal')).toBe(3000);
 
-      const zeroDoc = { amount: 0, amountPaise: 0, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const zeroDoc = { amount: 0, amountPaise: 0, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(zeroDoc, 'amount')).toBe(0);
 
-      const negDoc = { amount: -50.25, amountPaise: -5025, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const negDoc = { amount: -50.25, amountPaise: -5025, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(negDoc, 'amount')).toBe(-50.25);
     });
 
@@ -276,7 +276,7 @@ describe('paisePrintAdapters', () => {
         amountPaise: 9999,
         grandTotal: 1000,
         grandTotalPaise: 1234567,
-        __paiseSchema: PAISE_SCHEMA_VERSION,
+        paiseSchema: PAISE_SCHEMA_VERSION,
       };
       expect(readRupeeOr(tamperedDoc, 'amount')).toBe(123.45);
       expect(readRupeeOr(tamperedDoc, 'grandTotal')).toBe(1000);
@@ -285,23 +285,23 @@ describe('paisePrintAdapters', () => {
     // 4. missing/non-integer twin -> raw rupee unchanged
     it('returns raw rupee unchanged when twin is missing, non-integer, NaN, or non-number', () => {
       // Missing twin
-      const missingTwin = { amount: 123.45, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const missingTwin = { amount: 123.45, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(missingTwin, 'amount')).toBe(123.45);
 
       // Non-integer twin
-      const nonIntTwin = { amount: 123.45, amountPaise: 12345.5, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const nonIntTwin = { amount: 123.45, amountPaise: 12345.5, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(nonIntTwin, 'amount')).toBe(123.45);
 
       // NaN twin
-      const nanTwin = { amount: 123.45, amountPaise: NaN, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const nanTwin = { amount: 123.45, amountPaise: NaN, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(nanTwin, 'amount')).toBe(123.45);
 
       // Infinity twin
-      const infTwin = { amount: 123.45, amountPaise: Infinity, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const infTwin = { amount: 123.45, amountPaise: Infinity, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(infTwin, 'amount')).toBe(123.45);
 
       // Non-number twin
-      const strTwin = { amount: 123.45, amountPaise: '12345' as unknown as number, __paiseSchema: PAISE_SCHEMA_VERSION };
+      const strTwin = { amount: 123.45, amountPaise: '12345' as unknown as number, paiseSchema: PAISE_SCHEMA_VERSION };
       expect(readRupeeOr(strTwin, 'amount')).toBe(123.45);
     });
 
@@ -337,7 +337,7 @@ describe('paisePrintAdapters', () => {
       expect(readRupeeOr({ amount: 10.005 }, 'amount')).toBe(10.005);
 
       // With schema but no twin
-      expect(readRupeeOr({ amount: 10.005, __paiseSchema: PAISE_SCHEMA_VERSION }, 'amount')).toBe(10.005);
+      expect(readRupeeOr({ amount: 10.005, paiseSchema: PAISE_SCHEMA_VERSION }, 'amount')).toBe(10.005);
 
       // With schema + attached twin: toPaise(10.005) = 1001, fromPaise(1001) = 10.01 !== 10.005 -> raw rupee returned unchanged
       const attached = attachPaiseFields({ amount: 10.005 }, 'invoice');

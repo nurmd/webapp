@@ -16,6 +16,7 @@ import {
   recordFailure,
   getDueWrites,
   getWriteQueueHealth,
+  makeAllWritesDue,
 } from './db/writeQueue.ts';
 import {
   assertManualConflictResolution,
@@ -234,7 +235,7 @@ export class PouchService {
     pendingChanges: 0,
     conflicts: [],
     conflictsCount: 0,
-    writeQueue: { pending: 0, retrying: 0, failed: 0, dropped: 0 },
+    writeQueue: { pending: 0, retrying: 0, failed: 0, dropped: 0, errors: [] },
   };
   private pushError: string | null = null;
   private pullError: string | null = null;
@@ -1139,6 +1140,21 @@ export class PouchService {
     return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
   }
 
+  public async retryWriteQueueNow(): Promise<void> {
+    makeAllWritesDue(this.activeDbName);
+    await this.drainWriteQueue();
+    this.notifySyncState();
+  }
+
+  public async resetLocalDbAndRetry(): Promise<void> {
+    try {
+      this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
+    } catch (err) {
+      console.warn('[PouchDB] Failed to recreate local database handle:', err);
+    }
+    await this.retryWriteQueueNow();
+  }
+
   private async drainWriteQueue(): Promise<void> {
     if (this.isDrainingWriteQueue) return;
     if (this.isDemoMode()) return;
@@ -1214,9 +1230,13 @@ export class PouchService {
       if (e?.status !== 404) throw e;
     }
 
+    // Strip legacy underscore-prefixed paise markers: PouchDB/CouchDB reject any
+    // `_`-prefixed member that is not a known special field ("Bad special document member").
+    const { __paiseSchema: _legacyPaiseSchema, __paiseKind: _legacyPaiseKind, ...cleanDoc } =
+      doc as Record<string, unknown>;
     try {
       await this.localDB.put({
-        ...doc,
+        ...cleanDoc,
         _id: docId,
         _rev: rev,
         docType: type,

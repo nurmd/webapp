@@ -26,12 +26,22 @@ export interface QueuedWrite {
   lastError?: string;
 }
 
+export interface WriteQueueErrorGroup {
+  type: string;
+  message: string;
+  count: number;
+}
+
+export const MAX_ERROR_GROUPS = 5;
+export const MAX_ERROR_MESSAGE_LENGTH = 160;
+
 export interface WriteQueueHealth {
   pending: number;
   retrying: number;
   failed: number;
   oldestEnqueuedAt?: number;
   dropped: number;
+  errors: WriteQueueErrorGroup[];
 }
 
 export const MAX_ENTRIES = 500;
@@ -207,12 +217,54 @@ export function getDueWrites(dbName: string, now: number = Date.now()): QueuedWr
 }
 
 /**
+ * Groups queued write errors by type and normalized message, sorted by count desc,
+ * then type asc, then message asc, capped at MAX_ERROR_GROUPS.
+ */
+export function summarizeWriteQueueErrors(entries: QueuedWrite[]): WriteQueueErrorGroup[] {
+  const groupMap = new Map<string, WriteQueueErrorGroup>();
+
+  for (const entry of entries) {
+    const raw = entry.lastError || 'unknown error';
+    const collapsed = raw.replace(/\s+/g, ' ').trim();
+    const message = (collapsed || 'unknown error').slice(0, MAX_ERROR_MESSAGE_LENGTH);
+    const type = entry.type;
+    const key = `${type}::${message}`;
+
+    const existing = groupMap.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groupMap.set(key, {
+        type,
+        message,
+        count: 1,
+      });
+    }
+  }
+
+  const groups = Array.from(groupMap.values());
+  groups.sort((a, b) => {
+    if (b.count !== a.count) {
+      return b.count - a.count;
+    }
+    const typeCmp = a.type.localeCompare(b.type);
+    if (typeCmp !== 0) {
+      return typeCmp;
+    }
+    return a.message.localeCompare(b.message);
+  });
+
+  return groups.slice(0, MAX_ERROR_GROUPS);
+}
+
+/**
  * Returns health metrics for the write queue:
  * - pending: total queued operations
  * - retrying: entries with attempts > 0
  * - failed: entries with attempts >= 3
  * - oldestEnqueuedAt: timestamp of earliest enqueued entry
  * - dropped: count of discarded entries due to MAX_ENTRIES overflow
+ * - errors: summarized error groups
  */
 export function getWriteQueueHealth(dbName: string): WriteQueueHealth {
   const payload = loadPersistedQueue(dbName);
@@ -229,7 +281,24 @@ export function getWriteQueueHealth(dbName: string): WriteQueueHealth {
     failed,
     oldestEnqueuedAt,
     dropped: payload.dropped,
+    errors: summarizeWriteQueueErrors(entries),
   };
+}
+
+/**
+ * Resets nextAttemptAt to now for all queued writes in a database so they are immediately due for retry.
+ * No-op on an empty queue.
+ */
+export function makeAllWritesDue(dbName: string): void {
+  const payload = loadPersistedQueue(dbName);
+  if (payload.entries.length === 0) {
+    return;
+  }
+  const now = Date.now();
+  for (const entry of payload.entries) {
+    entry.nextAttemptAt = now;
+  }
+  savePersistedQueue(dbName, payload);
 }
 
 /**

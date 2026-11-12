@@ -244,7 +244,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function projectRupeeDoc(doc: object): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
-    if (key.endsWith('Paise') || key === '__paiseSchema' || key === '__paiseKind') {
+    if (key.endsWith('Paise') || key === 'paiseSchema' || key === 'paiseKind' || key === '__paiseSchema' || key === '__paiseKind') {
       continue;
     }
     if (Array.isArray(value)) {
@@ -283,7 +283,7 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
     expect(planAfter.totalCurrent).toBe(planAfter.totalDocuments);
   });
 
-  it('2. runPaiseMigration({ dryRun: true }) performs no writes: documents keep no __paiseSchema and totalMigrated === 0', () => {
+  it('2. runPaiseMigration({ dryRun: true }) performs no writes: documents keep no paiseSchema and totalMigrated === 0', () => {
     const report = db.runPaiseMigration({ dryRun: true });
     expect(report.success).toBe(true);
     expect(report.dryRun).toBe(true);
@@ -293,7 +293,7 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
     const invoices = db.getInvoices();
     expect(invoices.length).toBe(1);
     expect(hasCurrentPaiseSchema(invoices[0])).toBe(false);
-    expect(Reflect.get(invoices[0], '__paiseSchema')).toBeUndefined();
+    expect(Reflect.get(invoices[0], 'paiseSchema')).toBeUndefined();
 
     const purchases = db.getPurchases();
     expect(hasCurrentPaiseSchema(purchases[0])).toBe(false);
@@ -305,7 +305,7 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
     expect(hasCurrentPaiseSchema(vouchers[0])).toBe(false);
   });
 
-  it('3. Full run: every invoice/purchase/voucher/party doc gains __paiseSchema: 1 and correct twins, and verifyPaiseIntegrity() returns []', () => {
+  it('3. Full run: every invoice/purchase/voucher/party doc gains paiseSchema: 1 and correct twins, and verifyPaiseIntegrity() returns []', () => {
     const report = db.runPaiseMigration();
     expect(report.success).toBe(true);
     expect(report.dryRun).toBe(false);
@@ -318,25 +318,25 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
     // Spot-check Invoice
     const invoice = db.getInvoices()[0];
     expect(hasCurrentPaiseSchema(invoice)).toBe(true);
-    expect(Reflect.get(invoice, '__paiseSchema')).toBe(1);
+    expect(Reflect.get(invoice, 'paiseSchema')).toBe(1);
     expect(Reflect.get(invoice, 'grandTotalPaise')).toBe(117100);
 
     // Spot-check Party
     const party = db.getParties()[0];
     expect(hasCurrentPaiseSchema(party)).toBe(true);
-    expect(Reflect.get(party, '__paiseSchema')).toBe(1);
+    expect(Reflect.get(party, 'paiseSchema')).toBe(1);
     expect(Reflect.get(party, 'currentBalancePaise')).toBe(217100);
 
     // Spot-check Voucher
     const voucher = db.getVouchers()[0];
     expect(hasCurrentPaiseSchema(voucher)).toBe(true);
-    expect(Reflect.get(voucher, '__paiseSchema')).toBe(1);
+    expect(Reflect.get(voucher, 'paiseSchema')).toBe(1);
     expect(Reflect.get(voucher, 'totalAmountPaise')).toBe(50000);
 
     // Spot-check Purchase
     const purchase = db.getPurchases()[0];
     expect(hasCurrentPaiseSchema(purchase)).toBe(true);
-    expect(Reflect.get(purchase, '__paiseSchema')).toBe(1);
+    expect(Reflect.get(purchase, 'paiseSchema')).toBe(1);
     expect(Reflect.get(purchase, 'grandTotalPaise')).toBe(59000);
 
     // Integrity check clean
@@ -354,7 +354,7 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
     expect(secondReport.totalDivergences).toBe(0);
   });
 
-  it('5. Backup failure: preMigrationBackup throws; assert success === false, abortedReason starts with BACKUP_FAILED, and no doc gained __paiseSchema', () => {
+  it('5. Backup failure: preMigrationBackup throws; assert success === false, abortedReason starts with BACKUP_FAILED, and no doc gained paiseSchema', () => {
     vi.mocked(createAndVerifyPreMigrationBackup).mockImplementationOnce(() => {
       throw new Error('Simulated disk full failure');
     });
@@ -367,7 +367,7 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
 
     const invoices = db.getInvoices();
     expect(hasCurrentPaiseSchema(invoices[0])).toBe(false);
-    expect(Reflect.get(invoices[0], '__paiseSchema')).toBeUndefined();
+    expect(Reflect.get(invoices[0], 'paiseSchema')).toBeUndefined();
   });
 
   it('6. verifyPaiseIntegrity detects a tampered twin (mutate a stored doc grandTotalPaise, expect one mismatch with the right path)', () => {

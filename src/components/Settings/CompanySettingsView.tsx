@@ -467,6 +467,24 @@ const CompanySettingsViewComponent: React.FC<CompanySettingsViewProps> = ({
     }
   };
 
+  const handleRetryFailedWrites = async () => {
+    setIsSyncStarting(true);
+    try {
+      await pouch.retryWriteQueueNow();
+    } finally {
+      setIsSyncStarting(false);
+    }
+  };
+
+  const handleResetLocalDbAndRetry = async () => {
+    setIsSyncStarting(true);
+    try {
+      await pouch.resetLocalDbAndRetry();
+    } finally {
+      setIsSyncStarting(false);
+    }
+  };
+
   const handleConnectSync = async () => {
     const targetUrl = syncUrlInput.trim();
     if (!targetUrl) {
@@ -973,6 +991,8 @@ const CompanySettingsViewComponent: React.FC<CompanySettingsViewProps> = ({
                 setIsImportProfileModalOpen={setIsImportProfileModalOpen}
                 syncState={syncState}
                 handleSyncNow={handleSyncNow}
+                handleRetryFailedWrites={handleRetryFailedWrites}
+                handleResetLocalDbAndRetry={handleResetLocalDbAndRetry}
                 isSyncStarting={isSyncStarting}
                 isSyncConfigOpen={isSyncConfigOpen}
                 setIsSyncConfigOpen={setIsSyncConfigOpen}

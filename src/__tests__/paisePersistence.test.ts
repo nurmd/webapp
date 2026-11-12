@@ -52,8 +52,8 @@ describe('paisePersistence', () => {
 
       const attached = attachPaiseFields(invoice, 'invoice');
 
-      expect(attached.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
-      expect(attached.__paiseKind).toBe('invoice');
+      expect(attached.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(attached.paiseKind).toBe('invoice');
       expect(attached.totalGrossAmountPaise).toBe(toPaise(1000.5));
       expect(attached.totalDiscountPaise).toBe(toPaise(50.25));
       expect(attached.totalTaxableAmountPaise).toBe(toPaise(950.25));
@@ -107,8 +107,8 @@ describe('paisePersistence', () => {
       };
 
       const attached = attachPaiseFields(purchase, 'purchase');
-      expect(attached.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
-      expect(attached.__paiseKind).toBe('purchase');
+      expect(attached.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(attached.paiseKind).toBe('purchase');
       expect(attached.totalGrossAmountPaise).toBe(50000);
       expect(attached.grandTotalPaise).toBe(59000);
       expect(attached.paidAmountPaise).toBe(59000);
@@ -134,8 +134,8 @@ describe('paisePersistence', () => {
       };
 
       const attached = attachPaiseFields(voucher, 'voucher');
-      expect(attached.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
-      expect(attached.__paiseKind).toBe('voucher');
+      expect(attached.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(attached.paiseKind).toBe('voucher');
       expect(attached.totalAmountPaise).toBe(toPaise(1500.75));
       expect(attached.entries[0].debitPaise).toBe(toPaise(1500.75));
       expect(attached.entries[0].creditPaise).toBe(0);
@@ -154,8 +154,8 @@ describe('paisePersistence', () => {
       };
 
       const attached = attachPaiseFields(party, 'party');
-      expect(attached.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
-      expect(attached.__paiseKind).toBe('party');
+      expect(attached.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(attached.paiseKind).toBe('party');
       expect(attached.openingBalancePaise).toBe(toPaise(1250.5));
       expect(attached.currentBalancePaise).toBe(toPaise(3400.75));
     });
@@ -172,8 +172,8 @@ describe('paisePersistence', () => {
       };
 
       const attached = attachPaiseFields(expense, 'expense');
-      expect(attached.__paiseSchema).toBe(PAISE_SCHEMA_VERSION);
-      expect(attached.__paiseKind).toBe('expense');
+      expect(attached.paiseSchema).toBe(PAISE_SCHEMA_VERSION);
+      expect(attached.paiseKind).toBe('expense');
       expect(attached.amountPaise).toBe(toPaise(350.25));
       expect(attached.taxableAmountPaise).toBe(30000);
       expect(attached.taxAmountPaise).toBe(toPaise(50.25));
@@ -287,7 +287,7 @@ describe('paisePersistence', () => {
       const attached = attachPaiseFields(invoice, 'invoice');
 
       expect(invoice).toEqual(frozen);
-      expect(invoice).not.toHaveProperty('__paiseSchema');
+      expect(invoice).not.toHaveProperty('paiseSchema');
       expect(invoice).not.toHaveProperty('grandTotalPaise');
       expect(rawItem).not.toHaveProperty('unitPricePaise');
       expect(rawSplit).not.toHaveProperty('amountPaise');
@@ -402,7 +402,7 @@ describe('paisePersistence', () => {
       });
     });
 
-    it('ignores documents without __paiseSchema and returns []', () => {
+    it('ignores documents without paiseSchema and returns []', () => {
       const doc = { id: 'd1', grandTotal: 500 };
       expect(verifyPaiseFields(doc)).toEqual([]);
     });
@@ -413,7 +413,7 @@ describe('paisePersistence', () => {
       expect(verifyPaiseFields('string')).toEqual([]);
       expect(verifyPaiseFields(123)).toEqual([]);
       expect(verifyPaiseFields({})).toEqual([]);
-      expect(verifyPaiseFields({ __paiseSchema: 1, items: 'not-an-array' })).toEqual([]);
+      expect(verifyPaiseFields({ paiseSchema: 1, items: 'not-an-array' })).toEqual([]);
     });
   });
 
@@ -428,8 +428,10 @@ describe('paisePersistence', () => {
       expect(hasCurrentPaiseSchema(undefined)).toBe(false);
       expect(hasCurrentPaiseSchema('some-id')).toBe(false);
       expect(hasCurrentPaiseSchema({})).toBe(false);
-      expect(hasCurrentPaiseSchema({ __paiseSchema: 2 })).toBe(false);
-      expect(hasCurrentPaiseSchema({ __paiseSchema: '1' })).toBe(false);
+      expect(hasCurrentPaiseSchema({ paiseSchema: 2 })).toBe(false);
+      expect(hasCurrentPaiseSchema({ paiseSchema: '1' })).toBe(false);
+      // Backward compat: legacy underscore-prefixed marker still recognized.
+      expect(hasCurrentPaiseSchema({ __paiseSchema: PAISE_SCHEMA_VERSION })).toBe(true);
     });
   });
 });

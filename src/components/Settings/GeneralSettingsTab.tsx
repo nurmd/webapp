@@ -22,6 +22,8 @@ export interface GeneralSettingsTabProps {
   setSyncUrlInput: (url: string) => void;
   handleConnectSync: () => void;
   handleStopSync: () => void;
+  handleRetryFailedWrites?: () => void;
+  handleResetLocalDbAndRetry?: () => void;
   CURRENT_APP_VERSION: string;
   updateStatusText: string | null;
   handleCheckForUpdates: () => void;
@@ -64,6 +66,8 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
   setSyncUrlInput,
   handleConnectSync,
   handleStopSync,
+  handleRetryFailedWrites,
+  handleResetLocalDbAndRetry,
   CURRENT_APP_VERSION,
   updateStatusText,
   handleCheckForUpdates,
@@ -108,6 +112,8 @@ export const GeneralSettingsTab: React.FC<GeneralSettingsTabProps> = ({
         setSyncUrlInput={setSyncUrlInput}
         handleConnectSync={handleConnectSync}
         handleStopSync={handleStopSync}
+        handleRetryFailedWrites={handleRetryFailedWrites}
+        handleResetLocalDbAndRetry={handleResetLocalDbAndRetry}
       />
 
       {/* 2. GST & Legal Tax Configuration */}

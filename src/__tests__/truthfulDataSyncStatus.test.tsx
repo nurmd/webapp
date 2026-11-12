@@ -729,5 +729,161 @@ describe('Truthful Data & Sync Status Suite', () => {
 
       expect(handleSyncNowMock).toHaveBeenCalledTimes(1);
     });
+
+    it('with failed > 0, renders summary, error groups, retry + reset buttons and clicking each calls matching handler once', async () => {
+      const handleRetryFailedWritesMock = vi.fn();
+      const handleResetLocalDbAndRetryMock = vi.fn();
+
+      await act(async () => {
+        root!.render(
+          <DataSyncTab
+            isSyncingProfile={false}
+            lastProfileSyncTime=""
+            handleSyncAllSettingsAcrossDevices={vi.fn()}
+            profileSyncNotice={null}
+            setIsPairQrModalOpen={vi.fn()}
+            setIsImportProfileModalOpen={vi.fn()}
+            syncState={{
+              ...defaultSyncState,
+              writeQueue: {
+                pending: 5,
+                retrying: 3,
+                failed: 2,
+                dropped: 0,
+                oldestEnqueuedAt: Date.now() - 45 * 1000,
+                errors: [
+                  { type: 'invoice', message: 'Storage quota exceeded', count: 2 },
+                ],
+              },
+            }}
+            handleSyncNow={vi.fn()}
+            handleRetryFailedWrites={handleRetryFailedWritesMock}
+            handleResetLocalDbAndRetry={handleResetLocalDbAndRetryMock}
+            isSyncStarting={false}
+            isSyncConfigOpen={false}
+            setIsSyncConfigOpen={vi.fn()}
+            syncUrlInput=""
+            setSyncUrlInput={vi.fn()}
+            handleConnectSync={vi.fn()}
+            handleStopSync={vi.fn()}
+            isRemoteDbActive={true}
+            savedRemoteUrl="https://couchdb.example.com/store"
+          />
+        );
+      });
+
+      const failingSummary = container!.querySelector('[data-testid="sync-write-queue-failing"]');
+      expect(failingSummary).not.toBeNull();
+      expect(failingSummary!.textContent).toContain('2 writes failing · 5 queued · 0 dropped · oldest 45s');
+
+      const retryBtn = container!.querySelector('[data-testid="sync-write-queue-retry"]');
+      expect(retryBtn).not.toBeNull();
+      expect(retryBtn!.textContent).toBe('Retry now');
+
+      const resetBtn = container!.querySelector('[data-testid="sync-write-queue-reset"]');
+      expect(resetBtn).not.toBeNull();
+      expect(resetBtn!.textContent).toBe('Reset connection & retry');
+
+      expect(container!.textContent).toContain('invoice: Storage quota exceeded ×2');
+
+      if (retryBtn instanceof HTMLElement) {
+        await act(async () => {
+          retryBtn.click();
+        });
+      }
+      expect(handleRetryFailedWritesMock).toHaveBeenCalledTimes(1);
+
+      if (resetBtn instanceof HTMLElement) {
+        await act(async () => {
+          resetBtn.click();
+        });
+      }
+      expect(handleResetLocalDbAndRetryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('with dropped > 0, renders the drop warning text', async () => {
+      await act(async () => {
+        root!.render(
+          <DataSyncTab
+            isSyncingProfile={false}
+            lastProfileSyncTime=""
+            handleSyncAllSettingsAcrossDevices={vi.fn()}
+            profileSyncNotice={null}
+            setIsPairQrModalOpen={vi.fn()}
+            setIsImportProfileModalOpen={vi.fn()}
+            syncState={{
+              ...defaultSyncState,
+              writeQueue: {
+                pending: 500,
+                retrying: 10,
+                failed: 5,
+                dropped: 12,
+                oldestEnqueuedAt: Date.now() - 38 * 60 * 1000,
+                errors: [],
+              },
+            }}
+            handleSyncNow={vi.fn()}
+            isSyncStarting={false}
+            isSyncConfigOpen={false}
+            setIsSyncConfigOpen={vi.fn()}
+            syncUrlInput=""
+            setSyncUrlInput={vi.fn()}
+            handleConnectSync={vi.fn()}
+            handleStopSync={vi.fn()}
+            isRemoteDbActive={true}
+            savedRemoteUrl="https://couchdb.example.com/store"
+          />
+        );
+      });
+
+      const failingSummary = container!.querySelector('[data-testid="sync-write-queue-failing"]');
+      expect(failingSummary).not.toBeNull();
+      expect(failingSummary!.textContent).toContain('5 writes failing · 500 queued · 12 dropped · oldest 38m');
+
+      expect(container!.textContent).toContain(
+        'Oldest queued writes were dropped at the 500-entry cap — re-enter them or restore a backup.'
+      );
+    });
+
+    it('with failed === 0, none of the new block renders', async () => {
+      await act(async () => {
+        root!.render(
+          <DataSyncTab
+            isSyncingProfile={false}
+            lastProfileSyncTime=""
+            handleSyncAllSettingsAcrossDevices={vi.fn()}
+            profileSyncNotice={null}
+            setIsPairQrModalOpen={vi.fn()}
+            setIsImportProfileModalOpen={vi.fn()}
+            syncState={{
+              ...defaultSyncState,
+              writeQueue: {
+                pending: 2,
+                retrying: 1,
+                failed: 0,
+                dropped: 0,
+                errors: [],
+              },
+            }}
+            handleSyncNow={vi.fn()}
+            isSyncStarting={false}
+            isSyncConfigOpen={false}
+            setIsSyncConfigOpen={vi.fn()}
+            syncUrlInput=""
+            setSyncUrlInput={vi.fn()}
+            handleConnectSync={vi.fn()}
+            handleStopSync={vi.fn()}
+            isRemoteDbActive={true}
+            savedRemoteUrl="https://couchdb.example.com/store"
+          />
+        );
+      });
+
+      expect(container!.querySelector('[data-testid="sync-write-queue-failing"]')).toBeNull();
+      expect(container!.querySelector('[data-testid="sync-write-queue-retry"]')).toBeNull();
+      expect(container!.querySelector('[data-testid="sync-write-queue-reset"]')).toBeNull();
+      expect(container!.textContent).not.toContain('Oldest queued writes were dropped');
+      expect(container!.textContent).not.toContain('writes failing');
+    });
   });
 });

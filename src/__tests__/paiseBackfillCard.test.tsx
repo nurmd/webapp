@@ -275,7 +275,7 @@ describe('PaiseBackfillCard', () => {
     expect(hasCurrentPaiseSchema(parties[0])).toBe(true);
   });
 
-  it('5. Backup failure: mock createAndVerifyPreMigrationBackup to throw, confirm, assert the report shows a BACKUP_FAILED message and the seeded docs still have no __paiseSchema', () => {
+  it('5. Backup failure: mock createAndVerifyPreMigrationBackup to throw, confirm, assert the report shows a BACKUP_FAILED message and the seeded docs still have no paiseSchema', () => {
     vi.mocked(createAndVerifyPreMigrationBackup).mockImplementationOnce(() => {
       throw new Error('Simulated pre-migration backup failure');
     });

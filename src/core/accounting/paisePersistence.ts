@@ -93,8 +93,11 @@ function attachFieldsToObject(
  * The `${string}Paise` index signature lets callers read twins without casts.
  */
 export type PaiseTwins = {
-  __paiseSchema: number;
-  __paiseKind: PaisePersistKind;
+  paiseSchema: number;
+  paiseKind: PaisePersistKind;
+  /** Legacy marker retained for backward read of pre-fix documents. */
+  __paiseSchema?: number;
+  __paiseKind?: PaisePersistKind;
 } & {
   [key: `${string}Paise`]: number | undefined;
 };
@@ -129,8 +132,12 @@ export function attachPaiseFields<T extends object>(
 
   const docObj = doc as Record<string, unknown>;
   const result = attachFieldsToObject(docObj, config.topFields);
-  result.__paiseSchema = PAISE_SCHEMA_VERSION;
-  result.__paiseKind = kind;
+  result.paiseSchema = PAISE_SCHEMA_VERSION;
+  result.paiseKind = kind;
+  // Strip legacy underscore-prefixed markers so PouchDB/CouchDB never see them
+  // (they reject any `_`-prefixed member that is not a known special field).
+  delete result.__paiseSchema;
+  delete result.__paiseKind;
 
   if (config.nestedArrays) {
     for (const [arrKey, nestedFields] of Object.entries(config.nestedArrays)) {
@@ -150,7 +157,7 @@ export function attachPaiseFields<T extends object>(
 }
 
 function detectKind(doc: Record<string, unknown>): PaisePersistKind | null {
-  const kind = doc.__paiseKind;
+  const kind = doc.paiseKind ?? doc.__paiseKind;
   if (typeof kind === 'string' && kind in KIND_CONFIGS) {
     return kind as PaisePersistKind;
   }
@@ -172,7 +179,8 @@ export function verifyPaiseFields(doc: unknown): PaiseFieldMismatch[] {
     return [];
   }
   const docObj = doc as Record<string, unknown>;
-  if (docObj.__paiseSchema === undefined) {
+  const schemaVersion = docObj.paiseSchema ?? docObj.__paiseSchema;
+  if (schemaVersion === undefined) {
     return [];
   }
 
@@ -232,7 +240,8 @@ export function hasCurrentPaiseSchema(doc: unknown): boolean {
   if (!doc || typeof doc !== 'object') {
     return false;
   }
-  return (doc as Record<string, unknown>).__paiseSchema === PAISE_SCHEMA_VERSION;
+  const obj = doc as Record<string, unknown>;
+  return (obj.paiseSchema ?? obj.__paiseSchema) === PAISE_SCHEMA_VERSION;
 }
 
 function isRecord(val: unknown): val is Record<string, unknown> {
@@ -253,7 +262,8 @@ export function readPaiseOr(
   const rupee = doc[field];
   if (typeof rupee !== 'number' || !Number.isFinite(rupee)) return fallbackPaise;
   const rupeePaise = toPaise(rupee);
-  if (doc.__paiseSchema !== PAISE_SCHEMA_VERSION) return rupeePaise;
+  const schemaVersion = doc.paiseSchema ?? doc.__paiseSchema;
+  if (schemaVersion !== PAISE_SCHEMA_VERSION) return rupeePaise;
   const twin = doc[`${field}Paise`];
   if (typeof twin !== 'number' || !Number.isInteger(twin)) return rupeePaise;
   return twin === rupeePaise ? twin : rupeePaise; // Rupee always wins on mismatch
@@ -281,7 +291,8 @@ export function readRupeeOr(
   if (!isRecord(doc)) return fallback;
   const rupee = doc[field];
   if (typeof rupee !== 'number' || !Number.isFinite(rupee)) return fallback;
-  if (doc.__paiseSchema !== PAISE_SCHEMA_VERSION) return rupee;
+  const schemaVersion = doc.paiseSchema ?? doc.__paiseSchema;
+  if (schemaVersion !== PAISE_SCHEMA_VERSION) return rupee;
   const twin = doc[`${field}Paise`];
   if (typeof twin !== 'number' || !Number.isInteger(twin)) return rupee;
   if (fromPaise(twin) === rupee) return fromPaise(twin);
