@@ -8,6 +8,7 @@ import type { LoanAccount } from '../../models/loan.ts';
 import { computeCashBankSummary } from './cashBankCalculator.ts';
 import { aggregateStockValuation, computeTradingProfitAndStockSummary, aggregateGstr3b } from '../../components/Reports/utils/reportAggregations.ts';
 import { toPaise, fromPaise, addPaise, subPaise, absPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export interface BalanceSheetItem {
   id: string;
@@ -85,7 +86,7 @@ export function computeBalanceSheetSummary(params: {
   let totalReceivablesPaise = 0;
   for (const p of parties) {
     if (p.type === 'CUSTOMER') {
-      const balPaise = toPaise(p.currentBalance || 0);
+      const balPaise = readPaiseOr(p, 'currentBalance');
       if (balPaise > 0) {
         totalReceivablesPaise = addPaise(totalReceivablesPaise, balPaise);
       }
@@ -95,7 +96,7 @@ export function computeBalanceSheetSummary(params: {
   if (totalReceivablesPaise === 0) {
     for (const inv of invoices) {
       if (!inv.isCancelled && inv.balanceAmount) {
-        const invBalPaise = toPaise(inv.balanceAmount);
+        const invBalPaise = readPaiseOr(inv, 'balanceAmount');
         if (invBalPaise > 0) {
           totalReceivablesPaise = addPaise(totalReceivablesPaise, invBalPaise);
         }
@@ -133,7 +134,7 @@ export function computeBalanceSheetSummary(params: {
   let totalPayablesPaise = 0;
   for (const p of parties) {
     if (p.type === 'SUPPLIER') {
-      const balPaise = toPaise(p.currentBalance || 0);
+      const balPaise = readPaiseOr(p, 'currentBalance');
       if (balPaise < 0) {
         totalPayablesPaise = addPaise(totalPayablesPaise, absPaise(balPaise));
       }
@@ -142,7 +143,7 @@ export function computeBalanceSheetSummary(params: {
   if (totalPayablesPaise === 0) {
     for (const pur of purchases) {
       if (!pur.isCancelled && pur.balanceAmount) {
-        const purBalPaise = toPaise(pur.balanceAmount);
+        const purBalPaise = readPaiseOr(pur, 'balanceAmount');
         if (purBalPaise > 0) {
           totalPayablesPaise = addPaise(totalPayablesPaise, purBalPaise);
         }
@@ -165,7 +166,7 @@ export function computeBalanceSheetSummary(params: {
   let totalLoansOutstandingPaise = 0;
   for (const loan of loans) {
     if (loan.status === 'ACTIVE') {
-      const loanPaise = toPaise(loan.currentPrincipalOutstanding || 0);
+      const loanPaise = readPaiseOr(loan, 'currentPrincipalOutstanding');
       totalLoansOutstandingPaise = addPaise(totalLoansOutstandingPaise, loanPaise);
       nonCurrentLiabilityItems.push({
         id: `ncl-loan-${loan.id}`,

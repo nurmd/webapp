@@ -234,3 +234,27 @@ export function hasCurrentPaiseSchema(doc: unknown): boolean {
   }
   return (doc as Record<string, unknown>).__paiseSchema === PAISE_SCHEMA_VERSION;
 }
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null;
+}
+
+/**
+ * Reads an integer paise value for `field`. When __paiseSchema is current and the
+ * twin `${field}Paise` matches the rupee value, the twin is returned; the rupee field
+ * always wins on mismatch.
+ */
+export function readPaiseOr(
+  doc: object | null | undefined,
+  field: string,
+  fallbackPaise = 0
+): number {
+  if (!isRecord(doc)) return fallbackPaise;
+  const rupee = doc[field];
+  if (typeof rupee !== 'number' || !Number.isFinite(rupee)) return fallbackPaise;
+  const rupeePaise = toPaise(rupee);
+  if (doc.__paiseSchema !== PAISE_SCHEMA_VERSION) return rupeePaise;
+  const twin = doc[`${field}Paise`];
+  if (typeof twin !== 'number' || !Number.isInteger(twin)) return rupeePaise;
+  return twin === rupeePaise ? twin : rupeePaise; // Rupee always wins on mismatch
+}

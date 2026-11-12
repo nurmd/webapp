@@ -1,5 +1,6 @@
 import { Party } from '../../models/party.ts';
-import { absPaise, addPaise, fromPaise, toPaise } from '../money.ts';
+import { absPaise, addPaise, fromPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export interface PartyDuesSummary {
   totalReceivables: number;
@@ -30,7 +31,7 @@ export function computePartyDues(parties: Party[] = []): PartyDuesSummary {
   for (const party of parties) {
     if (!party) continue;
 
-    const balPaise = toPaise(party.currentBalance);
+    const balPaise = readPaiseOr(party, 'currentBalance');
 
     if (party.type === 'CUSTOMER') {
       if (balPaise > 0) {
