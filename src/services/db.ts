@@ -1,4 +1,4 @@
-import { SyncStorage } from './db/syncStorage.ts';
+import { PaiseMigrationStorage, scheduleStartupPaiseIntegrityCheck } from './db/paiseMigrationStorage.ts';
 import { scheduleStartupDivergenceCheck } from './db/divergenceReport.ts';
 
 export * from './db/index.ts';
@@ -16,12 +16,14 @@ export * from './db/index.ts';
  * - InvoicePurchaseStorage: Sales invoices, credit notes, purchase bills, debit notes, stock adjustments
  * - BackupRestoreStorage: Full JSON database backups, SHA-256 checksums, Disaster Recovery
  * - SyncStorage: Real-time PouchDB/CouchDB 2-way sync, demo data lifecycle
+ * - PaiseMigrationStorage: Idempotent backup-gated paise backfill migration and integrity checks
  */
-export class StorageService extends SyncStorage {}
+export class StorageService extends PaiseMigrationStorage {}
 
 export const db = new StorageService();
 
 if (typeof window !== 'undefined') {
   scheduleStartupDivergenceCheck();
+  scheduleStartupPaiseIntegrityCheck(db);
 }
 
