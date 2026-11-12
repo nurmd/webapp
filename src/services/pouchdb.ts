@@ -1163,19 +1163,20 @@ export class PouchService {
     try {
       const due = getDueWrites(this.activeDbName);
       for (const entry of due) {
+        const entryKey = entry.key || `${entry.op}:${entry.type}:${entry.id}`;
         try {
           if (entry.op === 'PUT') {
             await this.persistDoc(entry.type, entry.doc as any);
           } else {
             await this.persistDelete(entry.type, entry.id);
           }
-          removeWrite(this.activeDbName, entry.key);
+          removeWrite(this.activeDbName, entryKey);
         } catch (err: any) {
           const is409 = err && (err.status === 409 || err.name === 'conflict');
           if (is409) {
-            removeWrite(this.activeDbName, entry.key);
+            removeWrite(this.activeDbName, entryKey);
           } else {
-            recordFailure(this.activeDbName, entry.key, err?.message || String(err));
+            recordFailure(this.activeDbName, entryKey, err?.message || String(err));
           }
         }
       }

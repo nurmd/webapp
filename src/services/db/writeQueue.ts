@@ -187,7 +187,11 @@ export function enqueueWrite(
  */
 export function removeWrite(dbName: string, key: string): void {
   const payload = loadPersistedQueue(dbName);
-  const remaining = payload.entries.filter((e) => e.key !== key);
+  const resolvedKey = key || '';
+  const remaining = payload.entries.filter((e) => {
+    const entryKey = e.key || `${e.op}:${e.type}:${e.id}`;
+    return entryKey !== resolvedKey && e.key !== key;
+  });
   if (remaining.length !== payload.entries.length) {
     savePersistedQueue(dbName, { entries: remaining, dropped: payload.dropped });
   }
