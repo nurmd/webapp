@@ -1,15 +1,15 @@
 {
-  "version": "1.2.78",
+  "version": "1.2.79",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-11T15:48:58.503Z",
+  "buildTime": "2026-11-12T10:25:49.296Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "memoize tab-level views and stabilize App handlers",
-    "extract allocation row into VoucherAllocationRow",
-    "extract POS catalog tiles into PosCatalogCard",
-    "raise vitest timeouts to 30s for full-suite CPU contention",
-    "split InvoicePreviewModal into model hook + templates",
-    "progressive windowing for invoices, parties, items"
+    "manual paise backfill card in Data & Sync",
+    "route document money reads through paise-aware reader",
+    "adopt paise twins at party-dues and balance-sheet boundaries",
+    "backup-gated paise backfill migration + integrity check",
+    "additive paise persistence fields at storage write path",
+    "integer-paise core + passbook ordering/totalPaid fixes"
   ]
 }
