@@ -7,6 +7,7 @@ import {
 import { printSettingsService } from '../../services/printSettingsService.ts';
 import { inclusiveFromExclusive } from '../gst/pricing.ts';
 import { db } from '../../services/db.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 /**
  * Builds structured receipt data for ESC/POS thermal printing and text rendering.
@@ -68,27 +69,27 @@ export function buildThermalReceiptData(
       return {
         name: i.name,
         qty: i.quantity,
-        rate: i.unitPrice,
+        rate: readRupeeOr(i, 'unitPrice'),
         rateInclusive,
         cessRate: i.cessRate,
-        amount: i.totalAmount,
+        amount: readRupeeOr(i, 'totalAmount'),
       };
     }),
-    taxableAmount: invoice.totalTaxableAmount,
-    totalDiscount: thermalSettings.showItemDiscount ? invoice.totalDiscount : 0,
-    cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalCgst : 0,
-    sgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalSgst : 0,
-    igstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? invoice.totalIgst : 0,
+    taxableAmount: readRupeeOr(invoice, 'totalTaxableAmount'),
+    totalDiscount: thermalSettings.showItemDiscount ? readRupeeOr(invoice, 'totalDiscount') : 0,
+    cgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? readRupeeOr(invoice, 'totalCgst') : 0,
+    sgstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? readRupeeOr(invoice, 'totalSgst') : 0,
+    igstAmount: (!company.isCompositionScheme && thermalSettings.showTaxBreakdown) ? readRupeeOr(invoice, 'totalIgst') : 0,
     totalCess:
       !company.isCompositionScheme && thermalSettings.showTaxBreakdown
-        ? invoice.totalCess
+        ? readRupeeOr(invoice, 'totalCess')
         : 0,
-    shippingAmount: invoice.shippingAmount,
-    roundOff: invoice.roundOff,
-    grandTotal: invoice.grandTotal,
-    paidAmount: isDeliveryChallan ? undefined : invoice.paidAmount,
-    balanceAmount: isDeliveryChallan ? undefined : (thermalSettings.showBalanceDue ? invoice.balanceAmount : undefined),
-    partyBalance: isDeliveryChallan ? undefined : (thermalSettings.showPartyBalance && party ? party.currentBalance : undefined),
+    shippingAmount: readRupeeOr(invoice, 'shippingAmount'),
+    roundOff: readRupeeOr(invoice, 'roundOff'),
+    grandTotal: readRupeeOr(invoice, 'grandTotal'),
+    paidAmount: isDeliveryChallan ? undefined : readRupeeOr(invoice, 'paidAmount'),
+    balanceAmount: isDeliveryChallan ? undefined : (thermalSettings.showBalanceDue ? readRupeeOr(invoice, 'balanceAmount') : undefined),
+    partyBalance: isDeliveryChallan ? undefined : (thermalSettings.showPartyBalance && party ? readRupeeOr(party, 'currentBalance') : undefined),
     paymentSplits: isDeliveryChallan ? undefined : invoice.paymentSplits,
     upiId: isDeliveryChallan ? undefined : (thermalSettings.showUpiQr ? company.upiId : undefined),
     terms: thermalSettings.greetingText || company.termsAndConditions,

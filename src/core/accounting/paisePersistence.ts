@@ -258,3 +258,33 @@ export function readPaiseOr(
   if (typeof twin !== 'number' || !Number.isInteger(twin)) return rupeePaise;
   return twin === rupeePaise ? twin : rupeePaise; // Rupee always wins on mismatch
 }
+
+/**
+ * Reads a rupee value for `field`.
+ *
+ * Semantics, in order:
+ * 1. Non-object doc, or a rupee field that is not a finite number -> return fallback (default 0).
+ * 2. No __paiseSchema === PAISE_SCHEMA_VERSION -> return the raw rupee value unchanged (bit-identical, not rounded).
+ * 3. Twin missing / not a finite integer -> return the raw rupee value unchanged.
+ * 4. fromPaise(twin) === rupee -> return fromPaise(twin).
+ * 5. Otherwise -> return the raw rupee value unchanged.
+ *
+ * Rules 2, 3, and 5 ensure that the returned number is always exactly the stored rupee value,
+ * guaranteeing byte-identical print output. The twin path exists so a later "trust the twin"
+ * migration switch touches only this function.
+ */
+export function readRupeeOr(
+  doc: object | null | undefined,
+  field: string,
+  fallback = 0
+): number {
+  if (!isRecord(doc)) return fallback;
+  const rupee = doc[field];
+  if (typeof rupee !== 'number' || !Number.isFinite(rupee)) return fallback;
+  if (doc.__paiseSchema !== PAISE_SCHEMA_VERSION) return rupee;
+  const twin = doc[`${field}Paise`];
+  if (typeof twin !== 'number' || !Number.isInteger(twin)) return rupee;
+  if (fromPaise(twin) === rupee) return fromPaise(twin);
+  return rupee;
+}
+

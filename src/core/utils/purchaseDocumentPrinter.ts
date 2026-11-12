@@ -2,6 +2,7 @@ import { PurchaseBill, PurchaseItemEntry } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from './formatters.ts';
 import { printHtmlDocument, escapeHtml } from './printBridge.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 export function generatePurchaseBillHtml(company: CompanyProfile, bill: PurchaseBill): string {
   const companyName = escapeHtml(company.tradeName || company.businessName || 'Business Enterprise');
@@ -35,10 +36,10 @@ export function generatePurchaseBillHtml(company: CompanyProfile, bill: Purchase
       <td style="padding: 7px 8px; font-weight: 600; color: #0f172a;">${escapeHtml(item.name)}</td>
       <td style="padding: 7px 6px; text-align: center; color: #475569;">${escapeHtml(item.hsnSacCode || '—')}</td>
       <td style="padding: 7px 6px; text-align: center; font-weight: 600;">${item.quantity} ${escapeHtml(item.unit || '')}</td>
-      <td style="padding: 7px 8px; text-align: right;">${formatINR(item.unitPrice)}</td>
+      <td style="padding: 7px 8px; text-align: right;">${formatINR(readRupeeOr(item, 'unitPrice'))}</td>
       <td style="padding: 7px 8px; text-align: right;">${formatINR(item.taxableAmount)}</td>
       <td style="padding: 7px 6px; text-align: center;">${item.gstRate || 0}%</td>
-      <td style="padding: 7px 8px; text-align: right; font-weight: 700; color: #0f172a;">${formatINR(item.totalAmount)}</td>
+      <td style="padding: 7px 8px; text-align: right; font-weight: 700; color: #0f172a;">${formatINR(readRupeeOr(item, 'totalAmount'))}</td>
     </tr>
   `
     )
@@ -223,8 +224,8 @@ export function generatePurchaseBillHtml(company: CompanyProfile, bill: Purchase
       <div class="card-title">Billing & Payment Summary</div>
       <div><strong>Status:</strong> ${bill.paymentStatus || 'UNPAID'}</div>
       <div><strong>Mode:</strong> ${bill.paymentMode || 'CASH'}</div>
-      ${bill.paidAmount > 0 ? `<div><strong>Paid:</strong> ${formatINR(bill.paidAmount)}</div>` : ''}
-      <div><strong>Balance Due:</strong> ${formatINR(bill.balanceAmount || 0)}</div>
+      ${readRupeeOr(bill, 'paidAmount') > 0 ? `<div><strong>Paid:</strong> ${formatINR(readRupeeOr(bill, 'paidAmount'))}</div>` : ''}
+      <div><strong>Balance Due:</strong> ${formatINR(readRupeeOr(bill, 'balanceAmount', 0))}</div>
     </div>
   </div>
 
@@ -250,13 +251,13 @@ export function generatePurchaseBillHtml(company: CompanyProfile, bill: Purchase
     <table class="totals-table">
       <tr>
         <td style="color: #64748b;">Taxable Total:</td>
-        <td style="text-align: right; font-weight: 600;">${formatINR(bill.totalTaxableAmount || bill.totalGrossAmount)}</td>
+        <td style="text-align: right; font-weight: 600;">${formatINR(readRupeeOr(bill, 'totalTaxableAmount') || bill.totalGrossAmount)}</td>
       </tr>
       ${bill.totalTax ? `<tr><td style="color: #64748b;">Total GST:</td><td style="text-align: right; font-weight: 600;">${formatINR(bill.totalTax)}</td></tr>` : ''}
-      ${bill.roundOff ? `<tr><td style="color: #64748b;">Round Off:</td><td style="text-align: right;">${formatINR(bill.roundOff)}</td></tr>` : ''}
+      ${readRupeeOr(bill, 'roundOff') ? `<tr><td style="color: #64748b;">Round Off:</td><td style="text-align: right;">${formatINR(readRupeeOr(bill, 'roundOff'))}</td></tr>` : ''}
       <tr class="grand-total-row">
         <td>Grand Total:</td>
-        <td style="text-align: right;">${formatINR(bill.grandTotal)}</td>
+        <td style="text-align: right;">${formatINR(readRupeeOr(bill, 'grandTotal'))}</td>
       </tr>
     </table>
   </div>

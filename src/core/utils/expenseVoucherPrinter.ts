@@ -2,6 +2,7 @@ import { Expense } from '../../models/expense.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from './formatters.ts';
 import { printHtmlDocument, escapeHtml } from './printBridge.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 export function generateExpenseVoucherHtml(company: CompanyProfile, exp: Expense): string {
   const companyName = escapeHtml(company.tradeName || company.businessName || 'Business Enterprise');
@@ -142,7 +143,7 @@ export function generateExpenseVoucherHtml(company: CompanyProfile, exp: Expense
     </div>
     <div style="text-align: right;">
       <div class="label">Total Paid</div>
-      <div class="amount">${formatINR(exp.amount)}</div>
+      <div class="amount">${formatINR(readRupeeOr(exp, 'amount'))}</div>
     </div>
   </div>
 
@@ -166,13 +167,13 @@ export function generateExpenseVoucherHtml(company: CompanyProfile, exp: Expense
   </div>
 
   ${
-    exp.taxAmount > 0
+    readRupeeOr(exp, 'taxAmount') > 0
       ? `
     <div class="box" style="margin-bottom: 16px;">
       <div class="label">GST Tax Breakdown (${exp.gstRate}% GST)</div>
       <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px;">
-        <span>Taxable Value: <strong>${formatINR(exp.taxableAmount)}</strong></span>
-        <span>Total Tax: <strong>${formatINR(exp.taxAmount)}</strong></span>
+        <span>Taxable Value: <strong>${formatINR(readRupeeOr(exp, 'taxableAmount'))}</strong></span>
+        <span>Total Tax: <strong>${formatINR(readRupeeOr(exp, 'taxAmount'))}</strong></span>
         <span>ITC Claimable: <strong>${exp.itcEligible ? 'YES' : 'NO'}</strong></span>
       </div>
     </div>

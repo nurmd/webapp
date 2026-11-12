@@ -1,8 +1,9 @@
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
-import { formatINR, formatDate } from '../utils/formatters.ts';
+import { formatINR } from '../utils/formatters.ts';
 import { formatEWayDate, EWayBillTransportOptions } from './eWayBillExport.ts';
 import { printHtmlDocument } from '../utils/printBridge.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 export interface EWayBillSlipData {
   company: CompanyProfile;
@@ -53,7 +54,7 @@ export function generateEWayBillSlipHtml(
       <td style="padding: 6px 8px; text-align: right;">${formatINR(item.taxableAmount)}</td>
       <td style="padding: 6px 8px; text-align: center;">${item.gstRate}%</td>
       <td style="padding: 6px 8px; text-align: right;">${formatINR((item.cgstAmount || 0) + (item.sgstAmount || 0) + (item.igstAmount || 0) + (item.cessAmount || 0))}</td>
-      <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${formatINR(item.totalAmount)}</td>
+      <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${formatINR(readRupeeOr(item, 'totalAmount'))}</td>
     </tr>
   `
     )
@@ -252,9 +253,9 @@ export function generateEWayBillSlipHtml(
         </table>
 
         <div class="totals-bar">
-          <div>Taxable: ${formatINR(invoice.totalTaxableAmount)}</div>
-          <div>Total Tax: ${formatINR(typeof invoice.totalTax === 'number' ? invoice.totalTax : ((invoice.totalCgst || 0) + (invoice.totalSgst || 0) + (invoice.totalIgst || 0) + (invoice.totalCess || 0)))}</div>
-          <div style="font-size: 12px; font-weight: 900;">Total Invoice Value: ${formatINR(invoice.grandTotal)}</div>
+          <div>Taxable: ${formatINR(readRupeeOr(invoice, 'totalTaxableAmount'))}</div>
+          <div>Total Tax: ${formatINR(typeof invoice.totalTax === 'number' ? readRupeeOr(invoice, 'totalTax') : ((invoice.totalCgst || 0) + (invoice.totalSgst || 0) + (invoice.totalIgst || 0) + (invoice.totalCess || 0)))}</div>
+          <div style="font-size: 12px; font-weight: 900;">Total Invoice Value: ${formatINR(readRupeeOr(invoice, 'grandTotal'))}</div>
         </div>
 
         <!-- PART B: Vehicle & Transporter Details -->
