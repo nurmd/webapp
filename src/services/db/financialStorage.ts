@@ -6,6 +6,7 @@ import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
 import { STORAGE_KEYS, DEFAULT_BANK_ACCOUNTS, DEFAULT_CASH_BANK_TXNS, EMPTY_BANK_ACCOUNTS } from './storageEngine.ts';
 import { ItemStorage } from './itemStorage.ts';
+import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
 
 /**
  * Financial Accounting domain storage.
@@ -19,6 +20,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveVoucher(voucher: Voucher): void {
+    voucher = attachPaiseFields(voucher, 'voucher');
     const list = [...this.getVouchers()];
     const idx = list.findIndex((v) => v.id === voucher.id);
     const prevVoucher = idx >= 0 ? list[idx] : null;
@@ -135,6 +137,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveExpense(expense: Expense): void {
+    expense = attachPaiseFields(expense, 'expense');
     const list = [...this.getExpenses()];
     const idx = list.findIndex((e) => e.id === expense.id);
     if (idx >= 0) {
@@ -166,6 +169,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveBankAccount(account: BankAccount): void {
+    account = attachPaiseFields(account, 'bankAccount');
     const list = [...this.getBankAccounts()];
     const idx = list.findIndex((b) => b.id === account.id);
     if (idx >= 0) {
@@ -196,6 +200,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveCashBankTransaction(txn: CashBankTransaction): void {
+    txn = attachPaiseFields(txn, 'cashBankTxn');
     const list = [...this.getCashBankTransactions()];
     const idx = list.findIndex((t) => t.id === txn.id);
     if (idx >= 0) {
@@ -225,6 +230,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveLoan(loan: LoanAccount): void {
+    loan = attachPaiseFields(loan, 'loan');
     const list = [...this.getLoans()];
     const idx = list.findIndex((l) => l.id === loan.id);
     if (idx >= 0) {
@@ -257,6 +263,7 @@ export class FinancialStorage extends ItemStorage {
   }
 
   saveLoanTransaction(txn: LoanTransaction): void {
+    txn = attachPaiseFields(txn, 'loanTxn');
     const list = [...this.getLoanTransactions()];
     const idx = list.findIndex((t) => t.id === txn.id);
     if (idx >= 0) {

@@ -6,6 +6,7 @@ import { auditTrail } from '../auditTrail.ts';
 import { getFinancialYear } from '../../core/utils/dateFilters.ts';
 import { createRcmJournalVoucher, createReversalVoucher } from '../../core/accounting/ledger.ts';
 import { derivePaymentSettlement } from '../../core/accounting/paymentSplitUtils.ts';
+import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
 import { Voucher, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
 import { applyAllocations, reverseAllocations, inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
 import {
@@ -127,6 +128,8 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         notes: settlement.notes,
       };
     }
+
+    invoice = attachPaiseFields(invoice, 'invoice');
 
     const idx = list.findIndex((inv) => inv.id === invoice.id);
     const prevInvoice = idx >= 0 ? list[idx] : null;
@@ -414,6 +417,8 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         notes: settlement.notes,
       };
     }
+
+    bill = attachPaiseFields(bill, 'purchase');
 
     const list = [...this.getPurchases()];
     const idx = list.findIndex((b) => b.id === bill.id);

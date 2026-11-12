@@ -8,6 +8,7 @@ import {
   findDuplicateParty,
   DuplicateEntityNameError,
 } from '../../core/utils/entityUniqueness.ts';
+import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
 
 /**
  * Party and Customer/Supplier Accounts domain storage.
@@ -16,6 +17,7 @@ import {
  */
 export class PartyStorage extends SettingsStorage {
   saveParty(party: Party, allowDuplicateName?: boolean | { allowDuplicateName?: boolean }): void {
+    party = attachPaiseFields(party, 'party');
     const skipDuplicateCheck =
       typeof allowDuplicateName === 'boolean'
         ? allowDuplicateName
