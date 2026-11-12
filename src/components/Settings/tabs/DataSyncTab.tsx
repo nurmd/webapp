@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import PaiseBackfillCard from '../PaiseBackfillCard.tsx';
 import { PouchSyncState, DEFAULT_COUCHDB_REMOTE_URL, SyncConflict, pouch } from '../../../services/pouchdb.ts';
 import {
   collectSupportDiagnostics,
@@ -1422,6 +1423,8 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
           </div>
         )}
       </section>
+
+      <PaiseBackfillCard />
     </div>
   );
 };
