@@ -313,4 +313,44 @@ describe('PaiseBackfillCard', () => {
     const runBtn = screen.getByTestId('paise-backfill-run') as HTMLButtonElement;
     expect(runBtn.disabled).toBe(true);
   });
+
+  it('7. Divergences collapsible details (W3): renders divergences[] array with data-testid per row', () => {
+    // Seed 1 unmigrated invoice so plan has pending > 0, plus 1 stamped invoice with a tampered twin
+    const tamperedInvoice = {
+      ...sampleInvoice1,
+      id: 'INV-DIV-001',
+      grandTotal: 1000,
+      grandTotalPaise: 9999, // divergence!
+      paiseSchema: 1,
+    };
+    db.set(STORAGE_KEYS.INVOICES, [tamperedInvoice, { ...sampleInvoice2 }]);
+
+    render(<PaiseBackfillCard />);
+
+    fireEvent.click(screen.getByTestId('paise-backfill-check'));
+    fireEvent.click(screen.getByTestId('paise-backfill-run'));
+    fireEvent.click(screen.getByTestId('paise-backfill-confirm'));
+
+    const statusPanel = screen.getByTestId('paise-backfill-status');
+    expect(statusPanel).toBeTruthy();
+
+    const countsEl = screen.getByTestId('paise-backfill-report-counts');
+    expect(countsEl.textContent).toContain('Divergences 1');
+
+    // Divergences collapsible container exists
+    const divergencesDetails = screen.getByTestId('paise-backfill-divergences');
+    expect(divergencesDetails).toBeTruthy();
+
+    // Divergence row exists and has data-testid per row
+    const row = screen.getByTestId('divergence-row');
+    expect(row).toBeTruthy();
+    expect(row.textContent).toContain('invoice');
+    expect(row.textContent).toContain('INV-DIV-001');
+    expect(row.textContent).toContain('grandTotal');
+    expect(row.textContent).toContain('1000');
+    expect(row.textContent).toContain('9999');
+
+    const specificRowTag = screen.getByTestId('divergence-row-INV-DIV-001-grandTotal');
+    expect(specificRowTag).toBeTruthy();
+  });
 });

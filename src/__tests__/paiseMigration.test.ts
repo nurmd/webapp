@@ -28,7 +28,12 @@ import {
   PAISE_MIGRATION_ID,
   scheduleStartupPaiseIntegrityCheck,
 } from '../services/db/paiseMigrationStorage.ts';
-import { hasCurrentPaiseSchema } from '../core/accounting/paisePersistence.ts';
+import {
+  hasCurrentPaiseSchema,
+  verifyPaiseFields,
+} from '../core/accounting/paisePersistence.ts';
+import type { PurchaseBill } from '../models/purchase.ts';
+import type { Voucher } from '../core/accounting/voucherTypes.ts';
 
 const sampleInvoice = {
   id: 'INV-TEST-001',
@@ -432,5 +437,214 @@ describe('Paise Backfill Migration and Integrity Check Suite', () => {
       expect.stringContaining('[PaiseIntegrity] Startup integrity check found')
     );
     warnSpy.mockRestore();
+  });
+
+  it('9. Stale twins repair (W1): stamped document whose rupee value was edited gets repaired rather than skipped', () => {
+    // 1. Initial backfill migration stamps all docs
+    const initReport = db.runPaiseMigration();
+    expect(initReport.success).toBe(true);
+    expect(initReport.totalMigrated).toBe(9);
+
+    // 2. Simulate stale twin on PUR-TEST-001 (Talukder Hardware scenario):
+    // Rupee paidAmount edited 41000 -> 35000, balanceAmount edited 0 -> 6000,
+    // split amount edited 41000 -> 35000 + added credit split 6000, while twins stayed at 4100000 / 0.
+    const purchases = db.getPurchases();
+    const stalePurchase = {
+      ...purchases[0],
+      paidAmount: 35000,
+      balanceAmount: 6000,
+      paidAmountPaise: 4100000, // stale twin
+      balanceAmountPaise: 0,    // stale twin
+      paymentSplits: [
+        { id: 's1', mode: 'CASH', amount: 35000, amountPaise: 4100000 }, // stale twin
+        { id: 's2', mode: 'CREDIT', amount: 6000 },
+      ],
+    };
+    db.set(STORAGE_KEYS.PURCHASES, [stalePurchase]);
+
+    // verifyPaiseIntegrity detects the stale twins
+    const preCheck = db.verifyPaiseIntegrity();
+    expect(preCheck.length).toBeGreaterThan(0);
+    expect(preCheck.some((d) => d.id === stalePurchase.id && d.path === 'paidAmount')).toBe(true);
+
+    // 3. Re-run migration: doc should be repaired, NOT skipped
+    const repairReport = db.runPaiseMigration();
+    expect(repairReport.success).toBe(true);
+    expect(repairReport.totalMigrated).toBe(0);
+    expect(repairReport.totalRepaired).toBe(1);
+    expect(repairReport.totalSkipped).toBe(0);
+    expect(repairReport.totalDivergences).toBeGreaterThan(0);
+
+    // Check entity report
+    const purchaseResult = repairReport.entities.find((e) => e.entity === 'purchase');
+    expect(purchaseResult?.repaired).toBe(1);
+    expect(purchaseResult?.skipped).toBe(0);
+
+    // 4. Verify stored doc now has correct refreshed twins
+    const storedPurchase = db.getPurchases()[0];
+    expect(Reflect.get(storedPurchase, 'paidAmountPaise')).toBe(3500000);
+    expect(Reflect.get(storedPurchase, 'balanceAmountPaise')).toBe(600000);
+    expect((storedPurchase.paymentSplits as any[])[0].amountPaise).toBe(3500000);
+    expect((storedPurchase.paymentSplits as any[])[1].amountPaise).toBe(600000);
+
+    // 5. Subsequent integrity check is clean
+    expect(db.verifyPaiseIntegrity()).toEqual([]);
+  });
+
+  it('10. Sub-paise precision on unitPrice (W2): derived per-unit rate stamps as best-effort projection and is excluded from verify round-trip mismatches', () => {
+    // Seed an invoice with fractional unitPrice (e.g. 733.3333 with 4 decimals from lineTotal / quantity)
+    const fractionalInvoice = {
+      ...sampleInvoice,
+      id: 'INV-FRACTIONAL-001',
+      items: [
+        {
+          itemId: 'ITEM-FRAC-1',
+          name: 'Mustard Oil Fractional',
+          quantity: 1.5,
+          unit: 'LTR',
+          unitPrice: 733.3333, // 4 decimal derived rate
+          discountAmount: 0,
+          taxableAmount: 1100,
+          gstRate: 18,
+          cgstAmount: 99,
+          sgstAmount: 99,
+          utgstAmount: 0,
+          igstAmount: 0,
+          cessAmount: 0,
+          totalAmount: 1298,
+        },
+      ],
+      totalGrossAmount: 1100,
+      totalDiscount: 0,
+      totalTaxableAmount: 1100,
+      totalCgst: 99,
+      totalSgst: 99,
+      totalTax: 198,
+      grandTotal: 1298,
+      balanceAmount: 1298,
+    };
+    db.set(STORAGE_KEYS.INVOICES, [fractionalInvoice]);
+
+    // Backfill migration stamps it
+    const report = db.runPaiseMigration();
+    expect(report.success).toBe(true);
+    expect(report.totalMigrated).toBe(9); // 1 fractional invoice + 8 other seed docs
+    expect(report.totalDivergences).toBe(0);
+    expect(report.totalSkipped).toBe(0);
+
+    // Stored doc has the best-effort integer paise twin for unitPrice
+    const stored = db.getInvoices().find((i) => i.id === 'INV-FRACTIONAL-001')!;
+    expect(hasCurrentPaiseSchema(stored)).toBe(true);
+    expect(stored.items[0].unitPrice).toBe(733.3333);
+    expect((stored.items[0] as any).unitPricePaise).toBe(73333); // Math.round(733.3333 * 100)
+
+    // verifyPaiseIntegrity does not flag unitPrice as a divergence
+    expect(db.verifyPaiseIntegrity()).toEqual([]);
+  });
+
+  it('11. Regression test (W4): editing a purchase payment via savePaymentVoucher -> applyAllocations -> savePurchase refreshes twins to match rupee values', () => {
+    // 1. Create a purchase bill of grandTotal: 41000, initially unpaid
+    const purId = 'PUR-REGRESSION-001';
+    const testPurchase: PurchaseBill = {
+      ...samplePurchase,
+      purchaseType: 'BILL',
+      supplierAddress: '123 Market St',
+      supplierStateCode: '18',
+      placeOfSupplyStateCode: '18',
+      isIntraState: true,
+      itcEligibility: 'ALL_OTHER_ITC',
+      isRcm: false,
+      items: samplePurchase.items.map((it) => ({
+        ...it,
+        hsnSacCode: '1234',
+        unit: 'KGS' as const,
+      })),
+      id: purId,
+      billNumber: 'BILL-TALUKDER-001',
+      supplierId: 'PTY-002',
+      supplierName: 'Beta Suppliers',
+      grandTotal: 41000,
+      paidAmount: 0,
+      balanceAmount: 41000,
+      paymentStatus: 'UNPAID',
+      paymentMode: 'CREDIT',
+      paymentSplits: [{ id: 's-bal', mode: 'CREDIT', amount: 41000 }],
+    };
+    db.savePurchase(testPurchase);
+
+    // Initial payment voucher of 41000 allocates to the purchase
+    const voucherId = 'VOUCHER-TALUKDER-001';
+    const initialVoucher: Voucher = {
+      id: voucherId,
+      voucherNumber: 'PMT-2026-001',
+      date: '2026-11-13',
+      voucherType: 'PAYMENT',
+      partyId: 'PTY-002',
+      partyName: 'Beta Suppliers',
+      totalAmount: 41000,
+      narration: 'Initial full payment',
+      createdAt: '2026-11-13T03:00:00.000Z',
+      entries: [
+        { accountId: 'ACC_SUPPLIER', accountName: 'Beta Suppliers', debit: 41000, credit: 0 },
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 0, credit: 41000 },
+      ],
+      paymentAllocations: [
+        {
+          documentId: purId,
+          documentType: 'PURCHASE',
+          documentNumber: 'BILL-TALUKDER-001',
+          amount: 41000,
+        },
+      ],
+    };
+    db.savePaymentVoucher(initialVoucher);
+
+    // Purchase is now paid in full (41000) with matching twins
+    let storedPur = db.getPurchases().find((p) => p.id === purId)!;
+    expect(storedPur.paidAmount).toBe(41000);
+    expect(storedPur.balanceAmount).toBe(0);
+    expect(Reflect.get(storedPur, 'paidAmountPaise')).toBe(4100000);
+    expect(Reflect.get(storedPur, 'balanceAmountPaise')).toBe(0);
+
+    // 2. Now EDIT the payment voucher from 41000 down to 35000 (Talukder Hardware scenario):
+    // Voucher amount moves 41000 -> 35000.
+    // savePaymentVoucher internally executes:
+    // reverseAllocations -> saveVoucher -> applyAllocations -> savePurchase
+    const editedVoucher: Voucher = {
+      ...initialVoucher,
+      totalAmount: 35000,
+      narration: 'Edited payment: partial 35000',
+      entries: [
+        { accountId: 'ACC_SUPPLIER', accountName: 'Beta Suppliers', debit: 35000, credit: 0 },
+        { accountId: 'ACC_CASH', accountName: 'Cash-in-hand', debit: 0, credit: 35000 },
+      ],
+      paymentAllocations: [
+        {
+          documentId: purId,
+          documentType: 'PURCHASE',
+          documentNumber: 'BILL-TALUKDER-001',
+          amount: 35000,
+        },
+      ],
+    };
+    db.savePaymentVoucher(editedVoucher);
+
+    // 3. Verify the purchase after savePaymentVoucher -> applyAllocations -> savePurchase:
+    storedPur = db.getPurchases().find((p) => p.id === purId)!;
+    expect(storedPur.paidAmount).toBe(35000);
+    expect(storedPur.balanceAmount).toBe(6000);
+    // Crucial: assert the *Paise twins match the rupee values!
+    expect(Reflect.get(storedPur, 'paidAmountPaise')).toBe(3500000);
+    expect(Reflect.get(storedPur, 'balanceAmountPaise')).toBe(600000);
+    expect(storedPur.paymentSplits?.length).toBeGreaterThan(0);
+    const split0 = storedPur.paymentSplits![0];
+    expect(split0.amount).toBe(35000);
+    expect((split0 as any).amountPaise).toBe(3500000);
+    const split1 = storedPur.paymentSplits![1];
+    expect(split1.amount).toBe(6000);
+    expect((split1 as any).amountPaise).toBe(600000);
+
+    // Integrity check clean
+    expect(verifyPaiseFields(storedPur)).toEqual([]);
   });
 });

@@ -38,6 +38,7 @@ export interface PaiseMigrationDivergence {
 export interface PaiseMigrationEntityResult {
   entity: string;
   migrated: number;
+  repaired: number;
   skipped: number;
   divergences: PaiseMigrationDivergence[];
 }
@@ -51,8 +52,10 @@ export interface PaiseMigrationReport {
   finishedAt: string;
   entities: PaiseMigrationEntityResult[];
   totalMigrated: number;
+  totalRepaired: number;
   totalSkipped: number;
   totalDivergences: number;
+  divergences?: PaiseMigrationDivergence[];
   abortedReason?: string;
 }
 
@@ -198,6 +201,7 @@ export class PaiseMigrationStorage extends SyncStorage {
       const entityResults: PaiseMigrationEntityResult[] = plan.entities.map((p) => ({
         entity: p.entity,
         migrated: 0,
+        repaired: 0,
         skipped: p.pending,
         divergences: [],
       }));
@@ -208,8 +212,10 @@ export class PaiseMigrationStorage extends SyncStorage {
         finishedAt: new Date().toISOString(),
         entities: entityResults,
         totalMigrated: 0,
+        totalRepaired: 0,
         totalSkipped: plan.totalPending,
         totalDivergences: 0,
+        divergences: [],
         abortedReason: 'DRY_RUN',
       };
     }
@@ -229,14 +235,17 @@ export class PaiseMigrationStorage extends SyncStorage {
         finishedAt: new Date().toISOString(),
         entities: [],
         totalMigrated: 0,
+        totalRepaired: 0,
         totalSkipped: 0,
         totalDivergences: 0,
+        divergences: [],
         abortedReason: `BACKUP_FAILED: ${msg}`,
       };
     }
 
     const entityResults: PaiseMigrationEntityResult[] = [];
     let totalMigrated = 0;
+    let totalRepaired = 0;
     let totalSkipped = 0;
     let totalDivergences = 0;
 
@@ -244,6 +253,7 @@ export class PaiseMigrationStorage extends SyncStorage {
       const originalDocs = config.getDocs(this);
       const clonedList: MigratableDoc[] = [...originalDocs];
       let entityMigrated = 0;
+      let entityRepaired = 0;
       let entitySkipped = 0;
       const entityDivergences: PaiseMigrationDivergence[] = [];
       const changedBatch: MigratableDoc[] = [];
@@ -273,7 +283,19 @@ export class PaiseMigrationStorage extends SyncStorage {
               paise: m.paise,
             });
           }
-          entitySkipped++;
+          const repaired = attachPaiseFields(doc, config.kind);
+          const remainingMismatches = verifyPaiseFields(repaired);
+          if (remainingMismatches.length > 0) {
+            entitySkipped++;
+            continue;
+          }
+          clonedList[i] = repaired;
+          entityRepaired++;
+          changedBatch.push(repaired);
+
+          if (changedBatch.length >= batchSize) {
+            flushBatch();
+          }
           continue;
         }
 
@@ -305,16 +327,20 @@ export class PaiseMigrationStorage extends SyncStorage {
       flushBatch();
 
       totalMigrated += entityMigrated;
+      totalRepaired += entityRepaired;
       totalSkipped += entitySkipped;
       totalDivergences += entityDivergences.length;
 
       entityResults.push({
         entity: config.entity,
         migrated: entityMigrated,
+        repaired: entityRepaired,
         skipped: entitySkipped,
         divergences: entityDivergences,
       });
     }
+
+    const allDivergences = entityResults.flatMap((e) => e.divergences);
 
     return {
       success: true,
@@ -325,8 +351,10 @@ export class PaiseMigrationStorage extends SyncStorage {
       finishedAt: new Date().toISOString(),
       entities: entityResults,
       totalMigrated,
+      totalRepaired,
       totalSkipped,
       totalDivergences,
+      divergences: allDivergences,
     };
   }
 

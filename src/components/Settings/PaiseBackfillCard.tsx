@@ -25,8 +25,10 @@ export default function PaiseBackfillCard(): React.ReactElement {
         finishedAt: new Date().toISOString(),
         entities: [],
         totalMigrated: 0,
+        totalRepaired: 0,
         totalSkipped: 0,
         totalDivergences: 0,
+        divergences: [],
         abortedReason: msg,
       });
     }
@@ -54,14 +56,20 @@ export default function PaiseBackfillCard(): React.ReactElement {
         finishedAt: new Date().toISOString(),
         entities: [],
         totalMigrated: 0,
+        totalRepaired: 0,
         totalSkipped: 0,
         totalDivergences: 0,
+        divergences: [],
         abortedReason: msg,
       });
     } finally {
       setIsRunning(false);
     }
   };
+
+  const reportDivergences = report
+    ? report.divergences ?? report.entities.flatMap((e) => e.divergences)
+    : [];
 
   return (
     <section
@@ -202,7 +210,7 @@ export default function PaiseBackfillCard(): React.ReactElement {
                   data-testid="paise-backfill-report-counts"
                   className="font-semibold text-xs"
                 >
-                  Migrated {report.totalMigrated} · Skipped {report.totalSkipped} · Divergences {report.totalDivergences}
+                  Migrated {report.totalMigrated} · Repaired {report.totalRepaired} · Skipped {report.totalSkipped} · Divergences {report.totalDivergences}
                 </span>
               </div>
               {report.backupId && (
@@ -210,6 +218,47 @@ export default function PaiseBackfillCard(): React.ReactElement {
                   Backup {report.backupId}
                   {report.backupChecksum ? ` (${report.backupChecksum.slice(0, 12)})` : ''}
                 </div>
+              )}
+              {reportDivergences.length > 0 && (
+                <details
+                  data-testid="paise-backfill-divergences"
+                  className="mt-2 pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 text-xs"
+                >
+                  <summary
+                    data-testid="paise-backfill-divergences-toggle"
+                    className="font-semibold text-xs cursor-pointer select-none py-1 flex items-center justify-between"
+                  >
+                    <span>Divergences ({reportDivergences.length})</span>
+                    <span className="text-[10px] uppercase font-mono opacity-80">Toggle</span>
+                  </summary>
+                  <div
+                    data-testid="paise-backfill-divergences-list"
+                    className="mt-1.5 space-y-1 max-h-60 overflow-y-auto divide-y divide-emerald-200/40 dark:divide-emerald-900/30 font-mono text-[11px]"
+                  >
+                    {reportDivergences.map((div, idx) => (
+                      <div
+                        key={`${div.entity}-${div.id}-${div.path}-${idx}`}
+                        data-testid="divergence-row"
+                        className="pt-1.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            data-testid={`divergence-row-${div.id}-${div.path}`}
+                            className="font-bold uppercase text-[10px] px-1 rounded bg-black/5 dark:bg-white/10"
+                          >
+                            {div.entity}
+                          </span>
+                          <span className="font-semibold">{div.id}</span>
+                          <span className="opacity-75">{div.path}</span>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-90 text-[10px] sm:text-[11px]">
+                          <span>rupee: <strong>{div.rupee}</strong></span>
+                          <span>paise: <strong>{div.paise}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               )}
             </>
           ) : (

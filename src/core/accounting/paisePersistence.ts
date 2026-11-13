@@ -174,6 +174,14 @@ function detectKind(doc: Record<string, unknown>): PaisePersistKind | null {
   return null;
 }
 
+/**
+ * Fields that are derived rates (not stored monetary amounts) and can legitimately
+ * carry sub-paise precision (e.g. unitPrice = lineTotal / quantity with fractional quantities).
+ * Stamped as best-effort integer paise projections by attachPaiseFields, but excluded
+ * from the exact fromPaise(toPaise(x)) === x round-trip check.
+ */
+const VERIFY_EXCLUDED_FIELDS = new Set(['unitPrice']);
+
 export function verifyPaiseFields(doc: unknown): PaiseFieldMismatch[] {
   if (!doc || typeof doc !== 'object') {
     return [];
@@ -193,6 +201,9 @@ export function verifyPaiseFields(doc: unknown): PaiseFieldMismatch[] {
   const mismatches: PaiseFieldMismatch[] = [];
 
   for (const field of config.topFields) {
+    if (VERIFY_EXCLUDED_FIELDS.has(field)) {
+      continue;
+    }
     const rupee = docObj[field];
     const paise = docObj[`${field}Paise`];
     if (typeof rupee === 'number' && Number.isFinite(rupee) && typeof paise === 'number' && Number.isFinite(paise)) {
@@ -210,6 +221,9 @@ export function verifyPaiseFields(doc: unknown): PaiseFieldMismatch[] {
           if (item && typeof item === 'object') {
             const itemObj = item as Record<string, unknown>;
             for (const field of nestedFields) {
+              if (VERIFY_EXCLUDED_FIELDS.has(field)) {
+                continue;
+              }
               const rupee = itemObj[field];
               const paise = itemObj[`${field}Paise`];
               if (
