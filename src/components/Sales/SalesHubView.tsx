@@ -1012,7 +1012,7 @@ const SalesHubViewComponent: React.FC<SalesHubViewProps> = ({
                     type="number"
                     required
                     min="1"
-                    value={paymentAmount}
+                    value={paymentAmount || ''}
                     onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 rounded-xl border border-outline-variant bg-surface text-on-surface font-extrabold text-lg focus:outline-none focus:ring-2 focus:ring-secondary/40"
                   />
