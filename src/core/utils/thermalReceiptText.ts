@@ -55,7 +55,7 @@ export function buildThermalReceiptData(
       : thermalSettings.receiptTitle,
     invoiceNo: invoice.invoiceNumber,
     date: invoice.date,
-    customerName: invoice.partyName,
+    customerName: party?.name || invoice.partyName,
     customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
     items: invoice.items.map((i) => {
       const stored = Number(i.unitPriceInclusive);

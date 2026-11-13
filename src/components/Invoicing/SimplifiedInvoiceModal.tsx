@@ -213,7 +213,7 @@ export const SimplifiedInvoiceModal: React.FC<SimplifiedInvoiceModalProps> = ({
         {isGstActive && (
           <div className="flex items-center justify-between text-[11px] text-on-surface-variant bg-surface-container-low/70 py-1.5 px-2.5 rounded-xl">
             <span>
-              GSTIN: <strong className="font-mono text-on-surface">{invoice.partyGstin || 'Unregistered'}</strong>
+              GSTIN: <strong className="font-mono text-on-surface">{party?.gstin || invoice.partyGstin || 'Unregistered'}</strong>
             </span>
             <span>
               POS: <strong className="text-on-surface">State {invoice.placeOfSupplyStateCode || company.stateCode}</strong>

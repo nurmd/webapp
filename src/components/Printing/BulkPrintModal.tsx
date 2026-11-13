@@ -1,5 +1,6 @@
 import React from 'react';
 import { Invoice } from '../../models/invoice.ts';
+import { db } from '../../services/db.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -89,8 +90,17 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
           {docs.map((doc, idx) => {
             const isInv = 'invoiceNumber' in doc;
             const docNumber = isInv ? (doc as Invoice).invoiceNumber : (doc as PurchaseBill).billNumber;
-            const partyName = isInv ? (doc as Invoice).partyName : (doc as PurchaseBill).supplierName;
-            const partyGst = isInv ? (doc as Invoice).partyGstin : (doc as PurchaseBill).supplierGstin;
+            // Pull live party details so edited party info reflects in the print
+            // instead of the stale snapshot captured on the bill.
+            const liveInvParty = isInv && (doc as Invoice).partyId
+              ? db.getParties().find((pp) => pp.id === (doc as Invoice).partyId)
+              : null;
+            const partyName = isInv
+              ? (liveInvParty?.name || (doc as Invoice).partyName)
+              : (doc as PurchaseBill).supplierName;
+            const partyGst = isInv
+              ? (liveInvParty?.gstin || (doc as Invoice).partyGstin)
+              : (doc as PurchaseBill).supplierGstin;
             const docDate = doc.date;
             const docType = isInv ? (doc as Invoice).invoiceType || 'TAX INVOICE' : 'PURCHASE BILL';
             const items = (doc.items || []) as any[];
@@ -149,8 +159,8 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({
                     </span>
                     <p className="font-bold text-neutral-950 text-xs">{partyName || 'Cash Customer'}</p>
                     {partyGst && <p className="font-mono text-neutral-700">GSTIN: {partyGst}</p>}
-                    {isInv && (doc as Invoice).partyPhone && (
-                      <p className="text-neutral-600">Phone: {(doc as Invoice).partyPhone}</p>
+                    {isInv && (liveInvParty?.phone || (doc as Invoice).partyPhone) && (
+                      <p className="text-neutral-600">Phone: {liveInvParty?.phone || (doc as Invoice).partyPhone}</p>
                     )}
                   </div>
                   <div className="text-right">

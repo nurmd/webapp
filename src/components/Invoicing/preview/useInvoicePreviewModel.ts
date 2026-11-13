@@ -67,6 +67,19 @@ export function useInvoicePreviewModel(input: UseInvoicePreviewModelInput) {
     );
   }, [invoice.partyId, invoice.partyName]);
 
+  // Pull live party details so edited party info (name, phone, GSTIN, address)
+  // reflects in previews/prints instead of the stale snapshot on the bill.
+  const enrichedInvoice = useMemo(() => {
+    if (!party) return invoice;
+    return {
+      ...invoice,
+      partyName: party.name || invoice.partyName,
+      partyPhone: party.phone || invoice.partyPhone,
+      partyGstin: party.gstin || invoice.partyGstin,
+      partyAddress: party.billingAddress || invoice.partyAddress,
+    };
+  }, [invoice, party]);
+
   const totalBalanceDue = useMemo(() => {
     return getPartyTotalBalanceDue(party) ?? invoice.balanceAmount;
   }, [party, invoice.balanceAmount]);
@@ -305,7 +318,7 @@ export function useInvoicePreviewModel(input: UseInvoicePreviewModelInput) {
         : resolveReceiptTitle(thermalSettings.receiptTitle, company.isCompositionScheme, Boolean(company.gstin)),
       invoiceNo: invoice.invoiceNumber,
       date: formatDate(invoice.date),
-      customerName: invoice.partyName,
+      customerName: party?.name || invoice.partyName,
       customerPhone: party?.phone || (invoice.partyAddress?.match(/\b[6-9]\d{9}\b/)?.[0]),
       items: itemsList.map((i) => ({
         name: i.name,
@@ -353,7 +366,7 @@ export function useInvoicePreviewModel(input: UseInvoicePreviewModelInput) {
     company,
     hasItems,
     rawItems,
-    invoice,
+    invoice: enrichedInvoice,
     sellerStateObj,
     buyerStateObj,
     posStateCode,

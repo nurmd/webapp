@@ -14,6 +14,7 @@ import {
   getWhatsAppPhoneErrorMessage,
 } from '../../core/utils/whatsappIntent.ts';
 import { isDemoModeActive } from '../../core/utils/demoMode.ts';
+import { db } from '../../services/db.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import {
@@ -103,7 +104,23 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     }
   }, [previewMode]);
 
+  // Pull the live party from storage so edited party details (name, phone,
+  // GSTIN, address, balance) reflect in the share instead of the stale
+  // snapshot captured on the bill at creation time.
+  const liveParty = useMemo<Party | undefined>(() => {
+    if (invoice?.partyId) {
+      try {
+        const found = db.getParties().find((pp) => pp.id === invoice.partyId);
+        if (found) return found;
+      } catch {
+        // Fall through to the passed-in party / invoice snapshot.
+      }
+    }
+    return party;
+  }, [invoice?.partyId, party]);
+
   const defaultPhone =
+    (liveParty?.phone && liveParty.phone.trim()) ||
     (initialPhone && initialPhone.trim()) ||
     (invoice?.partyPhone && invoice.partyPhone.trim()) ||
     (party?.phone && party.phone.trim()) ||
@@ -140,22 +157,22 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     if (typeof initialTotalBalanceDue === 'number' && Number.isFinite(initialTotalBalanceDue)) {
       return Math.max(0, initialTotalBalanceDue);
     }
-    const fromParty = getPartyTotalBalanceDue(party);
+    const fromParty = getPartyTotalBalanceDue(liveParty);
     if (fromParty !== null) {
       return fromParty;
     }
     return undefined;
-  }, [initialTotalBalanceDue, party]);
+  }, [initialTotalBalanceDue, liveParty]);
 
   const { text: builtInvoiceText, whatsappUrl: defaultWhatsappUrl } = useMemo(() => {
     return buildWhatsAppMessage(
       company,
       {
         invoice,
-        party,
+        party: liveParty,
         balanceAmount: initialBalance,
         totalBalanceDue: resolvedTotalBalanceDue,
-        partyName: initialPartyName,
+        partyName: liveParty?.name || initialPartyName,
         partyPhone: phone,
       },
       {
@@ -165,7 +182,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         overdueDays,
       }
     );
-  }, [company, invoice, party, initialBalance, resolvedTotalBalanceDue, initialPartyName, phone, template, language, customNote, overdueDays]);
+  }, [company, invoice, liveParty, initialBalance, resolvedTotalBalanceDue, initialPartyName, phone, template, language, customNote, overdueDays]);
 
   const text = paymentShareText || builtInvoiceText;
 
@@ -281,7 +298,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         blob = await renderThermalReceiptImage(receiptText, width);
         fileName = `Receipt-${paymentReceiptParams.docNumber || 'Payment'}.png`;
 
-        const resolvedPartyDue = party ? getPartyTotalBalanceDue(party) : null;
+        const resolvedPartyDue = liveParty ? getPartyTotalBalanceDue(liveParty) : null;
         const partyBalanceVal =
           resolvedPartyDue !== null
             ? resolvedPartyDue
