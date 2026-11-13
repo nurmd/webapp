@@ -824,7 +824,7 @@ export const DataSyncTab: React.FC<DataSyncTabProps> = ({
                         disabled={isSyncStarting}
                         className="px-3 py-1.5 rounded-xl bg-secondary/15 hover:bg-secondary/25 text-on-secondary-container font-label-md text-xs font-bold shadow-sm active:scale-95 transition-transform cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                       >
-                        Reset connection & retry
+                        Repair sync
                       </button>
                     </div>
                   </div>

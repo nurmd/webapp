@@ -43,6 +43,45 @@ import {
 } from './db/localDbConstants.ts';
 
 /**
+ * Rejects if `promise` does not settle within `ms`. The underlying operation is
+ * abandoned (it may still be pending in the browser), which is acceptable for
+ * recovery probes and bounded queue drains.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
+ * Bounded timeouts used by {@link PouchService.repairLocalDatabase}. Exposed so
+ * tests can shrink them; production uses the defaults.
+ */
+export interface RepairTimeouts {
+  probeMs: number;
+  closeMs: number;
+  destroyMs: number;
+  restoreMs: number;
+}
+
+export const DEFAULT_REPAIR_TIMEOUTS: RepairTimeouts = {
+  probeMs: 3000,
+  closeMs: 3000,
+  destroyMs: 8000,
+  restoreMs: 120000,
+};
+
+/**
  * Computes deterministic 32-bit FNV-1a hex hash of a string.
  */
 export function computeUrlHash(url: string): string {
@@ -243,6 +282,39 @@ export class PouchService {
   private activeDbName: string = DEFAULT_LOCAL_DB_NAME;
   private isDrainingWriteQueue: boolean = false;
   private writeQueueTimer: any = null;
+  /** Per-entry cap for a single queue replay. A wedged store trips this. */
+  private writeQueueEntryTimeoutMs = 5000;
+  /** Set when the drain breaker trips; schedules a long backoff instead of churn. */
+  private writeQueueBreakerTripped = false;
+  /** Physical IndexedDB replica epoch; see POUCH_PERSIST_KEYS.DB_EPOCH. */
+  private localDbEpoch = 0;
+
+  private static epochKey(dbName: string): string {
+    return `${POUCH_PERSIST_KEYS.DB_EPOCH}_${dbName}`;
+  }
+
+  private static loadLocalDbEpoch(dbName: string): number {
+    try {
+      const raw = localStorage.getItem(PouchService.epochKey(dbName));
+      const parsed = raw ? Number.parseInt(raw, 10) : 0;
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private static persistLocalDbEpoch(dbName: string, epoch: number): void {
+    try {
+      localStorage.setItem(PouchService.epochKey(dbName), String(epoch));
+    } catch {
+      // best effort
+    }
+  }
+
+  /** Physical PouchDB/IndexedDB name for a logical database name. */
+  private static physicalDbName(dbName: string, epoch: number): string {
+    return epoch > 0 ? `${dbName}__r${epoch}` : dbName;
+  }
 
   public getWriteQueueHealth(): WriteQueueHealth {
     return getWriteQueueHealth(this.activeDbName);
@@ -299,7 +371,8 @@ export class PouchService {
       }
       activePouchInstance.activeDbName = localDbName;
       try {
-        activePouchInstance.localDB = new PouchDB(localDbName, { auto_compaction: true });
+        activePouchInstance.localDbEpoch = PouchService.loadLocalDbEpoch(localDbName);
+        activePouchInstance.localDB = activePouchInstance.createLocalDb(localDbName);
         activePouchInstance.setupChangesListener();
       } catch {}
       activePouchInstance.scheduleWriteQueueDrain();
@@ -456,7 +529,8 @@ export class PouchService {
       writeQueue: getWriteQueueHealth(this.activeDbName),
     };
     try {
-      this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
+      this.localDbEpoch = PouchService.loadLocalDbEpoch(this.activeDbName);
+      this.localDB = this.createLocalDb();
       this.setupChangesListener();
     } catch {
       this.localDB = {
@@ -674,7 +748,13 @@ export class PouchService {
       this.persistLastSyncedAt(partial.lastSyncedAt);
     }
     const writeQueue = partial.writeQueue ?? getWriteQueueHealth(this.activeDbName);
-    this.currentState = { ...this.currentState, ...partial, writeQueue };
+    // The durable queue is the truthful floor for "work not yet pushed". Previously
+    // this stayed at 0 while hundreds of writes were stuck, so diagnostics claimed
+    // everything was fine. Explicit values (e.g. 0 after a clean sync) still win.
+    const derivedPending = writeQueue.pending;
+    const pendingChanges =
+      partial.pendingChanges ?? Math.max(this.currentState.pendingChanges || 0, derivedPending);
+    this.currentState = { ...this.currentState, ...partial, pendingChanges, writeQueue };
     this.listeners.forEach((l) => l(this.currentState));
   }
 
@@ -1146,13 +1226,225 @@ export class PouchService {
     this.notifySyncState();
   }
 
-  public async resetLocalDbAndRetry(): Promise<void> {
+  /**
+   * Non-destructive health probe: write, read and remove a throwaway document.
+   * A wedged IndexedDB makes this hang, which is exactly what we want to detect.
+   */
+  private async probeLocalDb(ms: number = 3000): Promise<boolean> {
+    const probeId = `health:probe-${Date.now()}`;
     try {
-      this.localDB = new PouchDB(this.activeDbName, { auto_compaction: true });
-    } catch (err) {
-      console.warn('[PouchDB] Failed to recreate local database handle:', err);
+      await withTimeout(
+        (async () => {
+          await this.localDB.put({ _id: probeId, docType: 'health', at: new Date().toISOString() });
+          const doc = await this.localDB.get(probeId);
+          await this.localDB.remove(doc);
+        })(),
+        ms,
+        'local DB health probe',
+      );
+      return true;
+    } catch {
+      return false;
     }
-    await this.retryWriteQueueNow();
+  }
+
+  /** Factory for the local handle; overridable in tests. */
+  protected createLocalDb(
+    name: string = this.activeDbName,
+    epoch: number = this.localDbEpoch,
+  ): PouchDB.Database {
+    return new PouchDB(PouchService.physicalDbName(name, epoch), { auto_compaction: true });
+  }
+
+  /**
+   * Closes the handle so any pending/abandoned IndexedDB transactions are aborted,
+   * then opens a fresh one.
+   */
+  private async reopenLocalDb(closeMs: number = DEFAULT_REPAIR_TIMEOUTS.closeMs): Promise<void> {
+    try {
+      await withTimeout(this.localDB.close(), closeMs, 'close');
+    } catch {
+      // close() can hang on a wedged store; open a new handle regardless
+    }
+    this.localDB = this.createLocalDb(this.activeDbName);
+  }
+
+  /**
+   * Releases every live handle on the local database (sync handler + live changes
+   * feed). The changes feed holds an open IndexedDB connection, which blocks
+   * `deleteDatabase` — so it must be cancelled before any rebuild.
+   */
+  private releaseLocalHandles(): void {
+    try {
+      this.syncHandler?.cancel();
+    } catch {
+      // ignore
+    }
+    this.syncHandler = null;
+    try {
+      this.changesHandler?.cancel();
+    } catch {
+      // ignore
+    }
+    this.changesHandler = null;
+  }
+
+  /**
+   * Deletes the local replica. Tries PouchDB.destroy() first, then falls back to a
+   * raw IndexedDB delete, which can still succeed when destroy() is blocked by a
+   * stuck connection.
+   */
+  private async destroyLocalDb(
+    closeMs: number = DEFAULT_REPAIR_TIMEOUTS.closeMs,
+    destroyMs: number = DEFAULT_REPAIR_TIMEOUTS.destroyMs,
+  ): Promise<boolean> {
+    this.releaseLocalHandles();
+    try {
+      await withTimeout(this.localDB.close(), closeMs, 'close');
+    } catch (err: any) {
+      console.warn('[PouchDB] close() during repair:', err?.message || String(err));
+    }
+    try {
+      await withTimeout(this.localDB.destroy(), destroyMs, 'destroy');
+      return true;
+    } catch (err: any) {
+      console.warn('[PouchDB] destroy() failed, falling back to IndexedDB delete:', err?.message || String(err));
+    }
+    if (typeof indexedDB === 'undefined') return false;
+    const physicalName = PouchService.physicalDbName(this.activeDbName, this.localDbEpoch);
+    try {
+      return await withTimeout(
+        new Promise<boolean>((resolve) => {
+          let settled = false;
+          const finish = (ok: boolean) => {
+            if (settled) return;
+            settled = true;
+            resolve(ok);
+          };
+          const req = indexedDB.deleteDatabase(physicalName);
+          req.onsuccess = () => finish(true);
+          req.onerror = () => finish(false);
+          // Another connection is still open. Do not claim success: the old data
+          // would survive and the store stays wedged. Retry once after a pause.
+          req.onblocked = () => {
+            console.warn('[PouchDB] IndexedDB delete blocked by an open connection.');
+            setTimeout(() => {
+              try {
+                const retry = indexedDB.deleteDatabase(physicalName);
+                retry.onsuccess = () => finish(true);
+                retry.onerror = () => finish(false);
+                retry.onblocked = () => finish(false);
+              } catch {
+                finish(false);
+              }
+            }, 1500);
+          };
+        }),
+        destroyMs,
+        'indexedDB.deleteDatabase',
+      );
+    } catch (err: any) {
+      console.warn('[PouchDB] IndexedDB delete failed:', err?.message || String(err));
+      return false;
+    }
+  }
+
+  /**
+   * Pull-only restore of the local replica from the cloud database. Pushing is
+   * handled afterwards by the normal write-queue drain, which preserves revs.
+   */
+  private async pullFromRemote(restoreMs: number = DEFAULT_REPAIR_TIMEOUTS.restoreMs): Promise<boolean> {
+    if (!this.shouldSync()) return false;
+    const savedRemote = this.getStoredRemoteUrl();
+    if (!savedRemote) return false;
+    try {
+      const remoteDB = this.createRemoteDB(savedRemote);
+      await withTimeout(PouchDB.replicate(remoteDB, this.localDB, { batch_size: 100 }), restoreMs, 'restore replication');
+      return true;
+    } catch (err) {
+      console.warn('[PouchDB] Restore replication failed:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Repairs a wedged local PouchDB/IndexedDB store, then replays the write queue.
+   *
+   * Escalates in two tiers:
+   *   1. Close + reopen the handle (aborts abandoned transactions).
+   *   2. Destroy and rebuild the replica, then pull the authoritative state back
+   *      down from CouchDB. The write queue is preserved and replayed afterwards,
+   *      so local edits that never reached the cloud are still applied.
+   */
+  public async repairLocalDatabase(
+    opts: Partial<RepairTimeouts> = {},
+  ): Promise<{ ok: boolean; rebuilt: boolean; pending: number }> {
+    const t: RepairTimeouts = { ...DEFAULT_REPAIR_TIMEOUTS, ...opts };
+    this.isDrainingWriteQueue = true; // hold the drain off while we operate
+    this.writeQueueBreakerTripped = false;
+    try {
+      if (this.writeQueueTimer) {
+        clearTimeout(this.writeQueueTimer);
+        this.writeQueueTimer = null;
+      }
+      this.notifySyncState({ status: 'connecting' });
+
+      let healthy = await this.probeLocalDb(t.probeMs);
+
+      // Tier 1: drop the handle so abandoned IndexedDB transactions are aborted.
+      if (!healthy) {
+        await this.reopenLocalDb(t.closeMs);
+        healthy = await this.probeLocalDb(t.probeMs);
+      }
+
+      // Tier 2: the store itself is unusable. Rebuild it and restore from cloud.
+      let rebuilt = false;
+      if (!healthy) {
+        console.warn('[PouchDB] Local database unresponsive; rebuilding replica.');
+        const destroyed = await this.destroyLocalDb(t.closeMs, t.destroyMs);
+        if (!destroyed) {
+          // The replica cannot even be deleted because the handle will not close.
+          // Abandon it in place and move to a fresh physical IndexedDB name. The
+          // logical name — and therefore the write queue — is unchanged.
+          this.localDbEpoch += 1;
+          PouchService.persistLocalDbEpoch(this.activeDbName, this.localDbEpoch);
+          console.warn(
+            `[PouchDB] Replica could not be deleted; switching to fresh physical database (epoch ${this.localDbEpoch}).`,
+          );
+        }
+        this.localDB = this.createLocalDb();
+        if (this.shouldSync()) {
+          const restored = await this.pullFromRemote(t.restoreMs);
+          if (!restored) {
+            console.warn(
+              '[PouchDB] Replica rebuilt but cloud restore did not complete; the next sync will refill it.',
+            );
+          }
+        }
+        rebuilt = true;
+        healthy = await this.probeLocalDb(t.probeMs);
+        console.warn(
+          `[PouchDB] Rebuild complete deleted=${destroyed} healthy=${healthy} sync=${this.shouldSync()}`,
+        );
+      }
+
+      console.warn(
+        `[PouchDB] Repair finished healthy=${healthy} rebuilt=${rebuilt} pending=${readQueue(this.activeDbName).length}`,
+      );
+      return { ok: healthy, rebuilt, pending: readQueue(this.activeDbName).length };
+    } finally {
+      this.isDrainingWriteQueue = false;
+      this.writeQueueBreakerTripped = false;
+      makeAllWritesDue(this.activeDbName);
+      // destroyLocalDb() cancels the live changes feed; restore it so UI updates resume.
+      this.setupChangesListener();
+      this.notifySyncState({ status: this.shouldSync() ? 'syncing' : 'offline' });
+      void this.drainWriteQueue();
+    }
+  }
+
+  public async resetLocalDbAndRetry(): Promise<void> {
+    await this.repairLocalDatabase();
   }
 
   private async drainWriteQueue(): Promise<void> {
@@ -1162,25 +1454,57 @@ export class PouchService {
     this.isDrainingWriteQueue = true;
     try {
       const due = getDueWrites(this.activeDbName);
+      if (due.length === 0) {
+        this.notifySyncState();
+        return;
+      }
+
+      // Consecutive timeouts mean the local store is wedged, not that individual
+      // documents are bad. Stop early instead of burning 5s per entry for minutes.
+      let consecutiveTimeouts = 0;
+      const MAX_CONSECUTIVE_TIMEOUTS = 5;
+
       for (const entry of due) {
         const entryKey = entry.key || `${entry.op}:${entry.type}:${entry.id}`;
         try {
-          if (entry.op === 'PUT') {
-            await this.persistDoc(entry.type, entry.doc as any);
-          } else {
-            await this.persistDelete(entry.type, entry.id);
-          }
+          const work =
+            entry.op === 'PUT'
+              ? this.persistDoc(entry.type, entry.doc as any)
+              : this.persistDelete(entry.type, entry.id);
+          await withTimeout(work, this.writeQueueEntryTimeoutMs, 'write queue persist');
+          consecutiveTimeouts = 0;
+          this.writeQueueBreakerTripped = false;
           removeWrite(this.activeDbName, entryKey);
         } catch (err: any) {
+          const isTimeout = /timed out/i.test(err?.message || '');
           const is409 = err && (err.status === 409 || err.name === 'conflict');
           if (is409) {
             removeWrite(this.activeDbName, entryKey);
+            continue;
+          }
+          if (isTimeout) {
+            consecutiveTimeouts += 1;
           } else {
-            recordFailure(this.activeDbName, entryKey, err?.message || String(err));
+            consecutiveTimeouts = 0;
+            console.warn(
+              `[PouchDB] Write queue entry failed (${entry.type}/${entry.id}):`,
+              err?.message || String(err),
+            );
+          }
+          recordFailure(this.activeDbName, entryKey, err?.message || String(err));
+
+          if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+            this.writeQueueBreakerTripped = true;
+            console.warn(
+              '[PouchDB] Local store appears unresponsive ' +
+                `(${consecutiveTimeouts} consecutive timeouts); pausing drain. ` +
+                'Run "Repair sync" from Settings to rebuild the local replica.',
+            );
+            break;
           }
         }
       }
-      this.notifySyncState();
+      this.notifySyncState({ pendingChanges: readQueue(this.activeDbName).length });
     } catch (drainErr) {
       console.warn('[PouchDB] Write queue drain error:', drainErr);
     } finally {
@@ -1201,7 +1525,11 @@ export class PouchService {
 
     const now = Date.now();
     const earliest = Math.min(...queue.map((e) => e.nextAttemptAt));
-    const delay = Math.max(500, Math.min(30000, earliest - now));
+    // A tripped breaker means the store is wedged; retrying every few seconds just
+    // churns IndexedDB. Back off hard until the user repairs or the app restarts.
+    const delay = this.writeQueueBreakerTripped
+      ? 60000
+      : Math.max(500, Math.min(30000, earliest - now));
 
     this.writeQueueTimer = setTimeout(() => {
       this.writeQueueTimer = null;

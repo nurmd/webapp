@@ -782,7 +782,7 @@ describe('Truthful Data & Sync Status Suite', () => {
 
       const resetBtn = container!.querySelector('[data-testid="sync-write-queue-reset"]');
       expect(resetBtn).not.toBeNull();
-      expect(resetBtn!.textContent).toBe('Reset connection & retry');
+      expect(resetBtn!.textContent).toBe('Repair sync');
 
       expect(container!.textContent).toContain('invoice: Storage quota exceeded ×2');
 

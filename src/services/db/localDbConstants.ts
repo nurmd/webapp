@@ -15,6 +15,14 @@ export const POUCH_PERSIST_KEYS = {
   LAST_HYDRATED_DB: 'gst_last_hydrated_db',
   PENDING_DEMO_LOAD: 'gst_pending_demo_load',
   LAST_SYNCED_AT: 'gst_pouch_last_synced_at',
+  /**
+   * Per-database physical-index epoch. When a local IndexedDB replica becomes
+   * unusable (and cannot even be deleted because the handle will not close), the
+   * replica is abandoned in place and a fresh physical name is used instead. The
+   * logical database name — and therefore the write queue and sync bookkeeping —
+   * is unchanged.
+   */
+  DB_EPOCH: 'gst_pouch_db_epoch',
 } as const;
 
 export const LOCAL_DATABASES_REGISTRY_KEY = 'gst_local_databases';
