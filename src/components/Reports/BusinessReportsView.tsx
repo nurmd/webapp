@@ -328,6 +328,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
         dueDate: i.dueDate,
         date: i.date,
         balanceDue: i.balanceAmount !== undefined ? i.balanceAmount : i.grandTotal - (i.paidAmount || 0),
+        ...(i.balanceAmount !== undefined ? { balanceDuePaise: i.balanceAmountPaise, paiseSchema: i.paiseSchema } : {}),
         partyId: i.partyId,
         partyName: i.partyName,
       }));
@@ -339,6 +340,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
         dueDate: p.dueDate,
         date: p.date,
         balanceDue: p.balanceAmount !== undefined ? p.balanceAmount : p.grandTotal - (p.paidAmount || 0),
+        ...(p.balanceAmount !== undefined ? { balanceDuePaise: p.balanceAmountPaise, paiseSchema: p.paiseSchema } : {}),
         partyId: p.supplierId,
         partyName: p.supplierName,
       }));

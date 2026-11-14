@@ -82,6 +82,13 @@ export interface PurchaseBill {
   bankAccountId?: string;
   bankAccountName?: string;
 
+  // --- Integer paise twins & schema marker (Phase 3.2) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  balanceAmountPaise?: number;
+  paidAmountPaise?: number;
+  grandTotalPaise?: number;
+
   notes?: string;
   createdAt: string;
   updatedAt: string;

@@ -2,6 +2,7 @@ import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from './formatters.ts';
 import { printHtmlDocument } from './printBridge.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 export interface PrintableLedgerEntry {
   date: string;
@@ -22,7 +23,7 @@ export function printPartyLedgerStatement(
   const isCustomer = party.type === 'CUSTOMER';
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0);
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0);
-  const netBalance = party.currentBalance;
+  const netBalance = readRupeeOr(party, 'currentBalance', party.currentBalance);
   const balanceLabel = isCustomer
     ? netBalance > 0
       ? 'Receivable (Dr)'

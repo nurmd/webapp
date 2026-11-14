@@ -1,3 +1,5 @@
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
+
 export interface ThermalReceiptData {
   companyName: string;
   companyAddress: string;
@@ -126,8 +128,8 @@ export function formatThermalReceiptText(
     for (const item of data.items) {
       lines.push(item.name.substring(0, 32));
       const qtyStr = `${item.qty}`.padStart(5);
-      const rateStr = item.rate.toFixed(2).padStart(9);
-      const amtStr = item.amount.toFixed(2).padStart(11);
+      const rateStr = readRupeeOr(item, 'rate', item.rate).toFixed(2).padStart(9);
+      const amtStr = readRupeeOr(item, 'amount', item.amount).toFixed(2).padStart(11);
       lines.push('   ' + qtyStr + ' ' + rateStr + ' ' + amtStr);
 
       if (showGstDetails) {
@@ -158,8 +160,8 @@ export function formatThermalReceiptText(
     for (const item of data.items) {
       const name = item.name.length > 20 ? item.name.substring(0, 20) : item.name.padEnd(20);
       const qtyStr = `${item.qty}`.padStart(6);
-      const rateStr = item.rate.toFixed(2).padStart(9);
-      const amtStr = item.amount.toFixed(2).padStart(10);
+      const rateStr = readRupeeOr(item, 'rate', item.rate).toFixed(2).padStart(9);
+      const amtStr = readRupeeOr(item, 'amount', item.amount).toFixed(2).padStart(10);
       lines.push(`${name} ${qtyStr} ${rateStr} ${amtStr}`);
 
       if (showGstDetails) {
@@ -185,27 +187,28 @@ export function formatThermalReceiptText(
   lines.push(line);
 
   // Totals & Taxes
-  lines.push(padRow(data.isCompositionScheme ? 'Subtotal:' : data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  lines.push(padRow(data.isCompositionScheme ? 'Subtotal:' : data.gstin ? 'Subtotal (Taxable):' : 'Subtotal:', `Rs. ${readRupeeOr(data, 'taxableAmount', data.taxableAmount).toFixed(2)}`, width));
   if (data.totalDiscount && data.totalDiscount > 0) {
-    lines.push(padRow('Discount:', `-Rs. ${data.totalDiscount.toFixed(2)}`, width));
+    lines.push(padRow('Discount:', `-Rs. ${readRupeeOr(data, 'totalDiscount', data.totalDiscount).toFixed(2)}`, width));
   }
   if (!data.isCompositionScheme) {
-    if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
-    if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
-    if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+    if (data.cgstAmount > 0) lines.push(padRow('CGST:', `Rs. ${readRupeeOr(data, 'cgstAmount', data.cgstAmount).toFixed(2)}`, width));
+    if (data.sgstAmount > 0) lines.push(padRow('SGST:', `Rs. ${readRupeeOr(data, 'sgstAmount', data.sgstAmount).toFixed(2)}`, width));
+    if (data.igstAmount > 0) lines.push(padRow('IGST:', `Rs. ${readRupeeOr(data, 'igstAmount', data.igstAmount).toFixed(2)}`, width));
     if (showGstDetails && data.totalCess && data.totalCess > 0) {
-      lines.push(padRow('CESS:', `Rs. ${data.totalCess.toFixed(2)}`, width));
+      lines.push(padRow('CESS:', `Rs. ${readRupeeOr(data, 'totalCess', data.totalCess).toFixed(2)}`, width));
     }
   }
   if (data.shippingAmount && data.shippingAmount > 0) {
-    lines.push(padRow('Shipping:', `+Rs. ${data.shippingAmount.toFixed(2)}`, width));
+    lines.push(padRow('Shipping:', `+Rs. ${readRupeeOr(data, 'shippingAmount', data.shippingAmount).toFixed(2)}`, width));
   }
   if (data.roundOff && data.roundOff !== 0) {
-    const sign = data.roundOff > 0 ? '+' : '';
-    lines.push(padRow('Round Off:', `${sign}Rs. ${data.roundOff.toFixed(2)}`, width));
+    const roundOffVal = readRupeeOr(data, 'roundOff', data.roundOff);
+    const sign = roundOffVal > 0 ? '+' : '';
+    lines.push(padRow('Round Off:', `${sign}Rs. ${roundOffVal.toFixed(2)}`, width));
   }
   lines.push(doubleLine);
-  lines.push(padRow('GRAND TOTAL:', `Rs. ${data.grandTotal.toFixed(2)}`, width));
+  lines.push(padRow('GRAND TOTAL:', `Rs. ${readRupeeOr(data, 'grandTotal', data.grandTotal).toFixed(2)}`, width));
   lines.push(doubleLine);
 
   if (!isChallan) {
@@ -213,20 +216,21 @@ export function formatThermalReceiptText(
       data.paymentSplits.forEach((s) => {
         if (s.mode !== 'CREDIT' && s.amount > 0) {
           const modeLabel = s.mode === 'CREDIT_NOTE' ? 'Return' : s.mode;
-          lines.push(padRow(`Paid (${modeLabel}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+          lines.push(padRow(`Paid (${modeLabel}):`, `Rs. ${readRupeeOr(s, 'amount', s.amount).toFixed(2)}`, width));
         }
       });
     } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
-      lines.push(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+      lines.push(padRow('Paid Amount:', `Rs. ${readRupeeOr(data, 'paidAmount', data.paidAmount).toFixed(2)}`, width));
     }
     if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
-      lines.push(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+      lines.push(padRow('Bill Balance Due:', `Rs. ${readRupeeOr(data, 'balanceAmount', data.balanceAmount).toFixed(2)}`, width));
     }
     if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
-      const balText = data.partyBalance > 0
-        ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
-        : data.partyBalance < 0
-        ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+      const partyBalVal = readRupeeOr(data, 'partyBalance', data.partyBalance);
+      const balText = partyBalVal > 0
+        ? `Rs. ${partyBalVal.toFixed(2)} Dr`
+        : partyBalVal < 0
+        ? `Rs. ${Math.abs(partyBalVal).toFixed(2)} Cr`
         : 'Rs. 0.00';
       lines.push(padRow('Total Party Bal:', balText, width));
       lines.push(line);

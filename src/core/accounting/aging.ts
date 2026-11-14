@@ -3,7 +3,8 @@
  * Part of Milestone 2: Accounting Depth & Statutory Integrity
  */
 
-import { addPaise, fromPaise, toPaise } from '../money.ts';
+import { addPaise, fromPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
@@ -17,6 +18,10 @@ export interface AgingItemInput {
   dueDate?: string;
   date: string;
   balanceDue: number;
+  /** Optional integer paise twin of `balanceDue`, forwarded from a persisted invoice/purchase. */
+  balanceDuePaise?: number;
+  /** Optional paise schema marker of the source document. */
+  paiseSchema?: number;
   partyId?: string;
   partyName: string;
   phone?: string;
@@ -133,7 +138,7 @@ export function computeAgingBreakdown(
   const asOfUtc = getAsOfUtcMidnight(asOfDate);
 
   for (const item of items) {
-    const balancePaise = toPaise(item.balanceDue || 0);
+    const balancePaise = readPaiseOr(item, 'balanceDue', 0);
     // Ignore settled documents (<= 1 paise)
     if (balancePaise <= 1) continue;
 

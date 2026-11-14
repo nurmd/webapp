@@ -3,6 +3,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { Party } from '../../models/party.ts';
 import { Voucher, PaymentAllocation, PaymentAllocationDocumentType } from './voucherTypes.ts';
 import { toPaise, fromPaise, subPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 import { formatSplitNotes } from './paymentSplitUtils.ts';
 
 export function inferVoucherPaymentMode(voucher: Voucher): string {
@@ -78,7 +79,7 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
     const isCustomer = matchedParty.type === 'CUSTOMER';
     const isSupplier = matchedParty.type === 'SUPPLIER';
     const rawOpBal = typeof matchedParty.openingBalance === 'number' ? matchedParty.openingBalance : 0;
-    const absOpBal = fromPaise(Math.abs(toPaise(rawOpBal)));
+    const absOpBal = fromPaise(Math.abs(readPaiseOr(matchedParty, 'openingBalance', 0)));
 
     let inferredType = matchedParty.openingBalanceType;
     if (!inferredType && absOpBal > 0.01) {
@@ -144,22 +145,22 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
         }
         if (!isPartyMatch(inv.partyId, inv.partyName)) return false;
         const bal = typeof inv.balanceAmount === 'number'
-          ? fromPaise(toPaise(inv.balanceAmount))
-          : fromPaise(subPaise(toPaise(inv.grandTotal), toPaise(inv.paidAmount || 0)));
+          ? fromPaise(readPaiseOr(inv, 'balanceAmount'))
+          : fromPaise(subPaise(readPaiseOr(inv, 'grandTotal'), readPaiseOr(inv, 'paidAmount', 0)));
         return bal > 0.01;
       })
       .map((inv) => {
         const balPaise = typeof inv.balanceAmount === 'number'
-          ? toPaise(inv.balanceAmount)
-          : subPaise(toPaise(inv.grandTotal), toPaise(inv.paidAmount || 0));
+          ? readPaiseOr(inv, 'balanceAmount')
+          : subPaise(readPaiseOr(inv, 'grandTotal'), readPaiseOr(inv, 'paidAmount', 0));
         const bal = fromPaise(balPaise);
         return {
           id: inv.id,
           documentNumber: inv.invoiceNumber,
           number: inv.invoiceNumber,
           date: inv.date,
-          grandTotal: fromPaise(toPaise(inv.grandTotal)),
-          paidAmount: fromPaise(toPaise(inv.paidAmount || 0)),
+          grandTotal: fromPaise(readPaiseOr(inv, 'grandTotal')),
+          paidAmount: fromPaise(readPaiseOr(inv, 'paidAmount', 0)),
           balanceAmount: fromPaise(balPaise),
           documentType: (wantCredit ? 'CREDIT_NOTE' : 'INVOICE') as PaymentAllocationDocumentType,
           partyId: inv.partyId,
@@ -192,22 +193,22 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
       }
       if (!isPartyMatch(pur.supplierId, pur.supplierName)) return false;
       const bal = typeof pur.balanceAmount === 'number'
-        ? fromPaise(toPaise(pur.balanceAmount))
-        : fromPaise(subPaise(toPaise(pur.grandTotal), toPaise(pur.paidAmount || 0)));
+        ? fromPaise(readPaiseOr(pur, 'balanceAmount'))
+        : fromPaise(subPaise(readPaiseOr(pur, 'grandTotal'), readPaiseOr(pur, 'paidAmount', 0)));
       return bal > 0.01;
     })
     .map((pur) => {
       const balPaise = typeof pur.balanceAmount === 'number'
-        ? toPaise(pur.balanceAmount)
-        : subPaise(toPaise(pur.grandTotal), toPaise(pur.paidAmount || 0));
+        ? readPaiseOr(pur, 'balanceAmount')
+        : subPaise(readPaiseOr(pur, 'grandTotal'), readPaiseOr(pur, 'paidAmount', 0));
       const bal = fromPaise(balPaise);
       return {
         id: pur.id,
         documentNumber: pur.billNumber,
         number: pur.billNumber,
         date: pur.date,
-        grandTotal: fromPaise(toPaise(pur.grandTotal)),
-        paidAmount: fromPaise(toPaise(pur.paidAmount || 0)),
+        grandTotal: fromPaise(readPaiseOr(pur, 'grandTotal')),
+        paidAmount: fromPaise(readPaiseOr(pur, 'paidAmount', 0)),
         balanceAmount: fromPaise(balPaise),
         documentType: (wantDebit ? 'DEBIT_NOTE' : 'PURCHASE') as PaymentAllocationDocumentType,
         partyId: pur.supplierId,
@@ -411,9 +412,9 @@ export function applyAllocations<T extends Invoice | PurchaseBill>(
       return doc;
     }
 
-    const grandTotalPaise = toPaise(doc.grandTotal);
+    const grandTotalPaise = readPaiseOr(doc, 'grandTotal');
     const currentPaidPaise = typeof doc.paidAmount === 'number'
-      ? toPaise(doc.paidAmount)
+      ? readPaiseOr(doc, 'paidAmount')
       : (doc.paymentStatus === 'PAID' ? grandTotalPaise : 0);
     const newPaidPaise = Math.min(grandTotalPaise, Math.max(0, currentPaidPaise + allocAmtPaise));
     const newBalPaise = Math.max(0, grandTotalPaise - newPaidPaise);
@@ -568,9 +569,9 @@ export function reverseAllocations<T extends Invoice | PurchaseBill>(
       return doc;
     }
 
-    const grandTotalPaise = toPaise(doc.grandTotal);
+    const grandTotalPaise = readPaiseOr(doc, 'grandTotal');
     const currentPaidPaise = typeof doc.paidAmount === 'number'
-      ? toPaise(doc.paidAmount)
+      ? readPaiseOr(doc, 'paidAmount')
       : (doc.paymentStatus === 'PAID' ? grandTotalPaise : 0);
     const newPaidPaise = Math.max(0, currentPaidPaise - allocAmtPaise);
     const newBalPaise = Math.max(0, grandTotalPaise - newPaidPaise);
@@ -744,7 +745,7 @@ export function validateInvoicePreSave(params: {
       )
     : undefined;
 
-  const newInvoicePaidPaise = Math.max(0, toPaise(Number(newInvoice.paidAmount) || 0));
+  const newInvoicePaidPaise = Math.max(0, readPaiseOr(newInvoice, 'paidAmount', 0));
   const newInvoicePaid = fromPaise(newInvoicePaidPaise);
   const isOrderOrEstimate =
     newInvoice.invoiceType === 'ESTIMATE' ||
@@ -795,7 +796,7 @@ export function validateInvoicePreSave(params: {
     return sum + vAllocSumPaise;
   }, 0);
   const totalAllocatedToInvoice = fromPaise(totalAllocatedToInvoicePaise);
-  const grandTotalPaise = toPaise(newInvoice.grandTotal);
+  const grandTotalPaise = readPaiseOr(newInvoice, 'grandTotal');
 
   if (grandTotalPaise < totalAllocatedToInvoicePaise - 1) {
     return {
@@ -884,7 +885,7 @@ export function validatePurchasePreSave(params: {
           v.sourceDocumentId === newBill.id
       );
 
-  const newBillPaidPaise = Math.max(0, toPaise(Number(newBill.paidAmount) || 0));
+  const newBillPaidPaise = Math.max(0, readPaiseOr(newBill, 'paidAmount', 0));
   const newBillPaid = fromPaise(newBillPaidPaise);
   const isPurchaseOrder = newBill.purchaseType === 'PO';
   const isPurchaseChallan = newBill.purchaseType === 'CHALLAN';

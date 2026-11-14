@@ -1,3 +1,5 @@
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
+
 export interface PaymentReceiptParams {
   companyName: string;
   heading: string; // 'Payment In Receipt' | 'Payment Out Voucher' | 'Cash / Bank Transfer'
@@ -62,7 +64,7 @@ export function buildPaymentReceiptText(
   lines.push(line);
 
   // Amount
-  const amountStr = `₹${Number(params.amount || 0).toFixed(2)}`;
+  const amountStr = `₹${readRupeeOr(params, 'amount', Number(params.amount) || 0).toFixed(2)}`;
   lines.push(padRow('Amount:', amountStr, width));
 
   // Payment Mode
@@ -83,7 +85,7 @@ export function buildPaymentReceiptText(
   // Party Balance
   if (typeof params.partyBalance === 'number' && Number.isFinite(params.partyBalance)) {
     lines.push(line);
-    const balStr = `₹${params.partyBalance.toFixed(2)}`;
+    const balStr = `₹${readRupeeOr(params, 'partyBalance', params.partyBalance).toFixed(2)}`;
     lines.push(padRow('Balance Due:', balStr, width));
   }
 

@@ -1,6 +1,7 @@
 import type { Invoice, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import type { PurchaseBill } from '../../models/purchase.ts';
 import { toPaise, fromPaise, addPaise, subPaise, clampPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export interface SplitNotesAccountOptions {
   cashAccountId?: string;
@@ -146,11 +147,11 @@ export function parseSplitsFromInvoice(
   }
 
   // 3. Partial invoice (with non-zero paid amount and non-zero balance)
-  const paidPaise = typeof inv.paidAmount === 'number' ? toPaise(inv.paidAmount) : 0;
+  const paidPaise = typeof inv.paidAmount === 'number' ? readPaiseOr(inv, 'paidAmount') : 0;
   const balancePaise =
     typeof inv.balanceAmount === 'number'
-      ? toPaise(inv.balanceAmount)
-      : Math.max(0, toPaise(inv.grandTotal) - paidPaise);
+      ? readPaiseOr(inv, 'balanceAmount')
+      : Math.max(0, readPaiseOr(inv, 'grandTotal') - paidPaise);
 
   if (inv.paymentStatus === 'PARTIAL' || (paidPaise > 0 && balancePaise > 0)) {
     const paidMode: PaymentMode =
@@ -231,11 +232,11 @@ export function parseSplitsFromPurchase(
   }
 
   // 3. Partial bill
-  const paidPaise = typeof bill.paidAmount === 'number' ? toPaise(bill.paidAmount) : 0;
+  const paidPaise = typeof bill.paidAmount === 'number' ? readPaiseOr(bill, 'paidAmount') : 0;
   const balancePaise =
     typeof bill.balanceAmount === 'number'
-      ? toPaise(bill.balanceAmount)
-      : Math.max(0, toPaise(bill.grandTotal) - paidPaise);
+      ? readPaiseOr(bill, 'balanceAmount')
+      : Math.max(0, readPaiseOr(bill, 'grandTotal') - paidPaise);
 
   if (bill.paymentStatus === 'PARTIAL' || (paidPaise > 0 && balancePaise > 0)) {
     const paidMode: PaymentMode =
@@ -329,7 +330,7 @@ export function derivePaymentSettlement(doc: {
   bankAccountId?: string;
   bankAccountName?: string;
 }): DerivedPaymentSettlement {
-  const grandTotalPaise = toPaise(Math.max(0, doc.grandTotal || 0));
+  const grandTotalPaise = Math.max(0, readPaiseOr(doc, 'grandTotal', 0));
 
   // 1. Calculate raw total paid from explicit payment splits if present
   let rawPaidPaise: number;
@@ -356,16 +357,16 @@ export function derivePaymentSettlement(doc: {
     );
   } else {
     const modeUpper = (doc.paymentMode || '').toUpperCase();
-    if (typeof doc.paidAmount === 'number' && toPaise(doc.paidAmount) > 0) {
-      rawPaidPaise = toPaise(doc.paidAmount);
+    if (typeof doc.paidAmount === 'number' && readPaiseOr(doc, 'paidAmount') > 0) {
+      rawPaidPaise = readPaiseOr(doc, 'paidAmount');
     } else if (doc.paymentStatus === 'UNPAID' || (modeUpper === 'CREDIT' && doc.paymentStatus !== 'PARTIAL')) {
       rawPaidPaise = 0;
     } else if (typeof doc.paidAmount === 'number') {
-      rawPaidPaise = toPaise(doc.paidAmount);
+      rawPaidPaise = readPaiseOr(doc, 'paidAmount');
     } else if (doc.paymentStatus === 'PAID') {
       rawPaidPaise = grandTotalPaise;
     } else if (typeof doc.balanceAmount === 'number') {
-      rawPaidPaise = Math.max(0, grandTotalPaise - toPaise(doc.balanceAmount));
+      rawPaidPaise = Math.max(0, grandTotalPaise - readPaiseOr(doc, 'balanceAmount'));
     } else {
       rawPaidPaise = grandTotalPaise;
     }

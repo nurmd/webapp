@@ -104,6 +104,13 @@ export interface Invoice {
   bankAccountId?: string;
   bankAccountName?: string;
 
+  // --- Integer paise twins & schema marker (Phase 3.2) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  balanceAmountPaise?: number;
+  paidAmountPaise?: number;
+  grandTotalPaise?: number;
+
   notes?: string;
   terms?: string;
   createdAt: string;

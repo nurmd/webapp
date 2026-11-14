@@ -8,6 +8,7 @@ import {
   subPaise,
   isZeroPaise,
 } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export interface ReconciliationIssue {
   code:
@@ -225,7 +226,7 @@ export function buildCashBankReconciliation(params: {
       accountType = 'BANK';
     }
 
-    const openingBalancePaise = isConfigured ? toPaise(configuredAcc?.openingBalance || 0) : 0;
+    const openingBalancePaise = isConfigured ? readPaiseOr(configuredAcc, 'openingBalance', 0) : 0;
 
     let totalInflowPaise = 0;
     let totalOutflowPaise = 0;

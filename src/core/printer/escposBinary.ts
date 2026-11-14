@@ -1,4 +1,5 @@
 import { ThermalReceiptData } from './escpos.ts';
+import { readRupeeOr } from '../accounting/paisePersistence.ts';
 
 // ESC/POS Command Byte Constants
 export const ESC = 0x1b;
@@ -208,8 +209,8 @@ export function buildThermalReceiptBinary(
     for (const item of data.items) {
       builder.line(item.name.substring(0, 32));
       const qtyStr = `${item.qty}`.padStart(5);
-      const rateStr = item.rate.toFixed(2).padStart(9);
-      const amtStr = item.amount.toFixed(2).padStart(11);
+      const rateStr = readRupeeOr(item, 'rate', item.rate).toFixed(2).padStart(9);
+      const amtStr = readRupeeOr(item, 'amount', item.amount).toFixed(2).padStart(11);
       builder.line('   ' + qtyStr + ' ' + rateStr + ' ' + amtStr);
 
       if (showGstDetails) {
@@ -238,8 +239,8 @@ export function buildThermalReceiptBinary(
     for (const item of data.items) {
       const name = item.name.length > 20 ? item.name.substring(0, 20) : item.name.padEnd(20);
       const qtyStr = `${item.qty}`.padStart(6);
-      const rateStr = item.rate.toFixed(2).padStart(9);
-      const amtStr = item.amount.toFixed(2).padStart(10);
+      const rateStr = readRupeeOr(item, 'rate', item.rate).toFixed(2).padStart(9);
+      const amtStr = readRupeeOr(item, 'amount', item.amount).toFixed(2).padStart(10);
       builder.line(`${name} ${qtyStr} ${rateStr} ${amtStr}`);
 
       if (showGstDetails) {
@@ -265,25 +266,26 @@ export function buildThermalReceiptBinary(
   builder.line('-'.repeat(width));
 
   // Totals
-  builder.line(padRow(data.isCompositionScheme ? 'Subtotal:' : 'Taxable Amount:', `Rs. ${data.taxableAmount.toFixed(2)}`, width));
+  builder.line(padRow(data.isCompositionScheme ? 'Subtotal:' : 'Taxable Amount:', `Rs. ${readRupeeOr(data, 'taxableAmount', data.taxableAmount).toFixed(2)}`, width));
   if (!data.isCompositionScheme) {
     if (data.cgstAmount > 0) {
-      builder.line(padRow('CGST Total:', `Rs. ${data.cgstAmount.toFixed(2)}`, width));
+      builder.line(padRow('CGST Total:', `Rs. ${readRupeeOr(data, 'cgstAmount', data.cgstAmount).toFixed(2)}`, width));
     }
     if (data.sgstAmount > 0) {
-      builder.line(padRow('SGST Total:', `Rs. ${data.sgstAmount.toFixed(2)}`, width));
+      builder.line(padRow('SGST Total:', `Rs. ${readRupeeOr(data, 'sgstAmount', data.sgstAmount).toFixed(2)}`, width));
     }
     if (data.igstAmount > 0) {
-      builder.line(padRow('IGST Total:', `Rs. ${data.igstAmount.toFixed(2)}`, width));
+      builder.line(padRow('IGST Total:', `Rs. ${readRupeeOr(data, 'igstAmount', data.igstAmount).toFixed(2)}`, width));
     }
     if (showGstDetails && data.totalCess && data.totalCess > 0) {
-      builder.line(padRow('CESS Total:', `Rs. ${data.totalCess.toFixed(2)}`, width));
+      builder.line(padRow('CESS Total:', `Rs. ${readRupeeOr(data, 'totalCess', data.totalCess).toFixed(2)}`, width));
     }
   }
 
+  const grandTotalVal = readRupeeOr(data, 'grandTotal', data.grandTotal);
   builder.line('='.repeat(width));
   builder.bold(true).doubleSize(true).alignCenter();
-  builder.line(`TOTAL: Rs. ${data.grandTotal.toFixed(2)}`);
+  builder.line(`TOTAL: Rs. ${grandTotalVal.toFixed(2)}`);
   builder.doubleSize(false).bold(false);
   builder.line('='.repeat(width));
 
@@ -291,20 +293,21 @@ export function buildThermalReceiptBinary(
     if (data.paymentSplits && data.paymentSplits.length > 1) {
       data.paymentSplits.forEach((s) => {
         if (s.mode !== 'CREDIT' && s.amount > 0) {
-          builder.line(padRow(`Paid (${s.mode}):`, `Rs. ${s.amount.toFixed(2)}`, width));
+          builder.line(padRow(`Paid (${s.mode}):`, `Rs. ${readRupeeOr(s, 'amount', s.amount).toFixed(2)}`, width));
         }
       });
     } else if (typeof data.paidAmount === 'number' && data.paidAmount > 0) {
-      builder.line(padRow('Paid Amount:', `Rs. ${data.paidAmount.toFixed(2)}`, width));
+      builder.line(padRow('Paid Amount:', `Rs. ${readRupeeOr(data, 'paidAmount', data.paidAmount).toFixed(2)}`, width));
     }
     if (typeof data.balanceAmount === 'number' && data.balanceAmount > 0) {
-      builder.line(padRow('Bill Balance Due:', `Rs. ${data.balanceAmount.toFixed(2)}`, width));
+      builder.line(padRow('Bill Balance Due:', `Rs. ${readRupeeOr(data, 'balanceAmount', data.balanceAmount).toFixed(2)}`, width));
     }
     if (options.showPartyBalance !== false && typeof data.partyBalance === 'number') {
-      const balText = data.partyBalance > 0
-        ? `Rs. ${data.partyBalance.toFixed(2)} Dr`
-        : data.partyBalance < 0
-        ? `Rs. ${Math.abs(data.partyBalance).toFixed(2)} Cr`
+      const partyBalVal = readRupeeOr(data, 'partyBalance', data.partyBalance);
+      const balText = partyBalVal > 0
+        ? `Rs. ${partyBalVal.toFixed(2)} Dr`
+        : partyBalVal < 0
+        ? `Rs. ${Math.abs(partyBalVal).toFixed(2)} Cr`
         : 'Rs. 0.00';
       builder.line(padRow('Total Party Bal:', balText, width));
       builder.line('-'.repeat(width));
@@ -314,7 +317,7 @@ export function buildThermalReceiptBinary(
     if (options.printQr !== false && data.upiId) {
       const upiUri = `upi://pay?pa=${data.upiId}&pn=${encodeURIComponent(
         data.companyName
-      )}&am=${data.grandTotal.toFixed(2)}&cu=INR&tn=Invoice_${data.invoiceNo}`;
+      )}&am=${grandTotalVal.toFixed(2)}&cu=INR&tn=Invoice_${data.invoiceNo}`;
 
       builder.alignCenter().line('Scan UPI to Pay:');
       try {

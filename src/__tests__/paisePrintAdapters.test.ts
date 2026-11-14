@@ -8,6 +8,11 @@ import { buildThermalReceiptText } from '../core/utils/thermalReceiptText.ts';
 import { generatePurchaseBillHtml } from '../core/utils/purchaseDocumentPrinter.ts';
 import { generateEWayBillSlipHtml } from '../core/gst/eWayBillSlipPrinter.ts';
 import { generateExpenseVoucherHtml } from '../core/utils/expenseVoucherPrinter.ts';
+import { buildPaymentReceiptText } from '../core/utils/paymentReceiptText.ts';
+import { printPartyLedgerStatement, type PrintableLedgerEntry } from '../core/utils/ledgerStatementPrinter.ts';
+import * as printBridge from '../core/utils/printBridge.ts';
+import { formatThermalReceiptText, type ThermalReceiptData } from '../core/printer/escpos.ts';
+import { buildThermalReceiptBinary } from '../core/printer/escposBinary.ts';
 import { db } from '../services/db.ts';
 import type { CompanyProfile } from '../models/company.ts';
 import type { Invoice } from '../models/invoice.ts';
@@ -563,6 +568,221 @@ describe('paisePrintAdapters', () => {
       expect(JSON.stringify(expense)).toBe(beforeExpense);
       expect(JSON.stringify(attachedExpense)).toBe(beforeAttached);
       expect(JSON.stringify(company)).toBe(beforeCompany);
+    });
+  });
+
+  describe('7. buildPaymentReceiptText byte-identity', () => {
+    it('produces identical receipt text with and without twins, and with tampered twin', () => {
+      const rawParams = {
+        companyName: 'Apex Industrial Supplies',
+        heading: 'Payment In Receipt',
+        docNumber: 'RCPT-2026-001',
+        date: '2026-10-28',
+        partyName: 'Tata Motors Limited',
+        amount: 2500.75,
+        paymentMode: 'UPI',
+        bankAccountName: 'HDFC Current',
+        reference: 'UPI/123456789',
+        partyBalance: 5420.5,
+        notes: 'Advance for next shipment',
+      };
+
+      const text32Raw = buildPaymentReceiptText(rawParams, 32);
+      const text48Raw = buildPaymentReceiptText(rawParams, 48);
+
+      const attachedParams = {
+        ...rawParams,
+        amountPaise: 250075,
+        partyBalancePaise: 542050,
+        paiseSchema: PAISE_SCHEMA_VERSION,
+      };
+
+      const text32Attached = buildPaymentReceiptText(attachedParams, 32);
+      const text48Attached = buildPaymentReceiptText(attachedParams, 48);
+      expect(text32Attached).toBe(text32Raw);
+      expect(text48Attached).toBe(text48Raw);
+
+      const tamperedParams = {
+        ...attachedParams,
+        amountPaise: 999999,
+        partyBalancePaise: 888888,
+      };
+
+      const text32Tampered = buildPaymentReceiptText(tamperedParams, 32);
+      const text48Tampered = buildPaymentReceiptText(tamperedParams, 48);
+      expect(text32Tampered).toBe(text32Raw);
+      expect(text48Tampered).toBe(text48Raw);
+    });
+  });
+
+  describe('8. printPartyLedgerStatement byte-identity', () => {
+    it('produces identical printed HTML with and without twins, and with tampered twin', () => {
+      let printedHtml = '';
+      vi.spyOn(printBridge, 'printHtmlDocument').mockImplementation((html: string) => {
+        printedHtml = html;
+        return true;
+      });
+
+      const entries: PrintableLedgerEntry[] = [
+        {
+          date: '2026-04-01',
+          docNumber: 'INV-001',
+          type: 'SALE',
+          description: 'Sales Invoice',
+          debit: 1180,
+          credit: 0,
+          runningBalance: 1180,
+        },
+      ];
+
+      // Raw party
+      printPartyLedgerStatement(mockParty, mockCompany, entries, 'All Time');
+      const rawHtml = printedHtml;
+
+      // Attached party
+      const attachedParty = attachPaiseFields(mockParty, 'party');
+      printPartyLedgerStatement(attachedParty, mockCompany, entries, 'All Time');
+      expect(printedHtml).toBe(rawHtml);
+
+      // Tampered party
+      const tamperedParty: Party = {
+        ...attachedParty,
+        currentBalancePaise: 9999999,
+      } as unknown as Party;
+      printPartyLedgerStatement(tamperedParty, mockCompany, entries, 'All Time');
+      expect(printedHtml).toBe(rawHtml);
+    });
+  });
+
+  describe('9. formatThermalReceiptText byte-identity', () => {
+    it('produces identical text with and without twins, and with tampered twin', () => {
+      const rawData: ThermalReceiptData = {
+        companyName: 'Apex Industrial',
+        companyAddress: 'Pune',
+        gstin: '27AABCU9603R1ZM',
+        phone: '9876543210',
+        invoiceNo: 'INV-001',
+        date: '2026-10-28',
+        customerName: 'Tata Motors',
+        items: [
+          { name: 'Item 1', qty: 2, rate: 100, amount: 200 },
+          { name: 'Item 2', qty: 1, rate: 50, amount: 50 },
+        ],
+        taxableAmount: 250,
+        cgstAmount: 22.5,
+        sgstAmount: 22.5,
+        igstAmount: 0,
+        grandTotal: 295,
+        paidAmount: 200,
+        balanceAmount: 95,
+        partyBalance: 500,
+      };
+
+      const text32Raw = formatThermalReceiptText(rawData, 32);
+      const text48Raw = formatThermalReceiptText(rawData, 48);
+
+      const attachedData = {
+        ...rawData,
+        taxableAmountPaise: 25000,
+        cgstAmountPaise: 2250,
+        sgstAmountPaise: 2250,
+        grandTotalPaise: 29500,
+        paidAmountPaise: 20000,
+        balanceAmountPaise: 9500,
+        partyBalancePaise: 50000,
+        paiseSchema: PAISE_SCHEMA_VERSION,
+        items: rawData.items.map((i) => ({
+          ...i,
+          ratePaise: Math.round(i.rate * 100),
+          amountPaise: Math.round(i.amount * 100),
+          paiseSchema: PAISE_SCHEMA_VERSION,
+        })),
+      };
+
+      const text32Attached = formatThermalReceiptText(attachedData as unknown as ThermalReceiptData, 32);
+      const text48Attached = formatThermalReceiptText(attachedData as unknown as ThermalReceiptData, 48);
+      expect(text32Attached).toBe(text32Raw);
+      expect(text48Attached).toBe(text48Raw);
+
+      const tamperedData = {
+        ...attachedData,
+        grandTotalPaise: 999999,
+        taxableAmountPaise: 999999,
+        items: attachedData.items.map((i) => ({
+          ...i,
+          ratePaise: 999999,
+          amountPaise: 999999,
+        })),
+      };
+
+      const text32Tampered = formatThermalReceiptText(tamperedData as unknown as ThermalReceiptData, 32);
+      const text48Tampered = formatThermalReceiptText(tamperedData as unknown as ThermalReceiptData, 48);
+      expect(text32Tampered).toBe(text32Raw);
+      expect(text48Tampered).toBe(text48Raw);
+    });
+  });
+
+  describe('10. buildThermalReceiptBinary byte-identity', () => {
+    it('produces identical byte array with and without twins, and with tampered twin', () => {
+      const rawData: ThermalReceiptData = {
+        companyName: 'Apex Industrial',
+        companyAddress: 'Pune',
+        gstin: '27AABCU9603R1ZM',
+        phone: '9876543210',
+        invoiceNo: 'INV-001',
+        date: '2026-10-28',
+        customerName: 'Tata Motors',
+        items: [
+          { name: 'Item 1', qty: 2, rate: 100, amount: 200 },
+        ],
+        taxableAmount: 200,
+        cgstAmount: 18,
+        sgstAmount: 18,
+        igstAmount: 0,
+        grandTotal: 236,
+        paidAmount: 236,
+        balanceAmount: 0,
+      };
+
+      const bytesRaw32 = buildThermalReceiptBinary(rawData, { width: 32 });
+      const bytesRaw48 = buildThermalReceiptBinary(rawData, { width: 48 });
+
+      const attachedData = {
+        ...rawData,
+        taxableAmountPaise: 20000,
+        cgstAmountPaise: 1800,
+        sgstAmountPaise: 1800,
+        grandTotalPaise: 23600,
+        paidAmountPaise: 23600,
+        paiseSchema: PAISE_SCHEMA_VERSION,
+        items: rawData.items.map((i) => ({
+          ...i,
+          ratePaise: Math.round(i.rate * 100),
+          amountPaise: Math.round(i.amount * 100),
+          paiseSchema: PAISE_SCHEMA_VERSION,
+        })),
+      };
+
+      const bytesAttached32 = buildThermalReceiptBinary(attachedData as unknown as ThermalReceiptData, { width: 32 });
+      const bytesAttached48 = buildThermalReceiptBinary(attachedData as unknown as ThermalReceiptData, { width: 48 });
+      expect(bytesAttached32).toEqual(bytesRaw32);
+      expect(bytesAttached48).toEqual(bytesRaw48);
+
+      const tamperedData = {
+        ...attachedData,
+        grandTotalPaise: 999999,
+        taxableAmountPaise: 999999,
+        items: attachedData.items.map((i) => ({
+          ...i,
+          ratePaise: 999999,
+          amountPaise: 999999,
+        })),
+      };
+
+      const bytesTampered32 = buildThermalReceiptBinary(tamperedData as unknown as ThermalReceiptData, { width: 32 });
+      const bytesTampered48 = buildThermalReceiptBinary(tamperedData as unknown as ThermalReceiptData, { width: 48 });
+      expect(bytesTampered32).toEqual(bytesRaw32);
+      expect(bytesTampered48).toEqual(bytesRaw48);
     });
   });
 });

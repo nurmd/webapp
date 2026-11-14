@@ -5,6 +5,7 @@ import type { Expense } from '../../models/expense.ts';
 import type { Voucher } from './voucherTypes.ts';
 import type { LoanTransaction } from '../../models/loan.ts';
 import { addPaise, fromPaise, subPaise, toPaise } from '../money.ts';
+import { readPaiseOr, readRupeeOr } from './paisePersistence.ts';
 
 export interface CashFlowLineItem {
   id: string;
@@ -57,7 +58,7 @@ export function computeCashFlowStatement(params: {
   } = params;
 
   // 1. Opening balance from all cash and bank accounts
-  const openingLiquidBalancePaise = accounts.reduce((s, a) => addPaise(s, toPaise(a.openingBalance || 0)), 0);
+  const openingLiquidBalancePaise = accounts.reduce((s, a) => addPaise(s, readPaiseOr(a, 'openingBalance', 0)), 0);
 
   const operatingItems: CashFlowLineItem[] = [];
   const financingItems: CashFlowLineItem[] = [];
@@ -69,18 +70,21 @@ export function computeCashFlowStatement(params: {
   // A. Operating Activities - Inflows from Sales
   for (const inv of invoices) {
     if (inv.isCancelled) continue;
-    const paid = typeof inv.paidAmount === 'number'
-      ? inv.paidAmount
-      : (inv.paymentStatus === 'PAID' ? inv.grandTotal : 0);
+    const paidPaise = typeof inv.paidAmount === 'number'
+      ? readPaiseOr(inv, 'paidAmount')
+      : (inv.paymentStatus === 'PAID' ? readPaiseOr(inv, 'grandTotal', 0) : 0);
 
-    if (paid > 0 && inv.paymentMode !== 'CREDIT') {
+    if (paidPaise > 0 && inv.paymentMode !== 'CREDIT') {
+      const amount = typeof inv.paidAmount === 'number'
+        ? readRupeeOr(inv, 'paidAmount', inv.paidAmount)
+        : (inv.paymentStatus === 'PAID' ? readRupeeOr(inv, 'grandTotal', inv.grandTotal) : 0);
       operatingItems.push({
         id: `op-sale-${inv.id}`,
         date: inv.date,
         title: `Sales Receipt (${inv.invoiceNumber})`,
         category: 'OPERATING',
         flow: 'INFLOW',
-        amount: paid,
+        amount,
         mode: inv.paymentMode || 'CASH',
         counterparty: inv.partyName,
         referenceNo: inv.invoiceNumber,
@@ -123,18 +127,21 @@ export function computeCashFlowStatement(params: {
   // A. Operating Activities - Outflows from Purchases (Direct cash/bank payments)
   for (const pur of purchases) {
     if (pur.isCancelled) continue;
-    const paid = typeof pur.paidAmount === 'number'
-      ? pur.paidAmount
-      : (pur.paymentStatus === 'PAID' ? pur.grandTotal : 0);
+    const paidPaise = typeof pur.paidAmount === 'number'
+      ? readPaiseOr(pur, 'paidAmount')
+      : (pur.paymentStatus === 'PAID' ? readPaiseOr(pur, 'grandTotal', 0) : 0);
 
-    if (paid > 0) {
+    if (paidPaise > 0) {
+      const amount = typeof pur.paidAmount === 'number'
+        ? readRupeeOr(pur, 'paidAmount', pur.paidAmount)
+        : (pur.paymentStatus === 'PAID' ? readRupeeOr(pur, 'grandTotal', pur.grandTotal) : 0);
       operatingItems.push({
         id: `op-pur-${pur.id}`,
         date: pur.date,
         title: `Purchase Payment (${pur.billNumber})`,
         category: 'OPERATING',
         flow: 'OUTFLOW',
-        amount: paid,
+        amount,
         mode: pur.paymentMode || 'BANK',
         counterparty: pur.supplierName,
         referenceNo: pur.billNumber,
@@ -150,7 +157,7 @@ export function computeCashFlowStatement(params: {
       title: `Expense: ${exp.category || 'General Operational'}`,
       category: 'OPERATING',
       flow: 'OUTFLOW',
-      amount: exp.amount || 0,
+      amount: readRupeeOr(exp, 'amount', exp.amount || 0),
       mode: exp.paymentMode || 'CASH',
       counterparty: exp.vendorName || exp.title,
       referenceNo: exp.voucherNumber,
@@ -166,7 +173,7 @@ export function computeCashFlowStatement(params: {
         title: `Direct Capital / Inflow (${txn.description || 'Capital Addition'})`,
         category: 'FINANCING',
         flow: 'INFLOW',
-        amount: txn.amount,
+        amount: readRupeeOr(txn, 'amount', txn.amount || 0),
         mode: 'TRANSFER',
         referenceNo: txn.referenceNo || txn.txnNumber,
       });
@@ -177,7 +184,7 @@ export function computeCashFlowStatement(params: {
         title: `Drawings / Direct Outflow (${txn.description || 'Drawings'})`,
         category: 'FINANCING',
         flow: 'OUTFLOW',
-        amount: txn.amount,
+        amount: readRupeeOr(txn, 'amount', txn.amount || 0),
         mode: 'TRANSFER',
         referenceNo: txn.referenceNo || txn.txnNumber,
       });
@@ -189,7 +196,7 @@ export function computeCashFlowStatement(params: {
         title: `Contra Transfer: ${txn.type} (${txn.description || 'Bank Transfer'})`,
         category: 'INVESTING',
         flow: txn.type === 'DEPOSIT' ? 'INFLOW' : 'OUTFLOW',
-        amount: txn.amount,
+        amount: readRupeeOr(txn, 'amount', txn.amount || 0),
         mode: 'CONTRA',
         referenceNo: txn.referenceNo || txn.txnNumber,
       });
@@ -205,7 +212,7 @@ export function computeCashFlowStatement(params: {
         title: `Loan Disbursement Borrowed`,
         category: 'FINANCING',
         flow: 'INFLOW',
-        amount: lTxn.totalAmount,
+        amount: readRupeeOr(lTxn, 'totalAmount', lTxn.totalAmount || 0),
         mode: lTxn.paymentMode,
         referenceNo: lTxn.referenceNo,
       });
@@ -216,7 +223,7 @@ export function computeCashFlowStatement(params: {
         title: `Loan EMI / Principal Repayment`,
         category: 'FINANCING',
         flow: 'OUTFLOW',
-        amount: lTxn.totalAmount,
+        amount: readRupeeOr(lTxn, 'totalAmount', lTxn.totalAmount || 0),
         mode: lTxn.paymentMode,
         referenceNo: lTxn.referenceNo,
       });

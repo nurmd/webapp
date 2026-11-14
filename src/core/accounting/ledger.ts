@@ -1,12 +1,13 @@
 import type { Voucher, JournalEntryLine } from './voucherTypes.ts';
 import { toPaise, fromPaise, absPaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 /**
  * Validates that debit and credit amounts in a voucher match exactly.
  */
 export function validateVoucherBalance(entries: JournalEntryLine[]): { isBalanced: boolean; diff: number } {
-  const debitPaise = entries.reduce((sum, e) => sum + toPaise(e.debit), 0);
-  const creditPaise = entries.reduce((sum, e) => sum + toPaise(e.credit), 0);
+  const debitPaise = entries.reduce((sum, e) => sum + readPaiseOr(e, 'debit', 0), 0);
+  const creditPaise = entries.reduce((sum, e) => sum + readPaiseOr(e, 'credit', 0), 0);
   const diff = fromPaise(absPaise(debitPaise - creditPaise));
   return {
     isBalanced: diff === 0,

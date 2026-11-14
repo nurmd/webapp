@@ -9,6 +9,7 @@ import type { PurchaseBill } from '../../models/purchase.ts';
 import type { Expense } from '../../models/expense.ts';
 import type { Voucher } from './voucherTypes.ts';
 import { toPaise, fromPaise, addPaise, subPaise, comparePaise } from '../money.ts';
+import { readPaiseOr } from './paisePersistence.ts';
 
 export interface CashBankFinancialSummary {
   totalLiquidBalance: number;
@@ -50,12 +51,12 @@ export function computeCashBankSummary(params: {
   const balancesPaise: Record<string, number> = {};
   accounts.forEach((acc) => {
     if (!acc) return;
-    balancesPaise[acc.id] = toPaise(acc.openingBalance || 0);
+    balancesPaise[acc.id] = readPaiseOr(acc, 'openingBalance', 0);
   });
 
   if (balancesPaise['ACC_CASH'] === undefined) {
     const cashAcc = accounts.find((a) => a && a.accountType === 'CASH');
-    balancesPaise['ACC_CASH'] = cashAcc ? toPaise(cashAcc.openingBalance || 0) : 0;
+    balancesPaise['ACC_CASH'] = cashAcc ? readPaiseOr(cashAcc, 'openingBalance', 0) : 0;
   }
 
   const entries: UnifiedLedgerEntry[] = [];
@@ -128,8 +129,8 @@ export function computeCashBankSummary(params: {
   orderedInvoices.forEach((inv) => {
     if (!inv) return;
     const paidPaise = typeof inv.paidAmount === 'number'
-      ? toPaise(inv.paidAmount)
-      : (inv.paymentStatus === 'PAID' ? toPaise(inv.grandTotal || 0) : 0);
+      ? readPaiseOr(inv, 'paidAmount')
+      : (inv.paymentStatus === 'PAID' ? readPaiseOr(inv, 'grandTotal', 0) : 0);
 
     if (comparePaise(paidPaise, 0) > 0 && inv.paymentMode !== 'CREDIT') {
       // 1. Direct document allocation suppression
@@ -277,8 +278,8 @@ export function computeCashBankSummary(params: {
   orderedPurchases.forEach((pur) => {
     if (!pur) return;
     const paidPaise = typeof pur.paidAmount === 'number'
-      ? toPaise(pur.paidAmount)
-      : (pur.paymentStatus === 'PAID' ? toPaise(pur.grandTotal || 0) : 0);
+      ? readPaiseOr(pur, 'paidAmount')
+      : (pur.paymentStatus === 'PAID' ? readPaiseOr(pur, 'grandTotal', 0) : 0);
 
     if (comparePaise(paidPaise, 0) > 0 && pur.paymentMode !== 'CREDIT') {
       // 1. Direct document allocation suppression
@@ -374,7 +375,7 @@ export function computeCashBankSummary(params: {
   // 4. Process Expenses (Outflow)
   expenses.forEach((exp) => {
     if (!exp) return;
-    const expPaise = toPaise(exp.amount || 0);
+    const expPaise = readPaiseOr(exp, 'amount', 0);
     if (comparePaise(expPaise, 0) > 0) {
       const isCash = exp.paymentMode === 'CASH';
       const targetAccId = isCash ? 'ACC_CASH' : (exp.bankAccountId || defaultBank.id);
@@ -419,14 +420,14 @@ export function computeCashBankSummary(params: {
       bankIds.add('ACC_BANK_DEFAULT');
 
       const cashOrBankEntries = vEntries.filter(
-        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(toPaise(e.debit || 0), 0) > 0
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(readPaiseOr(e, 'debit', 0), 0) > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
         const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
-        const amtPaise = toPaise(entry.debit || 0);
+        const amtPaise = readPaiseOr(entry, 'debit', 0);
 
         balancesPaise[targetAccId] = addPaise(balancesPaise[targetAccId] || 0, amtPaise);
         const dateStr = v.date || todayStr;
@@ -456,14 +457,14 @@ export function computeCashBankSummary(params: {
       bankIds.add('ACC_BANK_DEFAULT');
 
       const cashOrBankEntries = vEntries.filter(
-        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(toPaise(e.credit || 0), 0) > 0
+        (e) => e && (e.accountId === 'ACC_CASH' || bankIds.has(e.accountId) || e.accountId?.startsWith('BANK') || e.accountId?.startsWith('ACC_BANK')) && comparePaise(readPaiseOr(e, 'credit', 0), 0) > 0
       );
       cashOrBankEntries.forEach((entry, idx) => {
         const isCash = entry.accountId === 'ACC_CASH';
         const matchedAcc = accounts.find((a) => a && a.id === entry.accountId);
         const targetAccId = isCash ? 'ACC_CASH' : (matchedAcc?.id || (entry.accountId && entry.accountId !== 'ACC_BANK' ? entry.accountId : defaultBank.id));
         const targetAccName = isCash ? 'Cash in Hand' : (matchedAcc?.accountName || entry.accountName || defaultBank.accountName);
-        const amtPaise = toPaise(entry.credit || 0);
+        const amtPaise = readPaiseOr(entry, 'credit', 0);
 
         balancesPaise[targetAccId] = subPaise(balancesPaise[targetAccId] || 0, amtPaise);
         const dateStr = v.date || todayStr;
@@ -487,8 +488,8 @@ export function computeCashBankSummary(params: {
         });
       });
     } else if (v.voucherType === 'CONTRA') {
-      const creditEntry = vEntries.find((e) => e && comparePaise(toPaise(e.credit || 0), 0) > 0);
-      const debitEntry = vEntries.find((e) => e && comparePaise(toPaise(e.debit || 0), 0) > 0);
+      const creditEntry = vEntries.find((e) => e && comparePaise(readPaiseOr(e, 'credit', 0), 0) > 0);
+      const debitEntry = vEntries.find((e) => e && comparePaise(readPaiseOr(e, 'debit', 0), 0) > 0);
       if (creditEntry && debitEntry) {
         const fromAccId = creditEntry.accountId || 'ACC_CASH';
         const toAccId = debitEntry.accountId || defaultBank.id;
@@ -496,7 +497,7 @@ export function computeCashBankSummary(params: {
         const toAcc = accounts.find((a) => a.id === toAccId);
         const fromName = fromAcc?.accountName || creditEntry.accountName || (fromAccId === 'ACC_CASH' ? 'Cash in Hand' : 'Cash');
         const toName = toAcc?.accountName || debitEntry.accountName || defaultBank.accountName;
-        const amtPaise = toPaise(debitEntry.debit || creditEntry.credit || v.totalAmount || 0);
+        const amtPaise = readPaiseOr(debitEntry, 'debit', 0) || readPaiseOr(creditEntry, 'credit', 0) || toPaise(v.totalAmount || 0);
         const dateStr = v.date || todayStr;
 
         balancesPaise[fromAccId] = subPaise(balancesPaise[fromAccId] || 0, amtPaise);
@@ -552,7 +553,7 @@ export function computeCashBankSummary(params: {
   // 6. Process Explicit Cash & Bank Transactions (Contra transfers, Direct In/Out)
   transactions.forEach((txn) => {
     if (!txn) return;
-    const amtPaise = toPaise(txn.amount || 0);
+    const amtPaise = readPaiseOr(txn, 'amount', 0);
     if (comparePaise(amtPaise, 0) <= 0) return;
 
     const dateStr = txn.date || txn.createdAt?.split('T')[0] || todayStr;
