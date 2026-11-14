@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { db } from '../../services/db.ts';
+import { useItems } from '../../core/store/useDataStore.ts';
 import { ItemCategory } from '../../models/category.ts';
 import { CategoryManagementModal } from './modals/CategoryManagementModal.tsx';
 
@@ -21,7 +22,7 @@ export const ItemSettingsTab: React.FC<ItemSettingsTabProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categories, setCategories] = useState<ItemCategory[]>(() => db.getCategories());
 
-  const items = useMemo(() => db.getItems(), []);
+  const items = useItems();
   const itemCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const item of items) {

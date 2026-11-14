@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
+import { useCompany } from '../../core/store/useDataStore.ts';
 import { db } from '../../services/db.ts';
 
 const SimplifiedInvoiceModal = React.lazy(() =>
@@ -78,7 +79,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   const [selectedPurchaseForPreview, setSelectedPurchaseForPreview] = useState<PurchaseBill | null>(null);
   const [showDisablePromptModal, setShowDisablePromptModal] = useState(false);
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
-  const company = useMemo(() => db.getCompany(), []);
+  const company = useCompany();
 
   const handleRowClick = (txn: ItemTransactionRecord) => {
     if (txn.type === 'SALE') {

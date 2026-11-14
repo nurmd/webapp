@@ -3,7 +3,7 @@ import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoic
 import { formatINR } from '../../../core/utils/formatters.ts';
 import { formatSplitNotes } from '../../../core/accounting/paymentSplitUtils.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
-import { db } from '../../../services/db.ts';
+import { useBankAccounts } from '../../../core/store/useDataStore.ts';
 
 export interface InvoicePaymentModalProps {
   isOpen: boolean;
@@ -64,9 +64,10 @@ export const InvoicePaymentModal: React.FC<InvoicePaymentModalProps> = ({
     return [{ id: '1', mode: 'CASH', amount: finalGrandTotal, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' }];
   });
 
+  const allBankAccounts = useBankAccounts();
   const bankAccounts = useMemo(() => {
-    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
-  }, []);
+    return allBankAccounts.filter((b) => b.accountType === 'BANK');
+  }, [allBankAccounts]);
 
   const defaultBank = bankAccounts.find((b) => (b as any).isDefault) || bankAccounts[0];
   const defaultBankId = defaultBank?.id || 'ACC_BANK';

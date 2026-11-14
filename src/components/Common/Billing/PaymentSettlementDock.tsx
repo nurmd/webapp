@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../../models/invoice.ts';
 import { formatINR } from '../../../core/utils/formatters.ts';
-import { db } from '../../../services/db.ts';
+import { useBankAccounts } from '../../../core/store/useDataStore.ts';
 
 export interface PaymentSettlementDockProps {
   paymentSplits: PaymentSplit[];
@@ -37,12 +37,13 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
   paymentModes = DEFAULT_PAYMENT_MODES,
   bankAccounts: passedBankAccounts,
 }) => {
+  const storeBankAccounts = useBankAccounts();
   const activeBankAccounts = useMemo(() => {
-    if (passedBankAccounts && passedBankAccounts.length > 0) {
-      return passedBankAccounts.filter((b) => (b.accountType || 'BANK') === 'BANK');
-    }
-    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
-  }, [passedBankAccounts]);
+    const candidateAccounts = passedBankAccounts && passedBankAccounts.length > 0
+      ? passedBankAccounts
+      : storeBankAccounts;
+    return candidateAccounts.filter((b) => (b.accountType || 'BANK') === 'BANK');
+  }, [passedBankAccounts, storeBankAccounts]);
 
   const allPaymentModes = useMemo(() => {
     const modes = [...paymentModes];

@@ -9,6 +9,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
+import { useCompany } from '../../core/store/useDataStore.ts';
 import { db } from '../../services/db.ts';
 import { AppTab } from '../Shell/Drawer.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
@@ -53,6 +54,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
   onUnlinkAllocation,
   onEditVoucher,
 }) => {
+  const storeCompany = useCompany();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
@@ -1139,7 +1141,7 @@ export const CashBankTransactionDetailModal: React.FC<CashBankTransactionDetailM
         <WhatsAppShareModal
           isOpen={isWhatsAppShareOpen}
           onClose={() => setIsWhatsAppShareOpen(false)}
-          company={company || db.getCompany()}
+          company={company || storeCompany}
           invoice={undefined}
           party={linkedParty || undefined}
           initialPhone={linkedParty?.phone}

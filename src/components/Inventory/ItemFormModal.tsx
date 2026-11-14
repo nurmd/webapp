@@ -3,6 +3,7 @@ import { InventoryItem, ItemPriceMode, UnitOfMeasurement, isItemDisabled } from 
 import { exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { useItems } from '../../core/store/useDataStore.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import type { HsnItem } from '../../core/gst/hsnCatalog';
@@ -33,6 +34,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     return true;
   }, isOpen, 20);
 
+  const storeItems = useItems();
+
   const [itemType, setItemType] = useState<'PRODUCT' | 'SERVICE'>('PRODUCT');
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
@@ -55,9 +58,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const nameChanged = !editingItem || normalizeEntityName(name) !== normalizeEntityName(editingItem.name);
   const isDuplicateName = useMemo(() => {
     if (!nameChanged) return false;
-    const itemsList = existingItems ?? db.getItems();
+    const itemsList = existingItems ?? storeItems;
     return Boolean(findDuplicateItem(name, itemsList, editingItem?.id));
-  }, [name, existingItems, editingItem, nameChanged]);
+  }, [name, existingItems, storeItems, editingItem, nameChanged]);
 
   useEffect(() => {
     if (isDuplicateName) {

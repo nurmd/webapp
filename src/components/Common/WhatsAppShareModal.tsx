@@ -14,7 +14,7 @@ import {
   getWhatsAppPhoneErrorMessage,
 } from '../../core/utils/whatsappIntent.ts';
 import { isDemoModeActive } from '../../core/utils/demoMode.ts';
-import { db } from '../../services/db.ts';
+import { useParties } from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import {
@@ -104,20 +104,22 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     }
   }, [previewMode]);
 
+  const parties = useParties();
+
   // Pull the live party from storage so edited party details (name, phone,
   // GSTIN, address, balance) reflect in the share instead of the stale
   // snapshot captured on the bill at creation time.
   const liveParty = useMemo<Party | undefined>(() => {
     if (invoice?.partyId) {
       try {
-        const found = db.getParties().find((pp) => pp.id === invoice.partyId);
+        const found = parties.find((pp) => pp.id === invoice.partyId);
         if (found) return found;
       } catch {
         // Fall through to the passed-in party / invoice snapshot.
       }
     }
     return party;
-  }, [invoice?.partyId, party]);
+  }, [invoice?.partyId, party, parties]);
 
   const defaultPhone =
     (liveParty?.phone && liveParty.phone.trim()) ||

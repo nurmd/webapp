@@ -6,7 +6,8 @@ import { amountInWords } from '../../../core/utils/currencyWords.ts';
 import { getStateByCode } from '../../../core/gst/stateCodes.ts';
 import { formatThermalReceiptText } from '../../../core/printer/escpos.ts';
 import { inclusiveFromExclusive } from '../../../core/gst/pricing.ts';
-import { DEFAULT_INVOICES, db } from '../../../services/db.ts';
+import { DEFAULT_INVOICES } from '../../../services/db.ts';
+import { useParties } from '../../../core/store/useDataStore.ts';
 import { printSettingsService, resolveReceiptTitle } from '../../../services/printSettingsService.ts';
 import { generateQrCodeSvgString } from '../../../core/utils/qrCodeSvg.ts';
 import { getPartyTotalBalanceDue } from '../../../core/utils/upiAndShare.ts';
@@ -54,10 +55,10 @@ export function useInvoicePreviewModel(input: UseInvoicePreviewModelInput) {
   const posStateObj = getStateByCode(posStateCode);
 
   const a4Settings = printSettingsService.getSettings().a4;
+  const parties = useParties();
 
   const party = useMemo(() => {
     if (!invoice.partyName && !invoice.partyId) return null;
-    const parties = db.getParties();
     return (
       parties.find(
         (p) =>
@@ -65,7 +66,7 @@ export function useInvoicePreviewModel(input: UseInvoicePreviewModelInput) {
           (p.name && p.name.trim().toLowerCase() === (invoice.partyName || '').trim().toLowerCase())
       ) || null
     );
-  }, [invoice.partyId, invoice.partyName]);
+  }, [invoice.partyId, invoice.partyName, parties]);
 
   // Pull live party details so edited party info (name, phone, GSTIN, address)
   // reflects in previews/prints instead of the stale snapshot on the bill.

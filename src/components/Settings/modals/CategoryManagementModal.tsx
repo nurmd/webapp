@@ -5,6 +5,7 @@ import {
   CATEGORY_ICON_OPTIONS,
 } from '../../../models/category.ts';
 import { db } from '../../../services/db.ts';
+import { useItems } from '../../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../../services/toast.ts';
 import { ConfirmDeleteModal } from '../../Common/ConfirmDeleteModal.tsx';
@@ -54,7 +55,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
   const [formError, setFormError] = useState('');
 
   // Compute item count per category from live catalog
-  const items = useMemo(() => db.getItems(), [isOpen, categories]);
+  const items = useItems();
   const itemCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const item of items) {

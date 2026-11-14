@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
-import { db } from '../../services/db.ts';
+import { useBankAccounts } from '../../core/store/useDataStore.ts';
 import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface SplitPaymentBreakdown {
@@ -35,9 +35,10 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     return true;
   }, isOpen, 20);
 
+  const allBankAccounts = useBankAccounts();
   const bankAccounts = useMemo(() => {
-    return db.getBankAccounts().filter((b) => b.accountType === 'BANK');
-  }, []);
+    return allBankAccounts.filter((b) => b.accountType === 'BANK');
+  }, [allBankAccounts]);
   const defaultBank = bankAccounts.find((b) => (b as any).isDefault) || bankAccounts[0];
 
   const [cash, setCash] = useState<string>('');

@@ -2,7 +2,7 @@ import React from 'react';
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
-import { db } from '../../services/db.ts';
+import { usePartyGroups, usePartyCategories } from '../../core/store/useDataStore.ts';
 import { isSystemParty } from '../../core/utils/systemParties.ts';
 
 export interface PartyInfoCardProps {
@@ -42,8 +42,10 @@ export const PartyInfoCard: React.FC<PartyInfoCardProps> = ({
   onCreateInvoice,
   onCreatePurchase,
 }) => {
-  const group = party.groupId ? db.getPartyGroups().find((g) => g.id === party.groupId) : undefined;
-  const category = party.categoryId ? db.getPartyCategories().find((c) => c.id === party.categoryId) : undefined;
+  const partyGroups = usePartyGroups();
+  const partyCategories = usePartyCategories();
+  const group = party.groupId ? partyGroups.find((g) => g.id === party.groupId) : undefined;
+  const category = party.categoryId ? partyCategories.find((c) => c.id === party.categoryId) : undefined;
 
   return (
     <section className="bg-white dark:bg-surface-container-lowest text-on-surface rounded-2xl p-3 sm:p-4 border border-outline-variant/40 shadow-sm flex flex-col gap-2.5">

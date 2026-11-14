@@ -4,7 +4,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { printExpenseVoucher } from '../../core/utils/expenseVoucherPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
-import { db } from '../../services/db.ts';
+import { useCompany } from '../../core/store/useDataStore.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
 import {
   DatePreset,
@@ -50,7 +50,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
   onSaveExpense,
   onDeleteExpense,
 }) => {
-  const company = useMemo(() => db.getCompany(), []);
+  const company = useCompany();
   const isGstActive = company.isGstEnabled !== false;
 
   // View & Filter States

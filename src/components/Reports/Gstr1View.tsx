@@ -5,7 +5,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { Download, FileSpreadsheet, ShieldCheck, Calculator, BarChart3, Landmark } from 'lucide-react';
 
 import { Expense } from '../../models/expense.ts';
-import { db } from '../../services/db.ts';
+import { useExpenses } from '../../core/store/useDataStore.ts';
 
 interface Gstr1ViewProps {
   invoices: Invoice[];
@@ -18,7 +18,8 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({
   purchases = [],
   expenses: propExpenses,
 }) => {
-  const activeExpenses = propExpenses !== undefined ? propExpenses : db.getExpenses();
+  const storeExpenses = useExpenses();
+  const activeExpenses = propExpenses !== undefined ? propExpenses : storeExpenses;
   const [activeMainTab, setActiveMainTab] = useState<'GSTR1' | 'GSTR3B' | 'PL' | 'BALANCE_SHEET'>('GSTR1');
   const [selectedSection, setSelectedSection] = useState<'4_B2B' | '7_B2CS' | '9B_CDNR' | '12_HSN'>('4_B2B');
 

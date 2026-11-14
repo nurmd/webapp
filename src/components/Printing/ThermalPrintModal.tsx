@@ -9,7 +9,7 @@ import {
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
 import { printSettingsService } from '../../services/printSettingsService.ts';
-import { db } from '../../services/db.ts';
+import { useParties } from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
 import {
@@ -70,10 +70,10 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   }, [width]);
 
   const thermalSettings = printSettingsService.getSettings().thermal;
+  const parties = useParties();
 
   const party = useMemo(() => {
     if (!invoice.partyName && !invoice.partyId) return null;
-    const parties = db.getParties();
     return (
       parties.find(
         (p) =>
@@ -81,7 +81,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
           (p.name && p.name.trim().toLowerCase() === (invoice.partyName || '').trim().toLowerCase())
       ) || null
     );
-  }, [invoice.partyId, invoice.partyName]);
+  }, [invoice.partyId, invoice.partyName, parties]);
 
   const receiptData = useMemo(
     () => buildThermalReceiptData(invoice, company),

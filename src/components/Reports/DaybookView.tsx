@@ -5,7 +5,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { BookOpen, CheckCircle, Printer } from 'lucide-react';
 import { ReportPdfConfig } from './utils/reportExportUtils.ts';
 import { ReportPreviewModal } from './ReportPreviewModal.tsx';
-import { db } from '../../services/db.ts';
+import { useCompany } from '../../core/store/useDataStore.ts';
 import { preloadReportPdfPreviewModal } from '../../core/utils/modalPreload.ts';
 
 interface DaybookViewProps {
@@ -17,7 +17,8 @@ export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers, company }) =
   const [filterType, setFilterType] = useState('ALL');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const activeCompany = useMemo(() => company || db.getCompany(), [company]);
+  const storeCompany = useCompany();
+  const activeCompany = company || storeCompany;
 
   const filtered = vouchers.filter((v) => filterType === 'ALL' || v.voucherType === filterType);
 

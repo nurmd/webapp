@@ -3,7 +3,7 @@ import { InventoryItem, ItemPriceMode, UnitOfMeasurement } from '../../models/it
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
-import { db } from '../../services/db.ts';
+import { useCompany } from '../../core/store/useDataStore.ts';
 
 interface CustomItemModalProps {
   isOpen: boolean;
@@ -23,7 +23,8 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
     return true;
   }, isOpen, 20);
 
-  const isGstEnabled = isGstActive ?? (typeof db?.getCompany === 'function' ? (db.getCompany()?.isGstEnabled !== false) : true);
+  const company = useCompany();
+  const isGstEnabled = isGstActive ?? (company?.isGstEnabled !== false);
 
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');

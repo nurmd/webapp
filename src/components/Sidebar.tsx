@@ -13,7 +13,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import { db } from '../services/db.ts';
+import { useCompany } from '../core/store/useDataStore.ts';
 
 export type NavTab =
   | 'dashboard'
@@ -34,7 +34,8 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
-  const isGstActive = db.getCompany().isGstEnabled !== false;
+  const company = useCompany();
+  const isGstActive = company.isGstEnabled !== false;
   const menuItems: Array<{ id: NavTab; label: string; icon: React.ReactNode }> = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
     { id: 'pos', label: 'POS Quick Bill', icon: <ShoppingCart size={18} /> },

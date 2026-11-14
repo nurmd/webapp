@@ -16,6 +16,7 @@ import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/u
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
+import { useBankAccounts } from '../../core/store/useDataStore.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
@@ -90,8 +91,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const [allocationModeState, setAllocationModeState] = useState<'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT'>('UNALLOCATED');
   const [isManualAllocation, setIsManualAllocation] = useState<boolean>(false);
 
+  const allBankAccounts = useBankAccounts();
+
   const availableBankAccounts = useMemo(() => {
-    const all = db.getBankAccounts() || [];
+    const all = allBankAccounts || [];
     const banks = all.filter((a) => a.accountType === 'BANK');
     if (banks.length > 0) return banks;
     return [
@@ -104,7 +107,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         updatedAt: '',
       },
     ];
-  }, []);
+  }, [allBankAccounts]);
 
   const [editBankAccountId, setEditBankAccountId] = useState<string>(() => {
     const banks = db.getBankAccounts().filter((a) => a.accountType === 'BANK');
