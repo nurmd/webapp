@@ -1,15 +1,15 @@
 {
-  "version": "1.2.81",
+  "version": "1.2.82",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-13T05:45:45.639Z",
+  "buildTime": "2026-11-14T07:58:37.277Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "fix(whatsapp/print): pull live party details dynamically",
-    "repair stale twins, exempt derived unitPrice, show divergence details (W1-W3)",
-    "recover from a wedged IndexedDB replica and bound the write-queue drain",
-    "make write-queue removal robust to missing keys (entryKey fallback)",
-    "v1.2.80 - survive WebView renderer death + repair write queue + unblock PouchDB writes",
-    "manual paise backfill card in Data & Sync"
+    "migrate 19 render-time db.get* reads to useDataStore hooks",
+    "progressive windowing for expenses, purchases and passbook",
+    "adopt readPaiseOr/readRupeeOr in accounting calculators and print adapters",
+    "allow clearing the payment amount input (SalesHubView)",
+    "v1.2.81 - repair stale paise twins, show divergence details, dynamic party details in WhatsApp/print",
+    "fix(whatsapp/print): pull live party details dynamically"
   ]
 }
