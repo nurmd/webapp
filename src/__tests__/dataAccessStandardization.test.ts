@@ -138,4 +138,33 @@ describe('Data Access Standardization: Wave 1 Static Guard (Phase 2 Batch B)', (
       expect(code).not.toMatch(/company=\{company\s*\|\|\s*db\.getCompany\(\)\}/);
     });
   });
+
+  describe('Wave 2 Batch 1: Identity-Dependent Render Reads', () => {
+    it('PaymentModalContext.tsx uses store hooks and eliminates all db.get* calls', () => {
+      const code = readComponent('src/components/Payments/PaymentModalContext.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useParties');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).toContain('useBankAccounts');
+      expect(code).not.toMatch(/db\.getParties\s*\(/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/db\.getBankAccounts\s*\(/);
+      expect(code).not.toMatch(/services\/db(\.ts)?['"]/);
+    });
+
+    it('SelectPartyModal.tsx uses store hooks and eliminates render-time db.getCompany/getInvoices/getPurchases/getVouchers', () => {
+      const code = readComponent('src/components/Parties/SelectPartyModal.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useCompany');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).toContain('useVouchers');
+      expect(code).not.toMatch(/db\.getCompany\s*\(/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/db\.getVouchers\s*\(/);
+    });
+  });
 });

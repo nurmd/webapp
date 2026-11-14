@@ -5,7 +5,12 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { BankAccount } from '../../models/bankAccount.ts';
 import { PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import { RecordPaymentModal } from '../Parties/RecordPaymentModal.tsx';
-import { db } from '../../services/db.ts';
+import {
+  useParties,
+  useInvoices,
+  usePurchases,
+  useBankAccounts,
+} from '../../core/store/useDataStore.ts';
 
 export interface OpenPaymentModalOptions {
   flow?: 'IN' | 'OUT';
@@ -90,6 +95,11 @@ export const PaymentModalProvider: React.FC<PaymentModalProviderProps> = ({
   bankAccounts,
   onRefresh,
 }) => {
+  const storeParties = useParties();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeBankAccounts = useBankAccounts();
+
   const [isOpen, setIsOpen] = useState(false);
   const [modalOptions, setModalOptions] = useState<OpenPaymentModalOptions>({});
   const [openCount, setOpenCount] = useState(0);
@@ -131,11 +141,11 @@ export const PaymentModalProvider: React.FC<PaymentModalProviderProps> = ({
   const resolvedParty = useMemo(() => {
     if (modalOptions.party) return modalOptions.party;
     if (modalOptions.partyId) {
-      const allParties = parties && parties.length > 0 ? parties : db.getParties();
+      const allParties = parties && parties.length > 0 ? parties : storeParties;
       return allParties.find((p) => p.id === modalOptions.partyId);
     }
     return undefined;
-  }, [modalOptions.party, modalOptions.partyId, parties]);
+  }, [modalOptions.party, modalOptions.partyId, parties, storeParties]);
 
   const resolvedFlow: 'IN' | 'OUT' =
     modalOptions.flow || (resolvedParty?.type === 'SUPPLIER' ? 'OUT' : 'IN');
@@ -162,10 +172,10 @@ export const PaymentModalProvider: React.FC<PaymentModalProviderProps> = ({
           asDialog={true}
           onClose={closeModal}
           party={resolvedParty}
-          parties={parties && parties.length > 0 ? parties : db.getParties()}
-          invoices={invoices && invoices.length > 0 ? invoices : db.getInvoices()}
-          purchases={purchases && purchases.length > 0 ? purchases : db.getPurchases()}
-          bankAccounts={bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts()}
+          parties={parties && parties.length > 0 ? parties : storeParties}
+          invoices={invoices && invoices.length > 0 ? invoices : storeInvoices}
+          purchases={purchases && purchases.length > 0 ? purchases : storePurchases}
+          bankAccounts={bankAccounts && bankAccounts.length > 0 ? bankAccounts : storeBankAccounts}
           initialPaymentType={resolvedFlow}
           onRecordPayment={(
             party,

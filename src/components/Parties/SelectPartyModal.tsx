@@ -1,9 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { Party } from '../../models/party.ts';
+import { CompanyProfile } from '../../models/company.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
 import { db } from '../../services/db.ts';
+import {
+  useCompany,
+  useInvoices,
+  usePurchases,
+  useVouchers,
+} from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { isSystemParty, createWalkInCustomer } from '../../core/utils/systemParties.ts';
 import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
@@ -16,6 +23,7 @@ export interface SelectPartyModalProps {
   onSelectParty: (party: Party) => void;
   onClose: () => void;
   onAddNewParty?: () => void;
+  company?: CompanyProfile;
 }
 
 export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
@@ -26,9 +34,16 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   onSelectParty,
   onClose,
   onAddNewParty,
+  company,
 }) => {
+  const storeCompany = useCompany();
+  const activeCompany = company || storeCompany;
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeVouchers = useVouchers();
+
   const isPos = mode === 'pos';
-  const isGstActive = db.getCompany().isGstEnabled !== false;
+  const isGstActive = activeCompany.isGstEnabled !== false;
 
   // POS State
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -60,9 +75,9 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
   // Precomputed lookup map of latest transaction timestamp against each party
   const partyLatestTxMap = useMemo(() => {
     const map = new Map<string, number>();
-    const invList = db.getInvoices();
-    const purList = db.getPurchases();
-    const vchList = db.getVouchers();
+    const invList = storeInvoices;
+    const purList = storePurchases;
+    const vchList = storeVouchers;
 
     for (const p of parties) {
       let latest = 0;
@@ -113,12 +128,12 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
     }
 
     return map;
-  }, [parties]);
+  }, [parties, storeInvoices, storePurchases, storeVouchers]);
 
   if (!isOpen) return null;
 
   // --- POS Mode Logic ---
-  const systemParty = parties.find(isSystemParty) || createWalkInCustomer(db.getCompany().stateCode || '27', 0);
+  const systemParty = parties.find(isSystemParty) || createWalkInCustomer(activeCompany.stateCode || '27', 0);
   const customerParties = parties.filter((p) => p.type === 'CUSTOMER' && !isSystemParty(p));
 
   const handleCycleSort = () => {
