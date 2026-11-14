@@ -3,6 +3,7 @@ import { Expense, ExpenseCategory } from '../../models/expense.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { printExpenseVoucher } from '../../core/utils/expenseVoucherPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 import { db } from '../../services/db.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
 import {
@@ -166,6 +167,8 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
       }
     });
   }, [filtered, sortBy]);
+
+  const expenseWindow = useProgressiveWindow(sortedExpenses.length);
 
   // Active filter count for badge
   const activeFilterCount =
@@ -358,18 +361,41 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({
             </div>
           </div>
         ) : (
-          sortedExpenses.map((exp) => (
-            <ExpenseCard
-              key={exp.id}
-              expense={exp}
-              isGstActive={isGstActive}
-              onView={(e) => setViewingExpense(e)}
-              onEdit={handleOpenEdit}
-              onDelete={(id) => setDeletingExpenseId(id)}
-              onShare={handleShareWhatsApp}
-              onPrint={handlePrint}
-            />
-          ))
+          <>
+            {sortedExpenses.slice(0, expenseWindow.visibleCount).map((exp) => (
+              <ExpenseCard
+                key={exp.id}
+                expense={exp}
+                isGstActive={isGstActive}
+                onView={(e) => setViewingExpense(e)}
+                onEdit={handleOpenEdit}
+                onDelete={(id) => setDeletingExpenseId(id)}
+                onShare={handleShareWhatsApp}
+                onPrint={handlePrint}
+              />
+            ))}
+            {expenseWindow.enabled && (
+              <div className="md:col-span-2 pt-2 pb-4 flex flex-col items-center gap-2">
+                <div ref={expenseWindow.sentinelRef} className="h-1 w-full" />
+                {expenseWindow.hasMore && (
+                  <button
+                    type="button"
+                    data-testid="expenses-show-more"
+                    onClick={expenseWindow.loadMore}
+                    className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                  >
+                    Show more ({expenseWindow.remaining} remaining)
+                  </button>
+                )}
+                <p
+                  data-testid="expenses-window-status"
+                  className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+                >
+                  Showing {expenseWindow.visibleCount} of {sortedExpenses.length} expenses
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 

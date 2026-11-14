@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatINR } from '../../core/utils/formatters.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 import { PassbookEntry, TxnFilterType, TxnSortOrderType } from './usePartyPassbook.ts';
 
 /**
@@ -49,6 +50,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
   setSearchTxn,
   onTransactionClick,
 }) => {
+  const passbookWindow = useProgressiveWindow(filteredPassbook.length);
+
   return (
     <section className="bg-slate-50 dark:bg-surface-container-low rounded-2xl border border-outline-variant/20 p-3 sm:p-4 shadow-xs flex flex-col gap-2.5">
       {/* Header & Filter Controls */}
@@ -125,7 +128,8 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
             <p className="text-xs">No transactions in this filter</p>
           </div>
         ) : (
-          filteredPassbook.map((entry) => {
+          <>
+            {filteredPassbook.slice(0, passbookWindow.visibleCount).map((entry) => {
             const isCredit = entry.credit > 0;
             const isDebit = entry.debit > 0;
 
@@ -413,7 +417,29 @@ export const PartyPassbookTable: React.FC<PartyPassbookTableProps> = ({
                 </div>
               </div>
             );
-          })
+          })}
+          {passbookWindow.enabled && (
+            <div className="pt-2 pb-4 flex flex-col items-center gap-2">
+              <div ref={passbookWindow.sentinelRef} className="h-1 w-full" />
+              {passbookWindow.hasMore && (
+                <button
+                  type="button"
+                  data-testid="passbook-show-more"
+                  onClick={passbookWindow.loadMore}
+                  className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Show more ({passbookWindow.remaining} remaining)
+                </button>
+              )}
+              <p
+                data-testid="passbook-window-status"
+                className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+              >
+                Showing {passbookWindow.visibleCount} of {filteredPassbook.length} entries
+              </p>
+            </div>
+          )}
+        </>
         )}
       </div>
     </section>

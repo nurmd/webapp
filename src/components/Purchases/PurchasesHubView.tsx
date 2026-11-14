@@ -18,6 +18,7 @@ import { BulkActionToolbar } from '../Common/BulkActionToolbar.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
 import {
   useModalPreloadOnMount,
   preloadSimplifiedPurchaseModal,
@@ -153,6 +154,8 @@ const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
       }
     });
   }, [statusFiltered, sortBy]);
+
+  const purchaseWindow = useProgressiveWindow(sortedPurchases.length);
 
   // Bulk selection and batch operations
   const {
@@ -500,7 +503,8 @@ const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
             No purchase records found.
           </div>
         ) : (
-          sortedPurchases.map((bill) => {
+          <>
+            {sortedPurchases.slice(0, purchaseWindow.visibleCount).map((bill) => {
             const isUnpaid = bill.paymentStatus === 'UNPAID';
             const isPartial = bill.paymentStatus === 'PARTIAL';
             const isPaid = bill.paymentStatus === 'PAID';
@@ -592,7 +596,29 @@ const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
                 </div>
               </div>
             );
-          })
+          })}
+          {purchaseWindow.enabled && (
+            <div className="md:col-span-2 pt-2 pb-4 flex flex-col items-center gap-2">
+              <div ref={purchaseWindow.sentinelRef} className="h-1 w-full" />
+              {purchaseWindow.hasMore && (
+                <button
+                  type="button"
+                  data-testid="purchases-show-more"
+                  onClick={purchaseWindow.loadMore}
+                  className="w-full py-2.5 px-4 rounded-xl border border-secondary/30 bg-secondary/5 hover:bg-secondary/10 text-secondary font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Show more ({purchaseWindow.remaining} remaining)
+                </button>
+              )}
+              <p
+                data-testid="purchases-window-status"
+                className="text-[11px] text-slate-500 dark:text-slate-400 font-medium"
+              >
+                Showing {purchaseWindow.visibleCount} of {sortedPurchases.length} purchases
+              </p>
+            </div>
+          )}
+        </>
         )}
       </section>
 
