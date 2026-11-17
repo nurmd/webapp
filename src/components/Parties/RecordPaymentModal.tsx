@@ -12,7 +12,7 @@ import {
 } from '../../core/accounting/paymentAllocation.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
-import { db } from '../../services/db.ts';
+import { useParties, useBankAccounts, useInvoices, usePurchases } from '../../core/store/useDataStore.ts';
 import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface RecordPaymentModalProps {
@@ -58,6 +58,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   onRecordPayment,
   onRefresh,
 }) => {
+  const storeParties = useParties();
+  const storeBankAccounts = useBankAccounts();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+
   useBackNavigation(() => {
     onClose();
     return true;
@@ -68,8 +73,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   );
 
   const allParties = useMemo(() => {
-    return parties && parties.length > 0 ? parties : db.getParties();
-  }, [parties]);
+    return parties && parties.length > 0 ? parties : storeParties;
+  }, [parties, storeParties]);
 
   const [selectedPartyId, setSelectedPartyId] = useState<string>(party?.id || '');
 
@@ -99,7 +104,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const [isManualAllocation, setIsManualAllocation] = useState<boolean>(false);
 
   const availableBankAccounts = useMemo(() => {
-    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts()) || [];
+    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : storeBankAccounts) || [];
     const banks = all.filter((a) => a.accountType === 'BANK');
     if (banks.length > 0) return banks;
     return [
@@ -112,10 +117,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         updatedAt: '',
       },
     ];
-  }, [bankAccounts]);
+  }, [bankAccounts, storeBankAccounts]);
 
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>(() => {
-    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : db.getBankAccounts()) || [];
+    const all = (bankAccounts && bankAccounts.length > 0 ? bankAccounts : storeBankAccounts) || [];
     const banks = all.filter((a) => a.accountType === 'BANK');
     const def = banks.find((a) => a.isDefault) || banks[0];
     return def?.id || 'ACC_BANK';
@@ -143,18 +148,18 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   // Outstanding documents for selected party with live DB fallback
   const effectiveInvoices = useMemo(() => {
-    const fromDb = db.getInvoices();
+    const fromDb = storeInvoices;
     if (!invoices || invoices.length === 0) return fromDb;
     const dbMap = new Map(fromDb.map((i) => [i.id, i]));
     return invoices.map((i) => dbMap.get(i.id) || i);
-  }, [invoices]);
+  }, [invoices, storeInvoices]);
 
   const effectivePurchases = useMemo(() => {
-    const fromDb = db.getPurchases();
+    const fromDb = storePurchases;
     if (!purchases || purchases.length === 0) return fromDb;
     const dbMap = new Map(fromDb.map((p) => [p.id, p]));
     return purchases.map((p) => dbMap.get(p.id) || p);
-  }, [purchases]);
+  }, [purchases, storePurchases]);
 
   const outstandingDocs: OutstandingDocument[] = useMemo(() => {
     if (!activeParty) return [];

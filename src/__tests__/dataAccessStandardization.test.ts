@@ -167,4 +167,65 @@ describe('Data Access Standardization: Wave 1 Static Guard (Phase 2 Batch B)', (
       expect(code).not.toMatch(/db\.getVouchers\s*\(/);
     });
   });
+
+  describe('Wave 2 Batch 2: TableGridInvoiceModal + RecordPaymentModal', () => {
+    it('TableGridInvoiceModal.tsx uses useInvoices and useParties and migrates render-path db.get* calls', () => {
+      const code = readComponent('src/components/Invoicing/TableGridInvoiceModal.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('useParties');
+
+      // Verify allInvoices memo uses storeInvoices and deps
+      const allInvoicesStart = code.indexOf('const allInvoices = useMemo');
+      const allInvoicesEnd = code.indexOf('const [selectedParty, setSelectedParty]');
+      expect(allInvoicesStart).toBeGreaterThan(-1);
+      expect(allInvoicesEnd).toBeGreaterThan(allInvoicesStart);
+      const allInvoicesSlice = code.slice(allInvoicesStart, allInvoicesEnd);
+      expect(allInvoicesSlice).toContain('storeInvoices');
+      expect(allInvoicesSlice).not.toContain('db.getInvoices');
+
+      // Verify selectedParty initializer uses storeParties
+      const selectedPartyStart = code.indexOf('const [selectedParty, setSelectedParty]');
+      const selectedPartyEnd = code.indexOf('const [isPartyModalOpen, setIsPartyModalOpen]');
+      expect(selectedPartyStart).toBeGreaterThan(-1);
+      expect(selectedPartyEnd).toBeGreaterThan(selectedPartyStart);
+      const selectedPartySlice = code.slice(selectedPartyStart, selectedPartyEnd);
+      expect(selectedPartySlice).toContain('const dbParties = storeParties;');
+      expect(selectedPartySlice).toContain('const dbParty = initialParty.id ? storeParties.find((p) => p.id === initialParty.id) : null;');
+      expect(selectedPartySlice).not.toContain('db.getParties');
+
+      // Verify invoiceNumber initializer uses storeInvoices
+      const invoiceNumberStart = code.indexOf('const [invoiceNumber, setInvoiceNumber]');
+      const invoiceNumberEnd = code.indexOf('const [isInvoiceNumberModalOpen, setIsInvoiceNumberModalOpen]');
+      expect(invoiceNumberStart).toBeGreaterThan(-1);
+      expect(invoiceNumberEnd).toBeGreaterThan(invoiceNumberStart);
+      const invoiceNumberSlice = code.slice(invoiceNumberStart, invoiceNumberEnd);
+      expect(invoiceNumberSlice).toContain('const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : storeInvoices;');
+      expect(invoiceNumberSlice).not.toContain('db.getInvoices');
+
+      // Verify parentInvoiceOptions memo uses storeInvoices and adds it to deps
+      const parentInvoiceOptionsStart = code.indexOf('const parentInvoiceOptions = useMemo');
+      const parentInvoiceOptionsEnd = code.indexOf('const handleParentInvoiceChange');
+      expect(parentInvoiceOptionsStart).toBeGreaterThan(-1);
+      expect(parentInvoiceOptionsEnd).toBeGreaterThan(parentInvoiceOptionsStart);
+      const parentInvoiceOptionsSlice = code.slice(parentInvoiceOptionsStart, parentInvoiceOptionsEnd);
+      expect(parentInvoiceOptionsSlice).toContain('storeInvoices');
+      expect(parentInvoiceOptionsSlice).toMatch(/\[existingInvoices,\s*initialInvoice,\s*selectedParty,\s*storeInvoices\]/);
+      expect(parentInvoiceOptionsSlice).not.toContain('db.getInvoices');
+    });
+
+    it('RecordPaymentModal.tsx uses store hooks and eliminates all db.get* calls and db import', () => {
+      const code = readComponent('src/components/Parties/RecordPaymentModal.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useParties');
+      expect(code).toContain('useBankAccounts');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).not.toMatch(/db\.getParties\s*\(/);
+      expect(code).not.toMatch(/db\.getBankAccounts\s*\(/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/services\/db(\.ts)?['"]/);
+    });
+  });
 });

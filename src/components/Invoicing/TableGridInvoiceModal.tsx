@@ -24,6 +24,7 @@ import { audioService } from '../../services/barcodeService.ts';
 import { InvoiceItemModal, InvoiceItemData } from './InvoiceItemModal.tsx';
 import { findDuplicateParty } from '../../core/utils/entityUniqueness.ts';
 import { db } from '../../services/db.ts';
+import { useInvoices, useParties } from '../../core/store/useDataStore.ts';
 import {
   generateNextInvoiceNumber,
   generateNextDocumentNumber,
@@ -70,6 +71,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   onAddNewParty,
   onPartyCreated,
 }) => {
+  const storeInvoices = useInvoices();
+  const storeParties = useParties();
+
   // Draft state for new invoice restoration
   const initialDraft = useMemo(
     () => (!initialInvoice ? draftService.getInvoiceDraft(defaultInvoiceType) : null),
@@ -123,13 +127,13 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   // All invoices in database for uniqueness verification
   const allInvoices = useMemo(() => {
-    return existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
-  }, [existingInvoices]);
+    return existingInvoices && existingInvoices.length > 0 ? existingInvoices : storeInvoices;
+  }, [existingInvoices, storeInvoices]);
 
   // Party selection
   const [selectedParty, setSelectedParty] = useState<Party | null>(() => {
     if (initialInvoice) {
-      const dbParties = db.getParties();
+      const dbParties = storeParties;
       const allKnownParties = [...parties, ...dbParties.filter((dp) => !parties.some((p) => p.id === dp.id))];
       const found = allKnownParties.find(
         (p) =>
@@ -152,7 +156,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       };
     }
     if (initialParty) {
-      const dbParty = initialParty.id ? db.getParties().find((p) => p.id === initialParty.id) : null;
+      const dbParty = initialParty.id ? storeParties.find((p) => p.id === initialParty.id) : null;
       return dbParty || initialParty;
     }
     if (initialDraft?.selectedParty) {
@@ -166,7 +170,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   // Invoice numbers & dates (Sequential & Guaranteed Unique)
   const [invoiceNumber, setInvoiceNumber] = useState<string>(() => {
     if (initialInvoice?.invoiceNumber) return initialInvoice.invoiceNumber;
-    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : storeInvoices;
     if (initialDraft?.invoiceNumber && !findConflictingInvoice(initialDraft.invoiceNumber, undefined, invs)) {
       return initialDraft.invoiceNumber;
     }
@@ -250,7 +254,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
 
   // Eligible parent sales invoices for credit notes (excluding non-sales docs, cancelled, and different parties)
   const parentInvoiceOptions = useMemo(() => {
-    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : db.getInvoices();
+    const invs = existingInvoices && existingInvoices.length > 0 ? existingInvoices : storeInvoices;
     return invs
       .filter((inv) => {
         if (initialInvoice && inv.id === initialInvoice.id) return false;
@@ -268,7 +272,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         date: inv.date,
         balanceAmount: typeof inv.balanceAmount === 'number' ? inv.balanceAmount : inv.grandTotal,
       }));
-  }, [existingInvoices, initialInvoice, selectedParty]);
+  }, [existingInvoices, initialInvoice, selectedParty, storeInvoices]);
 
   const handleParentInvoiceChange = (invoiceId: string) => {
     if (!invoiceId) {
