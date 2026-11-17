@@ -11,6 +11,12 @@ export interface BankAccount {
   upiId?: string; // e.g. "bharatinfotech@sbi"
   openingBalance: number;
   openingBalanceDate?: string;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  openingBalancePaise?: number;
+
   isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -31,6 +37,12 @@ export interface CashBankTransaction {
   fromAccountId?: string; // Account ID money was deducted from (or 'ACC_CASH')
   toAccountId?: string;   // Account ID money was added to (or 'ACC_CASH')
   amount: number;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  amountPaise?: number;
+
   referenceNo?: string;   // Cheque no, UTR, UPI Ref
   description: string;
   createdAt: string;

@@ -23,6 +23,9 @@ export interface PaymentSplit {
   accountName?: string;
   reference?: string;
   referenceNo?: string;
+
+  // --- Integer paise twins (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  amountPaise?: number;
 }
 
 export interface InvoiceItemEntry {
@@ -52,6 +55,17 @@ export interface InvoiceItemEntry {
   cessAmount: number;
   totalAmount: number;
   total?: number;                     // Optional alias for totalAmount
+
+  // --- Integer paise twins (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  unitPricePaise?: number;
+  discountAmountPaise?: number;
+  taxableAmountPaise?: number;
+  cgstAmountPaise?: number;
+  sgstAmountPaise?: number;
+  utgstAmountPaise?: number;
+  igstAmountPaise?: number;
+  cessAmountPaise?: number;
+  totalAmountPaise?: number;
 }
 
 export interface Invoice {
@@ -104,12 +118,23 @@ export interface Invoice {
   bankAccountId?: string;
   bankAccountName?: string;
 
-  // --- Integer paise twins & schema marker (Phase 3.2) ---
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
   paiseSchema?: number;
   __paiseSchema?: number;
   balanceAmountPaise?: number;
   paidAmountPaise?: number;
   grandTotalPaise?: number;
+  totalGrossAmountPaise?: number;
+  totalDiscountPaise?: number;
+  totalTaxableAmountPaise?: number;
+  totalCgstPaise?: number;
+  totalSgstPaise?: number;
+  totalUtgstPaise?: number;
+  totalIgstPaise?: number;
+  totalCessPaise?: number;
+  totalTaxPaise?: number;
+  roundOffPaise?: number;
+  shippingAmountPaise?: number;
 
   notes?: string;
   terms?: string;

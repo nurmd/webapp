@@ -35,4 +35,14 @@ export interface Expense {
   cashAccountName?: string;
   bankAccountId?: string;
   bankAccountName?: string;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  amountPaise?: number;
+  taxableAmountPaise?: number;
+  taxAmountPaise?: number;
+  cgstAmountPaise?: number;
+  sgstAmountPaise?: number;
+  igstAmountPaise?: number;
 }

@@ -34,6 +34,10 @@ export interface JournalEntryLine {
   debit: number;
   credit: number;
   narration?: string;
+
+  // --- Integer paise twins (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  debitPaise?: number;
+  creditPaise?: number;
 }
 
 export type PaymentAllocationDocumentType = 'INVOICE' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
@@ -44,6 +48,9 @@ export interface PaymentAllocation {
   documentNumber: string;
   amount: number;
   date?: string;
+
+  // --- Integer paise twins (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  amountPaise?: number;
 }
 
 export interface Voucher {
@@ -55,6 +62,12 @@ export interface Voucher {
   entries: JournalEntryLine[];
   narration: string;
   totalAmount: number;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  totalAmountPaise?: number;
+
   createdAt: string;
   isCancelled?: boolean;
   isReversed?: boolean;

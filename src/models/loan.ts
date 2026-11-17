@@ -20,6 +20,14 @@ export interface LoanAccount {
   tenorMonths: number; // e.g. 36
   emiAmount?: number;
   currentPrincipalOutstanding: number;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  sanctionAmountPaise?: number;
+  emiAmountPaise?: number;
+  currentPrincipalOutstandingPaise?: number;
+
   collateralDetails?: string;
   status: LoanStatus;
   createdAt: string;
@@ -42,5 +50,16 @@ export interface LoanTransaction {
   referenceNo?: string;
   notes?: string;
   remainingPrincipal: number;
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  principalPaidPaise?: number;
+  interestPaidPaise?: number;
+  chargesPaidPaise?: number;
+  chargesPaise?: number; // Optional alias matching KIND_CONFIGS chargesPaid
+  totalAmountPaise?: number;
+  remainingPrincipalPaise?: number;
+
   createdAt: string;
 }

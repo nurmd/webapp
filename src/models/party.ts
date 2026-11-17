@@ -39,6 +39,13 @@ export interface Party {
   openingBalanceType?: BalanceType; // 'TO_RECEIVE' | 'TO_PAY'
   openingBalanceDate?: string; // YYYY-MM-DD
   currentBalance: number; // Signed: Positive: Receivable (Dr), Negative: Payable (Cr)
+
+  // --- Integer paise twins & schema marker (Phase 3.2, derived from rupee fields; rupee remains authoritative) ---
+  paiseSchema?: number;
+  __paiseSchema?: number;
+  openingBalancePaise?: number;
+  currentBalancePaise?: number;
+
   isSystem?: boolean;
   groupId?: string;
   categoryId?: string;
