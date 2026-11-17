@@ -21,7 +21,16 @@ import type { Voucher } from '../../core/accounting/voucherTypes.ts';
 import type { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
 import type { LoanAccount, LoanTransaction } from '../../models/loan.ts';
 import { db } from '../../services/db.ts';
-import { useBankAccounts, useCashBankTxns } from '../../core/store/useDataStore.ts';
+import {
+  useInvoices,
+  usePurchases,
+  useExpenses,
+  useItems,
+  useParties,
+  useVouchers,
+  useBankAccounts,
+  useCashBankTxns,
+} from '../../core/store/useDataStore.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { DatePreset, getDateFilterBounds, isDateInRange } from '../../core/utils/dateFilters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
@@ -68,11 +77,11 @@ import { computeAgingBreakdown } from '../../core/accounting/aging.ts';
 
 export interface BusinessReportsViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
-  purchases: PurchaseBill[];
-  expenses: Expense[];
-  items: InventoryItem[];
-  parties: Party[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
+  expenses?: Expense[];
+  items?: InventoryItem[];
+  parties?: Party[];
   vouchers?: Voucher[];
   bankAccounts?: BankAccount[];
   cashBankTxns?: CashBankTransaction[];
@@ -226,8 +235,21 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
     }
   }, [initialDatePreset]);
 
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeExpenses = useExpenses();
+  const storeItems = useItems();
+  const storeParties = useParties();
+  const storeVouchers = useVouchers();
   const storeBankAccounts = useBankAccounts();
   const storeCashBankTxns = useCashBankTxns();
+
+  const resolvedInvoices = invoices ?? storeInvoices;
+  const resolvedPurchases = purchases ?? storePurchases;
+  const resolvedExpenses = expenses ?? storeExpenses;
+  const resolvedItems = items ?? storeItems;
+  const resolvedParties = parties ?? storeParties;
+  const resolvedVouchers = vouchers ?? storeVouchers;
 
   // Fallbacks for bank accounts and loans if not provided in props
   const resolvedBankAccounts = useMemo(() => {
@@ -294,16 +316,16 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
 
   // Date filtered records
   const periodInvoices = useMemo(() => {
-    return invoices.filter((i) => isDateInRange(i.date, dateBounds.start, dateBounds.end));
-  }, [invoices, dateBounds]);
+    return resolvedInvoices.filter((i) => isDateInRange(i.date, dateBounds.start, dateBounds.end));
+  }, [resolvedInvoices, dateBounds]);
 
   const periodPurchases = useMemo(() => {
-    return purchases.filter((p) => isDateInRange(p.date, dateBounds.start, dateBounds.end));
-  }, [purchases, dateBounds]);
+    return resolvedPurchases.filter((p) => isDateInRange(p.date, dateBounds.start, dateBounds.end));
+  }, [resolvedPurchases, dateBounds]);
 
   const periodExpenses = useMemo(() => {
-    return expenses.filter((e) => isDateInRange(e.date, dateBounds.start, dateBounds.end));
-  }, [expenses, dateBounds]);
+    return resolvedExpenses.filter((e) => isDateInRange(e.date, dateBounds.start, dateBounds.end));
+  }, [resolvedExpenses, dateBounds]);
 
   // Trading Profit and Stock Summary for the top performance card
   const tradingSummary = useMemo(() => {
@@ -311,14 +333,14 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
       periodInvoices,
       periodPurchases,
       periodExpenses,
-      items
+      resolvedItems
     );
-  }, [periodInvoices, periodPurchases, periodExpenses, items]);
+  }, [periodInvoices, periodPurchases, periodExpenses, resolvedItems]);
 
   // Inventory valuation summary
   const stockValuation = useMemo(() => {
-    return aggregateStockValuation(items);
-  }, [items]);
+    return aggregateStockValuation(resolvedItems);
+  }, [resolvedItems]);
 
   // Receivables & Payables Aging
   const { receivablesTotal, payablesTotal } = useMemo(() => {
@@ -480,7 +502,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
           <SalesRevenueCategory
             company={company}
             invoices={periodInvoices}
-            items={items}
+            items={resolvedItems}
             subReport={activeSubReport}
             searchQuery={searchQuery}
             dateRangeLabel={dateBounds.label}
@@ -507,10 +529,10 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
         {activeReportPage === 'party_khata' && (
           <PartyKhataDuesCategory
             company={company}
-            parties={parties}
+            parties={resolvedParties}
             invoices={periodInvoices}
             purchases={periodPurchases}
-            vouchers={vouchers}
+            vouchers={resolvedVouchers}
             subReport={activeSubReport}
             searchQuery={searchQuery}
             dateRangeLabel={dateBounds.label}
@@ -523,7 +545,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
         {activeReportPage === 'inventory_stock' && (
           <InventoryStockCategory
             company={company}
-            items={items}
+            items={resolvedItems}
             subReport={activeSubReport}
             searchQuery={searchQuery}
             dateRangeLabel={dateBounds.label}
@@ -540,7 +562,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
             invoices={periodInvoices}
             purchases={periodPurchases}
             expenses={periodExpenses}
-            vouchers={vouchers}
+            vouchers={resolvedVouchers}
             transactions={resolvedCashBankTxns}
             loans={localLoans}
             loanTransactions={localLoanTxns}
@@ -560,8 +582,8 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
             invoices={periodInvoices}
             purchases={periodPurchases}
             expenses={periodExpenses}
-            items={items}
-            parties={parties}
+            items={resolvedItems}
+            parties={resolvedParties}
             loans={localLoans}
             dateRangeLabel={dateBounds.label}
             onRegisterExportHandlers={(handlers) => {
@@ -575,10 +597,10 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
             company={company}
             accounts={resolvedBankAccounts}
             transactions={resolvedCashBankTxns}
-            invoices={invoices}
-            purchases={purchases}
-            expenses={expenses}
-            vouchers={vouchers}
+            invoices={resolvedInvoices}
+            purchases={resolvedPurchases}
+            expenses={resolvedExpenses}
+            vouchers={resolvedVouchers}
             searchQuery={searchQuery}
             dateRangeLabel={dateBounds.label}
             dateRangeStart={dateBounds.start}
@@ -611,7 +633,7 @@ const BusinessReportsViewComponent: React.FC<BusinessReportsViewProps> = ({
         )}
 
         {activeReportPage === 'daybook' && (
-          <DaybookView vouchers={vouchers} />
+          <DaybookView vouchers={resolvedVouchers} />
         )}
       </main>
 

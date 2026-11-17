@@ -84,18 +84,19 @@ export function computeWalkInVirtualBalance(invoices: Invoice[] = []): number {
 }
 
 /**
- * Pure resolver that merges the built-in Walk-in Customer into the party catalog.
+ * Pure resolver that merges the built-in Walk-in Customer into the party catalog
+ * using a precomputed virtual running balance.
  *
  * Requirements:
  * - If a party with id === 'CUSTOM_PARTY' already exists, mark it as system and preserve its stored balance; do not duplicate.
- * - If it does not exist, synthesize the virtual party with currentBalance computed from historical walk-in invoices.
+ * - If it does not exist, synthesize the virtual party with currentBalance set to virtualBalance.
  * - Pinned at index 0 for the Customers list.
  * - Produces referentially stable output for identical inputs.
  */
-export function withWalkInCustomer(
+export function withWalkInCustomerBalance(
   parties: Party[],
   companyStateCode: string = '27',
-  invoices: Invoice[] = []
+  virtualBalance: number = 0
 ): Party[] {
   const existingIndex = parties.findIndex((p) => p.id === SYSTEM_WALK_IN_PARTY_ID);
 
@@ -110,9 +111,20 @@ export function withWalkInCustomer(
     return updated;
   }
 
-  const virtualBalance = computeWalkInVirtualBalance(invoices);
   const walkInParty = createWalkInCustomer(companyStateCode, virtualBalance);
 
   // Return walk-in customer merged with existing catalog
   return [walkInParty, ...parties];
+}
+
+/**
+ * Pure resolver that merges the built-in Walk-in Customer into the party catalog.
+ * Backwards-compatible convenience wrapper that derives virtualBalance from invoices.
+ */
+export function withWalkInCustomer(
+  parties: Party[],
+  companyStateCode: string = '27',
+  invoices: Invoice[] = []
+): Party[] {
+  return withWalkInCustomerBalance(parties, companyStateCode, computeWalkInVirtualBalance(invoices));
 }

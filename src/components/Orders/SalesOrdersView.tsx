@@ -15,10 +15,11 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
+import { useInvoices } from '../../core/store/useDataStore.ts';
 
 export interface SalesOrdersViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
+  invoices?: Invoice[];
   onNewSalesOrder: () => void;
   onViewInvoice: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -28,13 +29,15 @@ export interface SalesOrdersViewProps {
 
 export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
   company,
-  invoices,
+  invoices: propInvoices,
   onNewSalesOrder,
   onViewInvoice,
   onEditInvoice,
   onDeleteInvoice,
   onRefresh,
 }) => {
+  const storeInvoices = useInvoices();
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'FULFILLED' | 'CANCELLED'>('ALL');
   const [search, setSearch] = useState('');
   const [confirmConvertDoc, setConfirmConvertDoc] = useState<Invoice | null>(null);

@@ -15,10 +15,11 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertPurchaseChallan, convertPurchaseChallanToBill } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
+import { usePurchases } from '../../core/store/useDataStore.ts';
 
 export interface PurchaseChallansViewProps {
   company: CompanyProfile;
-  purchases: PurchaseBill[];
+  purchases?: PurchaseBill[];
   onNewPurchaseChallan: () => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onEditPurchase?: (bill: PurchaseBill) => void;
@@ -28,13 +29,15 @@ export interface PurchaseChallansViewProps {
 
 export const PurchaseChallansView: React.FC<PurchaseChallansViewProps> = ({
   company,
-  purchases,
+  purchases: propPurchases,
   onNewPurchaseChallan,
   onViewPurchase,
   onEditPurchase,
   onDeletePurchase,
   onRefresh,
 }) => {
+  const storePurchases = usePurchases();
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
   const [activeTab, setActiveTab] = useState<'ALL' | 'RECEIVED' | 'IN_TRANSIT' | 'DRAFT' | 'CANCELLED'>('ALL');
   const [search, setSearch] = useState('');
   const [confirmConvertDoc, setConfirmConvertDoc] = useState<PurchaseBill | null>(null);

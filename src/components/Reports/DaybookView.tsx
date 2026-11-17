@@ -5,31 +5,40 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { BookOpen, CheckCircle, Printer } from 'lucide-react';
 import { ReportPdfConfig } from './utils/reportExportUtils.ts';
 import { ReportPreviewModal } from './ReportPreviewModal.tsx';
-import { useCompany } from '../../core/store/useDataStore.ts';
+import { useCompany, useVouchers } from '../../core/store/useDataStore.ts';
 import { preloadReportPdfPreviewModal } from '../../core/utils/modalPreload.ts';
 
 interface DaybookViewProps {
-  vouchers: Voucher[];
+  vouchers?: Voucher[];
   company?: CompanyProfile;
 }
 
-export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers, company }) => {
+export const DaybookView: React.FC<DaybookViewProps> = ({ vouchers: propVouchers, company }) => {
   const [filterType, setFilterType] = useState('ALL');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const storeCompany = useCompany();
   const activeCompany = company || storeCompany;
+  const storeVouchers = useVouchers();
+  const vouchers = propVouchers !== undefined ? propVouchers : storeVouchers;
 
-  const filtered = vouchers.filter((v) => filterType === 'ALL' || v.voucherType === filterType);
+  const filtered = useMemo(() => {
+    return vouchers.filter((v) => filterType === 'ALL' || v.voucherType === filterType);
+  }, [vouchers, filterType]);
 
-  const totalDebits = vouchers.reduce(
-    (sum, v) => sum + v.entries.reduce((s, e) => s + e.debit, 0),
-    0
-  );
-  const totalCredits = vouchers.reduce(
-    (sum, v) => sum + v.entries.reduce((s, e) => s + e.credit, 0),
-    0
-  );
+  const { totalDebits, totalCredits } = useMemo(() => {
+    let debits = 0;
+    let credits = 0;
+    for (const v of vouchers) {
+      if (v.entries) {
+        for (const e of v.entries) {
+          debits += e.debit || 0;
+          credits += e.credit || 0;
+        }
+      }
+    }
+    return { totalDebits: debits, totalCredits: credits };
+  }, [vouchers]);
 
   const daybookRows = useMemo(() => {
     const rows: (string | number)[][] = [];

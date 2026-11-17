@@ -14,10 +14,11 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { BillSelectorModal } from './BillSelectorModal.tsx';
 import { ReturnItemPickerModal } from './ReturnItemPickerModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
+import { usePurchases } from '../../core/store/useDataStore.ts';
 
 export interface PurchaseReturnsViewProps {
   company: CompanyProfile;
-  purchases: PurchaseBill[];
+  purchases?: PurchaseBill[];
   onNewPurchaseReturn: () => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onEditPurchase?: (bill: PurchaseBill) => void;
@@ -26,12 +27,14 @@ export interface PurchaseReturnsViewProps {
 
 export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
   company,
-  purchases,
+  purchases: propPurchases,
   onNewPurchaseReturn,
   onViewPurchase,
   onEditPurchase,
   onDeletePurchase,
 }) => {
+  const storePurchases = usePurchases();
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
   const [search, setSearch] = useState('');
   const [docToDelete, setDocToDelete] = useState<PurchaseBill | null>(null);
 

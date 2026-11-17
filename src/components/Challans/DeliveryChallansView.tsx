@@ -15,12 +15,13 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
+import { useInvoices } from '../../core/store/useDataStore.ts';
 
 export type ChallanTabFilter = 'ALL' | 'DRAFT' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
 
 export interface DeliveryChallansViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
+  invoices?: Invoice[];
   onNewDeliveryChallan: () => void;
   onViewInvoice: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -30,13 +31,15 @@ export interface DeliveryChallansViewProps {
 
 export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
   company,
-  invoices,
+  invoices: propInvoices,
   onNewDeliveryChallan,
   onViewInvoice,
   onEditInvoice,
   onDeleteInvoice,
   onRefresh,
 }) => {
+  const storeInvoices = useInvoices();
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
   const [activeTab, setActiveTab] = useState<ChallanTabFilter>('ALL');
   const [search, setSearch] = useState('');
   const [confirmConvertDoc, setConfirmConvertDoc] = useState<Invoice | null>(null);

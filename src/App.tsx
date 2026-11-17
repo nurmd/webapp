@@ -31,12 +31,7 @@ import {
   useCompany,
   useParties,
   useItems,
-  useInvoices,
-  usePurchases,
-  useExpenses,
-  useVouchers,
-  useBankAccounts,
-  useCashBankTxns,
+  useWalkInVirtualBalance,
 } from './core/store/useDataStore.ts';
 
 // Cold-Start Primary View (Statically imported for instant FCP)
@@ -47,7 +42,7 @@ import { findConflictingInvoice, getDocumentSeriesConfig, formatDocumentNumberPr
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
-import { withWalkInCustomer, isSystemParty } from './core/utils/systemParties.ts';
+import { withWalkInCustomerBalance, isSystemParty } from './core/utils/systemParties.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
 import { findDuplicateItem, findDuplicateParty } from './core/utils/entityUniqueness.ts';
@@ -199,20 +194,16 @@ export const App: React.FC = () => {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // React 18 Granular External Store Subscriptions
+  // React 18 Granular External Store Subscriptions (Shell-level only: Phase 2.5)
   const company = useCompany();
   const rawParties = useParties();
   const items = useItems();
-  const invoices = useInvoices();
-  const purchases = usePurchases();
-  const expenses = useExpenses();
-  const vouchers = useVouchers();
-  const bankAccounts = useBankAccounts();
-  const cashBankTxns = useCashBankTxns();
+  const walkInBalance = useWalkInVirtualBalance();
 
-  const parties = useMemo(() => {
-    return withWalkInCustomer(rawParties, company.stateCode, invoices);
-  }, [rawParties, company.stateCode, invoices]);
+  const parties = useMemo(
+    () => withWalkInCustomerBalance(rawParties, company.stateCode, walkInBalance),
+    [rawParties, company.stateCode, walkInBalance]
+  );
 
   // Modals state
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
@@ -1411,9 +1402,6 @@ export const App: React.FC = () => {
     <PaymentModalProvider
       onRecordPartyPayment={handleRecordPartyPayment}
       parties={parties}
-      invoices={invoices}
-      purchases={purchases}
-      bankAccounts={bankAccounts}
       onRefresh={refreshData}
     >
       <div className="h-screen h-[100dvh] bg-surface font-body-md text-on-surface antialiased flex flex-row overflow-hidden selection:bg-secondary-fixed selection:text-on-secondary-fixed">
@@ -1455,10 +1443,6 @@ export const App: React.FC = () => {
         {activeTab === 'dashboard' && (
           <DashboardView
             company={company}
-            invoices={invoices}
-            purchases={purchases}
-            vouchers={vouchers}
-            expenses={expenses}
             items={activeItems}
             parties={parties}
             onNewInvoice={handleOpenNewInvoice}
@@ -1488,7 +1472,6 @@ export const App: React.FC = () => {
         {activeTab === 'sales' && (
           <SalesHubView
             company={company}
-            invoices={invoices}
             onOpenStandardInvoice={handleOpenStandardInvoice}
             onOpenTableGridInvoice={handleOpenTableGridInvoice}
             onViewInvoice={setPreviewInvoice}
@@ -1504,12 +1487,6 @@ export const App: React.FC = () => {
             flow="IN"
             company={company}
             parties={parties}
-            accounts={bankAccounts}
-            transactions={cashBankTxns}
-            invoices={invoices}
-            purchases={purchases}
-            expenses={expenses}
-            vouchers={vouchers}
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
@@ -1523,7 +1500,6 @@ export const App: React.FC = () => {
         {activeTab === 'quotations' && (
           <QuotationsEstimatesView
             company={company}
-            invoices={invoices}
             onNewQuotation={handleOpenNewQuotation}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1535,7 +1511,6 @@ export const App: React.FC = () => {
         {activeTab === 'sales_orders' && (
           <SalesOrdersView
             company={company}
-            invoices={invoices}
             onNewSalesOrder={handleOpenNewSalesOrder}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1547,7 +1522,6 @@ export const App: React.FC = () => {
         {activeTab === 'delivery_challans' && (
           <DeliveryChallansView
             company={company}
-            invoices={invoices}
             onNewDeliveryChallan={handleOpenNewDeliveryChallan}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1559,7 +1533,6 @@ export const App: React.FC = () => {
         {activeTab === 'sales_returns' && (
           <SalesReturnsView
             company={company}
-            invoices={invoices}
             onNewSalesReturn={handleOpenNewSalesReturn}
             onViewInvoice={setPreviewInvoice}
             onEditInvoice={handleEditInvoice}
@@ -1570,7 +1543,6 @@ export const App: React.FC = () => {
 
         {activeTab === 'purchases' && (
           <PurchasesHubView
-            purchases={purchases}
             parties={parties}
             company={company}
             itemsCatalog={activeItems}
@@ -1585,12 +1557,6 @@ export const App: React.FC = () => {
             flow="OUT"
             company={company}
             parties={parties}
-            accounts={bankAccounts}
-            transactions={cashBankTxns}
-            invoices={invoices}
-            purchases={purchases}
-            expenses={expenses}
-            vouchers={vouchers}
             onSaveTransaction={handleSaveCashBankTxn}
             onDeleteTransaction={handleDeleteCashBankTxn}
             onNavigateTab={handleSelectTab}
@@ -1604,7 +1570,6 @@ export const App: React.FC = () => {
         {activeTab === 'purchase_orders' && (
           <PurchaseOrdersView
             company={company}
-            purchases={purchases}
             onNewPurchaseOrder={handleOpenNewPurchaseOrder}
             onViewPurchase={handleEditPurchase}
             onEditPurchase={handleEditPurchase}
@@ -1616,7 +1581,6 @@ export const App: React.FC = () => {
         {activeTab === 'purchase_challans' && (
           <PurchaseChallansView
             company={company}
-            purchases={purchases}
             onNewPurchaseChallan={handleOpenNewPurchaseChallan}
             onViewPurchase={handleEditPurchase}
             onEditPurchase={handleEditPurchase}
@@ -1628,7 +1592,6 @@ export const App: React.FC = () => {
         {activeTab === 'purchase_returns' && (
           <PurchaseReturnsView
             company={company}
-            purchases={purchases}
             onNewPurchaseReturn={handleOpenNewPurchaseReturn}
             onViewPurchase={handleEditPurchase}
             onEditPurchase={handleEditPurchase}
@@ -1638,7 +1601,6 @@ export const App: React.FC = () => {
 
         {activeTab === 'expenses' && (
           <ExpensesView
-            expenses={expenses}
             onSaveExpense={handleSaveExpense}
             onDeleteExpense={handleDeleteExpense}
           />
@@ -1647,8 +1609,6 @@ export const App: React.FC = () => {
         {activeTab === 'inventory' && (
           <InventoryView
             items={items}
-            invoices={invoices}
-            purchases={purchases}
             onSaveItem={handleSaveItem}
             onDeleteItem={handleDeleteItem}
             onSaveAdjustment={handleSaveAdjustment}
@@ -1661,10 +1621,6 @@ export const App: React.FC = () => {
         {activeTab === 'parties' && (
           <PartiesView
             parties={parties}
-            invoices={invoices}
-            purchases={purchases}
-            vouchers={vouchers}
-            bankAccounts={bankAccounts}
             initialSegment={partiesSegment}
             initialStatusFilter={partiesFilter}
             onSaveParty={handleSaveParty}
@@ -1680,18 +1636,12 @@ export const App: React.FC = () => {
         )}
 
         {activeTab === 'accounting' && (
-          <DaybookView vouchers={vouchers} />
+          <DaybookView />
         )}
 
         {activeTab === 'cash_bank' && (
           <CashBankManagementView
             company={company}
-            accounts={bankAccounts}
-            transactions={cashBankTxns}
-            invoices={invoices}
-            purchases={purchases}
-            expenses={expenses}
-            vouchers={vouchers}
             parties={parties}
             onViewInvoice={setPreviewInvoice}
             onViewPurchase={handleEditPurchase}
@@ -1708,14 +1658,8 @@ export const App: React.FC = () => {
         {activeTab === 'reports' && (
           <BusinessReportsView
             company={company}
-            invoices={invoices}
-            purchases={purchases}
-            expenses={expenses}
             items={items}
             parties={parties}
-            vouchers={vouchers}
-            bankAccounts={bankAccounts}
-            cashBankTxns={cashBankTxns}
             initialReportPage={reportsDeepLink?.report}
             initialAccountId={reportsDeepLink?.accountId}
             initialDatePreset={reportsDeepLink?.datePreset}
@@ -1744,12 +1688,8 @@ export const App: React.FC = () => {
         {activeTab === 'menu' && (
           <NavigationMenuHubView
             company={company}
-            invoices={invoices}
-            purchases={purchases}
             parties={parties}
             items={items}
-            expenses={expenses}
-            vouchers={vouchers}
             onNavigate={handleSelectTab}
             onNavigateToParties={handleNavigateToParties}
             onOpenRoleSwitch={handleOpenRoleSwitch}
@@ -1792,7 +1732,6 @@ export const App: React.FC = () => {
             itemsCatalog={activeItems}
             initialInvoice={editingInvoice}
             initialParty={selectedPartyForInvoice}
-            existingInvoices={invoices}
             defaultInvoiceType={invoiceModalDefaultType}
             onClose={() => {
               setIsTableGridInvoiceOpen(false);

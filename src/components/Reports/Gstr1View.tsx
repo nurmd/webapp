@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
@@ -23,119 +23,186 @@ export const Gstr1View: React.FC<Gstr1ViewProps> = ({
   const [activeMainTab, setActiveMainTab] = useState<'GSTR1' | 'GSTR3B' | 'PL' | 'BALANCE_SHEET'>('GSTR1');
   const [selectedSection, setSelectedSection] = useState<'4_B2B' | '7_B2CS' | '9B_CDNR' | '12_HSN'>('4_B2B');
 
-  // B2B Invoices (Table 4)
-  const b2bInvoices = invoices.filter((i) => i.invoiceType === 'B2B' && i.partyGstin);
+  // B2B Invoices (Table 4) - Memoized for Phase 2.4
+  const b2bInvoices = useMemo(
+    () => invoices.filter((i) => i.invoiceType === 'B2B' && i.partyGstin),
+    [invoices]
+  );
 
-  // B2C Small Invoices (Table 7)
-  const b2csInvoices = invoices.filter((i) => (i.invoiceType === 'B2CS' || !i.partyGstin) && i.invoiceType !== 'CREDIT_NOTE' && i.invoiceType !== 'DEBIT_NOTE');
+  // B2C Small Invoices (Table 7) - Memoized for Phase 2.4
+  const b2csInvoices = useMemo(
+    () =>
+      invoices.filter(
+        (i) =>
+          (i.invoiceType === 'B2CS' || !i.partyGstin) &&
+          i.invoiceType !== 'CREDIT_NOTE' &&
+          i.invoiceType !== 'DEBIT_NOTE'
+      ),
+    [invoices]
+  );
 
-  // Credit / Debit Notes (Table 9B CDNR)
-  const cdnrInvoices = invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE' || i.invoiceType === 'DEBIT_NOTE');
+  // Credit / Debit Notes (Table 9B CDNR) - Memoized for Phase 2.4
+  const cdnrInvoices = useMemo(
+    () => invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE' || i.invoiceType === 'DEBIT_NOTE'),
+    [invoices]
+  );
 
-  // HSN Summary (Table 12)
-  const hsnMap: Record<string, {
-    hsnCode: string;
-    description: string;
-    unit: string;
-    totalQty: number;
-    totalValue: number;
-    taxableValue: number;
-    cgst: number;
-    sgst: number;
-    igst: number;
-    cess: number;
-  }> = {};
+  // HSN Summary (Table 12) - Memoized for Phase 2.4
+  const hsnSummaryList = useMemo(() => {
+    const hsnMap: Record<string, {
+      hsnCode: string;
+      description: string;
+      unit: string;
+      totalQty: number;
+      totalValue: number;
+      taxableValue: number;
+      cgst: number;
+      sgst: number;
+      igst: number;
+      cess: number;
+    }> = {};
 
-  for (const inv of invoices) {
-    for (const item of inv.items) {
-      if (!hsnMap[item.hsnSacCode]) {
-        hsnMap[item.hsnSacCode] = {
-          hsnCode: item.hsnSacCode,
-          description: item.name,
-          unit: item.unit,
-          totalQty: 0,
-          totalValue: 0,
-          taxableValue: 0,
-          cgst: 0,
-          sgst: 0,
-          igst: 0,
-          cess: 0,
-        };
+    for (const inv of invoices) {
+      for (const item of inv.items) {
+        if (!hsnMap[item.hsnSacCode]) {
+          hsnMap[item.hsnSacCode] = {
+            hsnCode: item.hsnSacCode,
+            description: item.name,
+            unit: item.unit,
+            totalQty: 0,
+            totalValue: 0,
+            taxableValue: 0,
+            cgst: 0,
+            sgst: 0,
+            igst: 0,
+            cess: 0,
+          };
+        }
+        const entry = hsnMap[item.hsnSacCode];
+        entry.totalQty += item.quantity;
+        entry.totalValue += item.totalAmount;
+        entry.taxableValue += item.taxableAmount;
+        entry.cgst += item.cgstAmount;
+        entry.sgst += item.sgstAmount;
+        entry.igst += item.igstAmount;
+        entry.cess += item.cessAmount || 0;
       }
-      const entry = hsnMap[item.hsnSacCode];
-      entry.totalQty += item.quantity;
-      entry.totalValue += item.totalAmount;
-      entry.taxableValue += item.taxableAmount;
-      entry.cgst += item.cgstAmount;
-      entry.sgst += item.sgstAmount;
-      entry.igst += item.igstAmount;
-      entry.cess += item.cessAmount || 0;
     }
-  }
 
-  const hsnSummaryList = Object.values(hsnMap);
+    return Object.values(hsnMap);
+  }, [invoices]);
 
-  // GSTR-3B Calculations
-  // Normal sales add to output tax; Credit notes reduce output tax, Debit notes increase output tax
-  const regularSales = invoices.filter((i) => i.invoiceType !== 'CREDIT_NOTE' && i.invoiceType !== 'DEBIT_NOTE');
-  const creditNotes = invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
-  const debitNotes = invoices.filter((i) => i.invoiceType === 'DEBIT_NOTE');
+  // GSTR-3B & P&L Calculations - Memoized for Phase 2.4
+  const {
+    outwardTaxable,
+    outwardCgst,
+    outwardSgst,
+    outwardIgst,
+    outwardTotalTax,
+    itcCgst,
+    itcSgst,
+    itcIgst,
+    totalItc,
+    ineligible175Purchases,
+    ineligibleOthersPurchases,
+    totalIneligible175,
+    totalIneligibleOthers,
+    netCgstPayable,
+    netSgstPayable,
+    netIgstPayable,
+    netCashPayable,
+    totalSalesRevenue,
+    totalCostOfPurchases,
+    grossProfit,
+    totalActualExpenses,
+    netProfit,
+  } = useMemo(() => {
+    // Normal sales add to output tax; Credit notes reduce output tax, Debit notes increase output tax
+    const regularSales = invoices.filter((i) => i.invoiceType !== 'CREDIT_NOTE' && i.invoiceType !== 'DEBIT_NOTE');
+    const creditNotes = invoices.filter((i) => i.invoiceType === 'CREDIT_NOTE');
+    const debitNotes = invoices.filter((i) => i.invoiceType === 'DEBIT_NOTE');
 
-  const regularOutwardTaxable = regularSales.reduce((s, i) => s + i.totalTaxableAmount, 0);
-  const cnTaxable = creditNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
-  const dnTaxable = debitNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
-  const outwardTaxable = regularOutwardTaxable + dnTaxable - cnTaxable;
+    const regularOutwardTaxable = regularSales.reduce((s, i) => s + i.totalTaxableAmount, 0);
+    const cnTaxable = creditNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
+    const dnTaxable = debitNotes.reduce((s, i) => s + i.totalTaxableAmount, 0);
+    const outTaxable = regularOutwardTaxable + dnTaxable - cnTaxable;
 
-  const regularOutwardCgst = regularSales.reduce((s, i) => s + i.totalCgst, 0);
-  const cnCgst = creditNotes.reduce((s, i) => s + i.totalCgst, 0);
-  const dnCgst = debitNotes.reduce((s, i) => s + i.totalCgst, 0);
-  const outwardCgst = Math.max(0, regularOutwardCgst + dnCgst - cnCgst);
+    const regularOutwardCgst = regularSales.reduce((s, i) => s + i.totalCgst, 0);
+    const cnCgst = creditNotes.reduce((s, i) => s + i.totalCgst, 0);
+    const dnCgst = debitNotes.reduce((s, i) => s + i.totalCgst, 0);
+    const outCgst = Math.max(0, regularOutwardCgst + dnCgst - cnCgst);
 
-  const regularOutwardSgst = regularSales.reduce((s, i) => s + i.totalSgst, 0);
-  const cnSgst = creditNotes.reduce((s, i) => s + i.totalSgst, 0);
-  const dnSgst = debitNotes.reduce((s, i) => s + i.totalSgst, 0);
-  const outwardSgst = Math.max(0, regularOutwardSgst + dnSgst - cnSgst);
+    const regularOutwardSgst = regularSales.reduce((s, i) => s + i.totalSgst, 0);
+    const cnSgst = creditNotes.reduce((s, i) => s + i.totalSgst, 0);
+    const dnSgst = debitNotes.reduce((s, i) => s + i.totalSgst, 0);
+    const outSgst = Math.max(0, regularOutwardSgst + dnSgst - cnSgst);
 
-  const regularOutwardIgst = regularSales.reduce((s, i) => s + i.totalIgst, 0);
-  const cnIgst = creditNotes.reduce((s, i) => s + i.totalIgst, 0);
-  const dnIgst = debitNotes.reduce((s, i) => s + i.totalIgst, 0);
-  const outwardIgst = Math.max(0, regularOutwardIgst + dnIgst - cnIgst);
+    const regularOutwardIgst = regularSales.reduce((s, i) => s + i.totalIgst, 0);
+    const cnIgst = creditNotes.reduce((s, i) => s + i.totalIgst, 0);
+    const dnIgst = debitNotes.reduce((s, i) => s + i.totalIgst, 0);
+    const outIgst = Math.max(0, regularOutwardIgst + dnIgst - cnIgst);
 
-  const outwardTotalTax = outwardCgst + outwardSgst + outwardIgst;
+    const outTotalTax = outCgst + outSgst + outIgst;
 
-  // ITC from eligible Purchases
-  const eligiblePurchases = purchases.filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS');
-  const purchaseItcCgst = eligiblePurchases.reduce((s, p) => s + p.totalCgst, 0);
-  const purchaseItcSgst = eligiblePurchases.reduce((s, p) => s + p.totalSgst, 0);
-  const purchaseItcIgst = eligiblePurchases.reduce((s, p) => s + p.totalIgst, 0);
+    // ITC from eligible Purchases
+    const eligiblePurchases = purchases.filter((p) => p.itcEligibility !== 'INELIGIBLE_17_5' && p.itcEligibility !== 'INELIGIBLE_OTHERS');
+    const purchaseItcCgst = eligiblePurchases.reduce((s, p) => s + p.totalCgst, 0);
+    const purchaseItcSgst = eligiblePurchases.reduce((s, p) => s + p.totalSgst, 0);
+    const purchaseItcIgst = eligiblePurchases.reduce((s, p) => s + p.totalIgst, 0);
 
-  // ITC from eligible Business Expenses (T1.4)
-  const eligibleExpenses = activeExpenses.filter((e) => e.itcEligible && (e.taxAmount || 0) > 0);
-  const expenseItcCgst = eligibleExpenses.reduce((s, e) => s + (e.cgstAmount || 0), 0);
-  const expenseItcSgst = eligibleExpenses.reduce((s, e) => s + (e.sgstAmount || 0), 0);
-  const expenseItcIgst = eligibleExpenses.reduce((s, e) => s + (e.igstAmount || 0), 0);
+    // ITC from eligible Business Expenses (T1.4)
+    const eligibleExpenses = activeExpenses.filter((e) => e.itcEligible && (e.taxAmount || 0) > 0);
+    const expenseItcCgst = eligibleExpenses.reduce((s, e) => s + (e.cgstAmount || 0), 0);
+    const expenseItcSgst = eligibleExpenses.reduce((s, e) => s + (e.sgstAmount || 0), 0);
+    const expenseItcIgst = eligibleExpenses.reduce((s, e) => s + (e.igstAmount || 0), 0);
 
-  const itcCgst = purchaseItcCgst + expenseItcCgst;
-  const itcSgst = purchaseItcSgst + expenseItcSgst;
-  const itcIgst = purchaseItcIgst + expenseItcIgst;
-  const totalItc = itcCgst + itcSgst + itcIgst;
+    const iCgst = purchaseItcCgst + expenseItcCgst;
+    const iSgst = purchaseItcSgst + expenseItcSgst;
+    const iIgst = purchaseItcIgst + expenseItcIgst;
+    const tItc = iCgst + iSgst + iIgst;
 
-  const ineligible175Purchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_17_5');
-  const ineligibleOthersPurchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_OTHERS');
-  const totalIneligible175 = ineligible175Purchases.reduce((s, p) => s + p.totalTax, 0);
-  const totalIneligibleOthers = ineligibleOthersPurchases.reduce((s, p) => s + p.totalTax, 0);
+    const ineligible175Purchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_17_5');
+    const ineligibleOthersPurchases = purchases.filter((p) => p.itcEligibility === 'INELIGIBLE_OTHERS');
+    const tIneligible175 = ineligible175Purchases.reduce((s, p) => s + p.totalTax, 0);
+    const tIneligibleOthers = ineligibleOthersPurchases.reduce((s, p) => s + p.totalTax, 0);
 
-  const netCgstPayable = Math.max(0, outwardCgst - itcCgst);
-  const netSgstPayable = Math.max(0, outwardSgst - itcSgst);
-  const netIgstPayable = Math.max(0, outwardIgst - itcIgst);
-  const netCashPayable = netCgstPayable + netSgstPayable + netIgstPayable;
+    const nCgstPayable = Math.max(0, outCgst - iCgst);
+    const nSgstPayable = Math.max(0, outSgst - iSgst);
+    const nIgstPayable = Math.max(0, outIgst - iIgst);
+    const nCashPayable = nCgstPayable + nSgstPayable + nIgstPayable;
 
-  // Profit & Loss Calculations using actual expenses (T1.1)
-  const totalSalesRevenue = outwardTaxable;
-  const totalCostOfPurchases = purchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
-  const grossProfit = totalSalesRevenue - totalCostOfPurchases;
-  const totalActualExpenses = activeExpenses.reduce((s, e) => s + (e.taxableAmount || e.amount || 0), 0);
-  const netProfit = grossProfit - totalActualExpenses;
+    // Profit & Loss Calculations using actual expenses (T1.1)
+    const salesRev = outTaxable;
+    const costPurchases = purchases.reduce((s, p) => s + p.totalTaxableAmount, 0);
+    const gProfit = salesRev - costPurchases;
+    const actualExpenses = activeExpenses.reduce((s, e) => s + (e.taxableAmount || e.amount || 0), 0);
+    const nProfit = gProfit - actualExpenses;
+
+    return {
+      outwardTaxable: outTaxable,
+      outwardCgst: outCgst,
+      outwardSgst: outSgst,
+      outwardIgst: outIgst,
+      outwardTotalTax: outTotalTax,
+      itcCgst: iCgst,
+      itcSgst: iSgst,
+      itcIgst: iIgst,
+      totalItc: tItc,
+      ineligible175Purchases,
+      ineligibleOthersPurchases,
+      totalIneligible175: tIneligible175,
+      totalIneligibleOthers: tIneligibleOthers,
+      netCgstPayable: nCgstPayable,
+      netSgstPayable: nSgstPayable,
+      netIgstPayable: nIgstPayable,
+      netCashPayable: nCashPayable,
+      totalSalesRevenue: salesRev,
+      totalCostOfPurchases: costPurchases,
+      grossProfit: gProfit,
+      totalActualExpenses: actualExpenses,
+      netProfit: nProfit,
+    };
+  }, [invoices, purchases, activeExpenses]);
 
   const exportGstrJson = () => {
     const gstr1Payload = {

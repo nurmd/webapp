@@ -15,10 +15,11 @@ import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { useInvoices } from '../../core/store/useDataStore.ts';
 
 export interface QuotationsEstimatesViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
+  invoices?: Invoice[];
   onNewQuotation: () => void;
   onViewInvoice: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -28,13 +29,15 @@ export interface QuotationsEstimatesViewProps {
 
 export const QuotationsEstimatesView: React.FC<QuotationsEstimatesViewProps> = ({
   company,
-  invoices,
+  invoices: propInvoices,
   onNewQuotation,
   onViewInvoice,
   onEditInvoice,
   onDeleteInvoice,
   onRefresh,
 }) => {
+  const storeInvoices = useInvoices();
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
   const [activeTab, setActiveTab] = useState<'ALL' | 'OPEN' | 'CONVERTED'>('ALL');
   const [search, setSearch] = useState('');
   const [confirmConvertDoc, setConfirmConvertDoc] = useState<Invoice | null>(null);

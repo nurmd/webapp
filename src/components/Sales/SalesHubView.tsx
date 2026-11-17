@@ -30,6 +30,7 @@ import {
   preloadInvoicePreviewModal,
   preloadTableGridInvoiceModal,
 } from '../../core/utils/modalPreload.ts';
+import { useInvoices } from '../../core/store/useDataStore.ts';
 
 const BulkPrintModal = React.lazy(() =>
   import('../Printing/BulkPrintModal.tsx').then((m) => ({ default: m.BulkPrintModal }))
@@ -37,7 +38,7 @@ const BulkPrintModal = React.lazy(() =>
 
 interface SalesHubViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
+  invoices?: Invoice[];
   onOpenStandardInvoice: () => void;
   onOpenTableGridInvoice: () => void;
   onViewInvoice: (invoice: Invoice) => void;
@@ -49,7 +50,7 @@ interface SalesHubViewProps {
 
 const SalesHubViewComponent: React.FC<SalesHubViewProps> = ({
   company,
-  invoices,
+  invoices: propInvoices,
   onOpenStandardInvoice,
   onOpenTableGridInvoice,
   onViewInvoice,
@@ -58,6 +59,8 @@ const SalesHubViewComponent: React.FC<SalesHubViewProps> = ({
   onQuickPos,
   onRefresh,
 }) => {
+  const storeInvoices = useInvoices();
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
   useModalPreloadOnMount([
     preloadSimplifiedInvoiceModal,
     preloadInvoicePreviewModal,

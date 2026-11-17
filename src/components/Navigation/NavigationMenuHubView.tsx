@@ -11,15 +11,21 @@ import { pouch, PouchSyncState } from '../../services/pouchdb.ts';
 import { CURRENT_APP_VERSION } from '../../services/updateService.ts';
 import { getItemsNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { usePaymentModal } from '../Payments/PaymentModalContext.tsx';
+import {
+  useInvoices,
+  usePurchases,
+  useExpenses,
+  useVouchers,
+} from '../../core/store/useDataStore.ts';
 
 interface NavigationMenuHubViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
-  purchases: PurchaseBill[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
   parties: Party[];
   items: InventoryItem[];
-  expenses: Expense[];
-  vouchers: Voucher[];
+  expenses?: Expense[];
+  vouchers?: Voucher[];
   onNavigate: (tab: AppTab) => void;
   onNavigateToParties?: (segment: 'CUSTOMERS' | 'SUPPLIERS', filter?: 'ALL' | 'OVERDUE' | 'SETTLED') => void;
   onOpenRoleSwitch?: () => void;
@@ -58,12 +64,12 @@ interface MenuItem {
 
 export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   company,
-  invoices,
-  purchases,
+  invoices: propInvoices,
+  purchases: propPurchases,
   parties,
   items,
-  expenses,
-  vouchers,
+  expenses: propExpenses,
+  vouchers: propVouchers,
   onNavigate,
   onNavigateToParties,
   onOpenRoleSwitch,
@@ -73,6 +79,16 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
   isCheckingUpdate,
   onOpenPaymentModal,
 }) => {
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeExpenses = useExpenses();
+  const storeVouchers = useVouchers();
+
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
+  const expenses = propExpenses !== undefined ? propExpenses : storeExpenses;
+  const vouchers = propVouchers !== undefined ? propVouchers : storeVouchers;
+
   const paymentModal = usePaymentModal();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<HubCategory>('all');

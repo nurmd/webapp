@@ -17,6 +17,15 @@ import {
   useModalPreloadOnMount,
   preloadCashBankTransactionDetailModal,
 } from '../../core/utils/modalPreload.ts';
+import {
+  useBankAccounts,
+  useCashBankTxns,
+  useInvoices,
+  usePurchases,
+  useExpenses,
+  useVouchers,
+  useParties,
+} from '../../core/store/useDataStore.ts';
 
 const CashBankTransactionDetailModal = React.lazy(() =>
   import('./CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
@@ -24,12 +33,12 @@ const CashBankTransactionDetailModal = React.lazy(() =>
 
 interface CashBankManagementViewProps {
   company: CompanyProfile;
-  accounts: BankAccount[];
-  transactions: CashBankTransaction[];
-  invoices: Invoice[];
-  purchases: PurchaseBill[];
-  expenses: Expense[];
-  vouchers: Voucher[];
+  accounts?: BankAccount[];
+  transactions?: CashBankTransaction[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
+  expenses?: Expense[];
+  vouchers?: Voucher[];
   parties?: Party[];
   onSaveAccount: (account: BankAccount) => void;
   onDeleteAccount: (id: string) => void;
@@ -44,13 +53,13 @@ interface CashBankManagementViewProps {
 
 export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   company: _company,
-  accounts,
-  transactions,
-  invoices,
-  purchases,
-  expenses,
-  vouchers,
-  parties,
+  accounts: propAccounts,
+  transactions: propTransactions,
+  invoices: propInvoices,
+  purchases: propPurchases,
+  expenses: propExpenses,
+  vouchers: propVouchers,
+  parties: propParties,
   onSaveAccount,
   onDeleteAccount,
   onSaveTransaction,
@@ -61,6 +70,21 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
   onViewPurchase,
   onUnlinkAllocation,
 }) => {
+  const storeAccounts = useBankAccounts();
+  const storeTransactions = useCashBankTxns();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeExpenses = useExpenses();
+  const storeVouchers = useVouchers();
+  const storeParties = useParties();
+
+  const accounts = propAccounts !== undefined ? propAccounts : storeAccounts;
+  const transactions = propTransactions !== undefined ? propTransactions : storeTransactions;
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
+  const expenses = propExpenses !== undefined ? propExpenses : storeExpenses;
+  const vouchers = propVouchers !== undefined ? propVouchers : storeVouchers;
+  const parties = propParties !== undefined ? propParties : storeParties;
   useModalPreloadOnMount([preloadCashBankTransactionDetailModal]);
 
   // Navigation / Modal States

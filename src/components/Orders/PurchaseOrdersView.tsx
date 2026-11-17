@@ -15,10 +15,11 @@ import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertPurchaseOrder, convertPurchaseOrderToBill } from '../../core/utils/documentConversion.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
+import { usePurchases } from '../../core/store/useDataStore.ts';
 
 export interface PurchaseOrdersViewProps {
   company: CompanyProfile;
-  purchases: PurchaseBill[];
+  purchases?: PurchaseBill[];
   onNewPurchaseOrder: () => void;
   onViewPurchase?: (bill: PurchaseBill) => void;
   onEditPurchase?: (bill: PurchaseBill) => void;
@@ -28,13 +29,15 @@ export interface PurchaseOrdersViewProps {
 
 export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   company,
-  purchases,
+  purchases: propPurchases,
   onNewPurchaseOrder,
   onViewPurchase,
   onEditPurchase,
   onDeletePurchase,
   onRefresh,
 }) => {
+  const storePurchases = usePurchases();
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
   const [activeTab, setActiveTab] = useState<'ALL' | 'PENDING' | 'FULFILLED' | 'CANCELLED'>('ALL');
   const [search, setSearch] = useState('');
   const [confirmConvertPo, setConfirmConvertPo] = useState<PurchaseBill | null>(null);

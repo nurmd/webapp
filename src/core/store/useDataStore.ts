@@ -24,6 +24,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
 import { Voucher } from '../accounting/voucherTypes.ts';
 import { BankAccount, CashBankTransaction } from '../../models/bankAccount.ts';
+import { computeWalkInVirtualBalance } from '../utils/systemParties.ts';
 
 // ---------------------------------------------------------------------------
 // 1. Stable Subscription Function (Module-Level Singleton)
@@ -78,6 +79,9 @@ export const getBankAccountsSnapshot = createStableSnapshotGetter((): BankAccoun
 export const getCashBankTxnsSnapshot = createStableSnapshotGetter((): CashBankTransaction[] => db.getCashBankTransactions());
 export const getSettingsSnapshot = createStableSnapshotGetter((): SyncedSettings => db.getSettings());
 export const getStockAdjustmentsSnapshot = createStableSnapshotGetter((): StockAdjustment[] => db.getStockAdjustments());
+export const getWalkInVirtualBalanceSnapshot = createStableSnapshotGetter(
+  (): number => computeWalkInVirtualBalance(db.getInvoices())
+);
 
 // ---------------------------------------------------------------------------
 // 3. Domain-Specific Reactive Hooks
@@ -193,6 +197,19 @@ export function useSettings(): SyncedSettings {
  */
 export function useStockAdjustments(): StockAdjustment[] {
   return useSyncExternalStore(subscribeToDataStore, getStockAdjustmentsSnapshot, getStockAdjustmentsSnapshot);
+}
+
+/**
+ * Subscribes to invoice changes but yields only the walk-in virtual balance (primitive).
+ * Because the snapshot is a primitive number, Object.is bails out of re-rendering
+ * whenever the balance is unchanged across invoice writes.
+ */
+export function useWalkInVirtualBalance(): number {
+  return useSyncExternalStore(
+    subscribeToDataStore,
+    getWalkInVirtualBalanceSnapshot,
+    getWalkInVirtualBalanceSnapshot
+  );
 }
 
 // ---------------------------------------------------------------------------

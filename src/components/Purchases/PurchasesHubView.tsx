@@ -32,12 +32,14 @@ const TableGridPurchaseModal = React.lazy(() =>
 const SimplifiedPurchaseModal = React.lazy(() =>
   import('./SimplifiedPurchaseModal.tsx').then((m) => ({ default: m.SimplifiedPurchaseModal }))
 );
+import { usePurchases } from '../../core/store/useDataStore.ts';
+
 const BulkPrintModal = React.lazy(() =>
   import('../Printing/BulkPrintModal.tsx').then((m) => ({ default: m.BulkPrintModal }))
 );
 
 interface PurchasesHubViewProps {
-  purchases: PurchaseBill[];
+  purchases?: PurchaseBill[];
   parties: Party[];
   company: CompanyProfile;
   itemsCatalog: InventoryItem[];
@@ -48,7 +50,7 @@ interface PurchasesHubViewProps {
 }
 
 const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
-  purchases,
+  purchases: propPurchases,
   parties,
   company,
   itemsCatalog,
@@ -57,6 +59,8 @@ const PurchasesHubViewComponent: React.FC<PurchasesHubViewProps> = ({
   onEditPurchase,
   onAddNewParty,
 }) => {
+  const storePurchases = usePurchases();
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
   useModalPreloadOnMount([
     preloadSimplifiedPurchaseModal,
     preloadTableGridPurchaseModal,

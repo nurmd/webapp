@@ -8,8 +8,11 @@ import {
   isWalkInInvoice,
   isSystemParty,
   computeWalkInVirtualBalance,
+  withWalkInCustomerBalance,
   withWalkInCustomer,
 } from '../core/utils/systemParties.ts';
+import { preloadVoucherEditorModal } from '../core/utils/modalPreload.ts';
+import { VoucherEditorModal } from '../components/Parties/VoucherEditorModal.tsx';
 import { rbac } from '../services/rbac.ts';
 import type { Party } from '../models/party.ts';
 import type { Invoice } from '../models/invoice.ts';
@@ -1491,6 +1494,7 @@ describe('Payment Transactions & System Walk-in Customer Suite', () => {
     };
 
     it('opens VoucherEditorModal when clicking Edit Payment on a voucher row in PaymentTransactionsView', async () => {
+      await preloadVoucherEditorModal();
       await act(async () => {
         root.render(
           <PaymentTransactionsView

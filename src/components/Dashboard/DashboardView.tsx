@@ -31,6 +31,7 @@ import { computeCashBankSummary } from '../../core/accounting/cashBankCalculator
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import {
   useSettings,
+  useInvoices,
   usePurchases,
   useVouchers,
   useExpenses,
@@ -74,9 +75,9 @@ export interface ActivityTransaction {
 
 export interface DashboardViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
-  items: InventoryItem[];
-  parties: Party[];
+  invoices?: Invoice[];
+  items?: InventoryItem[];
+  parties?: Party[];
   purchases?: PurchaseBill[];
   vouchers?: Voucher[];
   expenses?: Expense[];
@@ -126,6 +127,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   onOpenPaymentModal,
 }) => {
   const paymentModal = usePaymentModal();
+  const storeInvoices = useInvoices();
   const storePurchases = usePurchases();
   const storeVouchers = useVouchers();
   const storeExpenses = useExpenses();
@@ -133,7 +135,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   const storeCashBankTxns = useCashBankTxns();
 
   // Resolve data sources with graceful fallback to store if props are omitted or undefined
-  const activeInvoices = invoices || [];
+  const activeInvoices = invoices !== undefined && invoices !== null ? invoices : storeInvoices;
   const activeParties = parties || [];
   const activeItems = items || [];
   const activePurchases = (propPurchases !== undefined && propPurchases !== null ? propPurchases : storePurchases) || [];
@@ -253,6 +255,17 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
 
   const bankAccounts = storeBankAccounts;
   const cashBankTransactions = storeCashBankTxns;
+
+  // Derived Party Index for O(1) Voucher / Activity lookups (Phase 2.4)
+  const { partyById, partyByName } = useMemo(() => {
+    const byId = new Map<string, Party>();
+    const byName = new Map<string, Party>();
+    for (const p of activeParties) {
+      if (p.id) byId.set(p.id, p);
+      if (p.name) byName.set(p.name.trim().toLowerCase(), p);
+    }
+    return { partyById: byId, partyByName: byName };
+  }, [activeParties]);
 
   const totalCashBankBalance = useMemo(() => {
     const summary = computeCashBankSummary({
@@ -418,21 +431,14 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
       const isReceipt = v.voucherType === 'RECEIPT';
       const flow: CashFlowDirection = isReceipt ? 'IN' : 'OUT';
 
-      // Resolve the real party from the voucher entries. Bank/discount lines often
-      // appear before the party line, so never use the first non-cash entry blindly.
+      // Resolve the real party from the voucher entries using indexed lookup (Phase 2.4)
       const entries = v.entries || [];
       const normalizedName = (value?: string) => (value || '').trim().toLowerCase();
       const partyEntry = entries.find((entry) =>
-        activeParties.some((party) => party.id === entry.accountId)
-      ) || entries.find((entry) =>
-        activeParties.some((party) => party.name && normalizedName(party.name) === normalizedName(entry.accountName))
+        partyById.has(entry.accountId) || partyByName.has(normalizedName(entry.accountName))
       );
       const matchedParty = partyEntry
-        ? activeParties.find(
-            (party) =>
-              party.id === partyEntry.accountId ||
-              (party.name && normalizedName(party.name) === normalizedName(partyEntry.accountName))
-          )
+        ? partyById.get(partyEntry.accountId) || partyByName.get(normalizedName(partyEntry.accountName))
         : undefined;
       const bankAccountIds = new Set(bankAccounts.map((account) => account.id));
       const systemAccountIds = new Set([
@@ -551,7 +557,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
       if (cmp !== 0) return cmp;
       return (b.id || '').localeCompare(a.id || '');
     });
-  }, [activeInvoices, activePurchases, activeVouchers, activeExpenses]);
+  }, [activeInvoices, activePurchases, activeVouchers, activeExpenses, partyById, partyByName, bankAccounts]);
 
   // Metric counts across types (single-pass linear computation for large datasets)
   const { salesCount, purchasesCount, vouchersCount, expensesCount, vouchersAndExpensesCount, unpaidCount, paidCount } = useMemo(() => {
@@ -1462,7 +1468,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
             setPaymentTarget(null);
           }}
           target={paymentTarget}
-          parties={parties}
+          parties={activeParties}
           onRecordPartyPayment={onRecordPartyPayment}
           onRefresh={onRefresh}
         />

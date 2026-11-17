@@ -17,10 +17,11 @@ import { ReturnItemPickerModal } from './ReturnItemPickerModal.tsx';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
 import { linkCreditNoteToInvoice, unlinkCreditNoteFromInvoice } from '../../core/returns/returnEngine.ts';
+import { useInvoices } from '../../core/store/useDataStore.ts';
 
 export interface SalesReturnsViewProps {
   company: CompanyProfile;
-  invoices: Invoice[];
+  invoices?: Invoice[];
   onNewSalesReturn: () => void;
   onViewInvoice: (invoice: Invoice) => void;
   onEditInvoice?: (invoice: Invoice) => void;
@@ -30,17 +31,19 @@ export interface SalesReturnsViewProps {
 
 export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
   company,
-  invoices,
+  invoices: propInvoices,
   onNewSalesReturn,
   onViewInvoice,
   onEditInvoice,
   onDeleteInvoice,
   onRefresh,
 }) => {
-  const [localInvoices, setLocalInvoices] = useState<Invoice[]>(invoices);
+  const storeInvoices = useInvoices();
+  const activeInvoices = propInvoices !== undefined ? propInvoices : storeInvoices;
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>(activeInvoices);
   useEffect(() => {
-    setLocalInvoices(invoices);
-  }, [invoices]);
+    setLocalInvoices(activeInvoices);
+  }, [activeInvoices]);
 
   const [search, setSearch] = useState('');
   const [docToDelete, setDocToDelete] = useState<Invoice | null>(null);

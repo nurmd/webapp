@@ -18,6 +18,16 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
 import type { PassbookEntry } from '../Parties/usePartyPassbook.ts';
 
+import {
+  useBankAccounts,
+  useCashBankTxns,
+  useInvoices,
+  usePurchases,
+  useExpenses,
+  useVouchers,
+  useParties,
+} from '../../core/store/useDataStore.ts';
+
 const CashBankTransactionDetailModal = React.lazy(() =>
   import('../CashBank/CashBankTransactionDetailModal.tsx').then((m) => ({ default: m.CashBankTransactionDetailModal }))
 );
@@ -28,11 +38,11 @@ const VoucherEditorModal = React.lazy(() =>
 export interface PaymentTransactionsViewProps {
   flow: 'IN' | 'OUT';
   company: CompanyProfile;
-  accounts: BankAccount[];
-  transactions: CashBankTransaction[];
-  invoices: Invoice[];
-  purchases: PurchaseBill[];
-  expenses: Expense[];
+  accounts?: BankAccount[];
+  transactions?: CashBankTransaction[];
+  invoices?: Invoice[];
+  purchases?: PurchaseBill[];
+  expenses?: Expense[];
   vouchers?: Voucher[];
   parties?: Party[];
   onSaveTransaction: (txn: CashBankTransaction) => void;
@@ -60,13 +70,13 @@ export interface PaymentTransactionsViewProps {
 export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = ({
   flow,
   company,
-  accounts,
-  transactions,
-  invoices,
-  purchases,
-  expenses,
-  vouchers = [],
-  parties = [],
+  accounts: propAccounts,
+  transactions: propTransactions,
+  invoices: propInvoices,
+  purchases: propPurchases,
+  expenses: propExpenses,
+  vouchers: propVouchers,
+  parties: propParties,
   onSaveTransaction,
   onDeleteTransaction,
   onNavigateTab,
@@ -76,6 +86,21 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   onOpenPaymentModal,
   onUnlinkAllocation,
 }) => {
+  const storeAccounts = useBankAccounts();
+  const storeTransactions = useCashBankTxns();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeExpenses = useExpenses();
+  const storeVouchers = useVouchers();
+  const storeParties = useParties();
+
+  const accounts = propAccounts !== undefined ? propAccounts : storeAccounts;
+  const transactions = propTransactions !== undefined ? propTransactions : storeTransactions;
+  const invoices = propInvoices !== undefined ? propInvoices : storeInvoices;
+  const purchases = propPurchases !== undefined ? propPurchases : storePurchases;
+  const expenses = propExpenses !== undefined ? propExpenses : storeExpenses;
+  const vouchers = propVouchers !== undefined ? propVouchers : storeVouchers;
+  const parties = propParties !== undefined ? propParties : storeParties;
   const isFlowIn = flow === 'IN';
   const paymentModal = usePaymentModal();
 

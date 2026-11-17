@@ -4,7 +4,7 @@ import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { printExpenseVoucher } from '../../core/utils/expenseVoucherPrinter.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
-import { useCompany } from '../../core/store/useDataStore.ts';
+import { useCompany, useExpenses } from '../../core/store/useDataStore.ts';
 import { safeOpenExternalUrl } from '../../core/utils/upiAndShare.ts';
 import {
   DatePreset,
@@ -25,7 +25,7 @@ import {
 } from './ExpensesFilterSheet.tsx';
 
 export interface ExpensesViewProps {
-  expenses: Expense[];
+  expenses?: Expense[];
   onSaveExpense: (expense: Expense) => void;
   onDeleteExpense: (id: string) => void;
 }
@@ -46,10 +46,12 @@ export const CATEGORIES: ExpenseCategory[] = [
 export { type ExpenseSortOption, EXPENSE_SORT_LABELS };
 
 export const ExpensesView: React.FC<ExpensesViewProps> = ({
-  expenses,
+  expenses: propExpenses,
   onSaveExpense,
   onDeleteExpense,
 }) => {
+  const storeExpenses = useExpenses();
+  const expenses = propExpenses !== undefined ? propExpenses : storeExpenses;
   const company = useCompany();
   const isGstActive = company.isGstEnabled !== false;
 
