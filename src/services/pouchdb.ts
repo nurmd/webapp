@@ -22,6 +22,11 @@ import {
   assertManualConflictResolution,
   type ConflictResolutionChoice,
 } from './conflictPolicy.ts';
+import {
+  isDocDivergent,
+  hasOnlyDerivedDivergence,
+  getDerivedDivergenceFields,
+} from '../core/sync/derivedFields.ts';
 
 export type { QueuedWrite, QueuedWriteOp, WriteQueueHealth };
 
@@ -1203,21 +1208,11 @@ export class PouchService {
   // --- Document CRUD Operations with Document Type Prefixes ---
 
   private isDocDivergent(a: any, b: any): boolean {
-    if (!a || !b) return true;
-    const cleanA = { ...a };
-    const cleanB = { ...b };
-    delete cleanA._id;
-    delete cleanA._rev;
-    delete cleanA._conflicts;
-    delete cleanA.syncedAt;
-    delete cleanA.docType;
-    delete cleanB._id;
-    delete cleanB._rev;
-    delete cleanB._conflicts;
-    delete cleanB.syncedAt;
-    delete cleanB.docType;
+    return isDocDivergent(a, b);
+  }
 
-    return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
+  private hasOnlyDerivedDivergence(a: any, b: any): boolean {
+    return hasOnlyDerivedDivergence(a, b);
   }
 
   public async retryWriteQueueNow(): Promise<void> {
@@ -1576,25 +1571,39 @@ export class PouchService {
         // 409 conflict: NEVER blind-overwrite latest revision!
         try {
           const latest = (await this.localDB.get(docId)) as any;
-          const isDivergent = this.isDocDivergent(doc, latest);
-
-          if (isDivergent) {
-            // Enqueue conflict into visible queue; preserve both revisions
-            const conflictId = `${docId}#409-${Date.now()}`;
-            const conflict: SyncConflict = {
-              id: conflictId,
-              docId,
-              docType: type,
-              entityId: doc.id,
-              winningRev: latest._rev,
-              conflictingRev: 'local-409',
-              winningDoc: latest,
-              conflictingDoc: doc,
-              detectedAt: new Date().toISOString(),
-            };
-            this.explicitConflicts.set(conflict.id, conflict);
-            await this.refreshConflicts();
+          if (!latest) {
+            return;
           }
+          if (!this.isDocDivergent(doc, latest)) {
+            // Stored doc already satisfies the write; ignore without raising a conflict
+            console.debug(`[persistDoc] 409 on ${docId} resolved: stored doc already identical`);
+            return;
+          }
+
+          if (this.hasOnlyDerivedDivergence(doc, latest)) {
+            // Stored revision is authoritative; derived/volatile fields will be recomputed
+            const ignoredDiffs = getDerivedDivergenceFields(doc, latest);
+            console.debug(
+              `[persistDoc] Ignoring 409 conflict on ${docId}: divergence only in derived/volatile fields (${ignoredDiffs.join(', ')})`
+            );
+            return;
+          }
+
+          // Real user-visible divergence: enqueue conflict into visible queue; preserve both revisions
+          const conflictId = `${docId}#409-${Date.now()}`;
+          const conflict: SyncConflict = {
+            id: conflictId,
+            docId,
+            docType: type,
+            entityId: doc.id,
+            winningRev: latest._rev,
+            conflictingRev: 'local-409',
+            winningDoc: latest,
+            conflictingDoc: doc,
+            detectedAt: new Date().toISOString(),
+          };
+          this.explicitConflicts.set(conflict.id, conflict);
+          await this.refreshConflicts();
         } catch (fetchErr) {
           console.warn(`Error handling 409 conflict for ${docId}:`, fetchErr);
         }

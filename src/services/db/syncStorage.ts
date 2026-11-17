@@ -2,6 +2,10 @@ import {
   assertManualConflictResolution,
   type ConflictResolutionChoice,
 } from '../conflictPolicy.ts';
+import {
+  isDocDivergent,
+  hasOnlyDerivedDivergence,
+} from '../../core/sync/derivedFields.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, StockAdjustment } from '../../models/item.ts';
@@ -714,21 +718,11 @@ export class SyncStorage extends BackupRestoreStorage {
   }
 
   private areEntitiesDivergent(a: any, b: any): boolean {
-    if (!a || !b) return true;
-    const cleanA = { ...a };
-    const cleanB = { ...b };
-    delete cleanA._id;
-    delete cleanA._rev;
-    delete cleanA._conflicts;
-    delete cleanA.syncedAt;
-    delete cleanA.docType;
-    delete cleanB._id;
-    delete cleanB._rev;
-    delete cleanB._conflicts;
-    delete cleanB.syncedAt;
-    delete cleanB.docType;
+    return isDocDivergent(a, b);
+  }
 
-    return JSON.stringify(cleanA) !== JSON.stringify(cleanB);
+  private hasOnlyDerivedDivergence(a: any, b: any): boolean {
+    return hasOnlyDerivedDivergence(a, b);
   }
 
   private reconcileCollection<T extends { id: string; updatedAt?: string; createdAt?: string }>(
@@ -780,8 +774,9 @@ export class SyncStorage extends BackupRestoreStorage {
           unsyncedToPush.push(localItem);
         } else {
           const isDivergent = this.areEntitiesDivergent(localItem, remoteItem);
+          const onlyDerivedDivergent = isDivergent && this.hasOnlyDerivedDivergence(localItem, remoteItem);
 
-          if (isFinancial && isDivergent) {
+          if (isFinancial && isDivergent && !onlyDerivedDivergent) {
             // For financial documents, if both sides changed, enqueue a visible conflict!
             // Never silently merge or replace the local dirty record!
             const conflictId = `${entityType}:${id}#financial-divergence`;
@@ -801,7 +796,7 @@ export class SyncStorage extends BackupRestoreStorage {
             }
             // Preserve the local record in place until operator resolves
             mergedMap.set(id, localItem);
-          } else if (isDivergent) {
+          } else if (isDivergent && !onlyDerivedDivergent) {
             const localTime = localItem.updatedAt || localItem.createdAt || '';
             const remoteTime = remoteItem.updatedAt || remoteItem.createdAt || '';
 
