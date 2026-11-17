@@ -5,7 +5,12 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
-import { useCompany } from '../../core/store/useDataStore.ts';
+import {
+  useCompany,
+  useInvoices,
+  usePurchases,
+  useStockAdjustments,
+} from '../../core/store/useDataStore.ts';
 import { db } from '../../services/db.ts';
 
 const SimplifiedInvoiceModal = React.lazy(() =>
@@ -80,15 +85,18 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   const [showDisablePromptModal, setShowDisablePromptModal] = useState(false);
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
   const company = useCompany();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeStockAdjustments = useStockAdjustments();
 
   const handleRowClick = (txn: ItemTransactionRecord) => {
     if (txn.type === 'SALE') {
-      const invoicesList = allInvoices ?? db.getInvoices();
+      const invoicesList = allInvoices ?? storeInvoices;
       let inv: Invoice | undefined;
       if (txn.invoiceId) {
-        inv = invoicesList.find((i) => i.id === txn.invoiceId) || db.getInvoices().find((i) => i.id === txn.invoiceId);
+        inv = invoicesList.find((i) => i.id === txn.invoiceId) || storeInvoices.find((i) => i.id === txn.invoiceId);
       } else if (txn.referenceNo) {
-        inv = invoicesList.find((i) => i.invoiceNumber === txn.referenceNo) || db.getInvoices().find((i) => i.invoiceNumber === txn.referenceNo);
+        inv = invoicesList.find((i) => i.invoiceNumber === txn.referenceNo) || storeInvoices.find((i) => i.invoiceNumber === txn.referenceNo);
       }
       if (inv) {
         const viewInv = onViewInvoice || previewInvoice;
@@ -99,12 +107,12 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
         }
       }
     } else if (txn.type === 'PURCHASE') {
-      const purchasesList = allPurchases ?? db.getPurchases();
+      const purchasesList = allPurchases ?? storePurchases;
       let bill: PurchaseBill | undefined;
       if (txn.purchaseId) {
-        bill = purchasesList.find((b) => b.id === txn.purchaseId) || db.getPurchases().find((b) => b.id === txn.purchaseId);
+        bill = purchasesList.find((b) => b.id === txn.purchaseId) || storePurchases.find((b) => b.id === txn.purchaseId);
       } else if (txn.referenceNo) {
-        bill = purchasesList.find((b) => b.billNumber === txn.referenceNo) || db.getPurchases().find((b) => b.billNumber === txn.referenceNo);
+        bill = purchasesList.find((b) => b.billNumber === txn.referenceNo) || storePurchases.find((b) => b.billNumber === txn.referenceNo);
       }
       if (bill) {
         const viewPur = onViewPurchase || previewPurchase;
@@ -120,9 +128,9 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
   const itemTransactions = useMemo(() => {
     if (!item) return [];
     const list: ItemTransactionRecord[] = [];
-    const invoicesToScan = allInvoices ?? db.getInvoices();
-    const purchasesToScan = allPurchases ?? db.getPurchases();
-    const adjustmentsToScan = allAdjustments ?? db.getStockAdjustments();
+    const invoicesToScan = allInvoices ?? storeInvoices;
+    const purchasesToScan = allPurchases ?? storePurchases;
+    const adjustmentsToScan = allAdjustments ?? storeStockAdjustments;
     const normalizedItemName = (item.name || '').normalize('NFC').trim().toLowerCase();
 
     // 1. Sales from Invoices
@@ -224,7 +232,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
       return safeB - safeA;
     });
     return list;
-  }, [item, allInvoices, allPurchases, allAdjustments]);
+  }, [item, allInvoices, allPurchases, allAdjustments, storeInvoices, storePurchases, storeStockAdjustments]);
 
   // Filtered transactions according to selected tab
   const filteredItemTransactions = useMemo(() => {
@@ -271,10 +279,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
     if (!item) return false;
     return isItemInBills(
       item.id,
-      allInvoices ?? db.getInvoices(),
-      allPurchases ?? db.getPurchases()
+      allInvoices ?? storeInvoices,
+      allPurchases ?? storePurchases
     );
-  }, [item, allInvoices, allPurchases]);
+  }, [item, allInvoices, allPurchases, storeInvoices, storePurchases]);
 
   if (!item) return null;
 

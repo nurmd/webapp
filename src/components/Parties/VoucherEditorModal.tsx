@@ -16,7 +16,13 @@ import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/u
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
-import { useBankAccounts } from '../../core/store/useDataStore.ts';
+import {
+  useCompany,
+  useParties,
+  useInvoices,
+  usePurchases,
+  useBankAccounts,
+} from '../../core/store/useDataStore.ts';
 import { PassbookEntry } from './usePartyPassbook.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { WhatsAppShareModal } from '../Common/WhatsAppShareModal.tsx';
@@ -56,6 +62,12 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   purchases,
   parties,
 }) => {
+  const storeCompany = useCompany();
+  const storeParties = useParties();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeBankAccounts = useBankAccounts();
+
   const isPayment = Boolean(
     editingLedgerEntry &&
       !editingLedgerEntry.isOpening &&
@@ -91,7 +103,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const [allocationModeState, setAllocationModeState] = useState<'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT'>('UNALLOCATED');
   const [isManualAllocation, setIsManualAllocation] = useState<boolean>(false);
 
-  const allBankAccounts = useBankAccounts();
+  const allBankAccounts = storeBankAccounts;
 
   const availableBankAccounts = useMemo(() => {
     const all = allBankAccounts || [];
@@ -110,7 +122,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   }, [allBankAccounts]);
 
   const [editBankAccountId, setEditBankAccountId] = useState<string>(() => {
-    const banks = db.getBankAccounts().filter((a) => a.accountType === 'BANK');
+    const banks = storeBankAccounts.filter((a) => a.accountType === 'BANK');
     const def = banks.find((a) => a.isDefault) || banks[0];
     return def?.id || 'ACC_BANK';
   });
@@ -232,19 +244,19 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   }, [editType]);
 
   const resolvedParties = useMemo(() => {
-    const list = parties && parties.length > 0 ? [...parties] : db.getParties();
+    const list = parties && parties.length > 0 ? [...parties] : storeParties;
     if (party && !list.some((p) => p.id === party.id)) {
       list.push(party);
     }
     return list;
-  }, [parties, party]);
+  }, [parties, party, storeParties]);
 
   const rawVoucherAllocations = useMemo(() => {
     return editingLedgerEntry?.rawVoucher?.paymentAllocations || [];
   }, [editingLedgerEntry?.rawVoucher?.paymentAllocations]);
 
   const effectiveInvoices = useMemo(() => {
-    const allInvs = invoices && invoices.length > 0 ? invoices : db.getInvoices();
+    const allInvs = invoices && invoices.length > 0 ? invoices : storeInvoices;
     if (
       editingLedgerEntry?.rawVoucher &&
       !editingLedgerEntry.rawVoucher.isReversed &&
@@ -256,10 +268,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       }
     }
     return allInvs;
-  }, [invoices, editingLedgerEntry?.rawVoucher, rawVoucherAllocations]);
+  }, [invoices, editingLedgerEntry?.rawVoucher, rawVoucherAllocations, storeInvoices]);
 
   const effectivePurchases = useMemo(() => {
-    const allPurs = purchases && purchases.length > 0 ? purchases : db.getPurchases();
+    const allPurs = purchases && purchases.length > 0 ? purchases : storePurchases;
     if (
       editingLedgerEntry?.rawVoucher &&
       !editingLedgerEntry.rawVoucher.isReversed &&
@@ -271,7 +283,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
       }
     }
     return allPurs;
-  }, [purchases, editingLedgerEntry?.rawVoucher, rawVoucherAllocations]);
+  }, [purchases, editingLedgerEntry?.rawVoucher, rawVoucherAllocations, storePurchases]);
 
   const outstandingDocs: OutstandingDocument[] = useMemo(() => {
     if (!isPayment || !party) return [];
@@ -905,7 +917,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const inv = db.getInvoices().find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
+                        const inv = storeInvoices.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
                         if (inv) {
                           onClose();
                           onViewInvoice(inv);
@@ -921,7 +933,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const pur = db.getPurchases().find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
+                        const pur = storePurchases.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
                         if (pur) {
                           onClose();
                           if (onViewPurchase) onViewPurchase(pur);
@@ -1707,14 +1719,14 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         <WhatsAppShareModal
           isOpen={isWhatsAppShareOpen}
           onClose={() => setIsWhatsAppShareOpen(false)}
-          company={company || db.getCompany()}
+          company={company || storeCompany}
           invoice={undefined}
           party={party}
           initialPhone={party?.phone}
           initialTotalBalanceDue={partyTotalDue ?? undefined}
           paymentShareText={(() => {
             const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
-            return buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || db.getCompany(), partyTotalDue, {
+            return buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || storeCompany, partyTotalDue, {
               heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
               docNumber: editingLedgerEntry.docNumber,
               date: formatDate(editDate || editingLedgerEntry.date),
@@ -1731,7 +1743,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             });
           })()}
           paymentReceiptParams={{
-            companyName: (company || db.getCompany())?.tradeName || (company || db.getCompany())?.businessName || '',
+            companyName: (company || storeCompany)?.tradeName || (company || storeCompany)?.businessName || '',
             heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
             docNumber: editingLedgerEntry.docNumber,
             date: formatDate(editDate || editingLedgerEntry.date),

@@ -8,6 +8,13 @@ import { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.t
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import {
+  useParties,
+  useInvoices,
+  usePurchases,
+  useVouchers,
+  useBankAccounts,
+} from '../../core/store/useDataStore.ts';
 import { usePartyPassbook, PassbookEntry } from './usePartyPassbook.ts';
 import { PartyInfoCard } from './PartyInfoCard.tsx';
 import { RecordPaymentModal } from './RecordPaymentModal.tsx';
@@ -107,6 +114,12 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   onRefresh,
   onOpenPaymentModal,
 }) => {
+  const storeParties = useParties();
+  const storeInvoices = useInvoices();
+  const storePurchases = usePurchases();
+  const storeVouchers = useVouchers();
+  const storeBankAccounts = useBankAccounts();
+
   const paymentModal = usePaymentModal();
   useModalPreloadOnMount([
     preloadVoucherEditorModal,
@@ -191,30 +204,30 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   }, []);
 
   const effectiveParty = useMemo(() => {
-    const fromDb = db.getParties().find((p) => p.id === party.id);
+    const fromDb = storeParties.find((p) => p.id === party.id);
     return fromDb || party;
-  }, [party, dbTick]);
+  }, [party, storeParties, dbTick]);
 
   const effectiveInvoices = useMemo(() => {
-    const fromDb = db.getInvoices();
+    const fromDb = storeInvoices;
     if (!invoices || invoices.length === 0) return fromDb;
     const dbMap = new Map(fromDb.map((i) => [i.id, i]));
     return invoices.map((i) => dbMap.get(i.id) || i);
-  }, [invoices, dbTick]);
+  }, [invoices, storeInvoices, dbTick]);
 
   const effectivePurchases = useMemo(() => {
-    const fromDb = db.getPurchases();
+    const fromDb = storePurchases;
     if (!purchases || purchases.length === 0) return fromDb;
     const dbMap = new Map(fromDb.map((p) => [p.id, p]));
     return purchases.map((p) => dbMap.get(p.id) || p);
-  }, [purchases, dbTick]);
+  }, [purchases, storePurchases, dbTick]);
 
   const effectiveVouchers = useMemo(() => {
-    const fromDb = db.getVouchers();
+    const fromDb = storeVouchers;
     if (!vouchers || vouchers.length === 0) return fromDb;
     const dbMap = new Map(fromDb.map((v) => [v.id, v]));
     return vouchers.map((v) => dbMap.get(v.id) || v);
-  }, [vouchers, dbTick]);
+  }, [vouchers, storeVouchers, dbTick]);
 
   const {
     isCustomer,
@@ -283,7 +296,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
       const totalSettled = Number((amount + disc).toFixed(2));
       const dateStr = paymentDate || new Date().toISOString().split('T')[0];
       const docId = Date.now().toString().slice(-6);
-      const bankAcc = bankAccountId ? db.getBankAccounts().find((a) => a.id === bankAccountId) : undefined;
+      const bankAcc = bankAccountId ? storeBankAccounts.find((a) => a.id === bankAccountId) : undefined;
 
       const receiptConfig = getDocumentSeriesConfig(company, 'PAYMENT_RECEIPT');
       const paymentConfig = getDocumentSeriesConfig(company, 'PAYMENT_VOUCHER');
@@ -301,7 +314,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           documentType: isPaymentIn ? 'INVOICE' : 'PURCHASE',
           invoices: effectiveInvoices,
           purchases: effectivePurchases,
-          parties: db.getParties(),
+          parties: storeParties,
         });
         resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
         resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';

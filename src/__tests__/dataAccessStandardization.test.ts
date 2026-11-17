@@ -228,4 +228,52 @@ describe('Data Access Standardization: Wave 1 Static Guard (Phase 2 Batch B)', (
       expect(code).not.toMatch(/services\/db(\.ts)?['"]/);
     });
   });
+
+  describe('Wave 2 Batch 3: VoucherEditorModal + PartyDetailModal + ItemDetailSheet', () => {
+    it('VoucherEditorModal.tsx uses store hooks and eliminates all db.get* calls', () => {
+      const code = readComponent('src/components/Parties/VoucherEditorModal.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useCompany');
+      expect(code).toContain('useParties');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).toContain('useBankAccounts');
+      expect(code).not.toMatch(/db\.getBankAccounts\s*\(/);
+      expect(code).not.toMatch(/db\.getParties\s*\(/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/db\.getCompany\s*\(/);
+    });
+
+    it('PartyDetailModal.tsx uses store hooks and eliminates all db.get* calls', () => {
+      const code = readComponent('src/components/Parties/PartyDetailModal.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useParties');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).toContain('useVouchers');
+      expect(code).toContain('useBankAccounts');
+      expect(code).not.toMatch(/db\.getParties\s*\(/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/db\.getVouchers\s*\(/);
+      expect(code).not.toMatch(/db\.getBankAccounts\s*\(/);
+    });
+
+    it('ItemDetailSheet.tsx uses store hooks for collections and eliminates collection db.get* calls while preserving getAllowNegativeStock', () => {
+      const code = readComponent('src/components/Inventory/ItemDetailSheet.tsx');
+      expect(code).toMatch(/from ['"].*core\/store\/useDataStore(\.ts)?['"]/);
+      expect(code).toContain('useCompany');
+      expect(code).toContain('useInvoices');
+      expect(code).toContain('usePurchases');
+      expect(code).toContain('useStockAdjustments');
+      expect(code).not.toMatch(/allInvoices\s*\?\?\s*db\.getInvoices\(\)/);
+      expect(code).not.toMatch(/allPurchases\s*\?\?\s*db\.getPurchases\(\)/);
+      expect(code).not.toMatch(/allAdjustments\s*\?\?\s*db\.getStockAdjustments\(\)/);
+      expect(code).not.toMatch(/db\.getInvoices\s*\(/);
+      expect(code).not.toMatch(/db\.getPurchases\s*\(/);
+      expect(code).not.toMatch(/db\.getStockAdjustments\s*\(/);
+      expect(code).toMatch(/db\.getAllowNegativeStock\s*\(/);
+    });
+  });
 });
