@@ -1,26 +1,24 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { InventoryItem, ItemPriceMode } from '../../models/item.ts';
+import { InventoryItem } from '../../models/item.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { isSystemParty, SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { Invoice, InvoiceItemEntry, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { normalizeInvoiceLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
-import { calculateInvoice } from '../../core/gst/calculator.ts';
 import { validateSingleInvoice } from '../../core/gst/gstrValidator.ts';
-import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { amountInWords } from '../../core/utils/currencyWords.ts';
 import { formatINR, roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
-import { hardwareScanner, audioService } from '../../services/barcodeService.ts';
+import { audioService } from '../../services/barcodeService.ts';
 import { CameraBarcodeScannerModal } from '../Scanner/CameraBarcodeScannerModal.tsx';
 import { db } from '../../services/db.ts';
 
 const ThermalPrintModal = React.lazy(() =>
   import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
 );
-import { generateNextInvoiceNumber, generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
+import { generateNextDocumentNumber } from '../../core/utils/invoiceNumber.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 
-import { PosCartItem, PosCustomerState, HeldBill, createPosCartItem } from './types.ts';
+import { PosCartItem, PosCustomerState, HeldBill } from './types.ts';
 import { SelectPosPartyModal } from './SelectPosPartyModal.tsx';
 import { CustomItemModal } from './CustomItemModal.tsx';
 import { HoldBillsModal } from './HoldBillsModal.tsx';
@@ -31,6 +29,11 @@ import { PosKeyboardShortcutsModal } from './PosKeyboardShortcutsModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { PosCatalogGridCard, PosCatalogListRow } from './pos/PosCatalogCard.tsx';
 
+import { usePosCart } from './quickBilling/usePosCart.ts';
+import { usePosCatalog } from './quickBilling/usePosCatalog.ts';
+import { useHeldBills } from './quickBilling/useHeldBills.ts';
+import { usePosTotals } from './quickBilling/usePosTotals.ts';
+
 interface QuickBillingViewProps {
   company: CompanyProfile;
   items: InventoryItem[];
@@ -38,8 +41,6 @@ interface QuickBillingViewProps {
   onCompleteSale: (invoice: Invoice) => void;
   onViewInvoice?: (invoice: Invoice) => void;
 }
-
-const HELD_BILLS_STORAGE_KEY = 'vyapar_pos_held_bills';
 
 export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   company,
@@ -50,11 +51,41 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 }) => {
   const isGstActive = company.isGstEnabled !== false;
 
-  // Cart state
-  const [cart, setCart] = useState<PosCartItem[]>([]);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [catalogViewMode, setCatalogViewMode] = useState<'GRID' | 'LIST'>('GRID');
+  // 1. Cart state & operations hook
+  const {
+    cart,
+    setCart,
+    cartDiscountType,
+    setCartDiscountType,
+    cartDiscountValue,
+    setCartDiscountValue,
+    additionalCharges,
+    setAdditionalCharges,
+    addToCart,
+    updateCartQty,
+    updateCartExclusivePrice,
+    updateCartInclusivePrice,
+    toggleCartPriceMode,
+    updateCartPrice,
+    removeFromCart,
+    clearCart,
+  } = usePosCart({ isGstActive, isCompositionScheme: !!company.isCompositionScheme });
+
+  // 2. Catalog search & filtering hook
+  const {
+    search,
+    setSearch,
+    selectedCategory,
+    setSelectedCategory,
+    catalogViewMode,
+    setCatalogViewMode,
+    categories,
+    filteredItems,
+    handleBarcodeScanned,
+    searchInputRef,
+    scanMessage,
+    setScanMessage,
+  } = usePosCatalog({ items, onAddToCart: addToCart });
 
   // Customer state: Initial POS customer defaults to system walk-in customer when available
   const systemParty = useMemo(() => parties?.find(isSystemParty) || null, [parties]);
@@ -88,11 +119,24 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     }
   }, [systemParty, customer.party, customer.phone, company.stateCode]);
 
-  // Discounts and Adjustments
-  const [cartDiscountType, setCartDiscountType] = useState<'PERCENT' | 'FLAT'>('FLAT');
-  const [cartDiscountValue, setCartDiscountValue] = useState<number>(0);
-  const [additionalCharges, setAdditionalCharges] = useState<number>(0);
-  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
+  // 3. Tax and Totals hook
+  const {
+    isIntraState,
+    calcSummary,
+    overallDiscountAmt,
+    finalPayableTotal,
+    totalCartCount,
+    isAllGstExempt,
+  } = usePosTotals({
+    cart,
+    customerStateCode: customer.stateCode,
+    companyStateCode: company.stateCode,
+    isGstActive,
+    isCompositionScheme: !!company.isCompositionScheme,
+    cartDiscountType,
+    cartDiscountValue,
+    additionalCharges,
+  });
 
   // Payment & Tender State
   const [paymentMode, setPaymentMode] = useState<PaymentMode | 'SPLIT'>('CASH');
@@ -108,7 +152,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     cardAccountName?: string;
   } | null>(null);
 
-  // Modals
+  // Modals & UI States
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isCustomItemModalOpen, setIsCustomItemModalOpen] = useState(false);
@@ -118,7 +163,6 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isMobileCartDrawerOpen, setIsMobileCartDrawerOpen] = useState(false);
   const [thermalPrintInvoice, setThermalPrintInvoice] = useState<Invoice | null>(null);
-  const [pendingResumeBill, setPendingResumeBill] = useState<HeldBill | null>(null);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
 
   // Post-sale completed invoice state
@@ -128,68 +172,49 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     cashTendered: number;
   } | null>(null);
 
-  // Live status ticker & alerts
-  const [scanMessage, setScanMessage] = useState<{ text: string; isError?: boolean } | null>(null);
-
-  // Held bills state with localStorage persistence
-  const [heldBills, setHeldBills] = useState<HeldBill[]>(() => {
-    try {
-      const saved = localStorage.getItem(HELD_BILLS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+  // 4. Held Bills hook
+  const {
+    heldBills,
+    pendingResumeBill,
+    setPendingResumeBill,
+    handleHoldBill,
+    handleResumeBill,
+    applyResumeBill,
+    handleDiscardHeldBill,
+    handleClearAllHeld,
+  } = useHeldBills({
+    cart,
+    customer,
+    cartDiscountType,
+    cartDiscountValue,
+    additionalCharges,
+    paymentMode,
+    finalPayableTotal,
+    companyStateCode: company.stateCode,
+    isGstActive,
+    isCompositionScheme: !!company.isCompositionScheme,
+    setCart,
+    setCustomer,
+    setCartDiscountType,
+    setCartDiscountValue,
+    setAdditionalCharges,
+    setPaymentMode,
+    setCashTendered,
+    setIsMobileCartDrawerOpen,
+    setScanMessage,
   });
-
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Persist held bills
-  useEffect(() => {
-    try {
-      localStorage.setItem(HELD_BILLS_STORAGE_KEY, JSON.stringify(heldBills));
-    } catch (e) {
-      console.error('Failed to save held bills:', e);
-    }
-  }, [heldBills]);
 
   // Priority 20: Handle POS modals and overlays
   useBackNavigation(() => {
-    if (thermalPrintInvoice) {
-      setThermalPrintInvoice(null);
-      return true;
-    }
-    if (completedSale) {
-      setCompletedSale(null);
-      return true;
-    }
-    if (isScannerOpen) {
-      setIsScannerOpen(false);
-      return true;
-    }
-    if (isCustomerModalOpen) {
-      setIsCustomerModalOpen(false);
-      return true;
-    }
-    if (isCustomItemModalOpen) {
-      setIsCustomItemModalOpen(false);
-      return true;
-    }
-    if (isHoldModalOpen) {
-      setIsHoldModalOpen(false);
-      return true;
-    }
-    if (isUpiModalOpen) {
-      setIsUpiModalOpen(false);
-      return true;
-    }
-    if (isSplitModalOpen) {
-      setIsSplitModalOpen(false);
-      return true;
-    }
-    if (isShortcutsModalOpen) {
-      setIsShortcutsModalOpen(false);
-      return true;
-    }
+    if (thermalPrintInvoice) { setThermalPrintInvoice(null); return true; }
+    if (completedSale) { setCompletedSale(null); return true; }
+    if (isScannerOpen) { setIsScannerOpen(false); return true; }
+    if (isCustomerModalOpen) { setIsCustomerModalOpen(false); return true; }
+    if (isCustomItemModalOpen) { setIsCustomItemModalOpen(false); return true; }
+    if (isHoldModalOpen) { setIsHoldModalOpen(false); return true; }
+    if (isUpiModalOpen) { setIsUpiModalOpen(false); return true; }
+    if (isSplitModalOpen) { setIsSplitModalOpen(false); return true; }
+    if (isShortcutsModalOpen) { setIsShortcutsModalOpen(false); return true; }
     return false;
   }, isScannerOpen || isCustomerModalOpen || isCustomItemModalOpen || isHoldModalOpen || isUpiModalOpen || isSplitModalOpen || isShortcutsModalOpen || !!completedSale || !!thermalPrintInvoice, 20);
 
@@ -199,406 +224,24 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
     return true;
   }, isMobileCartDrawerOpen, 15);
 
-  // Unique Categories
-  const categories = useMemo(() => {
-    const list = Array.from(new Set(items.map((i) => i.category || 'General').filter(Boolean)));
-    return ['ALL', 'FAST MOVERS', ...list];
-  }, [items]);
-
-  // Barcode & Item Search Handler
-  const handleBarcodeScanned = (barcodeOrQuery: string) => {
-    const clean = barcodeOrQuery.trim();
-    if (!clean) return;
-    const lower = clean.toLowerCase();
-
-    // 1. Try exact match first (barcode, SKU, ID, or exact name)
-    let found = items.find(
-      (i) =>
-        i.barcode === clean ||
-        i.sku?.toLowerCase() === lower ||
-        i.id === clean ||
-        i.name.toLowerCase() === lower
-    );
-
-    // 2. If no exact match, find item containing the text typed (substring match)
-    if (!found) {
-      found = items.find(
-        (i) =>
-          i.name.toLowerCase().includes(lower) ||
-          (i.barcode && i.barcode.toLowerCase().includes(lower)) ||
-          (i.sku && i.sku.toLowerCase().includes(lower))
-      );
-    }
-
-    // 3. Multi-word search if multiple words typed
-    if (!found) {
-      const words = lower.split(/\s+/).filter(Boolean);
-      if (words.length > 1) {
-        found = items.find((i) =>
-          words.every((w) =>
-            i.name.toLowerCase().includes(w) ||
-            (i.barcode && i.barcode.toLowerCase().includes(w)) ||
-            (i.sku && i.sku.toLowerCase().includes(w))
-          )
-        );
-      }
-    }
-
-    if (found) {
-      addToCart(found);
-      audioService.playScanSuccess();
-      setScanMessage({ text: `Added: ${found.name}` });
-      setTimeout(() => setScanMessage(null), 2500);
-    } else {
-      audioService.playScanError();
-      setScanMessage({ text: `Item not found matching "${clean}"`, isError: true });
-      setTimeout(() => setScanMessage(null), 3000);
-    }
-  };
-
-  const handleBarcodeScannedRef = useRef(handleBarcodeScanned);
-  handleBarcodeScannedRef.current = handleBarcodeScanned;
-
-  // Hardware Scanner Gun Listener (Subscribed once on mount, 0 churn on cart/item updates)
-  useEffect(() => {
-    const unsub = hardwareScanner.subscribe((code) => {
-      handleBarcodeScannedRef.current(code);
-    });
-    return unsub;
-  }, []);
-
   // POS Keyboard Shortcuts Handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA');
 
-      if (e.key === 'F2' || (e.key === '/' && !isInput)) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      } else if (e.key === 'F4') {
-        e.preventDefault();
-        handleHoldBill();
-      } else if (e.key === 'F7') {
-        e.preventDefault();
-        setIsHoldModalOpen(true);
-      } else if (e.key === 'F8') {
-        e.preventDefault();
-        setIsCustomItemModalOpen(true);
-      } else if (e.key === 'F9') {
-        e.preventDefault();
-        setPaymentMode('CASH');
-        handleCheckout('CASH');
-      } else if (e.key === 'F10') {
-        e.preventDefault();
-        setPaymentMode('UPI');
-        setIsUpiModalOpen(true);
-      } else if (e.key === 'F12') {
-        e.preventDefault();
-        setIsCustomerModalOpen(true);
-      } else if (e.key === '?' && !isInput) {
-        e.preventDefault();
-        setIsShortcutsModalOpen(true);
-      }
+      if (e.key === 'F2' || (e.key === '/' && !isInput)) { e.preventDefault(); searchInputRef.current?.focus(); searchInputRef.current?.select(); }
+      else if (e.key === 'F4') { e.preventDefault(); handleHoldBill(); }
+      else if (e.key === 'F7') { e.preventDefault(); setIsHoldModalOpen(true); }
+      else if (e.key === 'F8') { e.preventDefault(); setIsCustomItemModalOpen(true); }
+      else if (e.key === 'F9') { e.preventDefault(); setPaymentMode('CASH'); handleCheckout('CASH'); }
+      else if (e.key === 'F10') { e.preventDefault(); setPaymentMode('UPI'); setIsUpiModalOpen(true); }
+      else if (e.key === 'F12') { e.preventDefault(); setIsCustomerModalOpen(true); }
+      else if (e.key === '?' && !isInput) { e.preventDefault(); setIsShortcutsModalOpen(true); }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart, customer, heldBills]);
-
-  // Catalog Filtering (matches containing text typed across name, barcode, sku, category)
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const words = q ? q.split(/\s+/).filter(Boolean) : [];
-
-    return items.filter((i) => {
-      const matchesSearch =
-        words.length === 0 ||
-        words.every((w) =>
-          i.name.toLowerCase().includes(w) ||
-          (i.barcode && i.barcode.toLowerCase().includes(w)) ||
-          (i.sku && i.sku.toLowerCase().includes(w)) ||
-          (i.category && i.category.toLowerCase().includes(w))
-        );
-
-      let matchesCategory = true;
-      if (selectedCategory === 'FAST MOVERS') {
-        matchesCategory = (i.currentStock || 0) > 0;
-      } else if (selectedCategory !== 'ALL') {
-        matchesCategory = (i.category || 'General').toLowerCase() === selectedCategory.toLowerCase();
-      }
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [items, search, selectedCategory]);
-
-  // Cart operations
-  const addToCart = (item: InventoryItem, initialQty = 1) => {
-    setCart((prevCart) => {
-      const existing = prevCart.find((c) => c.item.id === item.id);
-      if (existing) {
-        return prevCart.map((c) =>
-          c.item.id === item.id ? { ...c, qty: c.qty + initialQty } : c
-        );
-      }
-      const newItem = createPosCartItem(item, initialQty);
-      if (!isGstActive || company.isCompositionScheme) {
-        newItem.unitPriceInclusive = newItem.unitPrice;
-        newItem.priceMode = 'EXCLUSIVE';
-        newItem.cessRate = 0;
-      }
-      return [...prevCart, newItem];
-    });
-  };
-
-  const updateCartQty = (itemId: string, qty: number) => {
-    if (qty <= 0) {
-      removeFromCart(itemId);
-      return;
-    }
-    const cleanQty = roundQuantity(qty, 4);
-    setCart(
-      cart.map((c) => (c.item.id === itemId ? { ...c, qty: cleanQty } : c))
-    );
-  };
-
-  const updateCartExclusivePrice = (itemId: string, raw: number | string) => {
-    const value = Math.max(0, Number(raw) || 0);
-    setCart((prevCart) =>
-      prevCart.map((c) => {
-        if (c.item.id !== itemId) return c;
-        if (!isGstActive || company.isCompositionScheme) {
-          return {
-            ...c,
-            unitPrice: value,
-            unitPriceInclusive: value,
-            priceMode: 'EXCLUSIVE',
-          };
-        }
-        const gst = Number(c.item.gstRate) || 0;
-        return {
-          ...c,
-          unitPrice: value,
-          unitPriceInclusive: inclusiveFromExclusive(value, gst),
-          priceMode: 'EXCLUSIVE',
-        };
-      })
-    );
-  };
-
-  const updateCartInclusivePrice = (itemId: string, raw: number | string) => {
-    const value = Math.max(0, Number(raw) || 0);
-    setCart((prevCart) =>
-      prevCart.map((c) => {
-        if (c.item.id !== itemId) return c;
-        if (!isGstActive || company.isCompositionScheme) {
-          return {
-            ...c,
-            unitPrice: value,
-            unitPriceInclusive: value,
-            priceMode: 'EXCLUSIVE',
-          };
-        }
-        const gst = Number(c.item.gstRate) || 0;
-        return {
-          ...c,
-          unitPrice: exclusiveFromInclusive(value, gst),
-          unitPriceInclusive: value,
-          priceMode: 'INCLUSIVE',
-        };
-      })
-    );
-  };
-
-  const toggleCartPriceMode = (itemId: string) => {
-    if (!isGstActive || company.isCompositionScheme) return;
-    setCart((prevCart) =>
-      prevCart.map((c) => {
-        if (c.item.id !== itemId) return c;
-        const currentMode = c.priceMode ?? 'EXCLUSIVE';
-        const nextMode: ItemPriceMode = currentMode === 'INCLUSIVE' ? 'EXCLUSIVE' : 'INCLUSIVE';
-        return {
-          ...c,
-          priceMode: nextMode,
-        };
-      })
-    );
-  };
-
-  const updateCartPrice = (itemId: string, unitPrice: number) => {
-    updateCartExclusivePrice(itemId, unitPrice);
-  };
-
-  const removeFromCart = (itemId: string) => {
-    setCart(cart.filter((c) => c.item.id !== itemId));
-  };
-
-  // Tax and Total Calculations
-  const supplierStateCode = company.stateCode || '27';
-  const recipientStateCode = customer.stateCode || supplierStateCode;
-  const isIntraState = supplierStateCode === recipientStateCode;
-
-  const calcInputs = useMemo(() => {
-    return cart.map((c) => {
-      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (c.item.gstRate || 0);
-      const excl = Number(c.unitPrice) || 0;
-      let incl = Number(c.unitPriceInclusive) || 0;
-      const mode = c.priceMode ?? 'EXCLUSIVE';
-      if (!isGstActive || company.isCompositionScheme) {
-        incl = excl;
-      } else if (mode === 'EXCLUSIVE') {
-        incl = inclusiveFromExclusive(excl, gst);
-      } else if (mode === 'INCLUSIVE' && incl <= 0) {
-        incl = inclusiveFromExclusive(excl, gst);
-      }
-      return {
-        quantity: c.qty,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        cessPercent: isGstActive && !company.isCompositionScheme ? (c.cessRate || c.item.cessRate || 0) : 0,
-        gstRate: gst,
-        discountPercent: c.discountPercent || 0,
-        discountAmount: c.discountAmount || 0,
-      };
-    });
-  }, [cart, isGstActive, company.isCompositionScheme]);
-
-  const calcSummary = useMemo(() => {
-    return calculateInvoice(supplierStateCode, recipientStateCode, calcInputs);
-  }, [supplierStateCode, recipientStateCode, calcInputs]);
-
-  // Overall Discount calculation
-  const overallDiscountAmt = useMemo(() => {
-    if (cartDiscountType === 'FLAT') {
-      return Math.min(calcSummary.totalTaxableAmount, cartDiscountValue || 0);
-    } else {
-      return Number(((calcSummary.totalTaxableAmount * (cartDiscountValue || 0)) / 100).toFixed(2));
-    }
-  }, [calcSummary.totalTaxableAmount, cartDiscountType, cartDiscountValue]);
-
-  // Final Payable Grand Total
-  const finalPayableTotal = useMemo(() => {
-    const raw = Math.max(
-      0,
-      calcSummary.grandTotal - overallDiscountAmt + (additionalCharges || 0)
-    );
-    return Math.round(raw);
-  }, [calcSummary.grandTotal, overallDiscountAmt, additionalCharges]);
-
-  const totalCartCount = useMemo(() => {
-    return cart.reduce((s, c) => s + c.qty, 0);
-  }, [cart]);
-
-  const isAllGstExempt = useMemo(() => {
-    return cart.length > 0 && cart.every((c) => (Number(c.item.gstRate) || 0) === 0);
-  }, [cart]);
-
-  // Cash change calculation
-  const numCashTendered = parseFloat(cashTendered) || 0;
-  const cashChangeDue = Math.max(0, numCashTendered - finalPayableTotal);
-
-  // Hold / Park Current Bill
-  const handleHoldBill = () => {
-    if (cart.length === 0) {
-      alert('Cart is empty. Add items to park this bill.');
-      return;
-    }
-
-    const holdNumber = heldBills.length + 1;
-    const newHold: HeldBill = {
-      id: `HOLD-${Date.now()}`,
-      heldAt: new Date().toISOString(),
-      label: `HOLD #${holdNumber}`,
-      customer,
-      cart,
-      cartDiscount: {
-        type: cartDiscountType,
-        value: cartDiscountValue,
-      },
-      additionalCharges,
-      paymentMode,
-      totalAmount: finalPayableTotal,
-    };
-
-    setHeldBills([newHold, ...heldBills]);
-    audioService.playScanSuccess();
-    setScanMessage({ text: `Bill parked as ${newHold.label}` });
-    setTimeout(() => setScanMessage(null), 2500);
-
-    // Reset current active counter
-    setCart([]);
-    setCustomer({
-      party: null,
-      phone: '',
-      isB2b: false,
-      stateCode: company.stateCode || '27',
-    });
-    setCartDiscountValue(0);
-    setAdditionalCharges(0);
-    setCashTendered('');
-    setIsMobileCartDrawerOpen(false);
-  };
-
-  const normalizeCart = (cartItems: PosCartItem[]): PosCartItem[] => {
-    return cartItems.map((c) => {
-      const item = c.item;
-      const gst = (!isGstActive || company.isCompositionScheme) ? 0 : (item.gstRate ?? 18);
-      const mode: ItemPriceMode = (!isGstActive || company.isCompositionScheme)
-        ? 'EXCLUSIVE'
-        : (c.priceMode || 'EXCLUSIVE');
-      let excl = Number(c.unitPrice ?? item.salePrice ?? 0);
-      let incl = Number(c.unitPriceInclusive);
-      if (!isGstActive || company.isCompositionScheme) {
-        incl = excl;
-      } else if (mode === 'EXCLUSIVE') {
-        incl = inclusiveFromExclusive(excl, gst);
-      } else {
-        if (!Number.isFinite(incl) || incl <= 0) {
-          incl = inclusiveFromExclusive(excl, gst);
-        }
-        excl = exclusiveFromInclusive(incl, gst);
-      }
-      return {
-        ...c,
-        unitPrice: excl,
-        unitPriceInclusive: incl,
-        priceMode: mode,
-        cessRate: c.cessRate !== undefined ? Number(c.cessRate) || 0 : (item.cessRate ?? 0),
-      };
-    });
-  };
-
-  const applyResumeBill = (bill: HeldBill) => {
-    setCart(normalizeCart(bill.cart));
-    setCustomer(bill.customer);
-    setCartDiscountType(bill.cartDiscount.type);
-    setCartDiscountValue(bill.cartDiscount.value);
-    setAdditionalCharges(bill.additionalCharges);
-    setPaymentMode(bill.paymentMode);
-
-    setHeldBills(heldBills.filter((b) => b.id !== bill.id));
-    audioService.playScanSuccess();
-    setScanMessage({ text: `Resumed ${bill.label}` });
-    setTimeout(() => setScanMessage(null), 2500);
-  };
-
-  const handleResumeBill = (bill: HeldBill) => {
-    if (cart.length > 0) {
-      setPendingResumeBill(bill);
-      return;
-    }
-    applyResumeBill(bill);
-  };
-
-  const handleDiscardHeldBill = (billId: string) => {
-    setHeldBills(heldBills.filter((b) => b.id !== billId));
-  };
-
-  const handleClearAllHeld = () => {
-    setHeldBills([]);
-  };
 
   // Customer Party Select: resolving null selection to system walk-in customer
   const handleSelectCustomer = (party: Party | null) => {
@@ -621,6 +264,10 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       });
     }
   };
+
+  // Cash change calculation
+  const numCashTendered = parseFloat(cashTendered) || 0;
+  const cashChangeDue = Math.max(0, numCashTendered - finalPayableTotal);
 
   // Checkout Execution
   // Accepts an optional pre-resolved split breakdown to avoid React async state race.
@@ -660,23 +307,19 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       chosenMode = (paymentMode as PaymentMode) || 'CASH';
     }
 
-    const invoiceItems: InvoiceItemEntry[] = cart.map((c, idx) => {
-      const itemCalc = calcSummary.items[idx];
-      const raw: RawLineItem = {
-        itemId: c.item.id,
-        name: c.item.name,
-        hsnSacCode: c.item.hsnSacCode,
-        unit: c.item.unit,
-        quantity: c.qty,
-        unitPrice: c.unitPrice,
-        unitPriceInclusive: c.unitPriceInclusive,
-        priceMode: c.priceMode,
-        discountPercent: c.discountPercent,
-        cessRate: c.cessRate || c.item.cessRate,
-        gstRate: c.item.gstRate,
-      };
-      return normalizeInvoiceLineItem(raw, itemCalc, { isGstActive, isComposition: !!company.isCompositionScheme }, idx);
-    });
+    const invoiceItems: InvoiceItemEntry[] = cart.map((c, idx) =>
+      normalizeInvoiceLineItem(
+        {
+          itemId: c.item.id, name: c.item.name, hsnSacCode: c.item.hsnSacCode, unit: c.item.unit,
+          quantity: c.qty, unitPrice: c.unitPrice, unitPriceInclusive: c.unitPriceInclusive,
+          priceMode: c.priceMode, discountPercent: c.discountPercent, cessRate: c.cessRate || c.item.cessRate,
+          gstRate: c.item.gstRate,
+        },
+        calcSummary.items[idx],
+        { isGstActive, isComposition: !!company.isCompositionScheme },
+        idx
+      )
+    );
 
     const isB2bInvoice = isGstActive && !!customer.gstin;
 
@@ -718,69 +361,23 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     const splitsList: PaymentSplit[] = activeSplit
       ? ([
-          activeSplit.cash > 0
-            ? {
-                id: `split-cash-${Date.now()}`,
-                mode: 'CASH' as PaymentMode,
-                amount: activeSplit.cash,
-                accountId: 'ACC_CASH',
-                accountName: 'Cash-in-hand',
-              }
-            : null,
-          activeSplit.upi > 0
-            ? {
-                id: `split-upi-${Date.now()}`,
-                mode: 'UPI' as PaymentMode,
-                amount: activeSplit.upi,
-                accountId: activeSplit.upiAccountId,
-                accountName: activeSplit.upiAccountName,
-              }
-            : null,
-          activeSplit.card > 0
-            ? {
-                id: `split-card-${Date.now()}`,
-                mode: 'CARD' as PaymentMode,
-                amount: activeSplit.card,
-                accountId: activeSplit.cardAccountId,
-                accountName: activeSplit.cardAccountName,
-              }
-            : null,
-          activeSplit.credit > 0
-            ? {
-                id: `split-credit-${Date.now()}`,
-                mode: 'CREDIT' as PaymentMode,
-                amount: activeSplit.credit,
-              }
-            : null,
+          activeSplit.cash > 0 ? { id: `split-cash-${Date.now()}`, mode: 'CASH' as PaymentMode, amount: activeSplit.cash, accountId: 'ACC_CASH', accountName: 'Cash-in-hand' } : null,
+          activeSplit.upi > 0 ? { id: `split-upi-${Date.now()}`, mode: 'UPI' as PaymentMode, amount: activeSplit.upi, accountId: activeSplit.upiAccountId, accountName: activeSplit.upiAccountName } : null,
+          activeSplit.card > 0 ? { id: `split-card-${Date.now()}`, mode: 'CARD' as PaymentMode, amount: activeSplit.card, accountId: activeSplit.cardAccountId, accountName: activeSplit.cardAccountName } : null,
+          activeSplit.credit > 0 ? { id: `split-credit-${Date.now()}`, mode: 'CREDIT' as PaymentMode, amount: activeSplit.credit } : null,
         ].filter(Boolean) as PaymentSplit[])
-      : [
-          {
-            id: '1',
-            mode: chosenMode,
-            amount: paidAmount,
-            accountId: chosenMode === 'CASH' ? 'ACC_CASH' : undefined,
-            accountName: chosenMode === 'CASH' ? 'Cash-in-hand' : undefined,
-          },
-        ];
+      : [{ id: '1', mode: chosenMode, amount: paidAmount, accountId: chosenMode === 'CASH' ? 'ACC_CASH' : undefined, accountName: chosenMode === 'CASH' ? 'Cash-in-hand' : undefined }];
 
     const activeParty = customer.party || (customer.phone ? null : systemParty);
 
     const newInvoice: Invoice = {
       id: `INV-${Date.now()}`,
-      invoiceNumber: generateNextDocumentNumber(
-        'POS_INVOICE',
-        company,
-        db.getInvoices()
-      ),
+      invoiceNumber: generateNextDocumentNumber('POS_INVOICE', company, db.getInvoices()),
       invoiceType: isB2bInvoice ? 'B2B' : 'B2CS',
       isGstInvoice: isGstActive,
       date: new Date().toISOString().split('T')[0],
       partyId: activeParty ? activeParty.id : (customer.phone ? undefined : SYSTEM_WALK_IN_PARTY_ID),
-      partyName: activeParty
-        ? activeParty.name
-        : customer.phone
-        ? `Retail (${customer.phone})`
-        : SYSTEM_WALK_IN_PARTY_NAME,
+      partyName: activeParty ? activeParty.name : customer.phone ? `Retail (${customer.phone})` : SYSTEM_WALK_IN_PARTY_NAME,
       partyGstin: isGstActive ? (activeParty?.gstin || customer.gstin) : undefined,
       partyAddress: activeParty?.billingAddress || 'Local Counter',
       partyStateCode: customer.stateCode,
@@ -830,18 +427,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
     // Reset Form for next sale
     setCart([]);
-    setCustomer({
-      party: systemParty,
-      phone: systemParty?.phone || '',
-      isB2b: !!systemParty?.gstin,
-      gstin: systemParty?.gstin,
-      stateCode: systemParty?.stateCode || company.stateCode || '27',
-    });
-    setCartDiscountValue(0);
-    setAdditionalCharges(0);
-    setCashTendered('');
-    setSplitBreakdown(null);
-    setIsMobileCartDrawerOpen(false);
+    setCustomer({ party: systemParty, phone: systemParty?.phone || '', isB2b: !!systemParty?.gstin, gstin: systemParty?.gstin, stateCode: systemParty?.stateCode || company.stateCode || '27' });
+    setCartDiscountValue(0); setAdditionalCharges(0); setCashTendered(''); setSplitBreakdown(null); setIsMobileCartDrawerOpen(false);
   };
 
   const handleStartNextSale = () => {
@@ -1723,13 +1310,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
       {/* Customer Selection Modal */}
       {isCustomerModalOpen && (
-        <SelectPosPartyModal
-          isOpen={isCustomerModalOpen}
-          parties={parties}
-          selectedParty={customer.party}
-          onSelectParty={handleSelectCustomer}
-          onClose={() => setIsCustomerModalOpen(false)}
-        />
+        <SelectPosPartyModal isOpen={isCustomerModalOpen} parties={parties} selectedParty={customer.party} onSelectParty={handleSelectCustomer} onClose={() => setIsCustomerModalOpen(false)} />
       )}
 
       {/* Custom Item Modal */}
@@ -1738,39 +1319,20 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           isOpen={isCustomItemModalOpen}
           onClose={() => setIsCustomItemModalOpen(false)}
           onAddCustomItem={(item, initialQty) => {
-            addToCart(item, initialQty);
-            audioService.playScanSuccess();
-            setScanMessage({ text: `Added: ${item.name}` });
-            setTimeout(() => setScanMessage(null), 2500);
+            addToCart(item, initialQty); audioService.playScanSuccess();
+            setScanMessage({ text: `Added: ${item.name}` }); setTimeout(() => setScanMessage(null), 2500);
           }}
         />
       )}
 
       {/* Parked / Held Bills Modal */}
       {isHoldModalOpen && (
-        <HoldBillsModal
-          isOpen={isHoldModalOpen}
-          heldBills={heldBills}
-          onResumeBill={handleResumeBill}
-          onDiscardBill={handleDiscardHeldBill}
-          onClearAll={handleClearAllHeld}
-          onClose={() => setIsHoldModalOpen(false)}
-        />
+        <HoldBillsModal isOpen={isHoldModalOpen} heldBills={heldBills} onResumeBill={handleResumeBill} onDiscardBill={handleDiscardHeldBill} onClearAll={handleClearAllHeld} onClose={() => setIsHoldModalOpen(false)} />
       )}
 
       {/* Dynamic UPI QR Code Modal */}
       {isUpiModalOpen && (
-        <UpiQrModal
-          isOpen={isUpiModalOpen}
-          amount={finalPayableTotal}
-          company={company}
-          invoiceNumber={previewInvoiceNumber}
-          onPaymentConfirmed={() => {
-            setPaymentMode('UPI');
-            handleCheckout('UPI');
-          }}
-          onClose={() => setIsUpiModalOpen(false)}
-        />
+        <UpiQrModal isOpen={isUpiModalOpen} amount={finalPayableTotal} company={company} invoiceNumber={previewInvoiceNumber} onPaymentConfirmed={() => { setPaymentMode('UPI'); handleCheckout('UPI'); }} onClose={() => setIsUpiModalOpen(false)} />
       )}
 
       {/* Split Payment Modal */}
@@ -1780,12 +1342,8 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           grandTotal={finalPayableTotal}
           hasCustomerSelected={!!customer.party}
           onConfirmSplit={(breakdown) => {
-            // Save to state for display/reset purposes
-            setSplitBreakdown(breakdown);
-            setPaymentMode('SPLIT');
-            // Pass breakdown DIRECTLY to avoid async state race (Bug fix)
-            setIsSplitModalOpen(false);
-            handleCheckout(undefined, breakdown);
+            setSplitBreakdown(breakdown); setPaymentMode('SPLIT');
+            setIsSplitModalOpen(false); handleCheckout(undefined, breakdown);
           }}
           onClose={() => setIsSplitModalOpen(false)}
         />
@@ -1793,10 +1351,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
       {/* Keyboard Shortcuts Cheat-sheet Modal */}
       {isShortcutsModalOpen && (
-        <PosKeyboardShortcutsModal
-          isOpen={isShortcutsModalOpen}
-          onClose={() => setIsShortcutsModalOpen(false)}
-        />
+        <PosKeyboardShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setIsShortcutsModalOpen(false)} />
       )}
 
       {/* Post-Sale Checkout Success Modal */}
@@ -1808,12 +1363,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
           changeDue={completedSale.changeDue}
           cashTendered={completedSale.cashTendered}
           onPrintThermal={() => setThermalPrintInvoice(completedSale.invoice)}
-          onViewA4={() => {
-            if (onViewInvoice) {
-              onViewInvoice(completedSale.invoice);
-            }
-            setCompletedSale(null);
-          }}
+          onViewA4={() => { if (onViewInvoice) onViewInvoice(completedSale.invoice); setCompletedSale(null); }}
           onNextSale={handleStartNextSale}
         />
       )}
@@ -1821,57 +1371,23 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       {/* Thermal Receipt Print Modal */}
       {thermalPrintInvoice && (
         <React.Suspense fallback={null}>
-          <ThermalPrintModal
-            invoice={thermalPrintInvoice}
-            company={company}
-            onClose={() => setThermalPrintInvoice(null)}
-          />
+          <ThermalPrintModal invoice={thermalPrintInvoice} company={company} onClose={() => setThermalPrintInvoice(null)} />
         </React.Suspense>
       )}
 
       {/* Camera Barcode Scanner Modal */}
       {isScannerOpen && (
-        <CameraBarcodeScannerModal
-          isOpen={isScannerOpen}
-          onClose={() => setIsScannerOpen(false)}
-          onScan={(code) => {
-            handleBarcodeScanned(code);
-            setIsScannerOpen(false);
-          }}
-        />
+        <CameraBarcodeScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={(code) => { handleBarcodeScanned(code); setIsScannerOpen(false); }} />
       )}
 
       {/* Replace Active Cart Confirmation Modal */}
       {pendingResumeBill && (
-        <ConfirmDeleteModal
-          isOpen={!!pendingResumeBill}
-          title="Replace Active Cart?"
-          recordName={pendingResumeBill.label}
-          description="Active cart currently has items. Resuming this parked bill will replace the current cart items. Continue?"
-          confirmText="Resume Bill"
-          cancelText="Cancel"
-          onConfirm={() => {
-            applyResumeBill(pendingResumeBill);
-            setPendingResumeBill(null);
-          }}
-          onClose={() => setPendingResumeBill(null)}
-        />
+        <ConfirmDeleteModal isOpen={!!pendingResumeBill} title="Replace Active Cart?" recordName={pendingResumeBill.label} description="Active cart currently has items. Resuming this parked bill will replace the current cart items. Continue?" confirmText="Resume Bill" cancelText="Cancel" onConfirm={() => { applyResumeBill(pendingResumeBill); setPendingResumeBill(null); }} onClose={() => setPendingResumeBill(null)} />
       )}
 
       {/* Clear Cart Confirmation Modal */}
       {showClearCartConfirm && (
-        <ConfirmDeleteModal
-          isOpen={showClearCartConfirm}
-          title="Clear Bill Items?"
-          description="Are you sure you want to clear all items from the current bill?"
-          confirmText="Clear Cart"
-          cancelText="Cancel"
-          onConfirm={() => {
-            setCart([]);
-            setShowClearCartConfirm(false);
-          }}
-          onClose={() => setShowClearCartConfirm(false)}
-        />
+        <ConfirmDeleteModal isOpen={showClearCartConfirm} title="Clear Bill Items?" description="Are you sure you want to clear all items from the current bill?" confirmText="Clear Cart" cancelText="Cancel" onConfirm={() => { clearCart(); setShowClearCartConfirm(false); }} onClose={() => setShowClearCartConfirm(false)} />
       )}
     </div>
   );
