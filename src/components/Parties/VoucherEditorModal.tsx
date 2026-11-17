@@ -1,20 +1,15 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Party } from '../../models/party.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Invoice, PaymentMode, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Voucher, JournalEntryLine, PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
 import {
-  getOutstandingDocuments,
-  allocateOldestFirst,
   validateAllocations,
-  reverseAllocations,
   OutstandingDocument,
 } from '../../core/accounting/paymentAllocation.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
-import { safeOpenExternalUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
-import { buildWhatsAppSendUrl } from '../../core/utils/whatsappIntent.ts';
 import { db } from '../../services/db.ts';
 import {
   useCompany,
@@ -30,6 +25,8 @@ import { PaymentReceiptSlipModal } from './PaymentReceiptSlipModal.tsx';
 import { VoucherAllocationRow } from './voucher/VoucherAllocationRow.tsx';
 import { printSettingsService } from '../../services/printSettingsService.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { useVoucherEditorForm } from './voucherEditor/useVoucherEditorForm.ts';
+import { useVoucherAllocations } from './voucherEditor/useVoucherAllocations.ts';
 
 export interface VoucherEditorModalProps {
   editingLedgerEntry: PassbookEntry | null;
@@ -68,298 +65,86 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
   const storePurchases = usePurchases();
   const storeBankAccounts = useBankAccounts();
 
-  const isPayment = Boolean(
-    editingLedgerEntry &&
-      !editingLedgerEntry.isOpening &&
-      (editingLedgerEntry.type === 'PAYMENT_IN' ||
-        editingLedgerEntry.type === 'PAYMENT_OUT' ||
-        editingLedgerEntry.rawVoucher ||
-        editingLedgerEntry.id.startsWith('pay-inv-') ||
-        editingLedgerEntry.id.startsWith('pay-pur-') ||
-        editingLedgerEntry.id.startsWith('pay-'))
-  );
-
-  const [isEditing, setIsEditing] = useState<boolean>(() => {
-    if (typeof initialEditing === 'boolean') return initialEditing;
-    return !isPayment;
-  });
-
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
   const [isPrintSlipOpen, setIsPrintSlipOpen] = useState(false);
-  const [editDate, setEditDate] = useState('');
-  const [editAmount, setEditAmount] = useState('');
-  const [editMode, setEditMode] = useState('UPI');
-  const [editSplitCash, setEditSplitCash] = useState('');
-  const [editSplitUPI, setEditSplitUPI] = useState('');
-  const [editSplitBank, setEditSplitBank] = useState('');
-  const [editDiscount, setEditDiscount] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-  const [editType, setEditType] = useState<'IN' | 'OUT'>('IN');
-  const [editOpeningType, setEditOpeningType] = useState<'RECEIVABLE' | 'PAYABLE'>('RECEIVABLE');
 
-  // Allocation State for Manual Payment Linking
-  const [allocationsMap, setAllocationsMap] = useState<Record<string, number>>({});
-  const [allocationModeState, setAllocationModeState] = useState<'MANUAL' | 'AUTO_FIFO' | 'UNALLOCATED' | 'SOURCE_DOCUMENT'>('UNALLOCATED');
-  const [isManualAllocation, setIsManualAllocation] = useState<boolean>(false);
-
-  const allBankAccounts = storeBankAccounts;
-
-  const availableBankAccounts = useMemo(() => {
-    const all = allBankAccounts || [];
-    const banks = all.filter((a) => a.accountType === 'BANK');
-    if (banks.length > 0) return banks;
-    return [
-      {
-        id: 'ACC_BANK',
-        accountName: 'Primary Bank Account',
-        accountType: 'BANK' as const,
-        openingBalance: 0,
-        createdAt: '',
-        updatedAt: '',
-      },
-    ];
-  }, [allBankAccounts]);
-
-  const [editBankAccountId, setEditBankAccountId] = useState<string>(() => {
-    const banks = storeBankAccounts.filter((a) => a.accountType === 'BANK');
-    const def = banks.find((a) => a.isDefault) || banks[0];
-    return def?.id || 'ACC_BANK';
+  const form = useVoucherEditorForm({
+    editingLedgerEntry,
+    party,
+    initialEditing,
+    bankAccounts: storeBankAccounts,
   });
-
-  const selectedBankName = useMemo(() => {
-    const found = availableBankAccounts.find((a) => a.id === editBankAccountId);
-    return found?.accountName || 'Bank Account';
-  }, [availableBankAccounts, editBankAccountId]);
-
-  const partyTotalDue = useMemo(() => {
-    return party ? getPartyTotalBalanceDue(party) : null;
-  }, [party]);
-
-  const populateForm = useCallback(() => {
-    if (!editingLedgerEntry) return;
-
-    setEditDate(editingLedgerEntry.date);
-    const amtVal = editingLedgerEntry.credit > 0 ? editingLedgerEntry.credit : editingLedgerEntry.debit;
-    setEditAmount(amtVal.toString());
-    setEditMode(editingLedgerEntry.paymentMode || 'UPI');
-    setEditNotes(editingLedgerEntry.description || '');
-    setEditType(editingLedgerEntry.type === 'PAYMENT_IN' ? 'IN' : 'OUT');
-
-    if (editingLedgerEntry.rawVoucher) {
-      const v = editingLedgerEntry.rawVoucher;
-      const discEntry = v.entries.find((e) => e.accountId === 'ACC_EXPENSE_DISCOUNT' || e.accountId === 'ACC_INCOME_DISCOUNT');
-      const discVal = discEntry ? (discEntry.debit || discEntry.credit || 0) : 0;
-      setEditDiscount(discVal > 0 ? discVal.toString() : '');
-
-      const cashEntry = v.entries.find((e) => e.accountId === 'ACC_CASH');
-      const bankEntries = v.entries.filter((e) => e.accountId !== 'ACC_CASH' && e.accountId !== party.id && (e.accountId.startsWith('BANK') || e.accountId.startsWith('ACC_BANK') || availableBankAccounts.some((a) => a.id === e.accountId)));
-      if (bankEntries.length > 0 && bankEntries[0].accountId) {
-        setEditBankAccountId(bankEntries[0].accountId);
-      }
-      const cashVal = cashEntry ? (cashEntry.debit || cashEntry.credit || 0) : 0;
-      const bankVal = bankEntries.reduce((sum, e) => sum + (e.debit || e.credit || 0), 0);
-      const paymentVal = cashVal + bankVal;
-      if (paymentVal > 0) {
-        setEditAmount(paymentVal.toString());
-      }
-      if (cashVal > 0 && bankVal > 0) {
-        setEditMode('SPLIT');
-        setEditSplitCash(cashVal.toString());
-        setEditSplitUPI(bankVal.toString());
-        setEditSplitBank('');
-      } else {
-        setEditSplitCash('');
-        setEditSplitUPI('');
-        setEditSplitBank('');
-      }
-
-      const initialMap: Record<string, number> = {};
-      if (v.paymentAllocations && v.paymentAllocations.length > 0) {
-        for (const alloc of v.paymentAllocations) {
-          if (typeof alloc.amount === 'number' && alloc.amount > 0) {
-            initialMap[alloc.documentId] = alloc.amount;
-          }
-        }
-      }
-      setAllocationsMap(initialMap);
-      setAllocationModeState(v.allocationMode || (v.paymentAllocations?.length ? 'MANUAL' : 'UNALLOCATED'));
-      setIsManualAllocation(v.allocationMode === 'MANUAL');
-    } else if (editingLedgerEntry.rawInvoice?.paymentSplits && editingLedgerEntry.rawInvoice.paymentSplits.length > 1) {
-      setAllocationsMap({});
-      setAllocationModeState('UNALLOCATED');
-      setIsManualAllocation(false);
-      setEditMode('SPLIT');
-      setEditMode('SPLIT');
-      const c = editingLedgerEntry.rawInvoice.paymentSplits.find((s) => s.mode === 'CASH')?.amount || 0;
-      const u = editingLedgerEntry.rawInvoice.paymentSplits.find((s) => s.mode === 'UPI')?.amount || 0;
-      const b = editingLedgerEntry.rawInvoice.paymentSplits.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING')?.amount || 0;
-      setEditSplitCash(c > 0 ? c.toString() : '');
-      setEditSplitUPI(u > 0 ? u.toString() : '');
-      setEditSplitBank(b > 0 ? b.toString() : '');
-    } else if (editingLedgerEntry.rawPurchase?.paymentSplits && editingLedgerEntry.rawPurchase.paymentSplits.length > 1) {
-      setEditMode('SPLIT');
-      const c = editingLedgerEntry.rawPurchase.paymentSplits.find((s) => s.mode === 'CASH')?.amount || 0;
-      const u = editingLedgerEntry.rawPurchase.paymentSplits.find((s) => s.mode === 'UPI')?.amount || 0;
-      const b = editingLedgerEntry.rawPurchase.paymentSplits.find((s) => s.mode === 'BANK' || s.mode === 'NET_BANKING')?.amount || 0;
-      setEditSplitCash(c > 0 ? c.toString() : '');
-      setEditSplitUPI(u > 0 ? u.toString() : '');
-      setEditSplitBank(b > 0 ? b.toString() : '');
-    } else {
-      setEditSplitCash('');
-      setEditSplitUPI('');
-      setEditSplitBank('');
-    }
-
-    if (editingLedgerEntry.isOpening) {
-      const isRec = party.openingBalanceType
-        ? party.openingBalanceType === 'TO_RECEIVE'
-        : editingLedgerEntry.debit > 0;
-      setEditOpeningType(isRec ? 'RECEIVABLE' : 'PAYABLE');
-    } else {
-      setEditOpeningType(editingLedgerEntry.debit > 0 ? 'RECEIVABLE' : 'PAYABLE');
-    }
-  }, [editingLedgerEntry, party, availableBankAccounts]);
-
-  useEffect(() => {
-    populateForm();
-  }, [populateForm]);
-
-  useEffect(() => {
-    if (typeof initialEditing === 'boolean') {
-      setIsEditing(initialEditing);
-    } else {
-      setIsEditing(!isPayment);
-    }
-  }, [editingLedgerEntry?.id, initialEditing, isPayment]);
-
-  const prevEditTypeRef = React.useRef(editType);
-  useEffect(() => {
-    if (prevEditTypeRef.current !== editType) {
-      prevEditTypeRef.current = editType;
-      setAllocationsMap({});
-      setAllocationModeState('UNALLOCATED');
-      setIsManualAllocation(false);
-    }
-  }, [editType]);
-
-  const resolvedParties = useMemo(() => {
-    const list = parties && parties.length > 0 ? [...parties] : storeParties;
-    if (party && !list.some((p) => p.id === party.id)) {
-      list.push(party);
-    }
-    return list;
-  }, [parties, party, storeParties]);
-
-  const rawVoucherAllocations = useMemo(() => {
-    return editingLedgerEntry?.rawVoucher?.paymentAllocations || [];
-  }, [editingLedgerEntry?.rawVoucher?.paymentAllocations]);
-
-  const effectiveInvoices = useMemo(() => {
-    const allInvs = invoices && invoices.length > 0 ? invoices : storeInvoices;
-    if (
-      editingLedgerEntry?.rawVoucher &&
-      !editingLedgerEntry.rawVoucher.isReversed &&
-      !editingLedgerEntry.rawVoucher.isCancelled
-    ) {
-      const invAllocs = rawVoucherAllocations.filter((a) => a.documentType === 'INVOICE');
-      if (invAllocs.length > 0) {
-        return reverseAllocations(allInvs, invAllocs);
-      }
-    }
-    return allInvs;
-  }, [invoices, editingLedgerEntry?.rawVoucher, rawVoucherAllocations, storeInvoices]);
-
-  const effectivePurchases = useMemo(() => {
-    const allPurs = purchases && purchases.length > 0 ? purchases : storePurchases;
-    if (
-      editingLedgerEntry?.rawVoucher &&
-      !editingLedgerEntry.rawVoucher.isReversed &&
-      !editingLedgerEntry.rawVoucher.isCancelled
-    ) {
-      const purAllocs = rawVoucherAllocations.filter((a) => a.documentType === 'PURCHASE');
-      if (purAllocs.length > 0) {
-        return reverseAllocations(allPurs, purAllocs);
-      }
-    }
-    return allPurs;
-  }, [purchases, editingLedgerEntry?.rawVoucher, rawVoucherAllocations, storePurchases]);
-
-  const outstandingDocs: OutstandingDocument[] = useMemo(() => {
-    if (!isPayment || !party) return [];
-    const targetDocType = editType === 'IN' ? 'INVOICE' : 'PURCHASE';
-    const docs = getOutstandingDocuments({
-      partyId: party.id,
-      partyName: party.name,
-      documentType: targetDocType,
-      invoices: effectiveInvoices,
-      purchases: effectivePurchases,
-      parties: resolvedParties,
-    });
-
-    if (editingLedgerEntry?.rawVoucher?.paymentAllocations) {
-      for (const alloc of editingLedgerEntry.rawVoucher.paymentAllocations) {
-        if (alloc.documentType !== targetDocType) continue;
-        if (!docs.some((d) => d.id === alloc.documentId)) {
-          docs.push({
-            id: alloc.documentId,
-            documentNumber: alloc.documentNumber,
-            number: alloc.documentNumber,
-            date: alloc.date || editingLedgerEntry.rawVoucher.date,
-            grandTotal: alloc.amount,
-            paidAmount: 0,
-            balanceAmount: alloc.amount,
-            documentType: alloc.documentType,
-            partyId: party.id,
-            partyName: party.name,
-          });
-        }
-      }
-    }
-
-    return docs;
-  }, [
+  const {
     isPayment,
+    isEditing,
+    setIsEditing,
+    editDate,
+    setEditDate,
+    editAmount,
+    setEditAmount,
+    editMode,
+    setEditMode,
+    editSplitCash,
+    setEditSplitCash,
+    editSplitUPI,
+    setEditSplitUPI,
+    editSplitBank,
+    setEditSplitBank,
+    editDiscount,
+    setEditDiscount,
+    editNotes,
+    setEditNotes,
+    editType,
+    setEditType,
+    editOpeningType,
+    setEditOpeningType,
+    availableBankAccounts,
+    editBankAccountId,
+    setEditBankAccountId,
+    selectedBankName,
+    partyTotalDue,
+    populateForm,
+    totalSettled,
+    isReceipt,
+    currentAmount,
+    currentDiscount,
+  } = form;
+
+  const allocations = useVoucherAllocations({
+    editingLedgerEntry,
     party,
     editType,
-    effectiveInvoices,
-    effectivePurchases,
-    resolvedParties,
-    editingLedgerEntry?.rawVoucher,
-  ]);
-
-  const totalSettled = useMemo(() => {
-    const numPayAmount = parseFloat(editAmount) || 0;
-    const numDiscount = parseFloat(editDiscount) || 0;
-    return Number((numPayAmount + numDiscount).toFixed(2));
-  }, [editAmount, editDiscount]);
-
-  const totalAllocated = useMemo(() => {
-    let sum = 0;
-    for (const val of Object.values(allocationsMap)) {
-      sum += Number(val) || 0;
-    }
-    return Number(sum.toFixed(2));
-  }, [allocationsMap]);
-
-  const unallocatedAmount = useMemo(() => {
-    return Math.max(0, Number((totalSettled - totalAllocated).toFixed(2)));
-  }, [totalSettled, totalAllocated]);
-
-  const isOverAllocated = totalAllocated > totalSettled + 0.01;
-
-  const isAnyDocOverAllocated = useMemo(() => {
-    return outstandingDocs.some((doc) => {
-      const val = allocationsMap[doc.id] || 0;
-      return val > doc.balanceAmount + 0.01;
-    });
-  }, [outstandingDocs, allocationsMap]);
-
-  const isSubmitDisabled = isOverAllocated || isAnyDocOverAllocated;
+    totalSettled,
+    invoices,
+    purchases,
+    parties: parties || storeParties,
+  });
+  const {
+    allocationsMap,
+    setAllocationsMap,
+    allocationModeState,
+    setAllocationModeState,
+    isManualAllocation,
+    setIsManualAllocation,
+    outstandingDocs,
+    totalAllocated,
+    unallocatedAmount,
+    isOverAllocated,
+    isAnyDocOverAllocated,
+    isSubmitDisabled,
+    handleAutoAllocate,
+    handleSelectAll,
+    handleClearAllocations,
+    handleToggleDoc,
+    handleAllocationValueChange,
+    resetAllocations,
+  } = allocations;
 
   useBackNavigation(() => {
     if (isEditing && isPayment) {
       populateForm();
+      resetAllocations();
       setIsEditing(false);
       return true;
     }
@@ -367,105 +152,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
     return true;
   }, !!editingLedgerEntry, 20);
 
-  // Guard after ALL hooks have been registered
   if (!editingLedgerEntry) return null;
-
-  const isReceipt =
-    editingLedgerEntry.type === 'PAYMENT_IN' ||
-    editType === 'IN' ||
-    (editingLedgerEntry.credit > 0 && editingLedgerEntry.debit === 0);
-
-  const currentAmount =
-    parseFloat(editAmount) ||
-    (editingLedgerEntry.credit > 0 ? editingLedgerEntry.credit : editingLedgerEntry.debit) ||
-    0;
-
-  const currentDiscount = parseFloat(editDiscount) || 0;
-
-  const handleAutoAllocate = () => {
-    if (totalSettled <= 0) return;
-    const auto = allocateOldestFirst(outstandingDocs, totalSettled);
-    const map: Record<string, number> = {};
-    for (const a of auto) {
-      map[a.documentId] = a.amount;
-    }
-    setAllocationsMap(map);
-    setIsManualAllocation(false);
-    setAllocationModeState('AUTO_FIFO');
-  };
-
-  const handleSelectAll = () => {
-    let remaining = totalSettled;
-    const map: Record<string, number> = {};
-    for (const doc of outstandingDocs) {
-      if (remaining <= 0) break;
-      const allocAmt = Math.min(doc.balanceAmount, remaining);
-      map[doc.id] = Number(allocAmt.toFixed(2));
-      remaining = Number((remaining - allocAmt).toFixed(2));
-    }
-    setAllocationsMap(map);
-    setIsManualAllocation(true);
-    setAllocationModeState('MANUAL');
-  };
-
-  const handleClearAllocations = () => {
-    setAllocationsMap({});
-    setIsManualAllocation(true);
-    setAllocationModeState('UNALLOCATED');
-  };
-
-  const handleToggleDoc = (doc: OutstandingDocument) => {
-    const currentAlloc = allocationsMap[doc.id] || 0;
-    if (currentAlloc > 0) {
-      setAllocationsMap((prev) => {
-        const next = { ...prev };
-        delete next[doc.id];
-        return next;
-      });
-      setIsManualAllocation(true);
-      setAllocationModeState('MANUAL');
-    } else {
-      const alreadyAllocated = Object.entries(allocationsMap).reduce(
-        (sum, [id, val]) => (id === doc.id ? sum : sum + (Number(val) || 0)),
-        0
-      );
-      const remaining = Math.max(0, Number((totalSettled - alreadyAllocated).toFixed(2)));
-      if (remaining <= 0) {
-        alert('All payment funds have already been allocated. Increase payment amount or reduce other allocations first.');
-        return;
-      }
-      const allocAmt = Math.min(doc.balanceAmount, remaining);
-      setAllocationsMap((prev) => ({
-        ...prev,
-        [doc.id]: Number(allocAmt.toFixed(2)),
-      }));
-      setIsManualAllocation(true);
-      setAllocationModeState('MANUAL');
-    }
-  };
-
-  const handleAllocationValueChange = (docId: string, valStr: string) => {
-    const rawVal = parseFloat(valStr);
-    const targetDoc = outstandingDocs.find((d) => d.id === docId);
-    const maxDocBal = targetDoc ? targetDoc.balanceAmount : undefined;
-
-    let val = isNaN(rawVal) ? 0 : rawVal;
-    if (maxDocBal !== undefined && val > maxDocBal) {
-      val = maxDocBal;
-    }
-
-    setAllocationsMap((prev) => {
-      const next = { ...prev };
-      if (!valStr || val <= 0) {
-        delete next[docId];
-      } else {
-        next[docId] = Number(val.toFixed(2));
-      }
-      return next;
-    });
-    setIsManualAllocation(true);
-    setAllocationModeState('MANUAL');
-  };
 
   const handleSaveLedgerItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -840,29 +527,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {onViewInvoice && (
-              <button
-                type="button"
-                onClick={() => {
-                  const inv = editingLedgerEntry.rawInvoice!;
-                  onClose();
-                  onViewInvoice(inv);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
-              >
+              <button type="button" onClick={() => { const inv = editingLedgerEntry.rawInvoice!; onClose(); onViewInvoice(inv); }} className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all">
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
                 <span>View</span>
               </button>
             )}
             {onEditInvoice && (
-              <button
-                type="button"
-                onClick={() => {
-                  const inv = editingLedgerEntry.rawInvoice!;
-                  onClose();
-                  onEditInvoice(inv);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high"
-              >
+              <button type="button" onClick={() => { const inv = editingLedgerEntry.rawInvoice!; onClose(); onEditInvoice(inv); }} className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high">
                 <span className="material-symbols-outlined text-[14px]">edit</span>
                 <span>Edit</span>
               </button>
@@ -914,34 +585,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                     <span className="text-secondary font-bold font-tabular-data">({formatINR(alloc.amount)})</span>
                   </div>
                   {!isOpeningBal && alloc.documentType === 'INVOICE' && onViewInvoice && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const inv = storeInvoices.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber);
-                        if (inv) {
-                          onClose();
-                          onViewInvoice(inv);
-                        }
-                      }}
-                      className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
-                    >
+                    <button type="button" onClick={() => { const inv = storeInvoices.find((i) => i.id === alloc.documentId || i.invoiceNumber === alloc.documentNumber); if (inv) { onClose(); onViewInvoice(inv); } }} className="px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all">
                       <span className="material-symbols-outlined text-[13px]">visibility</span>
                       <span>View</span>
                     </button>
                   )}
                   {!isOpeningBal && alloc.documentType === 'PURCHASE' && (onViewPurchase || onEditPurchase) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const pur = storePurchases.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber);
-                        if (pur) {
-                          onClose();
-                          if (onViewPurchase) onViewPurchase(pur);
-                          else if (onEditPurchase) onEditPurchase(pur);
-                        }
-                      }}
-                      className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
-                    >
+                    <button type="button" onClick={() => { const pur = storePurchases.find((p) => p.id === alloc.documentId || p.billNumber === alloc.documentNumber); if (pur) { onClose(); if (onViewPurchase) onViewPurchase(pur); else if (onEditPurchase) onEditPurchase(pur); } }} className="px-2.5 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-xs flex items-center gap-1 cursor-pointer active:scale-95 transition-all">
                       <span className="material-symbols-outlined text-[13px]">visibility</span>
                       <span>View</span>
                     </button>
@@ -965,29 +615,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {onViewPurchase && (
-              <button
-                type="button"
-                onClick={() => {
-                  const bill = editingLedgerEntry.rawPurchase!;
-                  onClose();
-                  onViewPurchase(bill);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-orange-600 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
-              >
+              <button type="button" onClick={() => { const bill = editingLedgerEntry.rawPurchase!; onClose(); onViewPurchase(bill); }} className="px-3 py-1.5 rounded-xl bg-orange-600 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all">
                 <span className="material-symbols-outlined text-[14px]">visibility</span>
                 <span>View</span>
               </button>
             )}
             {onEditPurchase && (
-              <button
-                type="button"
-                onClick={() => {
-                  const bill = editingLedgerEntry.rawPurchase!;
-                  onClose();
-                  onEditPurchase(bill);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high"
-              >
+              <button type="button" onClick={() => { const bill = editingLedgerEntry.rawPurchase!; onClose(); onEditPurchase(bill); }} className="px-3 py-1.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all hover:bg-surface-container-high">
                 <span className="material-symbols-outlined text-[14px]">edit</span>
                 <span>Edit</span>
               </button>
@@ -1019,20 +653,8 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
                 <h3 className="font-bold text-sm sm:text-base text-on-surface truncate whitespace-nowrap shrink-0">
                   {isEditing
-                    ? editingLedgerEntry.type === 'SALE'
-                      ? 'Edit Sales Invoice'
-                      : editingLedgerEntry.type === 'PURCHASE'
-                      ? 'Edit Purchase Bill'
-                      : isReceipt
-                      ? 'Edit Payment In'
-                      : 'Edit Payment Out'
-                    : isReceipt
-                    ? 'Payment In Details'
-                    : editingLedgerEntry.type === 'SALE'
-                    ? 'Sales Invoice Details'
-                    : editingLedgerEntry.type === 'PURCHASE'
-                    ? 'Purchase Bill Details'
-                    : 'Payment Out Details'}
+                    ? (editingLedgerEntry.type === 'SALE' ? 'Edit Sales Invoice' : editingLedgerEntry.type === 'PURCHASE' ? 'Edit Purchase Bill' : isReceipt ? 'Edit Payment In' : 'Edit Payment Out')
+                    : (isReceipt ? 'Payment In Details' : editingLedgerEntry.type === 'SALE' ? 'Sales Invoice Details' : editingLedgerEntry.type === 'PURCHASE' ? 'Purchase Bill Details' : 'Payment Out Details')}
                 </h3>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
@@ -1232,12 +854,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             {/* Read-Only Actions Footer */}
             <div className="flex items-center justify-between gap-2 p-3.5 border-t border-outline-variant/20 bg-surface-container-lowest/90 backdrop-blur-xs flex-shrink-0">
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
-                <button
-                  type="button"
-                  onClick={handleDeleteLedgerItem}
-                  className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
-                  title="Delete transaction"
-                >
+                <button type="button" onClick={handleDeleteLedgerItem} className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer" title="Delete transaction">
                   <span className="material-symbols-outlined text-[16px]">delete</span>
                   <span>Delete</span>
                 </button>
@@ -1245,36 +862,18 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
               <div className="flex items-center gap-2">
                 {company && (editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
-                  <button
-                    type="button"
-                    data-testid="voucher-print-slip"
-                    onClick={() => setIsPrintSlipOpen(true)}
-                    className="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-outline-variant/30"
-                    title="Print slip"
-                  >
+                  <button type="button" data-testid="voucher-print-slip" onClick={() => setIsPrintSlipOpen(true)} className="px-3.5 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-bold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-outline-variant/30" title="Print slip">
                     <span className="material-symbols-outlined text-[16px]">print</span>
                     <span>Print slip</span>
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  data-testid="voucher-share-whatsapp"
-                  onClick={handleShareWhatsApp}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                  title="Share on WhatsApp"
-                >
+                <button type="button" data-testid="voucher-share-whatsapp" onClick={handleShareWhatsApp} className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer" title="Share on WhatsApp">
                   <span className="material-symbols-outlined text-[16px]">share</span>
                   <span>WhatsApp</span>
                 </button>
 
-                <button
-                  type="button"
-                  data-testid="voucher-edit-button"
-                  onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-xs shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-                  title="Edit transaction"
-                >
+                <button type="button" data-testid="voucher-edit-button" onClick={() => setIsEditing(true)} className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/90 text-on-secondary font-bold text-xs shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer" title="Edit transaction">
                   <span className="material-symbols-outlined text-[16px]">edit</span>
                   <span>Edit</span>
                 </button>
@@ -1295,22 +894,10 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               {/* Payment Type switch if payment */}
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.type === 'PAYMENT_IN' || editingLedgerEntry.type === 'PAYMENT_OUT') && (
                 <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
-                  <button
-                    type="button"
-                    onClick={() => setEditType('IN')}
-                    className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${
-                      editType === 'IN' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
-                    }`}
-                  >
+                  <button type="button" onClick={() => setEditType('IN')} className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${editType === 'IN' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'}`}>
                     Payment In
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditType('OUT')}
-                    className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${
-                      editType === 'OUT' ? 'bg-amber-600 text-white shadow-xs' : 'text-on-surface-variant'
-                    }`}
-                  >
+                  <button type="button" onClick={() => setEditType('OUT')} className={`py-1.5 rounded-lg font-bold cursor-pointer transition-all ${editType === 'OUT' ? 'bg-amber-600 text-white shadow-xs' : 'text-on-surface-variant'}`}>
                     Payment Out
                   </button>
                 </div>
@@ -1320,38 +907,17 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
-                  />
+                  <input type="date" required value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]" />
                 </div>
                 <div>
                   <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Amount (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={editAmount}
-                    onChange={(e) => setEditAmount(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
-                  />
+                  <input type="number" step="0.01" required value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]" />
                 </div>
                 <div>
                   <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">
                     {editType === 'IN' ? 'Discount Allowed (₹)' : 'Discount Received (₹)'}
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={editDiscount}
-                    onChange={(e) => setEditDiscount(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
-                  />
+                  <input type="number" step="0.01" min="0" placeholder="0.00" value={editDiscount} onChange={(e) => setEditDiscount(e.target.value)} className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl font-bold text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]" />
                 </div>
               </div>
 
@@ -1450,78 +1016,30 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-bold text-on-surface">Cash</span>
                               {remaining > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = (c + remaining).toFixed(2);
-                                    setEditSplitCash(parseFloat(next).toString());
-                                  }}
-                                  className="text-[10px] font-bold text-secondary cursor-pointer"
-                                >
-                                  +Fill
-                                </button>
+                                <button type="button" onClick={() => setEditSplitCash(parseFloat((c + remaining).toFixed(2)).toString())} className="text-[10px] font-bold text-secondary cursor-pointer">+Fill</button>
                               )}
                             </div>
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={editSplitCash}
-                              onChange={(e) => setEditSplitCash(e.target.value)}
-                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                            />
+                            <input type="number" step="0.01" placeholder="0.00" value={editSplitCash} onChange={(e) => setEditSplitCash(e.target.value)} className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary" />
                           </div>
 
                           <div className="flex flex-col gap-1 p-2 rounded-xl bg-surface-container-low border border-outline-variant/20">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-bold text-on-surface">UPI</span>
                               {remaining > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = (u + remaining).toFixed(2);
-                                    setEditSplitUPI(parseFloat(next).toString());
-                                  }}
-                                  className="text-[10px] font-bold text-secondary cursor-pointer"
-                                >
-                                  +Fill
-                                </button>
+                                <button type="button" onClick={() => setEditSplitUPI(parseFloat((u + remaining).toFixed(2)).toString())} className="text-[10px] font-bold text-secondary cursor-pointer">+Fill</button>
                               )}
                             </div>
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={editSplitUPI}
-                              onChange={(e) => setEditSplitUPI(e.target.value)}
-                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                            />
+                            <input type="number" step="0.01" placeholder="0.00" value={editSplitUPI} onChange={(e) => setEditSplitUPI(e.target.value)} className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary" />
                           </div>
 
                           <div className="flex flex-col gap-1 p-2 rounded-xl bg-surface-container-low border border-outline-variant/20">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-bold text-on-surface">Bank</span>
                               {remaining > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = (b + remaining).toFixed(2);
-                                    setEditSplitBank(parseFloat(next).toString());
-                                  }}
-                                  className="text-[10px] font-bold text-secondary cursor-pointer"
-                                >
-                                  +Fill
-                                </button>
+                                <button type="button" onClick={() => setEditSplitBank(parseFloat((b + remaining).toFixed(2)).toString())} className="text-[10px] font-bold text-secondary cursor-pointer">+Fill</button>
                               )}
                             </div>
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={editSplitBank}
-                              onChange={(e) => setEditSplitBank(e.target.value)}
-                              className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary"
-                            />
+                            <input type="number" step="0.01" placeholder="0.00" value={editSplitBank} onChange={(e) => setEditSplitBank(e.target.value)} className="w-full px-2 py-1 bg-surface rounded-lg text-xs font-bold text-on-surface border border-outline-variant/20 focus:outline-none focus:border-secondary" />
                           </div>
                         </div>
                       </div>
@@ -1541,26 +1059,13 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-1 whitespace-nowrap shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleAutoAllocate}
-                        className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                        title="Auto-allocate FIFO oldest first"
-                      >
+                      <button type="button" onClick={handleAutoAllocate} className="px-2 py-0.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0" title="Auto-allocate FIFO oldest first">
                         Auto FIFO
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                      >
+                      <button type="button" onClick={handleSelectAll} className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0">
                         Select All
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleClearAllocations}
-                        className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
-                      >
+                      <button type="button" onClick={handleClearAllocations} className="px-2 py-0.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded text-[10px] font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0">
                         Clear
                       </button>
                     </div>
@@ -1621,13 +1126,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
               {/* Notes */}
               <div>
                 <label className="block font-bold text-on-surface-variant mb-1 text-[11px]">Notes / Remarks</label>
-                <input
-                  type="text"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Remarks..."
-                  className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]"
-                />
+                <input type="text" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Remarks..." className="w-full px-2.5 py-1.5 bg-surface-container-low rounded-xl text-on-surface border border-outline-variant/30 focus:outline-none focus:border-secondary min-h-[38px]" />
               </div>
 
               {/* Opening Balance Type Switcher */}
@@ -1635,23 +1134,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-bold text-on-surface-variant">Opening Balance Type</label>
                   <div className="grid grid-cols-2 gap-2 p-0.5 bg-surface rounded-xl border border-outline-variant/20">
-                    <button
-                      type="button"
-                      onClick={() => setEditOpeningType('RECEIVABLE')}
-                      className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
-                        editOpeningType === 'RECEIVABLE' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'
-                      }`}
-                    >
+                    <button type="button" onClick={() => setEditOpeningType('RECEIVABLE')} className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${editOpeningType === 'RECEIVABLE' ? 'bg-secondary text-on-secondary shadow-xs' : 'text-on-surface-variant'}`}>
                       <span className="material-symbols-outlined text-[15px]">call_received</span>
                       <span>To Receive (Dr)</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditOpeningType('PAYABLE')}
-                      className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
-                        editOpeningType === 'PAYABLE' ? 'bg-error text-on-error shadow-xs' : 'text-on-surface-variant'
-                      }`}
-                    >
+                    <button type="button" onClick={() => setEditOpeningType('PAYABLE')} className={`py-2 rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 ${editOpeningType === 'PAYABLE' ? 'bg-error text-on-error shadow-xs' : 'text-on-surface-variant'}`}>
                       <span className="material-symbols-outlined text-[15px]">call_made</span>
                       <span>To Pay (Cr)</span>
                     </button>
@@ -1663,36 +1150,17 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
             {/* Edit Mode Actions Footer */}
             <div className="flex items-center justify-between gap-2 p-3.5 border-t border-outline-variant/20 bg-surface-container-lowest/90 backdrop-blur-xs flex-shrink-0">
               {(editingLedgerEntry.rawVoucher || editingLedgerEntry.id.startsWith('pay-inv-') || editingLedgerEntry.id.startsWith('pay-pur-') || editingLedgerEntry.isOpening) ? (
-                <button
-                  type="button"
-                  onClick={handleDeleteLedgerItem}
-                  className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
-                >
+                <button type="button" onClick={handleDeleteLedgerItem} className="px-3 py-2 rounded-xl bg-error/10 hover:bg-error/20 text-error font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition-all">
                   <span className="material-symbols-outlined text-[16px]">delete</span>
                   <span>{editingLedgerEntry.isOpening ? 'Clear' : 'Delete'}</span>
                 </button>
               ) : <div />}
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isPayment) {
-                      populateForm();
-                      setIsEditing(false);
-                    } else {
-                      onClose();
-                    }
-                  }}
-                  className="px-3.5 py-2 rounded-xl text-on-surface-variant font-bold text-xs cursor-pointer hover:bg-surface-container-high transition-all"
-                >
+                <button type="button" onClick={() => { if (isPayment) { populateForm(); resetAllocations(); setIsEditing(false); } else { onClose(); } }} className="px-3.5 py-2 rounded-xl text-on-surface-variant font-bold text-xs cursor-pointer hover:bg-surface-container-high transition-all">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitDisabled}
-                  className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer hover:bg-secondary/90 disabled:opacity-50"
-                >
+                <button type="submit" disabled={isSubmitDisabled} className="px-5 py-2 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-sm active:scale-95 transition-all cursor-pointer hover:bg-secondary/90 disabled:opacity-50">
                   Save
                 </button>
               </div>
@@ -1724,24 +1192,17 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
           party={party}
           initialPhone={party?.phone}
           initialTotalBalanceDue={partyTotalDue ?? undefined}
-          paymentShareText={(() => {
-            const selectedBank = availableBankAccounts.find((a) => a.id === editBankAccountId);
-            return buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || storeCompany, partyTotalDue, {
-              heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
-              docNumber: editingLedgerEntry.docNumber,
-              date: formatDate(editDate || editingLedgerEntry.date),
-              amount: currentAmount,
-              discount: currentDiscount,
-              paymentMode: editMode,
-              bankAccountName: selectedBank?.accountName,
-              splits: editMode === 'SPLIT' ? {
-                cash: parseFloat(editSplitCash) || 0,
-                upi: parseFloat(editSplitUPI) || 0,
-                bank: parseFloat(editSplitBank) || 0,
-              } : undefined,
-              notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
-            });
-          })()}
+          paymentShareText={buildPaymentVoucherWhatsAppMessage(editingLedgerEntry, party, company || storeCompany, partyTotalDue, {
+            heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
+            docNumber: editingLedgerEntry.docNumber,
+            date: formatDate(editDate || editingLedgerEntry.date),
+            amount: currentAmount,
+            discount: currentDiscount,
+            paymentMode: editMode,
+            bankAccountName: availableBankAccounts.find((a) => a.id === editBankAccountId)?.accountName,
+            splits: editMode === 'SPLIT' ? { cash: parseFloat(editSplitCash) || 0, upi: parseFloat(editSplitUPI) || 0, bank: parseFloat(editSplitBank) || 0 } : undefined,
+            notes: editNotes || editingLedgerEntry.description || editingLedgerEntry.rawVoucher?.narration,
+          })}
           paymentReceiptParams={{
             companyName: (company || storeCompany)?.tradeName || (company || storeCompany)?.businessName || '',
             heading: isReceipt ? 'Payment In Receipt' : 'Payment Out Voucher',
