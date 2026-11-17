@@ -1,4 +1,4 @@
-import type { InvoiceItemEntry } from '../../models/invoice.ts';
+import type { InvoiceItemEntry, PaymentStatus } from '../../models/invoice.ts';
 import type { PurchaseItemEntry } from '../../models/purchase.ts';
 import type { UnitOfMeasurement, ItemPriceMode } from '../../models/item.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../gst/pricing.ts';
@@ -255,6 +255,52 @@ export function derivePaymentStatus(
     return 'PAID';
   }
   if (paidAmount > 0) {
+    return 'PARTIAL';
+  }
+  return 'UNPAID';
+}
+
+export interface PurchaseTotalsContext {
+  shippingAmount?: number;
+}
+
+/**
+ * Finalizes purchase bill totals using the purchase-specific rounding order:
+ * Math.max(0, Math.round(netAmount + shippingAmount)).
+ *
+ * Reproduces TableGridPurchaseModal inline math byte-for-byte:
+ * - finalGrandTotal = Math.max(0, Math.round(calcSummary.netAmount + shippingAmount))
+ * - finalRoundOff  = Number((finalGrandTotal - (calcSummary.netAmount + shippingAmount)).toFixed(2))
+ */
+export function finalizePurchaseTotals(
+  calcSummary: { netAmount: number },
+  ctx: { shippingAmount: number }
+): { grandTotal: number; roundOff: number } {
+  const shipping = Number(ctx?.shippingAmount) || 0;
+  const preRound = (Number(calcSummary?.netAmount) || 0) + shipping;
+  const grandTotal = Math.max(0, Math.round(preRound));
+  const roundOff = Number((grandTotal - preRound).toFixed(2));
+  return { grandTotal, roundOff };
+}
+
+/**
+ * Derives purchase bill payment status reproducing TableGridPurchaseModal inline rules:
+ * - if grandTotal <= 0 -> 'PAID'
+ * - else if totalPaid >= grandTotal -> 'PAID'
+ * - else if totalPaid > 0 -> 'PARTIAL'
+ * - else -> 'UNPAID'
+ */
+export function derivePurchasePaymentStatus(
+  grandTotal: number,
+  totalPaid: number
+): PaymentStatus {
+  if (grandTotal <= 0) {
+    return 'PAID';
+  }
+  if (totalPaid >= grandTotal) {
+    return 'PAID';
+  }
+  if (totalPaid > 0) {
     return 'PARTIAL';
   }
   return 'UNPAID';

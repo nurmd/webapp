@@ -3,7 +3,12 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { PurchaseBill, PurchaseItemEntry, ItcEligibility } from '../../models/purchase.ts';
-import { normalizePurchaseLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
+import {
+  normalizePurchaseLineItem,
+  RawLineItem,
+  finalizePurchaseTotals,
+  derivePurchasePaymentStatus,
+} from '../../core/invoicing/lineItemEngine.ts';
 import { PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
 import { parseSplitsFromPurchase, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
 import { calculateInvoice } from '../../core/gst/calculator.ts';
@@ -380,15 +385,9 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
 
   const [shippingAmount, setShippingAmount] = useState<number>(initialBill?.shippingAmount || initialDraft?.shippingAmount || 0);
 
-  const finalGrandTotal = useMemo(() => {
-    const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
-    return Math.max(0, Math.round(preRound));
-  }, [calcSummary.netAmount, shippingAmount]);
-
-  const finalRoundOff = useMemo(() => {
-    const preRound = calcSummary.netAmount + (Number(shippingAmount) || 0);
-    return Number((finalGrandTotal - preRound).toFixed(2));
-  }, [calcSummary.netAmount, shippingAmount, finalGrandTotal]);
+  const { grandTotal: finalGrandTotal, roundOff: finalRoundOff } = useMemo(() => {
+    return finalizePurchaseTotals(calcSummary, { shippingAmount: Number(shippingAmount) || 0 });
+  }, [calcSummary, shippingAmount]);
 
   const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
     if (initialDraft?.paymentSplits && initialDraft.paymentSplits.length > 0) {
@@ -433,17 +432,8 @@ export const TableGridPurchaseModal: React.FC<TableGridPurchaseModalProps> = ({
   }, [finalGrandTotal, totalPaid]);
 
   const autoPaymentStatus: PaymentStatus = useMemo(() => {
-    if (finalGrandTotal <= 0) {
-      return 'PAID';
-    }
-    if (totalPaid >= finalGrandTotal) {
-      return 'PAID';
-    }
-    if (totalPaid > 0) {
-      return 'PARTIAL';
-    }
-    return 'UNPAID';
-  }, [totalPaid, finalGrandTotal]);
+    return derivePurchasePaymentStatus(finalGrandTotal, totalPaid);
+  }, [finalGrandTotal, totalPaid]);
 
   const handleUpdateSplitMode = (id: string, newMode: PaymentMode) => {
     if (newMode === 'SPLIT') {
