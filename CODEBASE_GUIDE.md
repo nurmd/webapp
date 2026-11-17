@@ -76,6 +76,7 @@ gst-billing-app/
     │   ├── Accounting/        # DaybookView, CashBankManagementView
     │   ├── Reports/           # BusinessReportsView, GSTR-1, GSTR-3B, Stock Summary
     │   ├── Settings/          # CompanySettingsView, ItemSettingsTab, PrintSettingsView
+    │   ├── Update/            # AppUpdateModal, AppUpdatePrompt (OTA update auto-prompt & modal)
     │   └── Navigation/        # NavigationMenuHubView, BottomNav, TopHeader
     └── __tests__/             # Comprehensive Vitest integration & stress suites
 ```
@@ -507,6 +508,22 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - **Paise Print Adapters (`readRupeeOr` in `src/core/accounting/paisePersistence.ts`)**: Phase 3.2 step 5. `readRupeeOr(doc, field, fallback = 0)` returns the twin only when the doc is schema-current and `fromPaise(twin) === rupee`; in every other case it returns the **raw** stored rupee value (never re-rounded), so printed output is byte-identical by construction. Adopted across document print builders and thermal adapters reading persisted fields: `thermalReceiptText.ts` (item rate/amount, taxable, discount, CGST/SGST/IGST/cess, shipping, round-off, grand total, paid, balance, party balance), `purchaseDocumentPrinter.ts`, `eWayBillSlipPrinter.ts`, `expenseVoucherPrinter.ts`, `paymentReceiptText.ts` (`amount`, `partyBalance`), `ledgerStatementPrinter.ts` (`party.currentBalance`), `src/core/printer/escpos.ts` (`item.rate`, `item.amount`, totals/tax/subtotal/discount), and `src/core/printer/escposBinary.ts` (`item.rate`, `item.amount`, totals/tax/subtotal/discount). A later "trust the twin" switch only has to change `readRupeeOr`. Covered by `src/__tests__/paisePrintAdapters.test.ts` (19 tests: reader table incl. 3-decimal rupees staying unrounded, plus identical output with/without twins and with a tampered twin for each builder).
   - **Paise Backfill UI (`src/components/Settings/PaiseBackfillCard.tsx`)**: manual maintenance surface rendered at the end of Settings → Data & Sync, immediately after the read-only integrity check card. *Check plan* calls `db.planPaiseMigration()` and lists total/current/pending per entity; *Run backfill* switches to an inline two-step confirm (never `window.confirm`) and only then calls `db.runPaiseMigration()`, which stays backup-gated, per-doc verified and idempotent. The card then re-plans and renders `Migrated · Repaired · Skipped · Divergences` plus the backup id and a shortened checksum (or the verbatim `BACKUP_FAILED: …` reason), along with an expandable collapsible list of all `divergences[]` (entity, id, path, rupee, paise) with dedicated row test IDs. Both calls are wrapped so the component never throws. The migration is still never invoked automatically. Covered by `src/__tests__/paiseBackfillCard.test.tsx` (7 tests: initial disabled state, plan counts, confirm/cancel without writes, successful run + refreshed plan, backup-failure abort, empty database, divergence collapsible list [W3]).
 
+### J. OTA Update Detection & Auto-Prompt (`updateService.ts`, `AppUpdatePrompt.tsx`, `otaPromptStorage.ts`)
+- **Launch-Only Detection**: Background check runs strictly once on mount in `App.tsx` (`updateService.checkForUpdates()`). No foreground polling or timer-based checks.
+- **Auto-Prompt Invariants (`otaPromptStorage.ts`)**:
+  - `shouldAutoPromptOta(version, { currentVersion })`: Evaluates whether the detected version warrants an automatic prompt. Returns `false` if `version` equals `currentVersion`, matches `readSkippedOtaVersion()`, or matches `readNotifiedOtaVersion()`.
+  - Keys in `localStorage`: `vyapar_ota_skipped_version` (skipped version), `vyapar_ota_notified_version` (notified version).
+  - Defensive `try/catch` storage wrappers ensure corruption or missing storage never throws or crashes.
+  - Manual update check from Settings (`handleCheckUpdate(true)`) intentionally ignores skipped/notified state, always opening `AppUpdateModal` directly.
+- **Compact Overlay UI (`AppUpdatePrompt.tsx`)**:
+  - Centered dismissible card dialog (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`) with primary button autofocus and Escape dismissal.
+  - Platform-aware subtitle via `updateService.isPwaEnvironment()`: "A new web build is ready to apply." (PWA) vs "A new APK download is ready to install." (Android).
+  - Dynamic release notes fetched via `updateService.fetchDynamicReleaseNotes()` (max 3 bullets + "+N more" indicator), upholding repository invariant 13 (zero hardcoded fallback release notes).
+  - Priority 25 back navigation (`useBackNavigation`) handles Android hardware/gesture back to dismiss cleanly.
+  - Actions: **Update Now** (opens full `AppUpdateModal`), **Later** (dismisses prompt; retains tappable bottom status toast), and **Skip this version** (dismisses prompt, persists skipped version, suppresses update toast for that version).
+  - `isMandatory` releases hide Later/Skip buttons and switch primary button label to `Update now (required)`.
+  - Covered by `src/__tests__/appUpdatePrompt.test.tsx` (8 tests).
+
 ### I. Read-Only Cash/Bank Reconciliation Audit (`cashBankReconciliation.ts`, `CashBankReconciliationPanel.tsx`)
 - **What the Report Shows**:
   - Comprehensive per-account audit: configured opening balance, total inflows, total outflows, net movement, computed closing balance, ledger closing balance, and difference.
@@ -789,6 +806,7 @@ npm run coverage
 - `auditEpoch.test.tsx`: Audit epoch separation, legacy archive preservation, epoch-2 genesis/sequencing, reloadFromStorage persistence, broken legacy chain isolation, UI scope defaults, and statutory exports.
 - `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
 - `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
+- `appUpdatePrompt.test.tsx`: Auto-prompt popup rendering, dynamic release notes, Update Now / Later / Skip flows, mandatory release gating, priority 25 back navigation, defensive storage fallback, and App.tsx static guards.
 - `conflictManifest.test.ts`: Synthetic 31-document/48-revision conflict inventory, dependency-order warnings, credential redaction, backup round-trip hashes, and tamper detection.
 - `supportDiagnostics.test.ts`: Pure support diagnostics builder, URL credential redaction, path sanitization, and conflict aggregation.
 - `supportDiagnosticsService.test.ts`: Defensive collector service, zero-mutation guarantee, and local download helper.

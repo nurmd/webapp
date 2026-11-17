@@ -42,6 +42,12 @@ import { findConflictingInvoice, getDocumentSeriesConfig, formatDocumentNumberPr
 import { BankAccount, CashBankTransaction } from './models/bankAccount.ts';
 import { rbac, UserProfile } from './services/rbac.ts';
 import { updateService, AppReleaseInfo, CURRENT_APP_VERSION } from './services/updateService.ts';
+import {
+  shouldAutoPromptOta,
+  writeNotifiedOtaVersion,
+  writeSkippedOtaVersion,
+  readSkippedOtaVersion,
+} from './core/utils/otaPromptStorage.ts';
 import { withWalkInCustomerBalance, isSystemParty } from './core/utils/systemParties.ts';
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
@@ -139,6 +145,9 @@ const SimplifiedInvoiceModal = React.lazy(() =>
 const AppUpdateModal = React.lazy(() =>
   import('./components/Update/AppUpdateModal.tsx').then((m) => ({ default: m.AppUpdateModal }))
 );
+const AppUpdatePrompt = React.lazy(() =>
+  import('./components/Update/AppUpdatePrompt.tsx').then((m) => ({ default: m.AppUpdatePrompt }))
+);
 
 // Zero-CLS Suspense Fallbacks
 const ViewLoadingSkeleton: React.FC = () => (
@@ -187,6 +196,7 @@ export const App: React.FC = () => {
   const [activeUser, setActiveUser] = useState<UserProfile>(rbac.getActiveUser());
   const [isRoleSwitchOpen, setIsRoleSwitchOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isUpdatePromptOpen, setIsUpdatePromptOpen] = useState(false);
 
   // Dynamic OTA Update & Notification State
   const [hasUpdate, setHasUpdate] = useState<boolean>(false);
@@ -380,8 +390,20 @@ export const App: React.FC = () => {
       .checkForUpdates()
       .then((res) => {
         if (res.hasUpdate && res.latestRelease) {
-          setHasUpdate(true);
-          setLatestRelease(res.latestRelease);
+          const detectedVersion = res.latestRelease.version;
+          if (shouldAutoPromptOta(detectedVersion, { currentVersion: CURRENT_APP_VERSION })) {
+            writeNotifiedOtaVersion(detectedVersion);
+            setHasUpdate(true);
+            setLatestRelease(res.latestRelease);
+            setIsUpdatePromptOpen(true);
+          } else {
+            const skipped = readSkippedOtaVersion();
+            const isSkipped = skipped && detectedVersion.replace(/^v/i, '') === skipped.replace(/^v/i, '');
+            if (!isSkipped) {
+              setHasUpdate(true);
+              setLatestRelease(res.latestRelease);
+            }
+          }
         }
       })
       .catch(() => {});
@@ -446,6 +468,25 @@ export const App: React.FC = () => {
   const handleCheckUpdateFromChrome = useCallback(() => {
     handleCheckUpdate(true);
   }, [handleCheckUpdate]);
+
+  const handlePromptUpdateNow = useCallback(() => {
+    setIsUpdatePromptOpen(false);
+    setIsUpdateModalOpen(true);
+  }, []);
+
+  const handlePromptLater = useCallback(() => {
+    setIsUpdatePromptOpen(false);
+    if (latestRelease) {
+      showToast(`Update available (v${latestRelease.version})`);
+    }
+  }, [latestRelease, showToast]);
+
+  const handlePromptSkip = useCallback((version: string) => {
+    setIsUpdatePromptOpen(false);
+    writeSkippedOtaVersion(version);
+    setHasUpdate(false);
+    setToastMessage((cur) => (cur?.includes('Update') || cur?.includes(version) ? null : cur));
+  }, []);
 
   const handleSaveInvoice = useCallback((
     newInvoice: Invoice,
@@ -1848,6 +1889,20 @@ export const App: React.FC = () => {
                 setActiveTab('dashboard');
               }
             }}
+          />
+        </React.Suspense>
+      )}
+
+      {/* App Auto-Update Prompt Overlay */}
+      {isUpdatePromptOpen && (
+        <React.Suspense fallback={null}>
+          <AppUpdatePrompt
+            isOpen={isUpdatePromptOpen}
+            releaseInfo={latestRelease}
+            onUpdateNow={handlePromptUpdateNow}
+            onLater={handlePromptLater}
+            onSkip={handlePromptSkip}
+            onClose={handlePromptLater}
           />
         </React.Suspense>
       )}
