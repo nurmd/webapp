@@ -1,15 +1,15 @@
 {
-  "version": "1.2.83",
+  "version": "1.2.84",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-17T04:23:18.311Z",
+  "buildTime": "2026-11-19T07:46:53.068Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "document the 409 derived-field classification in the sync guide",
-    "stop phantom 409 conflicts caused by derived-field drift",
-    "record wave-2 completion of the Phase 2.1 data-access migration",
-    "wave-2 batch 3 - migrate VoucherEditorModal, PartyDetailModal and ItemDetailSheet to useDataStore hooks",
-    "wave-2 batch 2 - migrate TableGridInvoiceModal and RecordPaymentModal to useDataStore hooks",
-    "wave-2 batch 1 - migrate PaymentModalContext and SelectPartyModal to useDataStore hooks"
+    "OTA update notification card above the Financial Overview",
+    "show live party remaining balance on the Payment In thermal slip",
+    "sort Business Activity Timeline by creation time, not business date",
+    "real fake-indexeddb replication, persistDoc conflict and quota integration",
+    "route purchase totals and payment status through lineItemEngine",
+    "auto-popup when a new version is detected at launch"
   ]
 }
