@@ -82,6 +82,7 @@ export const PaymentReceiptSlipModal: React.FC<PaymentReceiptSlipModalProps> = (
       html,
       jobName: `Payment-${entry.docNumber}`,
       paperSize: 'default',
+      skipPdfGeneration: true,
     });
   }, [data, width, entry.docNumber]);
 

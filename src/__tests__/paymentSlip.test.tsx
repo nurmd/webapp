@@ -66,7 +66,7 @@ vi.mock('../core/utils/printBridge.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../core/utils/printBridge.ts')>();
   return {
     ...actual,
-    printDocument: vi.fn(),
+    printDocument: vi.fn((options: any) => actual.printDocument(options)),
   };
 });
 
@@ -339,6 +339,7 @@ describe('Payment Slip Suite', () => {
         jobName: 'Payment-REC-1001',
         paperSize: 'default',
         html: expect.stringContaining('@page'),
+        skipPdfGeneration: true,
       })
     );
   });
@@ -592,5 +593,118 @@ describe('Payment Slip Suite', () => {
     // Asserts live lookup useMemo derives editingVoucherParty from parties
     expect(sourceCode).toMatch(/const\s+editingVoucherParty\s*=\s*useMemo/);
     expect(sourceCode).toContain('parties.find');
+  });
+
+  it('6. native bridge routing: when AndroidBridge provides printHtml (and no PDF method), calling handlePrint invokes printHtml and does not invoke generatePdfFromHtml or generatePdfHtml', () => {
+    const mockPrintHtml = vi.fn();
+    const mockGeneratePdfFromHtml = vi.fn();
+    const mockGeneratePdfHtml = vi.fn();
+
+    (window as any).AndroidBridge = {
+      printHtml: mockPrintHtml,
+      generatePdfFromHtml: mockGeneratePdfFromHtml,
+      generatePdfHtml: mockGeneratePdfHtml,
+    };
+
+    try {
+      const entry: PassbookEntry = {
+        id: 'entry-native-1',
+        date: '2026-11-10',
+        docNumber: 'REC-NAT-1',
+        type: 'PAYMENT_IN',
+        description: 'Payment In Native Print',
+        debit: 0,
+        credit: 3200,
+        runningBalance: 1800,
+        paymentMode: 'UPI',
+      };
+
+      act(() => {
+        root!.render(
+          <PaymentReceiptSlipModal
+            entry={entry}
+            party={mockParty}
+            company={mockCompany}
+            onClose={() => {}}
+          />
+        );
+      });
+
+      const printBtn = container!.querySelector('[data-testid="payment-slip-print"]') as HTMLButtonElement;
+      expect(printBtn).not.toBeNull();
+
+      act(() => {
+        printBtn.click();
+      });
+
+      expect(mockPrintHtml).toHaveBeenCalledTimes(1);
+      expect(mockPrintHtml).toHaveBeenCalledWith(
+        expect.stringContaining('@page'),
+        'Payment-REC-NAT-1'
+      );
+      expect(mockGeneratePdfFromHtml).not.toHaveBeenCalled();
+      expect(mockGeneratePdfHtml).not.toHaveBeenCalled();
+    } finally {
+      delete (window as any).AndroidBridge;
+    }
+  });
+
+  it('7. browser print fallback: when AndroidBridge is absent, calling handlePrint routes to browser window.open fallback', () => {
+    delete (window as any).AndroidBridge;
+
+    const mockOpen = vi.fn();
+    const mockWrite = vi.fn();
+    const mockClose = vi.fn();
+    const mockPrintWindow = {
+      closed: false,
+      document: {
+        open: mockOpen,
+        write: mockWrite,
+        close: mockClose,
+      },
+      focus: vi.fn(),
+      print: vi.fn(),
+    };
+
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(mockPrintWindow as any);
+
+    try {
+      const entry: PassbookEntry = {
+        id: 'entry-browser-1',
+        date: '2026-11-10',
+        docNumber: 'REC-BROWSER-1',
+        type: 'PAYMENT_IN',
+        description: 'Payment In Browser Fallback',
+        debit: 0,
+        credit: 1500,
+        runningBalance: 500,
+        paymentMode: 'CASH',
+      };
+
+      act(() => {
+        root!.render(
+          <PaymentReceiptSlipModal
+            entry={entry}
+            party={mockParty}
+            company={mockCompany}
+            onClose={() => {}}
+          />
+        );
+      });
+
+      const printBtn = container!.querySelector('[data-testid="payment-slip-print"]') as HTMLButtonElement;
+      expect(printBtn).not.toBeNull();
+
+      act(() => {
+        printBtn.click();
+      });
+
+      expect(openSpy).toHaveBeenCalledWith('', '_blank');
+      expect(mockOpen).toHaveBeenCalled();
+      expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('@page'));
+      expect(mockClose).toHaveBeenCalled();
+    } finally {
+      openSpy.mockRestore();
+    }
   });
 });

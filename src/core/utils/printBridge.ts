@@ -162,16 +162,17 @@ export function generatePdfFromHtmlNative(
 
 /**
  * Unified printable HTML generator runner:
- * Tries direct native PDF generation first, then Android native print,
+ * Tries direct native PDF generation first (unless skipPdfGeneration is true), then Android native print,
  * and falls back to window.open, hidden iframe, and window.print().
  */
 export function printHtmlDocument(
   html: string,
   jobName: string,
-  paperSize: PrintPaperSize = 'A4'
+  paperSize: PrintPaperSize = 'A4',
+  skipPdfGeneration: boolean = false
 ): void {
   // 1. Try direct native PDF generation via AndroidBridge
-  if (generatePdfFromHtmlNative(html, jobName, paperSize)) {
+  if (!skipPdfGeneration && generatePdfFromHtmlNative(html, jobName, paperSize)) {
     return;
   }
 
@@ -272,6 +273,7 @@ export interface PrintDocumentOptions {
   jobName: string;
   paperSize?: PrintPaperSize;
   html?: string;
+  skipPdfGeneration?: boolean;
 }
 
 /**
@@ -285,7 +287,12 @@ export function printDocument(options: PrintDocumentOptions): void {
       console.warn('printDocument: HTML string required for standalone-html documentType');
       return;
     }
-    printHtmlDocument(options.html, options.jobName, options.paperSize || 'A4');
+    printHtmlDocument(
+      options.html,
+      options.jobName,
+      options.paperSize || 'A4',
+      options.skipPdfGeneration
+    );
   } else {
     printCurrentPage(options.jobName, options.paperSize || 'A4');
   }
