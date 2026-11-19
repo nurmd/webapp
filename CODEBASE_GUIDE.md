@@ -819,6 +819,9 @@ npm run coverage
 - `billIntake.test.ts`: GSTR-2B/2A parsing, printed-vs-computed reconciliation, supplier/item/duplicate matching, model-output coercion, and the auto-post confidence gate.
 - `stableLineItemKeysAndBackdrop.test.tsx`: Stable React keys for editable invoice/purchase line items (no index keys) and accessible button backdrops for the Sales/Purchases sort menus.
 - `purchaseTotalsEngine.test.ts`: Purchase bill totals (`finalizePurchaseTotals`) and payment status (`derivePurchasePaymentStatus`) characterization matrix, equivalence proof, and TableGridPurchaseModal integration guard.
+- `pouchdbReplicationIntegration.test.ts`: Real IndexedDB-backed (`fake-indexeddb`) PouchDB live replication integration (round trip, update propagation, bi-directional sync, MVCC conflict detection without doc loss, deletion propagation, and 200-document bulkDocs replication).
+- `pouchdbPersistDocIntegration.test.ts`: Real IndexedDB-backed (`fake-indexeddb`) `persistDoc` integration with live replication (clean write rev parity, concurrent remote edit reconciliation, derived-only divergence conflict shield via `hasOnlyDerivedDivergence`, and zero `local-409` leakage in stored docs or conflict arrays).
+- `storageQuotaIntegration.test.ts`: Real storage quota integration using `QuotaLocalStorageShim` (`QuotaExceededError` code 22): `recordQuotaExceeded` tracking, quota expansion recovery via `recordQuotaRecovered`, and reactive `StorageHealthSnapshot` verification.
 
 ---
 
