@@ -12,6 +12,7 @@ import {
 import { ThermalReceiptPreview } from '../Printing/ThermalReceiptPreview.tsx';
 import { printDocument } from '../../core/utils/printBridge.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { printSettingsService } from '../../services/printSettingsService.ts';
 
 export interface PaymentReceiptSlipModalProps {
   entry: PassbookEntry;
@@ -60,8 +61,13 @@ export const PaymentReceiptSlipModal: React.FC<PaymentReceiptSlipModalProps> = (
   }, [entry]);
 
   const data = useMemo(() => {
+    const showPartyBalance = printSettingsService.getSettings().thermal?.showPartyBalance !== false;
+    const isPaymentIn = source.type === 'PAYMENT_IN';
+    const balanceLabel = isPaymentIn ? 'Remaining Balance:' : 'Balance After:';
+
     return buildPaymentSlipData(source, party, company, {
-      balanceAfter: party.currentBalance,
+      balanceAfter: showPartyBalance ? party.currentBalance : undefined,
+      balanceLabel,
     });
   }, [source, party, company]);
 

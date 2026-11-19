@@ -31,6 +31,7 @@ export interface PaymentSlipData {
   notes?: string;
   allocations: PaymentSlipAllocation[];
   balanceAfter?: number;
+  balanceLabel?: 'Remaining Balance:' | 'Balance After:';
   companyName: string;
   companyAddress?: string;
   companyPhone?: string;
@@ -41,7 +42,7 @@ export function buildPaymentSlipData(
   source: PaymentSlipSource,
   party: Party,
   company: CompanyProfile,
-  options?: { balanceAfter?: number }
+  options?: { balanceAfter?: number; balanceLabel?: 'Remaining Balance:' | 'Balance After:' }
 ): PaymentSlipData {
   const slipTitle = source.type === 'PAYMENT_IN' ? 'PAYMENT RECEIPT' : 'PAYMENT VOUCHER';
   const companyName = company.tradeName || company.businessName || '';
@@ -63,6 +64,7 @@ export function buildPaymentSlipData(
     notes: source.notes,
     allocations: source.allocations ? [...source.allocations] : [],
     balanceAfter: options?.balanceAfter,
+    balanceLabel: options?.balanceLabel ?? 'Balance After:',
     companyName,
     companyAddress,
     companyPhone,
@@ -211,9 +213,10 @@ export function formatPaymentSlipText(data: PaymentSlipData, width: 32 | 48): st
   // Balance after
   if (data.balanceAfter !== undefined) {
     lines.push(dashedLine);
+    const label = data.balanceLabel || 'Balance After:';
     const balSign = data.balanceAfter > 0 ? 'Dr' : data.balanceAfter < 0 ? 'Cr' : '';
     const balStr = `${formatINR(Math.abs(data.balanceAfter))}${balSign ? ' ' + balSign : ''}`;
-    lines.push(padRow('Balance After:', balStr, width));
+    lines.push(padRow(label, balStr, width));
   }
 
   // Signature footer

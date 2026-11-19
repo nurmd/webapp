@@ -110,7 +110,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
   const [selectedLedgerEntry, setSelectedLedgerEntry] = useState<UnifiedLedgerEntry | null>(null);
   const [isDateModalOpen, setIsDateModalOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
-  const [editingVoucherParty, setEditingVoucherParty] = useState<Party | null>(null);
 
   // Filters: Payment In/Out defaults to ALL_TIME as mandated by invariant #17
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL_TIME');
@@ -127,7 +126,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     }
     if (editingVoucher) {
       setEditingVoucher(null);
-      setEditingVoucherParty(null);
       return true;
     }
     if (isDateModalOpen) {
@@ -169,6 +167,14 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
     return null;
   }, [parties]);
 
+  const editingVoucherParty = useMemo(() => {
+    if (!editingVoucher) return null;
+    const byId = editingVoucher.partyId
+      ? parties.find((p) => p.id === editingVoucher.partyId)
+      : undefined;
+    return byId ?? resolveVoucherParty(editingVoucher);
+  }, [editingVoucher, parties, resolveVoucherParty]);
+
   const [initialVoucherEditing, setInitialVoucherEditing] = useState<boolean>(false);
 
   const handleEditVoucher = useCallback((voucher: Voucher, options?: { initialEditing?: boolean }) => {
@@ -181,7 +187,6 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
       return;
     }
     setEditingVoucher(voucher);
-    setEditingVoucherParty(party);
     setInitialVoucherEditing(Boolean(options?.initialEditing));
     setIsDetailModalOpen(false);
     setSelectedLedgerEntry(null);
@@ -909,14 +914,12 @@ export const PaymentTransactionsView: React.FC<PaymentTransactionsViewProps> = (
             initialEditing={initialVoucherEditing}
             onClose={() => {
               setEditingVoucher(null);
-              setEditingVoucherParty(null);
               setInitialVoucherEditing(false);
             }}
             onViewInvoice={onViewInvoice}
             onViewPurchase={onViewPurchase}
             onRefresh={() => {
               setEditingVoucher(null);
-              setEditingVoucherParty(null);
               setInitialVoucherEditing(false);
             }}
             invoices={invoices}

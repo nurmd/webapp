@@ -22,6 +22,7 @@ import { CompanyProfile } from '../models/company.ts';
 import { Voucher } from '../core/accounting/voucherTypes.ts';
 import { formatINR } from '../core/utils/formatters.ts';
 import { escapeHtml, printDocument } from '../core/utils/printBridge.ts';
+import { printSettingsService } from '../services/printSettingsService.ts';
 
 // Mock Storage for happy-dom
 class TestStorage implements Storage {
@@ -387,5 +388,209 @@ describe('Payment Slip Suite', () => {
 
     const printSlipAction = container!.querySelector('[data-testid="payment-slip-print"]');
     expect(printSlipAction).not.toBeNull();
+  });
+
+  // ========================================================
+  // Remaining Balance & Live Party Lookup Specifications
+  // ========================================================
+  it('1. payment slip balance labeling: renders "Remaining Balance:" for PAYMENT_IN and "Balance After:" for PAYMENT_OUT', () => {
+    const rawVoucherIn: Voucher = {
+      id: 'VCH-IN-1',
+      voucherNumber: 'REC-IN-1',
+      voucherType: 'RECEIPT',
+      date: '2026-11-10',
+      totalAmount: 1500,
+      narration: 'Payment In slip test',
+      createdAt: '2026-11-10',
+      paymentAllocations: [],
+      entries: [],
+    };
+    const paymentInEntry: PassbookEntry = {
+      id: 'entry-in-1',
+      date: '2026-11-10',
+      docNumber: 'REC-IN-1',
+      type: 'PAYMENT_IN',
+      description: 'Payment In',
+      debit: 0,
+      credit: 1500,
+      runningBalance: 5000,
+      paymentMode: 'UPI',
+      rawVoucher: rawVoucherIn,
+    };
+
+    act(() => {
+      root!.render(
+        <PaymentReceiptSlipModal
+          entry={paymentInEntry}
+          party={mockParty}
+          company={mockCompany}
+          onClose={() => {}}
+        />
+      );
+    });
+
+    const previewIn = container!.querySelector('[data-testid="thermal-receipt-preview"]');
+    expect(previewIn).not.toBeNull();
+    expect(previewIn!.textContent).toContain('Remaining Balance:');
+    expect(previewIn!.textContent).toContain('5,000.00 Dr');
+    expect(previewIn!.textContent).not.toContain('Balance After:');
+
+    // Test PAYMENT_OUT
+    const rawVoucherOut: Voucher = {
+      id: 'VCH-OUT-1',
+      voucherNumber: 'PAY-OUT-1',
+      voucherType: 'PAYMENT',
+      date: '2026-11-10',
+      totalAmount: 2000,
+      narration: 'Payment Out slip test',
+      createdAt: '2026-11-10',
+      paymentAllocations: [],
+      entries: [],
+    };
+    const paymentOutEntry: PassbookEntry = {
+      id: 'entry-out-1',
+      date: '2026-11-10',
+      docNumber: 'PAY-OUT-1',
+      type: 'PAYMENT_OUT',
+      description: 'Payment Out',
+      debit: 2000,
+      credit: 0,
+      runningBalance: 3000,
+      paymentMode: 'CASH',
+      rawVoucher: rawVoucherOut,
+    };
+
+    act(() => {
+      root!.render(
+        <PaymentReceiptSlipModal
+          entry={paymentOutEntry}
+          party={mockParty}
+          company={mockCompany}
+          onClose={() => {}}
+        />
+      );
+    });
+
+    const previewOut = container!.querySelector('[data-testid="thermal-receipt-preview"]');
+    expect(previewOut).not.toBeNull();
+    expect(previewOut!.textContent).toContain('Balance After:');
+    expect(previewOut!.textContent).toContain('5,000.00 Dr');
+    expect(previewOut!.textContent).not.toContain('Remaining Balance:');
+  });
+
+  it('2. buildPaymentSlipData defaults balanceLabel to "Balance After:" when not supplied', () => {
+    const inSource: PaymentSlipSource = {
+      type: 'PAYMENT_IN',
+      docNumber: 'REC-DEFAULT-1',
+      date: '2026-11-10',
+      amount: 1000,
+    };
+    const data = buildPaymentSlipData(inSource, mockParty, mockCompany, {
+      balanceAfter: 4000,
+    });
+    expect(data.balanceLabel).toBe('Balance After:');
+
+    const formatted = formatPaymentSlipText(data, 32);
+    expect(formatted).toContain('Balance After:');
+    expect(formatted).not.toContain('Remaining Balance:');
+  });
+
+  it('3. thermal privacy toggle: showPartyBalance: false on printSettingsService omits the balance line entirely', () => {
+    const getSettingsSpy = vi.spyOn(printSettingsService, 'getSettings').mockReturnValue({
+      ...printSettingsService.getSettings(),
+      thermal: {
+        ...printSettingsService.getSettings().thermal,
+        showPartyBalance: false,
+      },
+    });
+
+    const paymentInEntry: PassbookEntry = {
+      id: 'entry-priv-1',
+      date: '2026-11-10',
+      docNumber: 'REC-PRIV-1',
+      type: 'PAYMENT_IN',
+      description: 'Payment In Privacy Check',
+      debit: 0,
+      credit: 2500,
+      runningBalance: 2500,
+      paymentMode: 'UPI',
+    };
+
+    try {
+      act(() => {
+        root!.render(
+          <PaymentReceiptSlipModal
+            entry={paymentInEntry}
+            party={mockParty}
+            company={mockCompany}
+            onClose={() => {}}
+          />
+        );
+      });
+
+      const preview = container!.querySelector('[data-testid="thermal-receipt-preview"]');
+      expect(preview).not.toBeNull();
+      expect(preview!.textContent).not.toContain('Remaining Balance:');
+      expect(preview!.textContent).not.toContain('Balance After:');
+    } finally {
+      getSettingsSpy.mockRestore();
+    }
+  });
+
+  it('4. width constraints hold: every line <= width (32 and 48) with longer "Remaining Balance:" label', () => {
+    const inSource: PaymentSlipSource = {
+      type: 'PAYMENT_IN',
+      docNumber: 'REC-WIDTH-01',
+      date: '2026-11-10',
+      amount: 50000,
+      paymentMode: 'NEFT',
+      notes: 'Payment settlement',
+    };
+    const dataWithRemainingBal = buildPaymentSlipData(inSource, mockParty, mockCompany, {
+      balanceAfter: 5000,
+      balanceLabel: 'Remaining Balance:',
+    });
+
+    // 32-character width
+    const text32 = formatPaymentSlipText(dataWithRemainingBal, 32);
+    const lines32 = text32.split('\n');
+    for (const line of lines32) {
+      expect(line.length).toBeLessThanOrEqual(32);
+    }
+    expect(text32).toContain('Remaining Balance:');
+    expect(text32).toContain('5,000.00 Dr');
+
+    // 48-character width
+    const text48 = formatPaymentSlipText(dataWithRemainingBal, 48);
+    const lines48 = text48.split('\n');
+    for (const line of lines48) {
+      expect(line.length).toBeLessThanOrEqual(48);
+    }
+    expect(text48).toContain('Remaining Balance:');
+    expect(text48).toContain('5,000.00 Dr');
+
+    // Extreme large balance truncates gracefully without exceeding line width
+    const extremeData = buildPaymentSlipData(inSource, mockParty, mockCompany, {
+      balanceAfter: -125450750.5,
+      balanceLabel: 'Remaining Balance:',
+    });
+    const extremeText32 = formatPaymentSlipText(extremeData, 32);
+    for (const line of extremeText32.split('\n')) {
+      expect(line.length).toBeLessThanOrEqual(32);
+    }
+    expect(extremeText32).toContain('Cr');
+  });
+
+  it('5. static guard: PaymentTransactionsView resolves editor party via live useMemo lookup from parties and removes editingVoucherParty useState', () => {
+    const paymentTxViewPath = path.resolve(__dirname, '../components/Payments/PaymentTransactionsView.tsx');
+    const sourceCode = fs.readFileSync(paymentTxViewPath, 'utf-8');
+
+    // Asserts editingVoucherParty is not in useState
+    expect(sourceCode).not.toMatch(/useState<Party\s*\|\s*null>\s*\(\s*null\s*\)/);
+    expect(sourceCode).not.toContain('setEditingVoucherParty');
+
+    // Asserts live lookup useMemo derives editingVoucherParty from parties
+    expect(sourceCode).toMatch(/const\s+editingVoucherParty\s*=\s*useMemo/);
+    expect(sourceCode).toContain('parties.find');
   });
 });
