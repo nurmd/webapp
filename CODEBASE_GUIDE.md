@@ -145,9 +145,14 @@ gst-billing-app/
   - **Truncation Notice & Sequence Footer**: When the in-memory window is truncated, `AuditLogView` shows an amber notice (retained vs total) and prints the current page's sequence range; nothing is hidden from exports or verification.
   - **Legacy Archival Is Export-Only**: `auditTrail.archiveLegacyEpoch()` returns a JSON bundle plus manifest (count, first/last sequence, last record hash) for the legacy epoch. It never deletes, rewrites, or compacts audit records.
 
-### E. PIN Security & RBAC (`src/services/pinSecurity.ts`, `src/core/security/rbac.ts`)
-- PBKDF2/SHA-256 salting for 4-digit staff PINs.
-- Roles: `OWNER` (full access), `CASHIER` (sales POS, view items), `ACCOUNTANT` / `CA` (ledgers, reports, audit logs).
+### E. PIN Security & RBAC (`src/services/rbac.ts`, `src/core/utils/crypto.ts`)
+- **PBKDF2 PIN Cryptography**:
+  - Standard PIN hashing utilizes PBKDF2-HMAC-SHA-256 with **100,000 iterations** and 32-byte (256-bit) output, encoded as 64 lowercase hex characters (`hashPin` / `pbkdf2Hex`).
+  - Web Crypto API (`crypto.subtle.deriveBits`) provides hardware-accelerated execution in secure contexts, with an iterated SHA-256 fallback in non-secure or test environments.
+  - Profiles track `pinAlgo?: 'sha256' | 'pbkdf2'` (defaulting to `'sha256'` on legacy rows).
+  - **Transparent JIT Migration**: When a user authenticates with a legacy single-round SHA-256 PIN hash (`verifyPin`), successful verification automatically re-hashes the PIN using PBKDF2, upgrades `pinAlgo` to `'pbkdf2'`, and persists the upgraded profile. Wrong PIN attempts do not migrate the record.
+- **Roles**: `OWNER` (full access), `CASHIER` (sales POS, view items, billing), `ACCOUNTANT` / `CA` (ledgers, reports, audit logs).
+- **Persistent Lockout Defense**: Progressive lockout tiers (3 attempts = 30s, 5 attempts = 60s, 10+ attempts = 300s) mirrored across local storage keys.
 
 ### F. Invoice-Linked Returns Engine (`src/core/returns/returnEngine.ts`, `src/components/Returns/`)
 - **Document Linking**: Sales Returns (`CREDIT_NOTE`, Table 9B) link directly to source sales invoices (`originalInvoiceId`, `originalInvoiceNumber`, `originalInvoiceDate`, `noteType: 'C'`). Purchase Returns (`RETURN`, Debit Notes) link directly to source purchase bills (`originalBillId`, `originalBillNumber`, `originalBillDate`, `noteType: 'D'`).
@@ -199,9 +204,13 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Abolished clock-skewed last-write-wins (`updatedAt` comparison) for financial documents.
   - Financial records (`invoice`, `purchase`, `voucher`, `expense`, `bank_account`, `cash_bank_txn`, `loan`, `loan_txn`) that undergo concurrent mutations on multiple devices are preserved and enqueued in an operator-visible **Revision Conflict Queue** instead of silently overwriting local unsynced edits.
   - HTTP 409 Put Conflicts: `putDoc()` compares content divergence (`isDocDivergent`); if divergent, it captures both revisions into explicit conflict state rather than performing blind overwrites.
-- **Remote URL Safety & Persistence**:
+- **Remote URL Safety, Redaction & Rotation (`src/core/utils/syncUrl.ts`, `docs/sync-url-rotation.md`)**:
   - User-configured CouchDB URLs are never auto-deleted, regardless of host or database name. A sync link must survive app updates and browser-storage resets.
   - The link is stored redundantly in `localStorage`, Android SharedPreferences (`AndroidBridge.get/set/removePreference`), and a local-only PouchDB doc (`_local/sync_remote_url`, never replicated). Full backups also carry an optional `syncRemoteUrl`.
+  - **Credential Redaction Invariant**: All diagnostics bundles, support exports, and console logs pass remote sync URLs through `redactSyncUrl()`, masking credentials (`user:password@` -> `***:***@`, `user@` -> `***@`) and returning `[REDACTED_INVALID_URL]` on malformed URLs.
+  - **Rotation Procedure & Keystore Hardening Follow-up**:
+    - Changing the remote URL in Settings derives a new per-remote database name (`vyapar_remote_${hash}`), preserving the previous local database without auto-deletion.
+    - Future native follow-up will migrate plaintext SharedPreferences to Android `EncryptedSharedPreferences` backed by the Android Keystore (see `docs/sync-url-rotation.md`).
   - The service worker (`public/sw.js`) bypasses cross-origin traffic and CouchDB/PouchDB endpoints (`_changes`, `_all_docs`, `_bulk_docs`, `_bulk_get`, `_revs_diff`, `_local`, `_find`, `_design`, `_session`). Replication responses are never cached, and responses to requests carrying `Authorization` are never persisted.
 - **Sync Push Path Hardening & Error Latch Isolation**:
   - `createRemoteDB()` strips inline credentials from the target database URL and passes authentication cleanly via `opts.auth` (with percent-decoded username and password), avoiding Fetch API `Request cannot be constructed from a URL that includes credentials` errors and handling complex special characters (e.g. `:` and `@`) in passwords.

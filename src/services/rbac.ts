@@ -10,8 +10,14 @@ export interface UserProfile {
   role: UserRole;
   roleTitle?: string;
   avatarColor?: string;
-  pinHash?: string; // 64-char lowercase hex SHA-256 of (pinSalt + pin)
+  /**
+   * 64-char lowercase hex hash of the PIN.
+   * For pinAlgo === 'pbkdf2' (standard >= v1.2.82): PBKDF2-HMAC-SHA-256 (>=100,000 iterations).
+   * For pinAlgo === 'sha256' (legacy v1.x): single-round SHA-256 of (pinSalt + pin).
+   */
+  pinHash?: string;
   pinSalt?: string; // 32-char lowercase hex (16 cryptographically random bytes)
+  pinAlgo?: 'sha256' | 'pbkdf2';
   createdAt: string;
   lastLogin?: string;
   pin?: string; // Deprecated legacy plaintext PIN; removed upon migration
@@ -23,15 +29,24 @@ export interface LockoutState {
   lastFailedAt?: number;
 }
 
-import { sha256Hex, generateRandomSalt } from '../core/utils/crypto.ts';
+import {
+  sha256Hex,
+  generateRandomSalt,
+  pbkdf2Hex,
+  verifyPbkdf2,
+} from '../core/utils/crypto.ts';
 
 export function generateSalt(byteLength: number = 16): string {
   return generateRandomSalt(byteLength);
 }
 
+/**
+ * Derives a PBKDF2-HMAC-SHA-256 digest with 100,000 iterations and 32-byte (256-bit) output,
+ * encoded as a 64-character lowercase hex string.
+ */
 export async function hashPin(pin: string, salt: string): Promise<string> {
-  const normalizedPin = pin.trim();
-  return sha256Hex(salt + normalizedPin);
+  const normalizedPin = (pin || '').trim();
+  return pbkdf2Hex(normalizedPin, salt, 100000, 32);
 }
 
 export function timingSafeEqual(a: string, b: string): boolean {
@@ -50,6 +65,44 @@ export function timingSafeEqual(a: string, b: string): boolean {
 
 export const constantTimeCompare = timingSafeEqual;
 
+/**
+ * Validates a PIN against a user profile.
+ * - If user.pinAlgo === 'pbkdf2', verifies via PBKDF2-HMAC-SHA-256 (100k rounds).
+ * - If user.pinAlgo === 'sha256' (or legacy row), verifies via sha256Hex(salt + pin);
+ *   on success, transparently re-hashes with PBKDF2, sets user.pinAlgo = 'pbkdf2', and clears any legacy pin.
+ */
+export async function verifyPin(pin: string, user: UserProfile): Promise<boolean> {
+  if (!pin || typeof pin !== 'string' || !user || !user.pinHash || !user.pinSalt) {
+    return false;
+  }
+
+  const cleanPin = pin.trim();
+  if (!cleanPin) {
+    return false;
+  }
+
+  const algo = user.pinAlgo || 'sha256';
+
+  if (algo === 'pbkdf2') {
+    return verifyPbkdf2(cleanPin, user.pinSalt, user.pinHash, 100000);
+  }
+
+  // Legacy SHA-256 path
+  const legacyComputed = await sha256Hex(user.pinSalt + cleanPin);
+  const isValid = timingSafeEqual(legacyComputed, user.pinHash);
+
+  if (isValid) {
+    // Transparent migration to PBKDF2
+    const newHash = await hashPin(cleanPin, user.pinSalt);
+    user.pinHash = newHash;
+    user.pinAlgo = 'pbkdf2';
+    delete user.pin;
+    return true;
+  }
+
+  return false;
+}
+
 export const DEFAULT_USERS: UserProfile[] = [
   {
     id: 'user_owner',
@@ -59,6 +112,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     avatarColor: '#006c49',
     pinHash: 'a8d95645cde5b3a7366b40ff0840ab6bdad05dec7e6c221d86fd500c57397e60',
     pinSalt: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    pinAlgo: 'sha256',
     createdAt: '2025-01-01T00:00:00.000Z',
   },
   {
@@ -69,6 +123,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     avatarColor: '#0284c7',
     pinHash: '74882b345b3db7cb85075187ab8839827e0e5255de9f802a19340fd4f944a76e',
     pinSalt: '0f1e2d3c4b5a69788796a5b4c3d2e1f0',
+    pinAlgo: 'sha256',
     createdAt: '2025-01-01T00:00:00.000Z',
   },
   {
@@ -79,6 +134,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     avatarColor: '#7c3aed',
     pinHash: 'f59834a284bfb5fea0d2549a5540528d20054262accd24ab35bd65df20a76308',
     pinSalt: '1a2b3c4d5e6f708192a3b4c5d6e7f809',
+    pinAlgo: 'sha256',
     createdAt: '2025-01-01T00:00:00.000Z',
   },
 ];
@@ -325,6 +381,7 @@ export class RbacService {
         const hash = await hashPin(cleanPin, salt);
         user.pinSalt = salt;
         user.pinHash = hash;
+        user.pinAlgo = 'pbkdf2';
         user.createdAt = user.createdAt || new Date().toISOString();
         user.lastLogin = new Date().toISOString();
         delete user.pin;
@@ -343,8 +400,7 @@ export class RbacService {
     }
 
     try {
-      const computed = await hashPin(cleanPin, user.pinSalt);
-      const isValid = timingSafeEqual(computed, user.pinHash);
+      const isValid = await verifyPin(cleanPin, user);
 
       if (isValid) {
         this.resetFailedAttempts(userId);
@@ -377,6 +433,7 @@ export class RbacService {
 
     this.users[idx].pinSalt = salt;
     this.users[idx].pinHash = hash;
+    this.users[idx].pinAlgo = 'pbkdf2';
     if (!this.users[idx].createdAt) {
       this.users[idx].createdAt = new Date().toISOString();
     }
@@ -387,6 +444,7 @@ export class RbacService {
     if (this.activeUser.id === userId) {
       this.activeUser.pinSalt = salt;
       this.activeUser.pinHash = hash;
+      this.activeUser.pinAlgo = 'pbkdf2';
       delete this.activeUser.pin;
     }
 
@@ -495,6 +553,7 @@ export class RbacService {
         const hash = await hashPin(plainPin, salt);
         u.pinSalt = salt;
         u.pinHash = hash;
+        u.pinAlgo = 'pbkdf2';
         u.createdAt = u.createdAt || new Date().toISOString();
         delete u.pin;
       }
@@ -506,6 +565,7 @@ export class RbacService {
       if (match) {
         memUser.pinHash = match.pinHash;
         memUser.pinSalt = match.pinSalt;
+        memUser.pinAlgo = match.pinAlgo;
         memUser.createdAt = match.createdAt || new Date().toISOString();
         delete memUser.pin;
       }

@@ -9,6 +9,7 @@ import {
   type SupportDiagnosticsBundle,
   type SupportDiagnosticsConflictItem,
 } from '../core/utils/supportDiagnostics.ts';
+import { redactSyncUrl } from '../core/utils/syncUrl.ts';
 
 export interface CollectDiagnosticsOptions {
   syncState?: PouchSyncState | null;
@@ -128,7 +129,7 @@ export function collectSupportDiagnostics(
     },
     sync: {
       status: syncState?.status || 'offline',
-      remoteUrl: syncState?.remoteUrl || null,
+      remoteUrl: syncState?.remoteUrl ? redactSyncUrl(syncState.remoteUrl) : null,
       pendingChanges: syncState?.pendingChanges ?? 0,
       lastSyncedTime: syncState?.lastSyncedAt || null,
       error: syncState?.error || null,

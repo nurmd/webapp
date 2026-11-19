@@ -89,7 +89,7 @@ describe('Cryptographic PIN Security Hardening (Milestone 2 - R3)', () => {
       expect(hash1).toMatch(/^[0-9a-f]{64}$/);
       expect(hash1).toBe(hash2);
       // Precomputed SHA-256 for salt + pin
-      expect(hash1).toBe('a8d95645cde5b3a7366b40ff0840ab6bdad05dec7e6c221d86fd500c57397e60');
+      expect(hash1).toBe('6fedf0cd8e9a5d438aad3c9592ebe88316eafd38ce39c69fa2b57c356c3a07ce');
     });
 
     it('TC-PIN-04: identical PINs with different salts produce distinct hashes (salt isolation)', async () => {

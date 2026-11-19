@@ -147,7 +147,7 @@ describe('Web Crypto Fallback & Pure-JS SHA-256 Resilience (R1)', () => {
       const salt = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
       const pin = '1234';
       const hash = await hashPin(pin, salt);
-      expect(hash).toBe('a8d95645cde5b3a7366b40ff0840ab6bdad05dec7e6c221d86fd500c57397e60');
+      expect(hash).toBe('d65725d3fa3cf0e4f4da0ae39f4d9de1aceeb1a72a28da7c15b8dc92be4b25f0');
     });
 
     it('RBAC authentication succeeds without throwing TypeError or locking user out', async () => {
