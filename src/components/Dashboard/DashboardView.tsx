@@ -290,8 +290,12 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   const allActivities = useMemo(() => {
     const feed: ActivityTransaction[] = [];
 
-    // Helper to reliably parse ISO, DD/MM/YYYY, or createdAt into a numeric timestamp
+    // Helper to reliably parse createdAt (authoritative for ordering) or fall back to business date (ISO, DD/MM/YYYY)
     const parseDateToTimestamp = (dateStr?: string, createdAt?: string): number => {
+      if (createdAt) {
+        const c = new Date(createdAt);
+        if (!isNaN(c.getTime())) return c.getTime();
+      }
       if (dateStr) {
         const d = new Date(dateStr);
         if (!isNaN(d.getTime())) return d.getTime();
@@ -305,10 +309,6 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
             if (!isNaN(parsed.getTime())) return parsed.getTime();
           }
         }
-      }
-      if (createdAt) {
-        const c = new Date(createdAt);
-        if (!isNaN(c.getTime())) return c.getTime();
       }
       return 0;
     };

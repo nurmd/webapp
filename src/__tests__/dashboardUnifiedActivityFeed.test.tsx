@@ -1908,5 +1908,201 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
 
     expect(filterBtn.getAttribute('aria-expanded')).toBe('false');
   });
+
+  // ==========================================
+  // Timeline Ordering: Latest Creation Priority
+  // ==========================================
+  describe('Business Activity Timeline Ordering (createdAt priority)', () => {
+    it('creation beats business date: invoice B created later renders above invoice A dated later', () => {
+      const baseInvoice = mockInvoices[0];
+      const invoiceA: Invoice = {
+        ...baseInvoice,
+        id: 'inv_sort_a',
+        invoiceNumber: 'INV-SORT-A',
+        date: '2026-10-25', // dated later
+        createdAt: '2026-10-10T10:00:00.000Z', // created earlier
+      };
+      const invoiceB: Invoice = {
+        ...baseInvoice,
+        id: 'inv_sort_b',
+        invoiceNumber: 'INV-SORT-B',
+        date: '2026-10-15', // dated earlier
+        createdAt: '2026-10-20T10:00:00.000Z', // created later
+      };
+
+      act(() => {
+        root.render(
+          <DashboardView
+            company={mockCompany}
+            invoices={[invoiceA, invoiceB]}
+            purchases={[]}
+            vouchers={[]}
+            expenses={[]}
+            items={mockItems}
+            parties={mockParties}
+            onNewInvoice={vi.fn()}
+            onQuickPos={vi.fn()}
+            onViewInvoice={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      const text = container.textContent || '';
+      const idxB = text.indexOf('INV-SORT-B');
+      const idxA = text.indexOf('INV-SORT-A');
+
+      expect(idxB).toBeGreaterThan(-1);
+      expect(idxA).toBeGreaterThan(-1);
+      expect(idxB).toBeLessThan(idxA);
+    });
+
+    it('same-day precision: two records sharing one business date order by latest createdAt', () => {
+      const baseInvoice = mockInvoices[0];
+      const invoiceMorning: Invoice = {
+        ...baseInvoice,
+        id: 'inv_same_morn',
+        invoiceNumber: 'INV-SAME-MORN',
+        date: '2026-10-20',
+        createdAt: '2026-10-20T09:00:00.000Z',
+      };
+      const invoiceAfternoon: Invoice = {
+        ...baseInvoice,
+        id: 'inv_same_aft',
+        invoiceNumber: 'INV-SAME-AFT',
+        date: '2026-10-20',
+        createdAt: '2026-10-20T15:30:00.000Z',
+      };
+
+      act(() => {
+        root.render(
+          <DashboardView
+            company={mockCompany}
+            invoices={[invoiceMorning, invoiceAfternoon]}
+            purchases={[]}
+            vouchers={[]}
+            expenses={[]}
+            items={mockItems}
+            parties={mockParties}
+            onNewInvoice={vi.fn()}
+            onQuickPos={vi.fn()}
+            onViewInvoice={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      const text = container.textContent || '';
+      const idxAft = text.indexOf('INV-SAME-AFT');
+      const idxMorn = text.indexOf('INV-SAME-MORN');
+
+      expect(idxAft).toBeGreaterThan(-1);
+      expect(idxMorn).toBeGreaterThan(-1);
+      expect(idxAft).toBeLessThan(idxMorn);
+    });
+
+    it('fallback: a record with no createdAt still sorts by its business date and does not drop to the bottom', () => {
+      const baseInvoice = mockInvoices[0];
+      const invoiceOct01: Invoice = {
+        ...baseInvoice,
+        id: 'inv_fb_oct01',
+        invoiceNumber: 'INV-FB-OCT01',
+        date: '2026-10-01',
+        createdAt: '2026-10-01T10:00:00.000Z',
+      };
+      const invoiceOct15Fallback: Invoice = {
+        ...baseInvoice,
+        id: 'inv_fb_oct15',
+        invoiceNumber: 'INV-FB-OCT15',
+        date: '2026-10-15',
+        createdAt: undefined as unknown as string,
+      };
+      const invoiceSep01: Invoice = {
+        ...baseInvoice,
+        id: 'inv_fb_sep01',
+        invoiceNumber: 'INV-FB-SEP01',
+        date: '2026-09-01',
+        createdAt: '2026-09-01T10:00:00.000Z',
+      };
+
+      act(() => {
+        root.render(
+          <DashboardView
+            company={mockCompany}
+            invoices={[invoiceOct01, invoiceOct15Fallback, invoiceSep01]}
+            purchases={[]}
+            vouchers={[]}
+            expenses={[]}
+            items={mockItems}
+            parties={mockParties}
+            onNewInvoice={vi.fn()}
+            onQuickPos={vi.fn()}
+            onViewInvoice={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      const text = container.textContent || '';
+      const idxFallback = text.indexOf('INV-FB-OCT15');
+      const idxOct01 = text.indexOf('INV-FB-OCT01');
+      const idxSep01 = text.indexOf('INV-FB-SEP01');
+
+      expect(idxFallback).toBeGreaterThan(-1);
+      expect(idxOct01).toBeGreaterThan(-1);
+      expect(idxSep01).toBeGreaterThan(-1);
+      expect(idxFallback).toBeLessThan(idxOct01);
+      expect(idxOct01).toBeLessThan(idxSep01);
+    });
+
+    it('label unchanged: assert the row still shows the business date text, proving ordering changed without changing display', () => {
+      const baseInvoice = mockInvoices[0];
+      const invoiceA: Invoice = {
+        ...baseInvoice,
+        id: 'inv_lbl_a',
+        invoiceNumber: 'INV-LBL-A',
+        date: '2026-10-25', // business date
+        createdAt: '2026-10-10T10:00:00.000Z', // created earlier
+      };
+      const invoiceB: Invoice = {
+        ...baseInvoice,
+        id: 'inv_lbl_b',
+        invoiceNumber: 'INV-LBL-B',
+        date: '2026-10-15', // business date
+        createdAt: '2026-10-20T10:00:00.000Z', // created later
+      };
+
+      act(() => {
+        root.render(
+          <DashboardView
+            company={mockCompany}
+            invoices={[invoiceA, invoiceB]}
+            purchases={[]}
+            vouchers={[]}
+            expenses={[]}
+            items={mockItems}
+            parties={mockParties}
+            onNewInvoice={vi.fn()}
+            onQuickPos={vi.fn()}
+            onViewInvoice={vi.fn()}
+            onNavigateTab={vi.fn()}
+          />
+        );
+      });
+
+      const text = container.textContent || '';
+      const idxB = text.indexOf('INV-LBL-B');
+      const idxA = text.indexOf('INV-LBL-A');
+
+      // Ordering: B renders above A
+      expect(idxB).toBeLessThan(idxA);
+
+      // Display: Row shows formatted business dates ('15/10/2026' and '25/10/2026'), NOT creation timestamps
+      expect(text).toContain('15/10/2026');
+      expect(text).toContain('25/10/2026');
+      expect(text).not.toContain('20/10/2026');
+      expect(text).not.toContain('10/10/2026');
+    });
+  });
 });
 
