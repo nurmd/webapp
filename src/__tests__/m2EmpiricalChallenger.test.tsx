@@ -527,9 +527,10 @@ describe('EMPIRICAL CHALLENGER: Milestone 2 Stress Test Suite', () => {
       const indexStats = fs.statSync(indexChunkPath);
       const indexSizeKb = indexStats.size / 1024;
       console.log(`[EMPIRICAL BUNDLE] Main index chunk: ${indexChunkFile} (${indexSizeKb.toFixed(2)} kB)`);
-      // Main entry chunk is well below 470 kB target (bumped from 465 to accommodate the
-      // IndexedDB wedge-recovery path and bounded write-queue drain)
-      expect(indexSizeKb).toBeLessThan(470);
+      // Main entry chunk is well below 475 kB target (bumped from 465 to accommodate the
+      // IndexedDB wedge-recovery path and bounded write-queue drain).
+      // Bumped 470 -> 475 by the Dashboard OTA notification card (2026-11).
+      expect(indexSizeKb).toBeLessThan(475);
 
       // Verify that the 5,000 HSN codes are NOT bundled into index chunk
       const indexContent = fs.readFileSync(indexChunkPath, 'utf-8');

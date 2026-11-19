@@ -523,6 +523,13 @@ The `StorageService` class (`db`) is the unified database facade composing focus
   - Actions: **Update Now** (opens full `AppUpdateModal`), **Later** (dismisses prompt; retains tappable bottom status toast), and **Skip this version** (dismisses prompt, persists skipped version, suppresses update toast for that version).
   - `isMandatory` releases hide Later/Skip buttons and switch primary button label to `Update now (required)`.
   - Covered by `src/__tests__/appUpdatePrompt.test.tsx` (8 tests).
+- **Dashboard OTA Notification Card (`DashboardView.tsx`)**:
+  - Rendered as the first child of the dashboard container, directly above the Financial Overview card, when an update is available (`updateInfo?: AppReleaseInfo | null`).
+  - Gated in `App.tsx` via `updateInfo={hasUpdate && !isUpdateBannerDismissed ? latestRelease : null}` with per-session dismissal (`isUpdateBannerDismissed`).
+  - Optional props in `DashboardViewProps`: `updateInfo?: AppReleaseInfo | null`, `onOpenUpdate?: () => void`, `onDismissUpdate?: () => void`.
+  - Compact presentation: `system_update` icon, clean version headline (`Update available — v{cleanVersion}`), optional release title, 1-tap "Update" button (opens `AppUpdateModal`), and dismiss button (`aria-label="Dismiss update notification"`). Whole card body is also clickable.
+  - Zero release notes bullets rendered in banner (preserves dashboard compactness). Renders nothing when `updateInfo` is null/undefined (no layout shifts).
+  - Covered by `src/__tests__/dashboardOtaBanner.test.tsx` (6 tests).
 
 ### I. Read-Only Cash/Bank Reconciliation Audit (`cashBankReconciliation.ts`, `CashBankReconciliationPanel.tsx`)
 - **What the Report Shows**:
@@ -808,6 +815,7 @@ npm run coverage
 - `gstr3bAndCogsCalculations.test.ts`: GSTR-3B ITC offset, COGS/margin calculations, aging boundaries, and stock valuation.
 - `updateServiceOtaFallback.test.ts`: Signed GitHub release asset selection, checksum parsing, and release-page fallback.
 - `appUpdatePrompt.test.tsx`: Auto-prompt popup rendering, dynamic release notes, Update Now / Later / Skip flows, mandatory release gating, priority 25 back navigation, defensive storage fallback, and App.tsx static guards.
+- `dashboardOtaBanner.test.tsx`: Dashboard OTA update notification banner presence/absence, document order placement above Financial Overview, Update button callback, dismiss button callback isolation, compactness guard (zero bullet text), and App.tsx static prop passing guards.
 - `conflictManifest.test.ts`: Synthetic 31-document/48-revision conflict inventory, dependency-order warnings, credential redaction, backup round-trip hashes, and tamper detection.
 - `supportDiagnostics.test.ts`: Pure support diagnostics builder, URL credential redaction, path sanitization, and conflict aggregation.
 - `supportDiagnosticsService.test.ts`: Defensive collector service, zero-mutation guarantee, and local download helper.

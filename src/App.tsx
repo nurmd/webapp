@@ -202,6 +202,7 @@ export const App: React.FC = () => {
   const [hasUpdate, setHasUpdate] = useState<boolean>(false);
   const [latestRelease, setLatestRelease] = useState<AppReleaseInfo | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState<boolean>(false);
+  const [isUpdateBannerDismissed, setIsUpdateBannerDismissed] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // React 18 Granular External Store Subscriptions (Shell-level only: Phase 2.5)
@@ -486,6 +487,14 @@ export const App: React.FC = () => {
     writeSkippedOtaVersion(version);
     setHasUpdate(false);
     setToastMessage((cur) => (cur?.includes('Update') || cur?.includes(version) ? null : cur));
+  }, []);
+
+  const handleOpenUpdateFromDashboard = useCallback(() => {
+    setIsUpdateModalOpen(true);
+  }, []);
+
+  const handleDismissUpdateBanner = useCallback(() => {
+    setIsUpdateBannerDismissed(true);
   }, []);
 
   const handleSaveInvoice = useCallback((
@@ -1486,6 +1495,9 @@ export const App: React.FC = () => {
             company={company}
             items={activeItems}
             parties={parties}
+            updateInfo={hasUpdate && !isUpdateBannerDismissed ? latestRelease : null}
+            onOpenUpdate={handleOpenUpdateFromDashboard}
+            onDismissUpdate={handleDismissUpdateBanner}
             onNewInvoice={handleOpenNewInvoice}
             onQuickPos={handleDashboardQuickPos}
             onViewInvoice={setPreviewInvoice}

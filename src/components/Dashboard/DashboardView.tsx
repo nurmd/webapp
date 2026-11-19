@@ -43,6 +43,7 @@ import {
   DashboardQuickActionId,
   normalizeDashboardQuickActions,
 } from '../../core/settings/dashboardQuickActions.ts';
+import type { AppReleaseInfo } from '../../services/updateService.ts';
 
 export type ActivityType = 'SALE' | 'PURCHASE' | 'VOUCHER' | 'EXPENSE';
 export type CashFlowDirection = 'IN' | 'OUT';
@@ -81,6 +82,9 @@ export interface DashboardViewProps {
   purchases?: PurchaseBill[];
   vouchers?: Voucher[];
   expenses?: Expense[];
+  updateInfo?: AppReleaseInfo | null;
+  onOpenUpdate?: () => void;
+  onDismissUpdate?: () => void;
   onNewInvoice: () => void;
   onQuickPos: () => void;
   onViewInvoice: (invoice: Invoice) => void;
@@ -112,6 +116,9 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   purchases: propPurchases,
   vouchers: propVouchers,
   expenses: propExpenses,
+  updateInfo,
+  onOpenUpdate,
+  onDismissUpdate,
   onNewInvoice,
   onQuickPos,
   onViewInvoice,
@@ -818,6 +825,57 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="flex flex-col w-full px-3 sm:px-4 md:px-6 gap-3 sm:gap-4 pt-3 pb-28 sm:pb-6 max-w-7xl mx-auto">
+      {/* OTA Update Notification Card */}
+      {updateInfo && (
+        <aside
+          data-testid="dashboard-ota-banner"
+          role="status"
+          aria-live="polite"
+          onClick={() => onOpenUpdate?.()}
+          className="w-full bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-300 dark:border-amber-700/60 rounded-2xl p-3 sm:p-3.5 shadow-sm flex items-center justify-between gap-3 cursor-pointer hover:border-amber-400 dark:hover:border-amber-600 transition-all select-none group"
+        >
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 dark:bg-amber-500/25 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px]">system_update</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5 truncate">
+                <span>Update available — v{(updateInfo.version || '').replace(/^v/i, '')}</span>
+              </div>
+              {updateInfo.releaseTitle && (
+                <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5">
+                  {updateInfo.releaseTitle}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenUpdate?.();
+              }}
+              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Update</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss update notification"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismissUpdate?.();
+              }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+        </aside>
+      )}
+
       {/* 2 & 3. Unified Financial Snapshot & Quick Actions (Responsive Tablet Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch">
         {/* Left: Financial Overview Card - Light High-Contrast Card */}
