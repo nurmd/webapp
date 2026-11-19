@@ -355,6 +355,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                         type="button"
                         onClick={() => setFormIcon(item.icon)}
                         title={item.label}
+                        aria-label={item.label}
                         className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                           formIcon === item.icon
                             ? 'bg-secondary text-on-secondary shadow-sm'
@@ -489,6 +490,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                         onClick={() => handleStartEdit(cat)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
                         title="Edit category"
+                        aria-label="Edit category"
                       >
                         <span className="material-symbols-outlined text-[16px]">edit</span>
                       </button>
@@ -501,6 +503,7 @@ export const CategoryManagementModal: React.FC<CategoryManagementModalProps> = (
                           }}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-error hover:bg-error-container/30 transition-colors cursor-pointer"
                           title="Delete category"
+                          aria-label="Delete category"
                         >
                           <span className="material-symbols-outlined text-[16px]">delete</span>
                         </button>

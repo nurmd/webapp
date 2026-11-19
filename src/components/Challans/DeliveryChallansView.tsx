@@ -306,6 +306,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
               onClick={() => setSearch('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5 rounded cursor-pointer"
               title="Clear search"
+              aria-label="Clear search"
             >
               <span className="material-symbols-outlined text-[16px]">close</span>
             </button>
@@ -586,6 +587,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                             data-testid={`challan-view-btn-${challan.id}`}
                             className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
                             title="Preview & Print Challan"
+                            aria-label="Preview & Print Challan"
                           >
                             <span className="material-symbols-outlined text-[18px]">print</span>
                           </button>
@@ -612,6 +614,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                               data-testid={`challan-edit-btn-${challan.id}`}
                               className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
                               title="Edit Challan"
+                              aria-label="Edit Challan"
                             >
                               <span className="material-symbols-outlined text-[18px]">edit</span>
                             </button>
@@ -626,6 +629,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                                   onClick={() => handleUpdateStatus(challan, 'DISPATCHED')}
                                   className="p-1.5 rounded-lg text-sky-700 hover:bg-sky-500/15 active:scale-95 transition-all cursor-pointer"
                                   title="Mark as Dispatched"
+                                  aria-label="Mark as Dispatched"
                                 >
                                   <span className="material-symbols-outlined text-[18px]">local_shipping</span>
                                 </button>
@@ -636,6 +640,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                                   onClick={() => handleUpdateStatus(challan, 'DELIVERED')}
                                   className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-500/15 active:scale-95 transition-all cursor-pointer"
                                   title="Mark as Delivered"
+                                  aria-label="Mark as Delivered"
                                 >
                                   <span className="material-symbols-outlined text-[18px]">done_all</span>
                                 </button>
@@ -651,6 +656,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                               data-testid={`challan-cancel-btn-${challan.id}`}
                               className="p-1.5 rounded-lg text-on-surface-variant hover:text-rose-600 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer"
                               title="Cancel Challan"
+                              aria-label="Cancel Challan"
                             >
                               <span className="material-symbols-outlined text-[18px]">cancel</span>
                             </button>
@@ -663,6 +669,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                             data-testid={`challan-delete-btn-${challan.id}`}
                             className="p-1.5 rounded-lg text-on-surface-variant hover:text-rose-600 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer"
                             title="Delete Challan"
+                            aria-label="Delete Challan"
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
@@ -796,6 +803,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                           onClick={() => onEditInvoice(challan)}
                           className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container active:scale-95 transition-all cursor-pointer"
                           title="Edit"
+                          aria-label="Edit"
                         >
                           <span className="material-symbols-outlined text-[16px]">edit</span>
                         </button>
@@ -806,6 +814,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
                         onClick={() => setDocToDelete(challan)}
                         className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-500/15 active:scale-95 transition-all cursor-pointer"
                         title="Delete"
+                        aria-label="Delete"
                       >
                         <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>

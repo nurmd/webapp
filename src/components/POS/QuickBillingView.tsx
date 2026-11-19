@@ -479,7 +479,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                 type="button"
                 onClick={() => setIsShortcutsModalOpen(true)}
                 className="w-7 h-7 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-slate-600 hover:text-slate-900 border border-outline-variant/30 cursor-pointer"
-                title="Keyboard Shortcuts (?)"
+                title="Keyboard Shortcuts (?)" aria-label="Keyboard Shortcuts"
               >
                 <span className="material-symbols-outlined text-[15px]">help</span>
               </button>
@@ -596,7 +596,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     ? 'bg-secondary text-on-secondary'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="Grid Cards"
+                title="Grid Cards" aria-label="Grid Cards"
               >
                 <span className="material-symbols-outlined text-[16px]">grid_view</span>
               </button>
@@ -608,7 +608,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     ? 'bg-secondary text-on-secondary'
                     : 'text-slate-500 hover:text-slate-900'
                 }`}
-                title="Dense List"
+                title="Dense List" aria-label="Dense List"
               >
                 <span className="material-symbols-outlined text-[16px]">view_list</span>
               </button>
@@ -723,7 +723,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                   type="button"
                   onClick={() => handleSelectCustomer(null)}
                   className="w-6 h-6 rounded-md hover:bg-surface-container text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
-                  title="Reset to Walk-in"
+                  title="Reset to Walk-in" aria-label="Reset to Walk-in"
                 >
                   <span className="material-symbols-outlined text-[14px]">close</span>
                 </button>
@@ -822,7 +822,7 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                     type="button"
                     onClick={() => removeFromCart(item.id)}
                     className="text-slate-400 hover:text-rose-600 cursor-pointer p-0.5"
-                    title="Remove item"
+                    title="Remove item" aria-label="Remove item"
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
                   </button>

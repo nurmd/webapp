@@ -383,6 +383,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                       }}
                       className="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-md transition-colors"
                       title="Edit Order"
+                      aria-label="Edit Order"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>
                     </button>
@@ -397,6 +398,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                       }}
                       className="p-1 text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
                       title="Cancel Order"
+                      aria-label="Cancel Order"
                     >
                       <span className="material-symbols-outlined text-[16px]">block</span>
                     </button>
@@ -410,6 +412,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
                     }}
                     className="p-1 text-error/70 hover:text-error hover:bg-error-container/20 rounded-md transition-colors"
                     title="Delete Order"
+                    aria-label="Delete Order"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>
                   </button>

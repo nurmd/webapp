@@ -464,6 +464,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                       }}
                       className="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-md transition-colors"
                       title="Edit Credit Note"
+                      aria-label="Edit Credit Note"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>
                     </button>
@@ -477,6 +478,7 @@ export const SalesReturnsView: React.FC<SalesReturnsViewProps> = ({
                     }}
                     className="p-1 text-error/70 hover:text-error hover:bg-error-container/20 rounded-md transition-colors"
                     title="Delete Credit Note"
+                    aria-label="Delete Credit Note"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>
                   </button>

@@ -175,6 +175,7 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
                 type="button"
                 onClick={() => onRemoveSplit(split.id)}
                 title="Remove split"
+                aria-label="Remove split"
                 className="h-8 w-8 rounded-lg flex items-center justify-center text-outline hover:text-error hover:bg-error-container/30 transition-colors cursor-pointer shrink-0"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>

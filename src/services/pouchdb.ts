@@ -27,6 +27,7 @@ import {
   hasOnlyDerivedDivergence,
   getDerivedDivergenceFields,
 } from '../core/sync/derivedFields.ts';
+import { redactSyncUrl } from '../core/utils/syncUrl.ts';
 
 export type { QueuedWrite, QueuedWriteOp, WriteQueueHealth };
 

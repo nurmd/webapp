@@ -140,7 +140,7 @@ export const AppUpdatePrompt: React.FC<AppUpdatePromptProps> = ({
           <div className="rounded-xl bg-surface-container/60 p-3.5 border border-outline-variant/20 space-y-2">
             <ul className="space-y-1.5 text-xs text-on-surface-variant">
               {displayedNotes.map((note, index) => (
-                <li key={index} className="flex items-start gap-2">
+                <li key={`${index}-${note}`} className="flex items-start gap-2">
                   <span className="text-primary font-bold select-none">•</span>
                   <span className="flex-1 leading-relaxed">{note}</span>
                 </li>

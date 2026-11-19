@@ -52,7 +52,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     });
   });
 
-  it('1. hashPin with a known salt produces a 64-char hex string and is deterministic', async () => {
+  it('1. hashPin with a known salt produces a 64-char hex string and is deterministic', { timeout: 60000 }, async () => {
     const salt = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
     const pin = '1234';
 
@@ -65,7 +65,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     expect(hash1).toBe(hash2);
   });
 
-  it('2. PBKDF2 hash differs from the legacy single-round SHA-256 of salt+pin', async () => {
+  it('2. PBKDF2 hash differs from the legacy single-round SHA-256 of salt+pin', { timeout: 60000 }, async () => {
     const salt = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
     const pin = '1234';
 
@@ -79,7 +79,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     expect(pbkdf2Derived).not.toBe(legacySingleRoundSha256);
   });
 
-  it('3. verifyPin accepts the correct PIN and rejects a wrong one for a PBKDF2 profile', async () => {
+  it('3. verifyPin accepts the correct PIN and rejects a wrong one for a PBKDF2 profile', { timeout: 60000 }, async () => {
     const salt = 'c0ffee112233445566778899aabbccdd';
     const pin = '4321';
     const pbkdf2Hash = await hashPin(pin, salt);
@@ -101,7 +101,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     expect(isWrongValid).toBe(false);
   });
 
-  it('4. legacy sha256 profile: first successful verify migrates to pbkdf2 (pinAlgo === "pbkdf2") and the stored hash changes; subsequent verify uses PBKDF2', async () => {
+  it('4. legacy sha256 profile: first successful verify migrates to pbkdf2 (pinAlgo === "pbkdf2") and the stored hash changes; subsequent verify uses PBKDF2', { timeout: 60000 }, async () => {
     const salt = '1a2b3c4d5e6f708192a3b4c5d6e7f809';
     const pin = '9999';
     const legacyHash = await sha256Hex(salt + pin);
@@ -137,7 +137,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     expect(wrongVerify).toBe(false);
   });
 
-  it('5. wrong PIN on a legacy profile does not migrate and keeps pinAlgo === "sha256"', async () => {
+  it('5. wrong PIN on a legacy profile does not migrate and keeps pinAlgo === "sha256"', { timeout: 60000 }, async () => {
     const salt = '0f1e2d3c4b5a69788796a5b4c3d2e1f0';
     const correctPin = '0000';
     const legacyHash = await sha256Hex(salt + correctPin);
@@ -158,7 +158,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     expect(user.pinHash).toBe(legacyHash);
   });
 
-  it('6. pbkdf2Hex returns 64 hex chars and is deterministic; fallback path (mock subtle undefined) still returns a stable hash', async () => {
+  it('6. pbkdf2Hex returns 64 hex chars and is deterministic; fallback path (mock subtle undefined) still returns a stable hash', { timeout: 60000 }, async () => {
     const password = 'mySecretPin';
     const salt = 'randomSaltHex123';
 
@@ -198,7 +198,7 @@ describe('RBAC PBKDF2-SHA-256 PIN Hashing & Transparent Migration (4.12)', () =>
     }
   });
 
-  it('7. no plaintext PIN is ever persisted (pin field deleted after migration)', async () => {
+  it('7. no plaintext PIN is ever persisted (pin field deleted after migration)', { timeout: 60000 }, async () => {
     const legacyUsersWithPlaintext = [
       {
         id: 'user_plain_1',

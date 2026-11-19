@@ -372,6 +372,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
                       }}
                       className="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-md transition-colors"
                       title="Edit Debit Note"
+                      aria-label="Edit Debit Note"
                     >
                       <span className="material-symbols-outlined text-[16px]">edit</span>
                     </button>
@@ -385,6 +386,7 @@ export const PurchaseReturnsView: React.FC<PurchaseReturnsViewProps> = ({
                     }}
                     className="p-1 text-error/70 hover:text-error hover:bg-error-container/20 rounded-md transition-colors"
                     title="Delete Debit Note"
+                    aria-label="Delete Debit Note"
                   >
                     <span className="material-symbols-outlined text-[16px]">delete</span>
                   </button>

@@ -188,6 +188,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
             onClick={() => onNavigateTab('dashboard')}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-200 transition-colors cursor-pointer flex-shrink-0"
             title="Back to Dashboard"
+            aria-label="Back to Dashboard"
           >
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
           </button>
@@ -523,6 +524,7 @@ export const CashBankManagementView: React.FC<CashBankManagementViewProps> = ({
                       }}
                       className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-surface-container text-slate-500 hover:text-slate-900 flex items-center justify-center active:scale-95 transition-all cursor-pointer"
                       title="Edit bank account details"
+                      aria-label="Edit bank account details"
                     >
                       <span className="material-symbols-outlined text-[14px]">edit</span>
                     </button>

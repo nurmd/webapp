@@ -138,6 +138,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                   onClick={() => setAdjQty('')}
                   className="absolute right-2 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
                   title="Clear quantity"
+                  aria-label="Clear quantity"
                 >
                   <span className="material-symbols-outlined text-[14px]">close</span>
                 </button>

@@ -436,6 +436,7 @@ export const PartyGroupsCategoriesModal: React.FC<PartyGroupsCategoriesModalProp
                 onClick={() => setSearchQuery('')}
                 className="text-on-surface-variant hover:text-on-surface p-0.5"
                 title="Clear search"
+                aria-label="Clear search"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>
               </button>

@@ -121,6 +121,7 @@ export const PrintSettingsView: React.FC<PrintSettingsViewProps> = ({
               onClick={onBack}
               className="w-9 h-9 rounded-xl bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface cursor-pointer active:scale-95 transition-all"
               title="Back"
+              aria-label="Back"
             >
               <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             </button>

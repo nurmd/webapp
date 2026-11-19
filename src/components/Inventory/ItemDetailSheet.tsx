@@ -581,6 +581,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             onClick={() => onOpenEdit(item)}
             className="w-9 h-9 rounded-xl bg-surface-container text-on-surface flex items-center justify-center active:scale-95 cursor-pointer hover:bg-surface-container-high transition-colors"
             title="Edit Item"
+            aria-label="Edit Item"
           >
             <span className="material-symbols-outlined text-[18px]">edit</span>
           </button>
@@ -633,6 +634,11 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                 : 'bg-error/10 text-error hover:bg-error/20'
             }`}
             title={
+              itemInBills
+                ? 'Item is in bills (Cannot delete - Click to disable)'
+                : 'Delete Item'
+            }
+            aria-label={
               itemInBills
                 ? 'Item is in bills (Cannot delete - Click to disable)'
                 : 'Delete Item'

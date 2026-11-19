@@ -215,6 +215,7 @@ export const CameraBarcodeScannerModal: React.FC<CameraBarcodeScannerModalProps>
                     torchOn ? 'bg-amber-400 text-black' : 'bg-black/60 text-white hover:bg-black/80'
                   }`}
                   title="Toggle Flashlight"
+                  aria-label="Toggle Flashlight"
                 >
                   <span className="material-symbols-outlined text-[20px]">
                     {torchOn ? 'flashlight_on' : 'flashlight_off'}

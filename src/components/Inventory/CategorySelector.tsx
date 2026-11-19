@@ -192,6 +192,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                 type="button"
                 onClick={() => setSearchQuery('')}
                 className="text-on-surface-variant hover:text-on-surface p-0.5"
+                aria-label="Close"
               >
                 <span className="material-symbols-outlined text-[14px]">close</span>
               </button>
@@ -224,6 +225,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
                   type="button"
                   onClick={() => setShowQuickAdd(false)}
                   className="text-on-surface-variant hover:text-on-surface"
+                  aria-label="Close"
                 >
                   <span className="material-symbols-outlined text-[14px]">close</span>
                 </button>

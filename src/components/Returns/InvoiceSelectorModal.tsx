@@ -103,6 +103,7 @@ export const InvoiceSelectorModal: React.FC<InvoiceSelectorModalProps> = ({
             data-testid="close-invoice-selector-btn"
             onClick={onClose}
             className="p-1.5 rounded-full hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>

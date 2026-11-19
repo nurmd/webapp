@@ -239,6 +239,7 @@ export const BillIntakeView: React.FC<BillIntakeViewProps> = ({ company, parties
             onClick={() => setIsSettingsOpen((v) => !v)}
             className="h-9 w-9 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant"
             title="Intake settings"
+            aria-label="Intake settings"
           >
             <span className="material-symbols-outlined text-[20px]">tune</span>
           </button>
@@ -247,6 +248,7 @@ export const BillIntakeView: React.FC<BillIntakeViewProps> = ({ company, parties
             onClick={onClose}
             className="h-9 w-9 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant"
             title="Close"
+            aria-label="Close"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
