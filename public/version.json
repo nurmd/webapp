@@ -1,15 +1,15 @@
 {
-  "version": "1.2.84",
+  "version": "1.2.85",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-19T07:46:53.068Z",
+  "buildTime": "2026-11-20T12:47:32.848Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
-    "OTA update notification card above the Financial Overview",
-    "show live party remaining balance on the Payment In thermal slip",
-    "sort Business Activity Timeline by creation time, not business date",
-    "real fake-indexeddb replication, persistDoc conflict and quota integration",
-    "route purchase totals and payment status through lineItemEngine",
-    "auto-popup when a new version is detected at launch"
+    "unify derivePaymentStatus/derivePurchasePaymentStatus (audit 4.11)",
+    "payments linked to Opening Balance now reduce the balance",
+    "cross-module settlement invariants (audit 4.11)",
+    "a11y: label icon-only buttons and remove last key={index} (audit 4.15)",
+    "add npm run test:stress script for nightly stress suites",
+    "PBKDF2 PIN hashing + sync-URL redaction and rotation docs"
   ]
 }
