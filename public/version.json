@@ -1,15 +1,15 @@
 {
-  "version": "1.2.85",
+  "version": "1.2.86",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-20T13:35:17.882Z",
+  "buildTime": "2026-11-20T16:56:48.268Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "opening balance linkable amount respects prior allocations",
+    "make party list balance match passbook ledger (Abu Imran/Nitai Bauri)",
+    "global keyboard shortcuts for tab navigation",
+    "avoid duplicate Payment In entries for receipts (mixed/allocated)",
     "unify derivePaymentStatus/derivePurchasePaymentStatus (audit 4.11)",
-    "payments linked to Opening Balance now reduce the balance",
-    "cross-module settlement invariants (audit 4.11)",
-    "a11y: label icon-only buttons and remove last key={index} (audit 4.15)",
-    "add npm run test:stress script for nightly stress suites",
-    "PBKDF2 PIN hashing + sync-URL redaction and rotation docs"
+    "payments linked to Opening Balance now reduce the balance"
   ]
 }
