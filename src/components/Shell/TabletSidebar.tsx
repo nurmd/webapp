@@ -13,6 +13,7 @@ interface TabletSidebarProps {
   onCheckUpdate?: () => void;
   hasUpdate?: boolean;
   latestVersion?: string;
+  onOpenShortcuts?: () => void;
 }
 
 export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
@@ -24,6 +25,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
   onCheckUpdate,
   hasUpdate,
   latestVersion,
+  onOpenShortcuts,
 }) => {
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
     try {
@@ -255,6 +257,30 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
             </span>
           )}
         </button>
+
+        {/* Keyboard Shortcuts Hint / Trigger */}
+        {onOpenShortcuts && (
+          <button
+            onClick={onOpenShortcuts}
+            type="button"
+            className={`h-7 rounded-lg flex items-center px-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 transition-colors cursor-pointer ${
+              isMinimized ? 'w-11 mx-auto justify-center' : 'w-full justify-between text-[11px]'
+            }`}
+            title="Keyboard shortcuts (?)"
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="material-symbols-outlined text-[16px] text-slate-500 dark:text-slate-400 shrink-0">keyboard</span>
+              {!isMinimized && (
+                <span className="truncate">Shortcuts</span>
+              )}
+            </div>
+            {!isMinimized && (
+              <kbd className="px-1.5 py-0.2 text-[10px] font-mono font-bold bg-white dark:bg-slate-800 border border-black/10 dark:border-white/10 rounded text-slate-600 dark:text-slate-300 shadow-2xs">
+                ?
+              </kbd>
+            )}
+          </button>
+        )}
 
         {/* Sidebar Expand / Collapse Toggle Button at Bottom */}
         <button

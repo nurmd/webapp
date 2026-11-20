@@ -27,6 +27,12 @@ import { Header } from './components/Shell/Header.tsx';
 import { AppTab } from './components/Shell/Drawer.tsx';
 import { BottomNav } from './components/Shell/BottomNav.tsx';
 import { TabletSidebar } from './components/Shell/TabletSidebar.tsx';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.ts';
+const KeyboardShortcutHelpModal = React.lazy(() =>
+  import('./components/Navigation/KeyboardShortcutHelpModal.tsx').then((m) => ({
+    default: m.KeyboardShortcutHelpModal,
+  }))
+);
 import {
   useCompany,
   useParties,
@@ -217,6 +223,7 @@ export const App: React.FC = () => {
   );
 
   // Modals state
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [isStandardInvoiceOpen, setIsStandardInvoiceOpen] = useState(false);
   const [isTableGridInvoiceOpen, setIsTableGridInvoiceOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -1413,6 +1420,8 @@ export const App: React.FC = () => {
   const handleOpenSettings = useCallback(() => handleSelectTab('settings'), [handleSelectTab]);
   const handleOpenRoleSwitch = useCallback(() => setIsRoleSwitchOpen(true), []);
   const handleCloseRoleSwitch = useCallback(() => setIsRoleSwitchOpen(false), []);
+  const handleOpenShortcuts = useCallback(() => setShowShortcutHelp(true), []);
+  const handleCloseShortcuts = useCallback(() => setShowShortcutHelp(false), []);
   const handleSearchClick = useCallback(() => handleSelectTab('menu'), [handleSelectTab]);
   const handleBarcodeClick = useCallback(() => handleSelectTab('pos'), [handleSelectTab]);
   const handleDashboardQuickPos = useCallback(() => {
@@ -1449,6 +1458,29 @@ export const App: React.FC = () => {
     setActiveTab('settings');
   }, [setActiveTab]);
 
+  // Global Keyboard Shortcuts for Tab Navigation & Help Overlay
+  const isAnyModalOpen = Boolean(
+    isStandardInvoiceOpen ||
+    isTableGridInvoiceOpen ||
+    isTableGridPurchaseOpen ||
+    editingInvoice ||
+    editingPurchase ||
+    previewInvoice ||
+    printInvoice ||
+    fullA4Invoice ||
+    deleteConfirmation.isOpen ||
+    isRoleSwitchOpen ||
+    isUpdatePromptOpen ||
+    isUpdateModalOpen
+  );
+
+  useKeyboardShortcuts({
+    onNavigateTab: handleSelectTab,
+    showHelp: showShortcutHelp,
+    setShowHelp: setShowShortcutHelp,
+    enabled: !isAnyModalOpen,
+  });
+
   return (
     <PaymentModalProvider
       onRecordPartyPayment={handleRecordPartyPayment}
@@ -1466,6 +1498,7 @@ export const App: React.FC = () => {
         onCheckUpdate={handleCheckUpdateFromChrome}
         hasUpdate={hasUpdate}
         latestVersion={latestRelease?.version}
+        onOpenShortcuts={handleOpenShortcuts}
       />
 
       {/* Main Content Area */}
@@ -1927,6 +1960,17 @@ export const App: React.FC = () => {
             isOpen={isUpdateModalOpen}
             releaseInfo={latestRelease}
             onClose={() => setIsUpdateModalOpen(false)}
+          />
+        </React.Suspense>
+      )}
+
+      {/* Global Keyboard Shortcut Help Modal */}
+      {showShortcutHelp && (
+        <React.Suspense fallback={null}>
+          <KeyboardShortcutHelpModal
+            isOpen={showShortcutHelp}
+            onClose={handleCloseShortcuts}
+            onSelectTab={handleSelectTab}
           />
         </React.Suspense>
       )}

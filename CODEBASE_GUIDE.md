@@ -133,6 +133,13 @@ gst-billing-app/
   - In `usePartyPassbook.ts`, `totalVoucherReceipts` / `totalVoucherPayments` count only voucher portions applied to invoices/purchases (excluding `OPENING-BALANCE-`), ensuring upfront unvouchered invoice payments and opening-balance payment vouchers both properly credit the running balance to match `currentBalance`.
   - In `paymentAllocation.ts`, `getOutstandingDocuments` accepts optional `vouchers?: Voucher[]` to net prior active allocations targeting `OPENING-BALANCE-<partyId>` from the opening balance pseudo-doc's `balanceAmount`/`paidAmount`, omitting the pseudo-doc when remaining balance `<= 0.01`.
   - In `invoicePurchaseStorage.ts`, `savePaymentVoucher` pre-validation enforces that allocations to `OPENING-BALANCE-<partyId>` do not exceed the remaining opening balance via the shared helper `getPartyOpeningBalanceAllocationStatus`.
+- **Global Keyboard Shortcuts & Tab Navigation Invariant (`src/hooks/useKeyboardShortcuts.ts`, `src/components/Navigation/KeyboardShortcutHelpModal.tsx`)**:
+  - Single `window` keydown listener (`passive: false`) provides 1-key chord tab navigation (`Alt + <letter>` case-insensitive) and help overlay toggle (`?` / Shift + `/`, `Alt + H`, `Esc` to close).
+  - Shortcut map: `Alt+D` (Dashboard), `Alt+S` (Sales), `Alt+P` (Payment In), `Alt+B` (Purchases), `Alt+O` (Payment Out), `Alt+R` (Parties), `Alt+C` (Cash & Bank), `Alt+I` (Inventory), `Alt+E` (Expenses), `Alt+A` (Reports), `Alt+G` (Accounting), `Alt+K` (POS), `Alt+T` (Settings), `Alt+M` (Menu).
+  - **Typing Isolation Guard**: Any event originating from or within an `INPUT`, `TEXTAREA`, `SELECT`, or `contentEditable` element is strictly ignored without calling `preventDefault()`, guaranteeing text entry is never intercepted.
+  - **Modal State Guard**: When an application modal or dialog is open (`isAnyModalOpen`), tab navigation shortcuts are disabled to prevent state changes underneath open workflows.
+  - **RBAC Compliance**: Respects `rbac.canAccessTab` so unauthorized roles cannot jump to restricted views.
+  - **Discoverability**: `KeyboardShortcutHelpModal` presents a categorized grid of all shortcuts, accessible via `?`, `Alt + H`, and the `Shortcuts` hint in `TabletSidebar`. Covered by `src/__tests__/keyboardShortcuts.test.tsx`.
 
 ### D. Audit Trail Engine (`src/services/auditTrail.ts`)
 - Implements Indian Ministry of Corporate Affairs (MCA) audit trail mandates (Companies (Accounts) Rules, 2014 Rule 3(1)).
