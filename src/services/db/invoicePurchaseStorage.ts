@@ -8,7 +8,12 @@ import { createRcmJournalVoucher, createReversalVoucher } from '../../core/accou
 import { derivePaymentSettlement } from '../../core/accounting/paymentSplitUtils.ts';
 import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
 import { Voucher, PaymentAllocationDocumentType } from '../../core/accounting/voucherTypes.ts';
-import { applyAllocations, reverseAllocations, inferVoucherPaymentMode } from '../../core/accounting/paymentAllocation.ts';
+import {
+  applyAllocations,
+  reverseAllocations,
+  inferVoucherPaymentMode,
+  getPartyOpeningBalanceAllocationStatus,
+} from '../../core/accounting/paymentAllocation.ts';
 import {
   applyInvoiceStockDecrement,
   revertInvoiceStockAdjustment,
@@ -849,6 +854,35 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         if (alloc.documentId.startsWith('OPENING-BALANCE-')) {
           if (voucher.partyId && alloc.documentId !== `OPENING-BALANCE-${voucher.partyId}`) {
             throw new Error(`Opening balance allocation belongs to a different party.`);
+          }
+          const targetPartyId = voucher.partyId || alloc.documentId.replace('OPENING-BALANCE-', '');
+          const parties = this.getParties();
+          const party = parties.find(
+            (p) =>
+              p.id === targetPartyId ||
+              (voucher.partyName && p.name.trim().toLowerCase() === voucher.partyName.trim().toLowerCase())
+          );
+          if (!party) {
+            throw new Error(`Party for Opening Balance not found.`);
+          }
+          const isCustomer = party.type === 'CUSTOMER';
+          const docType = isCustomer ? 'INVOICE' : 'PURCHASE';
+          const status = getPartyOpeningBalanceAllocationStatus({
+            party,
+            documentType: docType,
+            vouchers: this.getVouchers(),
+            excludeVoucherId: prevVoucher?.id || voucher.id,
+          });
+
+          if (!status.eligible || status.remainingBalance <= 0.01) {
+            throw new Error(
+              `Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹0.00 on ${docLabel}.`
+            );
+          }
+          if (alloc.amount > status.remainingBalance + 0.01) {
+            throw new Error(
+              `Allocation amount ₹${alloc.amount.toFixed(2)} exceeds balance ₹${status.remainingBalance.toFixed(2)} on ${docLabel}.`
+            );
           }
           continue;
         }

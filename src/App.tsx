@@ -1173,6 +1173,7 @@ export const App: React.FC = () => {
         invoices: db.getInvoices(),
         purchases: db.getPurchases(),
         parties: db.getParties(),
+        vouchers: db.getVouchers(),
       });
       resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
       resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';

@@ -280,7 +280,20 @@ export function usePartyPassbook({
             : v.sourceDocumentNumber || '';
 
           if (v.voucherType === 'RECEIPT') {
-            totalVoucherReceipts += v.totalAmount;
+            let appliedToInvoicesPaise = 0;
+            if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+              for (const a of v.paymentAllocations) {
+                if (
+                  (a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE') &&
+                  !a.documentId?.startsWith('OPENING-BALANCE-')
+                ) {
+                  appliedToInvoicesPaise += toPaise(Number(a.amount) || 0);
+                }
+              }
+            } else if (v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId && !v.sourceDocumentId.startsWith('OPENING-BALANCE-')) {
+              appliedToInvoicesPaise = toPaise(Number(v.totalAmount) || 0);
+            }
+            totalVoucherReceipts += fromPaise(appliedToInvoicesPaise);
             const desc = linkedDocsText
               ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
               : (v.narration || (isSplitVoucher ? 'Split Payment received' : 'Payment received'));
@@ -299,7 +312,20 @@ export function usePartyPassbook({
               rawVoucher: v,
             });
           } else if (v.voucherType === 'PAYMENT') {
-            totalVoucherPayments += v.totalAmount;
+            let appliedToPurchasesPaise = 0;
+            if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+              for (const a of v.paymentAllocations) {
+                if (
+                  (a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE') &&
+                  !a.documentId?.startsWith('OPENING-BALANCE-')
+                ) {
+                  appliedToPurchasesPaise += toPaise(Number(a.amount) || 0);
+                }
+              }
+            } else if (v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId && !v.sourceDocumentId.startsWith('OPENING-BALANCE-')) {
+              appliedToPurchasesPaise = toPaise(Number(v.totalAmount) || 0);
+            }
+            totalVoucherPayments += fromPaise(appliedToPurchasesPaise);
             const desc = linkedDocsText
               ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
               : (v.narration || (isSplitVoucher ? 'Split Payment disbursed' : 'Payment made'));

@@ -315,6 +315,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           invoices: effectiveInvoices,
           purchases: effectivePurchases,
           parties: storeParties,
+          vouchers: effectiveVouchers,
         });
         resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
         resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';

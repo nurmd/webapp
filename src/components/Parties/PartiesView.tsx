@@ -393,6 +393,7 @@ const PartiesViewComponent: React.FC<PartiesViewProps> = ({
           invoices: invoices && invoices.length > 0 ? invoices : db.getInvoices(),
           purchases: purchases && purchases.length > 0 ? purchases : db.getPurchases(),
           parties: db.getParties(),
+          vouchers: allVouchers,
         });
         resolvedAllocations = allocateOldestFirst(outstanding, totalSettled);
         resolvedMode = resolvedAllocations.length > 0 ? 'AUTO_FIFO' : 'UNALLOCATED';

@@ -39,6 +39,86 @@ export interface GetOutstandingDocumentsParams {
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
   parties?: Party[];
+  vouchers?: Voucher[];
+}
+
+export interface PartyOpeningAllocationStatus {
+  eligible: boolean;
+  openingDocId: string;
+  initialPaise: number;
+  allocatedPaise: number;
+  remainingPaise: number;
+  initialAmount: number;
+  allocatedAmount: number;
+  remainingBalance: number;
+}
+
+export function getPartyOpeningBalanceAllocationStatus(params: {
+  party: Party;
+  documentType: PaymentAllocationDocumentType;
+  vouchers?: Voucher[];
+  excludeVoucherId?: string;
+}): PartyOpeningAllocationStatus {
+  const { party, documentType, vouchers = [], excludeVoucherId } = params;
+  const isCustomer = party.type === 'CUSTOMER';
+  const isSupplier = party.type === 'SUPPLIER';
+  const rawOpBal = typeof party.openingBalance === 'number' ? party.openingBalance : 0;
+  const absOpBalPaise = Math.abs(readPaiseOr(party, 'openingBalance', 0));
+  const absOpBal = fromPaise(absOpBalPaise);
+
+  let inferredType = party.openingBalanceType;
+  if (!inferredType && absOpBalPaise > 1) {
+    if (rawOpBal > 0) {
+      inferredType = isCustomer ? 'TO_RECEIVE' : 'TO_PAY';
+    } else {
+      inferredType = isCustomer ? 'TO_PAY' : 'TO_RECEIVE';
+    }
+  }
+
+  const openingDocId = `OPENING-BALANCE-${party.id}`;
+
+  const eligible =
+    (documentType === 'INVOICE' && isCustomer && inferredType === 'TO_RECEIVE' && absOpBalPaise > 1) ||
+    (documentType === 'PURCHASE' && isSupplier && inferredType === 'TO_PAY' && absOpBalPaise > 1);
+
+  if (!eligible) {
+    return {
+      eligible: false,
+      openingDocId,
+      initialPaise: 0,
+      allocatedPaise: 0,
+      remainingPaise: 0,
+      initialAmount: 0,
+      allocatedAmount: 0,
+      remainingBalance: 0,
+    };
+  }
+
+  let allocatedPaise = 0;
+  if (vouchers && vouchers.length > 0) {
+    for (const v of vouchers) {
+      if (v.isCancelled || v.isReversed) continue;
+      if (excludeVoucherId && v.id === excludeVoucherId) continue;
+      for (const a of v.paymentAllocations || []) {
+        if (a.documentId === openingDocId) {
+          allocatedPaise += toPaise(Number(a.amount) || 0);
+        }
+      }
+    }
+  }
+
+  const remainingPaise = Math.max(0, absOpBalPaise - allocatedPaise);
+
+  return {
+    eligible: true,
+    openingDocId,
+    initialPaise: absOpBalPaise,
+    allocatedPaise,
+    remainingPaise,
+    initialAmount: absOpBal,
+    allocatedAmount: fromPaise(allocatedPaise),
+    remainingBalance: fromPaise(remainingPaise),
+  };
 }
 
 /**
@@ -76,53 +156,33 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
 
   let openingBalanceDoc: OutstandingDocument | undefined;
   if (matchedParty) {
-    const isCustomer = matchedParty.type === 'CUSTOMER';
-    const isSupplier = matchedParty.type === 'SUPPLIER';
-    const rawOpBal = typeof matchedParty.openingBalance === 'number' ? matchedParty.openingBalance : 0;
-    const absOpBal = fromPaise(Math.abs(readPaiseOr(matchedParty, 'openingBalance', 0)));
-
-    let inferredType = matchedParty.openingBalanceType;
-    if (!inferredType && absOpBal > 0.01) {
-      if (rawOpBal > 0) {
-        inferredType = isCustomer ? 'TO_RECEIVE' : 'TO_PAY';
-      } else {
-        inferredType = isCustomer ? 'TO_PAY' : 'TO_RECEIVE';
-      }
-    }
-
     const resolvedPId = partyId || matchedParty.id;
     const today = new Date().toISOString().split('T')[0];
 
-    if (documentType === 'INVOICE' && isCustomer && inferredType === 'TO_RECEIVE' && absOpBal > 0.01) {
-      openingBalanceDoc = {
-        id: `OPENING-BALANCE-${resolvedPId}`,
-        documentNumber: 'Opening Balance',
-        number: 'Opening Balance',
-        date: matchedParty.openingBalanceDate || today,
-        grandTotal: absOpBal,
-        paidAmount: 0,
-        balanceAmount: absOpBal,
-        documentType: 'INVOICE',
-        partyId: resolvedPId,
-        partyName: matchedParty.name,
-        rawInvoice: undefined,
-        rawPurchase: undefined,
-      };
-    } else if (documentType === 'PURCHASE' && isSupplier && inferredType === 'TO_PAY' && absOpBal > 0.01) {
-      openingBalanceDoc = {
-        id: `OPENING-BALANCE-${resolvedPId}`,
-        documentNumber: 'Opening Balance',
-        number: 'Opening Balance',
-        date: matchedParty.openingBalanceDate || today,
-        grandTotal: absOpBal,
-        paidAmount: 0,
-        balanceAmount: absOpBal,
-        documentType: 'PURCHASE',
-        partyId: resolvedPId,
-        partyName: matchedParty.name,
-        rawInvoice: undefined,
-        rawPurchase: undefined,
-      };
+    const status = getPartyOpeningBalanceAllocationStatus({
+      party: matchedParty,
+      documentType,
+      vouchers: params.vouchers,
+    });
+
+    if (status.eligible) {
+      const remaining = params.vouchers !== undefined ? status.remainingBalance : status.initialAmount;
+      if (remaining > 0.01) {
+        openingBalanceDoc = {
+          id: `OPENING-BALANCE-${resolvedPId}`,
+          documentNumber: 'Opening Balance',
+          number: 'Opening Balance',
+          date: matchedParty.openingBalanceDate || today,
+          grandTotal: status.initialAmount,
+          paidAmount: status.allocatedAmount,
+          balanceAmount: remaining,
+          documentType: documentType === 'INVOICE' ? 'INVOICE' : 'PURCHASE',
+          partyId: resolvedPId,
+          partyName: matchedParty.name,
+          rawInvoice: undefined,
+          rawPurchase: undefined,
+        };
+      }
     }
   }
 

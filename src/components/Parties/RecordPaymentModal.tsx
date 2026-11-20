@@ -3,7 +3,7 @@ import { Party } from '../../models/party.ts';
 import { Invoice, PaymentSplit } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { BankAccount } from '../../models/bankAccount.ts';
-import { PaymentAllocation } from '../../core/accounting/voucherTypes.ts';
+import { PaymentAllocation, Voucher } from '../../core/accounting/voucherTypes.ts';
 import {
   getOutstandingDocuments,
   allocateOldestFirst,
@@ -12,7 +12,7 @@ import {
 } from '../../core/accounting/paymentAllocation.ts';
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
-import { useParties, useBankAccounts, useInvoices, usePurchases } from '../../core/store/useDataStore.ts';
+import { useParties, useBankAccounts, useInvoices, usePurchases, useVouchers } from '../../core/store/useDataStore.ts';
 import { PaymentEntryForm } from '../Common/PaymentEntryForm.tsx';
 
 export interface RecordPaymentModalProps {
@@ -22,6 +22,7 @@ export interface RecordPaymentModalProps {
   parties?: Party[];
   invoices?: Invoice[];
   purchases?: PurchaseBill[];
+  vouchers?: Voucher[];
   liveNetBalance?: number;
   isCustomer?: boolean;
   bankAccounts?: BankAccount[];
@@ -50,6 +51,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   parties,
   invoices,
   purchases,
+  vouchers,
   liveNetBalance: _liveNetBalance,
   isCustomer,
   bankAccounts,
@@ -62,6 +64,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   const storeBankAccounts = useBankAccounts();
   const storeInvoices = useInvoices();
   const storePurchases = usePurchases();
+  const storeVouchers = useVouchers();
 
   useBackNavigation(() => {
     onClose();
@@ -161,6 +164,13 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
     return purchases.map((p) => dbMap.get(p.id) || p);
   }, [purchases, storePurchases]);
 
+  const effectiveVouchers = useMemo(() => {
+    const fromDb = storeVouchers;
+    if (!vouchers || vouchers.length === 0) return fromDb;
+    const dbMap = new Map(fromDb.map((v) => [v.id, v]));
+    return vouchers.map((v) => dbMap.get(v.id) || v);
+  }, [vouchers, storeVouchers]);
+
   const outstandingDocs: OutstandingDocument[] = useMemo(() => {
     if (!activeParty) return [];
     const isCustomer = activeParty.type === 'CUSTOMER';
@@ -179,8 +189,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       invoices: effectiveInvoices,
       purchases: effectivePurchases,
       parties: allParties,
+      vouchers: effectiveVouchers,
     });
-  }, [activeParty, paymentType, effectiveInvoices, effectivePurchases, allParties]);
+  }, [activeParty, paymentType, effectiveInvoices, effectivePurchases, allParties, effectiveVouchers]);
 
   // Calculate settlement totals
   const numPayAmount = parseFloat(paymentAmount) || 0;

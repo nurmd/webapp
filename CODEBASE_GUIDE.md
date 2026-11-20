@@ -128,6 +128,11 @@ gst-billing-app/
   - Pinned at index 0 of Customers list with `isSystem: true` and a dedicated `System` badge.
   - Read-only profile: Edit and Delete buttons are strictly hidden; hard-coded deletion guard protects against programmatic deletion.
   - POS Integration: In `SelectPosPartyModal`, selecting the default counter row selects this canonical system party; duplicate walk-in records in the registered customer list are filtered out.
+- **Opening Balance Payment Allocation & Allocation-Aware Party Balance Invariant (`partyStorage.ts`, `usePartyPassbook.ts`, `paymentAllocation.ts`, `invoicePurchaseStorage.ts`)**:
+  - In `partyStorage.ts` (`recalculatePartyBalance` and `syncAllPartyBalances`), party balances treat receipts/payments not applied to invoices/purchases (`totalAmount - appliedToInvoices/Purchases` in integer paise) as direct balance adjustments (`customer balance -= notApplied`, `supplier balance += notApplied`), eliminating the old `totalReceipts - totalInvoicePaid` heuristic. Receipts linked to opening balance (`OPENING-BALANCE-<partyId>`) reduce party balance without mutating `openingBalance`.
+  - In `usePartyPassbook.ts`, `totalVoucherReceipts` / `totalVoucherPayments` count only voucher portions applied to invoices/purchases (excluding `OPENING-BALANCE-`), ensuring upfront unvouchered invoice payments and opening-balance payment vouchers both properly credit the running balance to match `currentBalance`.
+  - In `paymentAllocation.ts`, `getOutstandingDocuments` accepts optional `vouchers?: Voucher[]` to net prior active allocations targeting `OPENING-BALANCE-<partyId>` from the opening balance pseudo-doc's `balanceAmount`/`paidAmount`, omitting the pseudo-doc when remaining balance `<= 0.01`.
+  - In `invoicePurchaseStorage.ts`, `savePaymentVoucher` pre-validation enforces that allocations to `OPENING-BALANCE-<partyId>` do not exceed the remaining opening balance via the shared helper `getPartyOpeningBalanceAllocationStatus`.
 
 ### D. Audit Trail Engine (`src/services/auditTrail.ts`)
 - Implements Indian Ministry of Corporate Affairs (MCA) audit trail mandates (Companies (Accounts) Rules, 2014 Rule 3(1)).
