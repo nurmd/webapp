@@ -9,6 +9,7 @@ import {
   DuplicateEntityNameError,
 } from '../../core/utils/entityUniqueness.ts';
 import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
+import { toPaise, fromPaise } from '../../core/money.ts';
 
 /**
  * Party and Customer/Supplier Accounts domain storage.
@@ -356,9 +357,9 @@ export class PartyStorage extends SettingsStorage {
     const partyNameNorm = (party.name || '').trim().toLowerCase();
 
     // 1. Explicit Opening Balance
-    let balance = 0;
+    let balancePaise = 0;
     if (typeof party.openingBalance === 'number' && party.openingBalance !== 0) {
-      const absAmt = Math.abs(party.openingBalance);
+      const absAmtPaise = toPaise(Math.abs(party.openingBalance));
       let opType = party.openingBalanceType;
       if (!opType) {
         if (party.openingBalance > 0) {
@@ -368,9 +369,9 @@ export class PartyStorage extends SettingsStorage {
         }
       }
       if (opType === 'TO_RECEIVE') {
-        balance += absAmt;
+        balancePaise += absAmtPaise;
       } else {
-        balance -= absAmt;
+        balancePaise -= absAmtPaise;
       }
     }
 
@@ -380,109 +381,113 @@ export class PartyStorage extends SettingsStorage {
       const partyInvoices = invoices.filter(
         (inv) => !inv.isCancelled && (inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm))
       );
-      partyInvoices.forEach((inv) => {
+      let unpaidInvoicesPaise = 0;
+      let unpaidCreditNotesPaise = 0;
+      let invoicePaidTotalPaise = 0;
+
+      for (const inv of partyInvoices) {
         // Estimates, Sales Orders, and Delivery Challans do not post to accounting balances
         if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
-          return;
+          continue;
         }
         const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
         if (inv.invoiceType === 'CREDIT_NOTE') {
-          balance -= unpaid; // Credit Note reduces customer receivable
+          unpaidCreditNotesPaise += toPaise(unpaid);
         } else {
-          balance += unpaid;
+          unpaidInvoicesPaise += toPaise(unpaid);
+          invoicePaidTotalPaise += toPaise(inv.paidAmount || 0);
         }
-      });
+      }
+      balancePaise += unpaidInvoicesPaise;
+      balancePaise -= unpaidCreditNotesPaise;
 
-      // Check for unallocated/advance receipt vouchers
+      // Receipts
       const vouchers = this.getVouchers();
       const partyReceipts = vouchers.filter(
         (v) =>
           !v.isCancelled &&
           !v.isReversed &&
           v.voucherType === 'RECEIPT' &&
-          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
+          (v.partyId === party.id ||
+            (v.partyName && v.partyName.trim().toLowerCase() === partyNameNorm) ||
+            v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm)))
       );
 
-      // Opening-balance receipts are payments against the opening balance, not invoices:
-      // subtract them directly and exclude them from the invoice-settlement aggregate.
-      let openingReceiptsTotal = 0;
-      let totalReceipts = 0;
+      let openingAllocatedPaise = 0;
+      let allReceiptTotalsPaise = 0;
+
       for (const v of partyReceipts) {
-        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-'));
-        if (isOpening) {
-          openingReceiptsTotal += (Number(v.totalAmount) || 0);
-        } else {
-          totalReceipts += (Number(v.totalAmount) || 0);
+        allReceiptTotalsPaise += toPaise(Number(v.totalAmount) || 0);
+        for (const alloc of v.paymentAllocations || []) {
+          if (alloc.documentId?.startsWith('OPENING-BALANCE-')) {
+            openingAllocatedPaise += toPaise(Number(alloc.amount) || 0);
+          }
         }
       }
-      balance -= openingReceiptsTotal;
 
-      const totalInvoicePaid = partyInvoices
-        .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
-        .reduce((sum, inv) => {
-          if (inv.paymentSplits && inv.paymentSplits.length > 0) {
-            return sum + inv.paymentSplits
-              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
-              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0);
-          }
-          return sum + (inv.paidAmount || 0);
-        }, 0);
-      if (totalReceipts > totalInvoicePaid) {
-        // Customer paid more than total settled on invoices (advance from customer)
-        balance -= (totalReceipts - totalInvoicePaid);
-      }
+      const advancePaise = Math.max(
+        0,
+        allReceiptTotalsPaise - invoicePaidTotalPaise - openingAllocatedPaise
+      );
+      balancePaise -= (openingAllocatedPaise + advancePaise);
     } else {
       // Purchases: we owe vendor remaining unpaid balance (negative = payable)
       const purchases = this.getPurchases();
       const partyPurchases = purchases.filter(
-        (pur) => pur.supplierId === party.id || (pur.supplierName && pur.supplierName.trim().toLowerCase() === partyNameNorm)
+        (pur) => !pur.isCancelled && (pur.supplierId === party.id || (pur.supplierName && pur.supplierName.trim().toLowerCase() === partyNameNorm))
       );
-      partyPurchases.forEach((pur) => {
+      let unpaidPurchasesPaise = 0;
+      let unpaidDebitNotesPaise = 0;
+      let purchasePaidTotalPaise = 0;
+
+      for (const pur of partyPurchases) {
         // Purchase Orders and Purchase Challans do not affect vendor payable balances
-        if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) {
-          return;
+        if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN') {
+          continue;
         }
         const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
-        if (pur.purchaseType === 'RETURN') {
-          balance += unpaid; // Purchase Return Debit Note reduces supplier payable
+        if (pur.purchaseType === 'RETURN' || pur.noteType === 'D') {
+          unpaidDebitNotesPaise += toPaise(unpaid);
         } else {
-          balance -= unpaid; // Normal purchase bill increases supplier payable
+          unpaidPurchasesPaise += toPaise(unpaid);
+          purchasePaidTotalPaise += toPaise(pur.paidAmount || 0);
         }
-      });
+      }
+      balancePaise -= unpaidPurchasesPaise;
+      balancePaise += unpaidDebitNotesPaise;
 
-      // Check for unallocated/advance payment out vouchers
+      // Payments
       const vouchers = this.getVouchers();
       const partyPayments = vouchers.filter(
         (v) =>
           !v.isCancelled &&
           !v.isReversed &&
           v.voucherType === 'PAYMENT' &&
-          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
+          (v.partyId === party.id ||
+            (v.partyName && v.partyName.trim().toLowerCase() === partyNameNorm) ||
+            v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm)))
       );
-      // Opening-balance payments are payments against the opening balance, not purchases:
-      // add them directly and exclude them from the purchase-settlement aggregate.
-      let openingPaymentsTotal = 0;
-      let totalPayments = 0;
+
+      let openingAllocatedPaise = 0;
+      let allPaymentTotalsPaise = 0;
+
       for (const v of partyPayments) {
-        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-'));
-        if (isOpening) {
-          openingPaymentsTotal += (Number(v.totalAmount) || 0);
-        } else {
-          totalPayments += (Number(v.totalAmount) || 0);
+        allPaymentTotalsPaise += toPaise(Number(v.totalAmount) || 0);
+        for (const alloc of v.paymentAllocations || []) {
+          if (alloc.documentId?.startsWith('OPENING-BALANCE-')) {
+            openingAllocatedPaise += toPaise(Number(alloc.amount) || 0);
+          }
         }
       }
-      balance += openingPaymentsTotal;
 
-      const totalPurchasePaid = partyPurchases
-        .filter((pur) => pur.purchaseType !== 'PO' && pur.purchaseType !== 'CHALLAN' && !pur.isCancelled && pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
-        .reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
-      if (totalPayments > totalPurchasePaid) {
-        // We paid vendor more than total billed on purchases (advance to vendor)
-        balance += (totalPayments - totalPurchasePaid);
-      }
+      const advanceOutPaise = Math.max(
+        0,
+        allPaymentTotalsPaise - purchasePaidTotalPaise - openingAllocatedPaise
+      );
+      balancePaise += (openingAllocatedPaise + advanceOutPaise);
     }
 
-    const netBalance = Math.round(balance * 100) / 100;
+    const netBalance = Math.round(fromPaise(balancePaise) * 100) / 100;
     if (party.currentBalance !== netBalance) {
       party.currentBalance = netBalance;
       party.updatedAt = new Date().toISOString();
@@ -507,14 +512,19 @@ export class PartyStorage extends SettingsStorage {
 
     // 1. Build lookup and accumulator maps: O(P)
     interface PartyAccumulator {
-      unpaidInvoicesDelta: number;
-      totalInvoicePaid: number;
-      unpaidPurchasesDelta: number;
-      totalPurchasePaid: number;
-      totalReceipts: number;
-      totalPayments: number;
-      openingReceipts: number;
-      openingPayments: number;
+      unpaidInvoicesPaise: number;
+      unpaidCreditNotesPaise: number;
+      invoicePaidTotalPaise: number;
+
+      unpaidPurchasesPaise: number;
+      unpaidDebitNotesPaise: number;
+      purchasePaidTotalPaise: number;
+
+      allReceiptTotalsPaise: number;
+      openingAllocatedReceiptsPaise: number;
+
+      allPaymentTotalsPaise: number;
+      openingAllocatedPaymentsPaise: number;
     }
 
     const partyById = new Map<string, Party>();
@@ -527,14 +537,19 @@ export class PartyStorage extends SettingsStorage {
         partyByName.set(p.name.trim().toLowerCase(), p);
       }
       accMap.set(p.id, {
-        unpaidInvoicesDelta: 0,
-        totalInvoicePaid: 0,
-        unpaidPurchasesDelta: 0,
-        totalPurchasePaid: 0,
-        totalReceipts: 0,
-        totalPayments: 0,
-        openingReceipts: 0,
-        openingPayments: 0,
+        unpaidInvoicesPaise: 0,
+        unpaidCreditNotesPaise: 0,
+        invoicePaidTotalPaise: 0,
+
+        unpaidPurchasesPaise: 0,
+        unpaidDebitNotesPaise: 0,
+        purchasePaidTotalPaise: 0,
+
+        allReceiptTotalsPaise: 0,
+        openingAllocatedReceiptsPaise: 0,
+
+        allPaymentTotalsPaise: 0,
+        openingAllocatedPaymentsPaise: 0,
       });
     }
 
@@ -550,29 +565,22 @@ export class PartyStorage extends SettingsStorage {
       const acc = accMap.get(party.id);
       if (!acc) continue;
 
-      if (inv.invoiceType !== 'CREDIT_NOTE') {
-        const directPaid = inv.paymentSplits && inv.paymentSplits.length > 0
-          ? inv.paymentSplits
-              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
-              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0)
-          : (inv.paidAmount || 0);
-        acc.totalInvoicePaid += directPaid;
-      }
-
       if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
         continue;
       }
 
       const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
       if (inv.invoiceType === 'CREDIT_NOTE') {
-        acc.unpaidInvoicesDelta -= unpaid;
+        acc.unpaidCreditNotesPaise += toPaise(unpaid);
       } else {
-        acc.unpaidInvoicesDelta += unpaid;
+        acc.unpaidInvoicesPaise += toPaise(unpaid);
+        acc.invoicePaidTotalPaise += toPaise(inv.paidAmount || 0);
       }
     }
 
     // 3. Single pass over purchases: O(U)
     for (const pur of purchases) {
+      if (pur.isCancelled) continue;
       let supplier = pur.supplierId ? partyById.get(pur.supplierId) : undefined;
       if (!supplier && pur.supplierName) {
         supplier = partyByName.get(pur.supplierName.trim().toLowerCase());
@@ -582,17 +590,14 @@ export class PartyStorage extends SettingsStorage {
       const acc = accMap.get(supplier.id);
       if (!acc) continue;
 
-      if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) continue;
-
-      if (pur.purchaseType !== 'RETURN' && pur.noteType !== 'D') {
-        acc.totalPurchasePaid += (pur.paidAmount || 0);
-      }
+      if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN') continue;
 
       const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
-      if (pur.purchaseType === 'RETURN') {
-        acc.unpaidPurchasesDelta += unpaid;
+      if (pur.purchaseType === 'RETURN' || pur.noteType === 'D') {
+        acc.unpaidDebitNotesPaise += toPaise(unpaid);
       } else {
-        acc.unpaidPurchasesDelta -= unpaid;
+        acc.unpaidPurchasesPaise += toPaise(unpaid);
+        acc.purchasePaidTotalPaise += toPaise(pur.paidAmount || 0);
       }
     }
 
@@ -605,32 +610,47 @@ export class PartyStorage extends SettingsStorage {
 
       const matchedPartiesThisVoucher = new Set<string>();
 
+      if (v.partyId) {
+        const party = partyById.get(v.partyId);
+        if (party) matchedPartiesThisVoucher.add(party.id);
+      }
+      if (v.partyName) {
+        const party = partyByName.get(v.partyName.trim().toLowerCase());
+        if (party) matchedPartiesThisVoucher.add(party.id);
+      }
+
       for (const e of v.entries) {
         let party = e.accountId ? partyById.get(e.accountId) : undefined;
         if (!party && e.accountName) {
           party = partyByName.get(e.accountName.trim().toLowerCase());
         }
+        if (party) {
+          matchedPartiesThisVoucher.add(party.id);
+        }
+      }
+
+      if (matchedPartiesThisVoucher.size === 0) continue;
+
+      const vTotalPaise = toPaise(Number(v.totalAmount) || 0);
+      let openingAllocatedPaise = 0;
+      for (const alloc of v.paymentAllocations || []) {
+        if (alloc.documentId?.startsWith('OPENING-BALANCE-')) {
+          openingAllocatedPaise += toPaise(Number(alloc.amount) || 0);
+        }
+      }
+
+      for (const pId of matchedPartiesThisVoucher) {
+        const party = partyById.get(pId);
         if (!party) continue;
-
-        if (matchedPartiesThisVoucher.has(party.id)) continue;
-        matchedPartiesThisVoucher.add(party.id);
-
-        const acc = accMap.get(party.id);
+        const acc = accMap.get(pId);
         if (!acc) continue;
 
-        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-') && a.documentId === `OPENING-BALANCE-${party.id}`);
         if (isReceipt && party.type === 'CUSTOMER') {
-          if (isOpening) {
-            acc.openingReceipts += (Number(v.totalAmount) || 0);
-          } else {
-            acc.totalReceipts += (Number(v.totalAmount) || 0);
-          }
+          acc.allReceiptTotalsPaise += vTotalPaise;
+          acc.openingAllocatedReceiptsPaise += openingAllocatedPaise;
         } else if (isPayment && party.type !== 'CUSTOMER') {
-          if (isOpening) {
-            acc.openingPayments += (Number(v.totalAmount) || 0);
-          } else {
-            acc.totalPayments += (Number(v.totalAmount) || 0);
-          }
+          acc.allPaymentTotalsPaise += vTotalPaise;
+          acc.openingAllocatedPaymentsPaise += openingAllocatedPaise;
         }
       }
     }
@@ -644,9 +664,9 @@ export class PartyStorage extends SettingsStorage {
       const isCustomer = party.type === 'CUSTOMER';
       const acc = accMap.get(party.id)!;
 
-      let balance = 0;
+      let balancePaise = 0;
       if (typeof party.openingBalance === 'number' && party.openingBalance !== 0) {
-        const absAmt = Math.abs(party.openingBalance);
+        const absAmtPaise = toPaise(Math.abs(party.openingBalance));
         let opType = party.openingBalanceType;
         if (!opType) {
           opType = party.openingBalance > 0
@@ -654,27 +674,33 @@ export class PartyStorage extends SettingsStorage {
             : (isCustomer ? 'TO_PAY' : 'TO_RECEIVE');
         }
         if (opType === 'TO_RECEIVE') {
-          balance += absAmt;
+          balancePaise += absAmtPaise;
         } else {
-          balance -= absAmt;
+          balancePaise -= absAmtPaise;
         }
       }
 
       if (isCustomer) {
-        balance += acc.unpaidInvoicesDelta;
-        if (acc.totalReceipts > acc.totalInvoicePaid) {
-          balance -= (acc.totalReceipts - acc.totalInvoicePaid);
-        }
-        balance -= acc.openingReceipts;
+        balancePaise += acc.unpaidInvoicesPaise;
+        balancePaise -= acc.unpaidCreditNotesPaise;
+
+        const advancePaise = Math.max(
+          0,
+          acc.allReceiptTotalsPaise - acc.invoicePaidTotalPaise - acc.openingAllocatedReceiptsPaise
+        );
+        balancePaise -= (acc.openingAllocatedReceiptsPaise + advancePaise);
       } else {
-        balance += acc.unpaidPurchasesDelta;
-        if (acc.totalPayments > acc.totalPurchasePaid) {
-          balance += (acc.totalPayments - acc.totalPurchasePaid);
-        }
-        balance += acc.openingPayments;
+        balancePaise -= acc.unpaidPurchasesPaise;
+        balancePaise += acc.unpaidDebitNotesPaise;
+
+        const advanceOutPaise = Math.max(
+          0,
+          acc.allPaymentTotalsPaise - acc.purchasePaidTotalPaise - acc.openingAllocatedPaymentsPaise
+        );
+        balancePaise += (acc.openingAllocatedPaymentsPaise + advanceOutPaise);
       }
 
-      const netBalance = Math.round(balance * 100) / 100;
+      const netBalance = Math.round(fromPaise(balancePaise) * 100) / 100;
       if (party.currentBalance !== netBalance) {
         parties[i] = {
           ...party,
