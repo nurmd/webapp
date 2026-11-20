@@ -40,6 +40,7 @@ export interface GetOutstandingDocumentsParams {
   purchases?: PurchaseBill[];
   parties?: Party[];
   vouchers?: Voucher[];
+  excludeVoucherId?: string;
 }
 
 export interface PartyOpeningAllocationStatus {
@@ -163,6 +164,7 @@ export function getOutstandingDocuments(params: GetOutstandingDocumentsParams): 
       party: matchedParty,
       documentType,
       vouchers: params.vouchers,
+      excludeVoucherId: params.excludeVoucherId,
     });
 
     if (status.eligible) {

@@ -14,6 +14,7 @@ import {
   useParties,
   useInvoices,
   usePurchases,
+  useVouchers,
 } from '../../../core/store/useDataStore.ts';
 
 export interface UseVoucherAllocationsOptions {
@@ -38,6 +39,7 @@ export function useVoucherAllocations({
   const storeParties = useParties();
   const storeInvoices = useInvoices();
   const storePurchases = usePurchases();
+  const storeVouchers = useVouchers();
 
   const isPayment = Boolean(
     editingLedgerEntry &&
@@ -147,6 +149,8 @@ export function useVoucherAllocations({
       invoices: effectiveInvoices,
       purchases: effectivePurchases,
       parties: resolvedParties,
+      vouchers: storeVouchers,
+      excludeVoucherId: editingLedgerEntry?.rawVoucher?.id,
     });
 
     if (editingLedgerEntry?.rawVoucher?.paymentAllocations) {
