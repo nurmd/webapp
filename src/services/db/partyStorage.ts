@@ -9,7 +9,6 @@ import {
   DuplicateEntityNameError,
 } from '../../core/utils/entityUniqueness.ts';
 import { attachPaiseFields } from '../../core/accounting/paisePersistence.ts';
-import { toPaise, fromPaise } from '../../core/money.ts';
 
 /**
  * Party and Customer/Supplier Accounts domain storage.
@@ -394,33 +393,44 @@ export class PartyStorage extends SettingsStorage {
         }
       });
 
-      // Receipt vouchers: portion not applied to invoices/credit notes
+      // Check for unallocated/advance receipt vouchers
       const vouchers = this.getVouchers();
       const partyReceipts = vouchers.filter(
         (v) =>
           !v.isCancelled &&
           !v.isReversed &&
           v.voucherType === 'RECEIPT' &&
-          (v.partyId === party.id ||
-            (v.partyName && v.partyName.trim().toLowerCase() === partyNameNorm) ||
-            v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm)))
+          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
 
-      let totalNotAppliedPaise = 0;
+      // Opening-balance receipts are payments against the opening balance, not invoices:
+      // subtract them directly and exclude them from the invoice-settlement aggregate.
+      let openingReceiptsTotal = 0;
+      let totalReceipts = 0;
       for (const v of partyReceipts) {
-        let appliedPaise = 0;
-        for (const alloc of v.paymentAllocations || []) {
-          if (
-            (alloc.documentType === 'INVOICE' || alloc.documentType === 'CREDIT_NOTE') &&
-            !alloc.documentId?.startsWith('OPENING-BALANCE-')
-          ) {
-            appliedPaise += toPaise(Number(alloc.amount) || 0);
-          }
+        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-'));
+        if (isOpening) {
+          openingReceiptsTotal += (Number(v.totalAmount) || 0);
+        } else {
+          totalReceipts += (Number(v.totalAmount) || 0);
         }
-        const vTotalPaise = toPaise(Number(v.totalAmount) || 0);
-        totalNotAppliedPaise += Math.max(0, vTotalPaise - appliedPaise);
       }
-      balance -= fromPaise(totalNotAppliedPaise);
+      balance -= openingReceiptsTotal;
+
+      const totalInvoicePaid = partyInvoices
+        .filter((inv) => inv.invoiceType !== 'CREDIT_NOTE')
+        .reduce((sum, inv) => {
+          if (inv.paymentSplits && inv.paymentSplits.length > 0) {
+            return sum + inv.paymentSplits
+              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
+              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0);
+          }
+          return sum + (inv.paidAmount || 0);
+        }, 0);
+      if (totalReceipts > totalInvoicePaid) {
+        // Customer paid more than total settled on invoices (advance from customer)
+        balance -= (totalReceipts - totalInvoicePaid);
+      }
     } else {
       // Purchases: we owe vendor remaining unpaid balance (negative = payable)
       const purchases = this.getPurchases();
@@ -440,33 +450,36 @@ export class PartyStorage extends SettingsStorage {
         }
       });
 
-      // Payment vouchers: portion not applied to purchases/debit notes
+      // Check for unallocated/advance payment out vouchers
       const vouchers = this.getVouchers();
       const partyPayments = vouchers.filter(
         (v) =>
           !v.isCancelled &&
           !v.isReversed &&
           v.voucherType === 'PAYMENT' &&
-          (v.partyId === party.id ||
-            (v.partyName && v.partyName.trim().toLowerCase() === partyNameNorm) ||
-            v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm)))
+          v.entries.some((e) => e.accountId === party.id || (e.accountName && e.accountName.toLowerCase() === partyNameNorm))
       );
-
-      let totalNotAppliedPaise = 0;
+      // Opening-balance payments are payments against the opening balance, not purchases:
+      // add them directly and exclude them from the purchase-settlement aggregate.
+      let openingPaymentsTotal = 0;
+      let totalPayments = 0;
       for (const v of partyPayments) {
-        let appliedPaise = 0;
-        for (const alloc of v.paymentAllocations || []) {
-          if (
-            (alloc.documentType === 'PURCHASE' || alloc.documentType === 'DEBIT_NOTE') &&
-            !alloc.documentId?.startsWith('OPENING-BALANCE-')
-          ) {
-            appliedPaise += toPaise(Number(alloc.amount) || 0);
-          }
+        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-'));
+        if (isOpening) {
+          openingPaymentsTotal += (Number(v.totalAmount) || 0);
+        } else {
+          totalPayments += (Number(v.totalAmount) || 0);
         }
-        const vTotalPaise = toPaise(Number(v.totalAmount) || 0);
-        totalNotAppliedPaise += Math.max(0, vTotalPaise - appliedPaise);
       }
-      balance += fromPaise(totalNotAppliedPaise);
+      balance += openingPaymentsTotal;
+
+      const totalPurchasePaid = partyPurchases
+        .filter((pur) => pur.purchaseType !== 'PO' && pur.purchaseType !== 'CHALLAN' && !pur.isCancelled && pur.purchaseType !== 'RETURN' && pur.noteType !== 'D')
+        .reduce((sum, pur) => sum + (pur.paidAmount || 0), 0);
+      if (totalPayments > totalPurchasePaid) {
+        // We paid vendor more than total billed on purchases (advance to vendor)
+        balance += (totalPayments - totalPurchasePaid);
+      }
     }
 
     const netBalance = Math.round(balance * 100) / 100;
@@ -495,9 +508,13 @@ export class PartyStorage extends SettingsStorage {
     // 1. Build lookup and accumulator maps: O(P)
     interface PartyAccumulator {
       unpaidInvoicesDelta: number;
+      totalInvoicePaid: number;
       unpaidPurchasesDelta: number;
-      totalReceiptsNotAppliedPaise: number;
-      totalPaymentsNotAppliedPaise: number;
+      totalPurchasePaid: number;
+      totalReceipts: number;
+      totalPayments: number;
+      openingReceipts: number;
+      openingPayments: number;
     }
 
     const partyById = new Map<string, Party>();
@@ -511,9 +528,13 @@ export class PartyStorage extends SettingsStorage {
       }
       accMap.set(p.id, {
         unpaidInvoicesDelta: 0,
+        totalInvoicePaid: 0,
         unpaidPurchasesDelta: 0,
-        totalReceiptsNotAppliedPaise: 0,
-        totalPaymentsNotAppliedPaise: 0,
+        totalPurchasePaid: 0,
+        totalReceipts: 0,
+        totalPayments: 0,
+        openingReceipts: 0,
+        openingPayments: 0,
       });
     }
 
@@ -528,6 +549,15 @@ export class PartyStorage extends SettingsStorage {
 
       const acc = accMap.get(party.id);
       if (!acc) continue;
+
+      if (inv.invoiceType !== 'CREDIT_NOTE') {
+        const directPaid = inv.paymentSplits && inv.paymentSplits.length > 0
+          ? inv.paymentSplits
+              .filter((s) => (s.mode || '').toUpperCase() !== 'CREDIT' && (s.mode || '').toUpperCase() !== 'CREDIT_NOTE')
+              .reduce((sub, x) => sub + (Number(x.amount) || 0), 0)
+          : (inv.paidAmount || 0);
+        acc.totalInvoicePaid += directPaid;
+      }
 
       if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
         continue;
@@ -554,6 +584,10 @@ export class PartyStorage extends SettingsStorage {
 
       if (pur.purchaseType === 'PO' || pur.purchaseType === 'CHALLAN' || pur.isCancelled) continue;
 
+      if (pur.purchaseType !== 'RETURN' && pur.noteType !== 'D') {
+        acc.totalPurchasePaid += (pur.paidAmount || 0);
+      }
+
       const unpaid = typeof pur.balanceAmount === 'number' ? pur.balanceAmount : Math.max(0, pur.grandTotal - (pur.paidAmount || 0));
       if (pur.purchaseType === 'RETURN') {
         acc.unpaidPurchasesDelta += unpaid;
@@ -571,49 +605,32 @@ export class PartyStorage extends SettingsStorage {
 
       const matchedPartiesThisVoucher = new Set<string>();
 
-      if (v.partyId) {
-        const party = partyById.get(v.partyId);
-        if (party) matchedPartiesThisVoucher.add(party.id);
-      }
-      if (v.partyName) {
-        const party = partyByName.get(v.partyName.trim().toLowerCase());
-        if (party) matchedPartiesThisVoucher.add(party.id);
-      }
-
       for (const e of v.entries) {
         let party = e.accountId ? partyById.get(e.accountId) : undefined;
         if (!party && e.accountName) {
           party = partyByName.get(e.accountName.trim().toLowerCase());
         }
-        if (party) {
-          matchedPartiesThisVoucher.add(party.id);
-        }
-      }
-
-      if (matchedPartiesThisVoucher.size === 0) continue;
-
-      let appliedPaise = 0;
-      for (const alloc of v.paymentAllocations || []) {
-        if (alloc.documentId?.startsWith('OPENING-BALANCE-')) continue;
-        if (isReceipt && (alloc.documentType === 'INVOICE' || alloc.documentType === 'CREDIT_NOTE')) {
-          appliedPaise += toPaise(Number(alloc.amount) || 0);
-        } else if (isPayment && (alloc.documentType === 'PURCHASE' || alloc.documentType === 'DEBIT_NOTE')) {
-          appliedPaise += toPaise(Number(alloc.amount) || 0);
-        }
-      }
-      const vTotalPaise = toPaise(Number(v.totalAmount) || 0);
-      const notAppliedPaise = Math.max(0, vTotalPaise - appliedPaise);
-
-      for (const pId of matchedPartiesThisVoucher) {
-        const party = partyById.get(pId);
         if (!party) continue;
-        const acc = accMap.get(pId);
+
+        if (matchedPartiesThisVoucher.has(party.id)) continue;
+        matchedPartiesThisVoucher.add(party.id);
+
+        const acc = accMap.get(party.id);
         if (!acc) continue;
 
+        const isOpening = (v.paymentAllocations || []).some((a) => a.documentId?.startsWith('OPENING-BALANCE-') && a.documentId === `OPENING-BALANCE-${party.id}`);
         if (isReceipt && party.type === 'CUSTOMER') {
-          acc.totalReceiptsNotAppliedPaise += notAppliedPaise;
+          if (isOpening) {
+            acc.openingReceipts += (Number(v.totalAmount) || 0);
+          } else {
+            acc.totalReceipts += (Number(v.totalAmount) || 0);
+          }
         } else if (isPayment && party.type !== 'CUSTOMER') {
-          acc.totalPaymentsNotAppliedPaise += notAppliedPaise;
+          if (isOpening) {
+            acc.openingPayments += (Number(v.totalAmount) || 0);
+          } else {
+            acc.totalPayments += (Number(v.totalAmount) || 0);
+          }
         }
       }
     }
@@ -645,10 +662,16 @@ export class PartyStorage extends SettingsStorage {
 
       if (isCustomer) {
         balance += acc.unpaidInvoicesDelta;
-        balance -= fromPaise(acc.totalReceiptsNotAppliedPaise);
+        if (acc.totalReceipts > acc.totalInvoicePaid) {
+          balance -= (acc.totalReceipts - acc.totalInvoicePaid);
+        }
+        balance -= acc.openingReceipts;
       } else {
         balance += acc.unpaidPurchasesDelta;
-        balance += fromPaise(acc.totalPaymentsNotAppliedPaise);
+        if (acc.totalPayments > acc.totalPurchasePaid) {
+          balance += (acc.totalPayments - acc.totalPurchasePaid);
+        }
+        balance += acc.openingPayments;
       }
 
       const netBalance = Math.round(balance * 100) / 100;

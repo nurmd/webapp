@@ -280,8 +280,10 @@ export function usePartyPassbook({
             : v.sourceDocumentNumber || '';
 
           if (v.voucherType === 'RECEIPT') {
-            let appliedToInvoicesPaise = 0;
             if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+              // Count only invoice/credit-note allocations, excluding opening-balance ones.
+              // Mixed receipts (opening + invoice) count their invoice portion only.
+              let appliedToInvoicesPaise = 0;
               for (const a of v.paymentAllocations) {
                 if (
                   (a.documentType === 'INVOICE' || a.documentType === 'CREDIT_NOTE') &&
@@ -290,10 +292,18 @@ export function usePartyPassbook({
                   appliedToInvoicesPaise += toPaise(Number(a.amount) || 0);
                 }
               }
+              totalVoucherReceipts += fromPaise(appliedToInvoicesPaise);
             } else if (v.sourceDocumentType === 'INVOICE' && v.sourceDocumentId && !v.sourceDocumentId.startsWith('OPENING-BALANCE-')) {
-              appliedToInvoicesPaise = toPaise(Number(v.totalAmount) || 0);
+              totalVoucherReceipts += Number(v.totalAmount) || 0;
+            } else {
+              // No allocation info: original heuristic (count full amount), unless it is an
+              // opening-balance receipt (then count 0 to avoid hiding cash payments).
+              const isOpening = (v.sourceDocumentId && v.sourceDocumentId.startsWith('OPENING-BALANCE-')) ||
+                (v.sourceDocumentNumber === 'Opening Balance');
+              if (!isOpening) {
+                totalVoucherReceipts += Number(v.totalAmount) || 0;
+              }
             }
-            totalVoucherReceipts += fromPaise(appliedToInvoicesPaise);
             const desc = linkedDocsText
               ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
               : (v.narration || (isSplitVoucher ? 'Split Payment received' : 'Payment received'));
@@ -312,8 +322,8 @@ export function usePartyPassbook({
               rawVoucher: v,
             });
           } else if (v.voucherType === 'PAYMENT') {
-            let appliedToPurchasesPaise = 0;
             if (v.paymentAllocations && v.paymentAllocations.length > 0) {
+              let appliedToPurchasesPaise = 0;
               for (const a of v.paymentAllocations) {
                 if (
                   (a.documentType === 'PURCHASE' || a.documentType === 'DEBIT_NOTE') &&
@@ -322,10 +332,16 @@ export function usePartyPassbook({
                   appliedToPurchasesPaise += toPaise(Number(a.amount) || 0);
                 }
               }
+              totalVoucherPayments += fromPaise(appliedToPurchasesPaise);
             } else if (v.sourceDocumentType === 'PURCHASE' && v.sourceDocumentId && !v.sourceDocumentId.startsWith('OPENING-BALANCE-')) {
-              appliedToPurchasesPaise = toPaise(Number(v.totalAmount) || 0);
+              totalVoucherPayments += Number(v.totalAmount) || 0;
+            } else {
+              const isOpening = (v.sourceDocumentId && v.sourceDocumentId.startsWith('OPENING-BALANCE-')) ||
+                (v.sourceDocumentNumber === 'Opening Balance');
+              if (!isOpening) {
+                totalVoucherPayments += Number(v.totalAmount) || 0;
+              }
             }
-            totalVoucherPayments += fromPaise(appliedToPurchasesPaise);
             const desc = linkedDocsText
               ? (v.narration ? `${v.narration} (Linked: ${linkedDocsText})` : `Linked to: ${linkedDocsText}`)
               : (v.narration || (isSplitVoucher ? 'Split Payment disbursed' : 'Payment made'));
