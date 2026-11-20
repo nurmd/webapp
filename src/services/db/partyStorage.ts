@@ -431,6 +431,23 @@ export class PartyStorage extends SettingsStorage {
       );
       balancePaise -= (openingAllocatedPaise + advancePaise);
     } else {
+      // Sales invoices to this supplier (we sold to them) are receivables.
+      const invoices = this.getInvoices();
+      const partyInvoices = invoices.filter(
+        (inv) => !inv.isCancelled && (inv.partyId === party.id || (inv.partyName && inv.partyName.trim().toLowerCase() === partyNameNorm))
+      );
+      for (const inv of partyInvoices) {
+        if (inv.invoiceType === 'ESTIMATE' || inv.invoiceType === 'SALES_ORDER' || inv.invoiceType === 'DELIVERY_CHALLAN') {
+          continue;
+        }
+        const unpaid = typeof inv.balanceAmount === 'number' ? inv.balanceAmount : Math.max(0, inv.grandTotal - (inv.paidAmount || 0));
+        if (inv.invoiceType === 'CREDIT_NOTE') {
+          balancePaise -= toPaise(unpaid);
+        } else {
+          balancePaise += toPaise(unpaid);
+        }
+      }
+
       // Purchases: we owe vendor remaining unpaid balance (negative = payable)
       const purchases = this.getPurchases();
       const partyPurchases = purchases.filter(
@@ -560,7 +577,7 @@ export class PartyStorage extends SettingsStorage {
       if (!party && inv.partyName) {
         party = partyByName.get(inv.partyName.trim().toLowerCase());
       }
-      if (!party || party.type !== 'CUSTOMER') continue;
+      if (!party) continue;
 
       const acc = accMap.get(party.id);
       if (!acc) continue;
@@ -574,7 +591,9 @@ export class PartyStorage extends SettingsStorage {
         acc.unpaidCreditNotesPaise += toPaise(unpaid);
       } else {
         acc.unpaidInvoicesPaise += toPaise(unpaid);
-        acc.invoicePaidTotalPaise += toPaise(inv.paidAmount || 0);
+        if (party.type === 'CUSTOMER') {
+          acc.invoicePaidTotalPaise += toPaise(inv.paidAmount || 0);
+        }
       }
     }
 
@@ -690,6 +709,9 @@ export class PartyStorage extends SettingsStorage {
         );
         balancePaise -= (acc.openingAllocatedReceiptsPaise + advancePaise);
       } else {
+        balancePaise += acc.unpaidInvoicesPaise;
+        balancePaise -= acc.unpaidCreditNotesPaise;
+
         balancePaise -= acc.unpaidPurchasesPaise;
         balancePaise += acc.unpaidDebitNotesPaise;
 
