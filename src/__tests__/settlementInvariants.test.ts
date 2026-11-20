@@ -431,15 +431,12 @@ describe('Audit 4.11 — Settlement Cross-Module Invariants', () => {
   describe('Invariant 3: Status Derivation Consistency (Invoice vs Purchase parity)', () => {
     /**
      * Requirement:
-     * derivePaymentStatus(paid, grandTotal) and derivePurchasePaymentStatus(grandTotal, paid)
+     * derivePaymentStatus(grandTotal, paid) and derivePurchasePaymentStatus(grandTotal, paid)
      * agree on PAID/PARTIAL/UNPAID for a matrix of (grandTotal, paid) including
      * 0, partial, exact, over-paid, and grandTotal 0.
      *
-     * Audit note (4.11): the two engines do NOT share an argument order, which is a
-     * silent-swap hazard. `derivePaymentStatus` is exported but has no production
-     * caller today; unifying both to `(grandTotal, totalPaid)` is queued as a
-     * follow-up batch. Until then each engine is invoked with its own signature so
-     * this suite verifies semantic parity rather than accidentally testing argument order.
+     * Audit note (4.11): both engines share the unified (grandTotal, totalPaid) signature
+     * and strict semantics without 1-paise tolerance divergence.
      */
     const statusMatrix = [
       { name: 'unpaid bill', grandTotal: 100.00, paid: 0.00, expectedStatus: 'UNPAID' },
@@ -455,23 +452,20 @@ describe('Audit 4.11 — Settlement Cross-Module Invariants', () => {
         const purchaseStatus = derivePurchasePaymentStatus(grandTotal, paid);
         expect(purchaseStatus).toBe(expectedStatus);
 
-        // derivePaymentStatus takes (paidAmount, grandTotal) — the inverse of the purchase engine.
-        const invoiceStatus = derivePaymentStatus(paid, grandTotal);
+        // Both engines take (grandTotal, totalPaid) under unified signature (Audit 4.11).
+        const invoiceStatus = derivePaymentStatus(grandTotal, paid);
         expect(invoiceStatus).toBe(purchaseStatus);
       });
     });
 
-    it('documents the 1-paise tolerance divergence (grandTotal: 100.00, paid: 99.99)', () => {
-      // Known drift, tracked for the status-engine unification follow-up:
-      //   derivePaymentStatus(paid: 99.99, grandTotal: 100) applies a -0.01 tolerance -> 'PAID'
-      //   derivePurchasePaymentStatus(grandTotal: 100, paid: 99.99) is strict -> 'PARTIAL'
-      // This baseline keeps the divergence visible instead of hiding it. Flip to a
-      // strict parity assertion when both engines are unified.
-      const invoiceStatus = derivePaymentStatus(99.99, 100.00);
+    it('evaluates strict parity without 1-paise tolerance divergence (grandTotal: 100.00, paid: 99.99)', () => {
+      // Audit 4.11 unification: both engines share (grandTotal, totalPaid) signature and strict rules
+      const invoiceStatus = derivePaymentStatus(100.00, 99.99);
       const purchaseStatus = derivePurchasePaymentStatus(100.00, 99.99);
 
-      expect(invoiceStatus).toBe('PAID');
+      expect(invoiceStatus).toBe('PARTIAL');
       expect(purchaseStatus).toBe('PARTIAL');
+      expect(invoiceStatus).toBe(purchaseStatus);
     });
   });
 

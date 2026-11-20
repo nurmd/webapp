@@ -242,22 +242,18 @@ export function finalizeTotals(
 }
 
 /**
- * Derives payment status based on paid amount relative to grand total.
- * - PAID if paidAmount >= grandTotal - 0.01 (accounts for 1 paisa rounding variance)
- * - PARTIAL if paidAmount > 0
+ * Derives payment status based on grand total and total paid (Audit 4.11 unified).
+ * Shares identical (grandTotal: number, totalPaid: number) signature and strict rules
+ * with derivePurchasePaymentStatus:
+ * - PAID if grandTotal <= 0 || totalPaid >= grandTotal
+ * - PARTIAL if totalPaid > 0
  * - UNPAID otherwise
  */
 export function derivePaymentStatus(
-  paidAmount: number,
-  grandTotal: number
-): 'PAID' | 'PARTIAL' | 'UNPAID' {
-  if (paidAmount >= grandTotal - 0.01) {
-    return 'PAID';
-  }
-  if (paidAmount > 0) {
-    return 'PARTIAL';
-  }
-  return 'UNPAID';
+  grandTotal: number,
+  totalPaid: number
+): PaymentStatus {
+  return derivePurchasePaymentStatus(grandTotal, totalPaid);
 }
 
 export interface PurchaseTotalsContext {

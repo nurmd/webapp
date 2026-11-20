@@ -324,12 +324,12 @@ describe('lineItemEngine', () => {
       expect(derivePaymentStatus(1000, 1000)).toBe('PAID');
     });
 
-    it('returns PAID within 1 paisa rounding margin', () => {
-      expect(derivePaymentStatus(999.99, 1000)).toBe('PAID');
+    it('returns PARTIAL within 1 paisa rounding margin under strict semantics', () => {
+      expect(derivePaymentStatus(1000, 999.99)).toBe('PARTIAL');
     });
 
     it('returns PAID for overpayment', () => {
-      expect(derivePaymentStatus(1050, 1000)).toBe('PAID');
+      expect(derivePaymentStatus(1000, 1050)).toBe('PAID');
     });
 
     it('returns PAID for zero amount bill with zero paid', () => {
@@ -337,14 +337,14 @@ describe('lineItemEngine', () => {
     });
 
     it('returns PARTIAL for partial payments', () => {
-      expect(derivePaymentStatus(500, 1000)).toBe('PARTIAL');
-      expect(derivePaymentStatus(0.01, 1000)).toBe('PARTIAL');
-      expect(derivePaymentStatus(999.98, 1000)).toBe('PARTIAL');
+      expect(derivePaymentStatus(1000, 500)).toBe('PARTIAL');
+      expect(derivePaymentStatus(1000, 0.01)).toBe('PARTIAL');
+      expect(derivePaymentStatus(1000, 999.98)).toBe('PARTIAL');
     });
 
     it('returns UNPAID for zero or negative payment', () => {
-      expect(derivePaymentStatus(0, 1000)).toBe('UNPAID');
-      expect(derivePaymentStatus(-50, 1000)).toBe('UNPAID');
+      expect(derivePaymentStatus(1000, 0)).toBe('UNPAID');
+      expect(derivePaymentStatus(1000, -50)).toBe('UNPAID');
     });
   });
 });
