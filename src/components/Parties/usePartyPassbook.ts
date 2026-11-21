@@ -53,12 +53,12 @@ export function comparePassbookEntries(
     if (b.type === 'OPENING') return 1;
   }
 
-  const dateA = a.date ? new Date(a.date).getTime() : 0;
-  const dateB = b.date ? new Date(b.date).getTime() : 0;
-  const timeA = isNaN(dateA) ? 0 : dateA;
-  const timeB = isNaN(dateB) ? 0 : dateB;
-  const timeDiff = descending ? timeB - timeA : timeA - timeB;
-  if (timeDiff !== 0) return timeDiff;
+  const tsA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
+  const tsB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+  const tA = isNaN(tsA) ? 0 : tsA;
+  const tB = isNaN(tsB) ? 0 : tsB;
+  const tsDiff = descending ? tB - tA : tA - tB;
+  if (tsDiff !== 0) return tsDiff;
 
   // On the same date, OPENING is the day's start (oldest), so in descending order it appears after other entries
   if (descending) {
@@ -66,22 +66,16 @@ export function comparePassbookEntries(
     if (b.type === 'OPENING') return -1;
   }
 
+  // On identical timestamps, bills before their payments (tie-breaker only)
   if ((a.type === 'SALE' || a.type === 'PURCHASE') && (b.type === 'PAYMENT_IN' || b.type === 'PAYMENT_OUT')) return -1;
   if ((b.type === 'SALE' || b.type === 'PURCHASE') && (a.type === 'PAYMENT_IN' || a.type === 'PAYMENT_OUT')) return 1;
 
-  // Normal sales come before sales returns (Credit Notes) on the same date
+  // Normal sales come before sales returns (Credit Notes) on the same instant
   if (a.type === 'SALE' && b.type === 'SALE') {
     const aIsCN = a.rawInvoice?.invoiceType === 'CREDIT_NOTE';
     const bIsCN = b.rawInvoice?.invoiceType === 'CREDIT_NOTE';
     if (!aIsCN && bIsCN) return -1;
     if (aIsCN && !bIsCN) return 1;
-  }
-
-  const createdA = a.createdAt || '';
-  const createdB = b.createdAt || '';
-  if (createdA !== createdB) {
-    const createdDiff = createdA < createdB ? -1 : 1;
-    return descending ? -createdDiff : createdDiff;
   }
 
   const idA = a.id || '';

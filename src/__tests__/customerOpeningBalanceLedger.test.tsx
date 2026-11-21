@@ -975,13 +975,13 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
       expect(res.filteredPassbook[0].docNumber).toBe('INV-SORT-2');
       expect(res.filteredPassbook[0].date).toBe('2026-04-06');
 
-      // 2. For 2026-04-05: SALE must come before PAYMENT_IN (not inverted by reverse)
-      expect(res.filteredPassbook[1].type).toBe('SALE');
-      expect(res.filteredPassbook[1].docNumber).toBe('INV-SORT-1');
+      // 2. For 2026-04-05: sorted by time - payment (12:00) is newer than sale (10:00) in NEWEST order
+      expect(res.filteredPassbook[1].type).toBe('PAYMENT_IN');
+      expect(res.filteredPassbook[1].docNumber).toBe('PAY-SORT-1');
       expect(res.filteredPassbook[1].date).toBe('2026-04-05');
 
-      expect(res.filteredPassbook[2].type).toBe('PAYMENT_IN');
-      expect(res.filteredPassbook[2].docNumber).toBe('PAY-SORT-1');
+      expect(res.filteredPassbook[2].type).toBe('SALE');
+      expect(res.filteredPassbook[2].docNumber).toBe('INV-SORT-1');
       expect(res.filteredPassbook[2].date).toBe('2026-04-05');
 
       // 3. OPENING (2026-04-01) is the last entry in NEWEST (descending) order
@@ -1103,8 +1103,8 @@ describe('Customer Opening Balance Retention & Ledger Calculation Verification',
 
       const resNewest = harness.result();
       expect(resNewest.txnSortOrder).toBe('NEWEST');
-      expect(resNewest.filteredPassbook[0].docNumber).toBe('INV-SAME-01');
-      expect(resNewest.filteredPassbook[1].docNumber).toBe('CN-SAME-01');
+      expect(resNewest.filteredPassbook[0].docNumber).toBe('CN-SAME-01');
+      expect(resNewest.filteredPassbook[1].docNumber).toBe('INV-SAME-01');
 
       act(() => {
         resNewest.setTxnSortOrder('OLDEST');
