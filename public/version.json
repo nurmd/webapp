@@ -1,15 +1,15 @@
 {
-  "version": "1.2.87",
+  "version": "1.2.88",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-21T03:25:21.954Z",
+  "buildTime": "2026-11-21T04:47:06.821Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "keep supplier +GRN FAB visible above bottom nav and show single plus",
+    "order transactions by business transaction date instead of createdAt across the app",
+    "v1.2.87 - exclude GRN/PO from cash & bank ledger, cash flow, and party khata; add +GRN FAB on supplier Orders tab",
     "exclude GRN/PO from cash & bank ledger, cash flow, and party khata; add +GRN FAB on supplier Orders tab",
     "sort transactions by time (createdAt) instead of type priority",
-    "include sales invoices as receivables for supplier parties (Talukder Hardware)",
-    "v1.2.86 - party balance matches passbook ledger; opening-balance linkable amount respects prior allocations; global keyboard shortcuts",
-    "opening balance linkable amount respects prior allocations",
-    "make party list balance match passbook ledger (Abu Imran/Nitai Bauri)"
+    "include sales invoices as receivables for supplier parties (Talukder Hardware)"
   ]
 }
