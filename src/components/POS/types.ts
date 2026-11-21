@@ -9,6 +9,7 @@ export interface PosCartItem {
   unitPrice: number;             // GST-exclusive
   unitPriceInclusive?: number;   // GST-inclusive
   priceMode?: ItemPriceMode;     // defaults to EXCLUSIVE
+  priceTier?: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
   cessRate?: number;
   discountPercent?: number;
   discountAmount?: number;
@@ -19,13 +20,22 @@ export interface PosCartItem {
 export function createPosCartItem(item: InventoryItem, qty = 1): PosCartItem {
   const gst = item.gstRate ?? 18;
   const mode = item.salePriceMode ?? 'EXCLUSIVE';
-  const excl = item.salePrice || 0;
-  const incl = item.salePriceInclusive !== undefined
+  const tier = item.defaultPriceTier || 'RETAIL';
+  let tierPrice = item.salePrice || 0;
+  if (tier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0) {
+    tierPrice = item.semiWholesalePrice;
+  } else if (tier === 'WHOLESALE' && item.wholesalePrice && item.wholesalePrice > 0) {
+    tierPrice = item.wholesalePrice;
+  }
+
+  const excl = tierPrice;
+  const incl = (mode === 'INCLUSIVE' && item.salePriceInclusive !== undefined && tier === 'RETAIL')
     ? item.salePriceInclusive
     : inclusiveFromExclusive(excl, gst);
   return {
     item,
     qty,
+    priceTier: tier,
     unitPrice: mode === 'INCLUSIVE' ? exclusiveFromInclusive(incl, gst) : excl,
     unitPriceInclusive: mode === 'INCLUSIVE' ? incl : inclusiveFromExclusive(excl, gst),
     priceMode: mode,

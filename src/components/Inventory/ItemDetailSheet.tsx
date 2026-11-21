@@ -5,6 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
+import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
 import {
   useCompany,
   useInvoices,
@@ -315,13 +316,19 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                   ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   : 'bg-secondary-container text-on-secondary-container'
               }`}>
-                {formatQuantity(item.currentStock, 4)} {item.unit}
+                {formatQuantity(item.currentStock, 4)} {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit}
+                {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? (
+                  <span className="text-[10px] opacity-75 font-normal ml-1">
+                    ({formatQuantity(convertQuantityFromBase(item.currentStock, item.unit, item), 2)} {item.unit})
+                  </span>
+                ) : null}
               </span>
             </div>
             <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
               {item.category}
               {isGstActive && item.hsnSacCode ? ` • HSN: ${item.hsnSacCode}` : ''}
               {item.sku ? ` • SKU: ${item.sku}` : ''}
+              {item.subUnit && item.subUnitFactor ? ` • 1 ${item.unit} = ${item.subUnitFactor} ${item.subUnit}` : ''}
             </p>
           </div>
 
@@ -424,11 +431,34 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             <span className="text-[10px] text-outline font-semibold uppercase block">Stock Value</span>
             <span className="font-bold text-on-surface text-sm">
               {isBuyPriceVisible(item.id)
-                ? formatINR(item.currentStock * item.purchasePrice)
+                ? formatINR(convertQuantityFromBase(item.currentStock, item.unit, item) * (item.purchasePrice || 0))
                 : '***'}
             </span>
           </div>
         </div>
+
+        {/* Multi-Tier Pricing Bar (Retail / Semi-Wholesale / Wholesale) */}
+        {((item.semiWholesalePrice !== undefined && item.semiWholesalePrice > 0) ||
+          (item.wholesalePrice !== undefined && item.wholesalePrice > 0)) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/20 text-xs flex-shrink-0">
+            <span className="text-[10px] text-outline font-bold uppercase tracking-wider">
+              Price Tiers:
+            </span>
+            <span className="font-mono text-on-surface">
+              Retail: <strong className="text-secondary">{formatINR(item.salePrice)}</strong>
+            </span>
+            {item.semiWholesalePrice !== undefined && item.semiWholesalePrice > 0 && (
+              <span className="font-mono text-on-surface">
+                Semi-Wholesale: <strong className="text-secondary">{formatINR(item.semiWholesalePrice)}</strong>
+              </span>
+            )}
+            {item.wholesalePrice !== undefined && item.wholesalePrice > 0 && (
+              <span className="font-mono text-on-surface">
+                Wholesale: <strong className="text-secondary">{formatINR(item.wholesalePrice)}</strong>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Filter Tabs */}
         <div className="flex items-center justify-between gap-1 flex-shrink-0">

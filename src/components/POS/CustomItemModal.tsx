@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { InventoryItem, ItemPriceMode, UnitOfMeasurement } from '../../models/item.ts';
+import { db } from '../../services/db.ts';
+import { useUnits } from '../../core/store/useDataStore.ts';
 import { roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
@@ -34,6 +36,18 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
   const [gstRate, setGstRate] = useState<number>(18);
   const [hsnCode, setHsnCode] = useState('998313');
   const [unit, setUnit] = useState<UnitOfMeasurement>('PCS');
+
+  const allUnits = useUnits();
+  const availableUnits = useMemo(() => {
+    const list = allUnits;
+    const active = list.filter((u) => u.active);
+    if (unit && !active.some((u) => u.code === unit)) {
+      const match = list.find((u) => u.code === unit);
+      if (match) return [match, ...active];
+      return [{ code: unit, label: unit, kind: 'CUSTOM' as const, active: true }, ...active];
+    }
+    return active;
+  }, [unit, allUnits]);
 
   if (!isOpen) return null;
 
@@ -249,13 +263,11 @@ export const CustomItemModal: React.FC<CustomItemModalProps> = ({
                 onChange={(e) => setUnit(e.target.value as UnitOfMeasurement)}
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-xl px-2.5 py-2 text-xs font-semibold text-on-surface outline-none focus:border-secondary"
               >
-                <option value="PCS">PCS (Pieces)</option>
-                <option value="NOS">NOS (Numbers)</option>
-                <option value="KG">KG (Kilograms)</option>
-                <option value="BOX">BOX (Boxes)</option>
-                <option value="PKT">PKT (Packets)</option>
-                <option value="LTR">LTR (Litres)</option>
-                <option value="MTR">MTR (Metres)</option>
+                {availableUnits.map((u) => (
+                  <option key={u.code} value={u.code}>
+                    {u.code} ({u.label})
+                  </option>
+                ))}
               </select>
             </div>
           </div>

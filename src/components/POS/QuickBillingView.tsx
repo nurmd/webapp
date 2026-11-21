@@ -33,6 +33,7 @@ import { usePosCart } from './quickBilling/usePosCart.ts';
 import { usePosCatalog } from './quickBilling/usePosCatalog.ts';
 import { useHeldBills } from './quickBilling/useHeldBills.ts';
 import { usePosTotals } from './quickBilling/usePosTotals.ts';
+import { PosCartItemTierPills } from './quickBilling/PosCartItemTierPills.tsx';
 
 interface QuickBillingViewProps {
   company: CompanyProfile;
@@ -53,38 +54,16 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
 
   // 1. Cart state & operations hook
   const {
-    cart,
-    setCart,
-    cartDiscountType,
-    setCartDiscountType,
-    cartDiscountValue,
-    setCartDiscountValue,
-    additionalCharges,
-    setAdditionalCharges,
-    addToCart,
-    updateCartQty,
-    updateCartExclusivePrice,
-    updateCartInclusivePrice,
-    toggleCartPriceMode,
-    updateCartPrice,
-    removeFromCart,
-    clearCart,
+    cart, setCart, cartDiscountType, setCartDiscountType, cartDiscountValue, setCartDiscountValue,
+    additionalCharges, setAdditionalCharges, addToCart, updateCartQty,
+    updateCartExclusivePrice, updateCartInclusivePrice, toggleCartPriceMode,
+    updateCartPrice, updateCartPriceTier, removeFromCart, clearCart,
   } = usePosCart({ isGstActive, isCompositionScheme: !!company.isCompositionScheme });
 
   // 2. Catalog search & filtering hook
   const {
-    search,
-    setSearch,
-    selectedCategory,
-    setSelectedCategory,
-    catalogViewMode,
-    setCatalogViewMode,
-    categories,
-    filteredItems,
-    handleBarcodeScanned,
-    searchInputRef,
-    scanMessage,
-    setScanMessage,
+    search, setSearch, selectedCategory, setSelectedCategory, catalogViewMode, setCatalogViewMode,
+    categories, filteredItems, handleBarcodeScanned, searchInputRef, scanMessage, setScanMessage,
   } = usePosCatalog({ items, onAddToCart: addToCart });
 
   // Customer state: Initial POS customer defaults to system walk-in customer when available
@@ -311,6 +290,9 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
       normalizeInvoiceLineItem(
         {
           itemId: c.item.id, name: c.item.name, hsnSacCode: c.item.hsnSacCode, unit: c.item.unit,
+          subUnit: c.item.subUnit,
+          subUnitQuantity: c.item.subUnit && c.item.subUnitFactor ? c.qty * c.item.subUnitFactor : undefined,
+          priceTier: c.priceTier || c.item.defaultPriceTier || 'RETAIL',
           quantity: c.qty, unitPrice: c.unitPrice, unitPriceInclusive: c.unitPriceInclusive,
           priceMode: c.priceMode, discountPercent: c.discountPercent, cessRate: c.cessRate || c.item.cessRate,
           gstRate: c.item.gstRate,
@@ -816,6 +798,11 @@ export const QuickBillingView: React.FC<QuickBillingViewProps> = ({
                         </>
                       ) : ''}
                     </span>
+                    <PosCartItemTierPills
+                      item={item}
+                      currentTier={cartItem.priceTier}
+                      onSelectTier={updateCartPriceTier}
+                    />
                   </div>
 
                   <button

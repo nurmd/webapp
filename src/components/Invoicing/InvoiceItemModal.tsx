@@ -9,6 +9,8 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { calculateItemGst } from '../../core/gst/calculator.ts';
 import { calculateRateFromTotal, exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { findDuplicateItem } from '../../core/utils/entityUniqueness.ts';
+import { convertQuantityToBase } from '../../core/inventory/stockEngine.ts';
+import { useUnits } from '../../core/store/useDataStore.ts';
 
 export interface InvoiceItemData {
   itemId: string;
@@ -17,6 +19,9 @@ export interface InvoiceItemData {
   hsnSacCode: string;
   quantity: number;
   unit: UnitOfMeasurement | string;
+  subUnit?: string;
+  subUnitQuantity?: number;
+  priceTier?: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
   unitPrice: number;
   unitPriceInclusive?: number;
   priceMode?: ItemPriceMode;
@@ -90,6 +95,47 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     initialItem?.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : ''
   );
   const [unit, setUnit] = useState<string>(initialItem?.unit || 'PCS');
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<InventoryItem | null>(() => {
+    if (initialItem?.itemId) {
+      return itemsCatalog.find((i) => i.id === initialItem.itemId) || null;
+    }
+    return null;
+  });
+  const [priceTier, setPriceTier] = useState<'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE'>(
+    initialItem?.priceTier || selectedCatalogItem?.defaultPriceTier || 'RETAIL'
+  );
+  const [catalogSalePrice, setCatalogSalePrice] = useState<string>(() => {
+    if (initialItem?.itemId) {
+      const itm = itemsCatalog.find((i) => i.id === initialItem.itemId);
+      if (itm) {
+        const p = itm.salePriceMode === 'INCLUSIVE' && itm.salePriceInclusive !== undefined
+          ? itm.salePriceInclusive
+          : itm.salePrice;
+        return p !== undefined && p !== null ? String(p) : '';
+      }
+    }
+    return '';
+  });
+
+  const allUnits = useUnits();
+  const availableUnits = useMemo(() => {
+    if (selectedCatalogItem?.subUnit) {
+      const main = selectedCatalogItem.unit;
+      const sub = selectedCatalogItem.subUnit;
+      return [
+        { code: main, label: `${main} (Base)` },
+        { code: sub, label: `${sub} (Sub-Unit)` },
+      ];
+    }
+    const list = allUnits;
+    const active = list.filter((u) => u.active);
+    if (unit && !active.some((u) => u.code === unit)) {
+      const match = list.find((u) => u.code === unit);
+      if (match) return [match, ...active];
+      return [{ code: unit, label: unit, kind: 'CUSTOM' as const, active: true }, ...active];
+    }
+    return active.length > 0 ? active : COMMON_UNITS.map((u) => ({ code: u, label: u, kind: 'STANDARD' as const, active: true }));
+  }, [selectedCatalogItem, unit, allUnits]);
   const initialItemMode = initialItem?.priceMode ?? 'EXCLUSIVE';
   const initialItemGst = initialItem?.gstRate ?? 18;
   const initialRawExcl = Number(initialItem?.unitPrice) || 0;
@@ -154,6 +200,17 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   const [newItemSalePrice, setNewItemSalePrice] = useState('');
   const [newItemPurchasePrice, setNewItemPurchasePrice] = useState('');
   const [newItemUnit, setNewItemUnit] = useState<UnitOfMeasurement>('PCS');
+
+  const availableNewItemUnits = useMemo(() => {
+    const list = allUnits;
+    const active = list.filter((u) => u.active);
+    if (newItemUnit && !active.some((u) => u.code === newItemUnit)) {
+      const match = list.find((u) => u.code === newItemUnit);
+      if (match) return [match, ...active];
+      return [{ code: newItemUnit, label: newItemUnit, kind: 'CUSTOM' as const, active: true }, ...active];
+    }
+    return active.length > 0 ? active : COMMON_UNITS.map((u) => ({ code: u, label: u, kind: 'STANDARD' as const, active: true }));
+  }, [newItemUnit, allUnits]);
   const [newItemHsn, setNewItemHsn] = useState(defaultHsn);
   const [newItemGstRate, setNewGstRate] = useState<number>(18);
   const [newItemStock, setNewItemStock] = useState('0');
@@ -183,6 +240,18 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (initialItem) {
+        const catalogMatch = itemsCatalog.find((i) => i.id === initialItem.itemId) || null;
+        setSelectedCatalogItem(catalogMatch);
+        setPriceTier(initialItem.priceTier || catalogMatch?.defaultPriceTier || 'RETAIL');
+        if (catalogMatch) {
+          const p = catalogMatch.salePriceMode === 'INCLUSIVE' && catalogMatch.salePriceInclusive !== undefined
+            ? catalogMatch.salePriceInclusive
+            : catalogMatch.salePrice;
+          setCatalogSalePrice(p !== undefined && p !== null ? String(p) : '');
+        } else {
+          setCatalogSalePrice('');
+        }
+
         setItemId(initialItem.itemId || '');
         setName(initialItem.name || '');
         setDescription(initialItem.description || '');
@@ -241,6 +310,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   }, [isOpen, initialItem]);
 
   const resetForm = () => {
+    setSelectedCatalogItem(null);
+    setCatalogSalePrice('');
+    setPriceTier('RETAIL');
     setItemId('');
     setName('');
     setDescription('');
@@ -292,6 +364,15 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   // Handle catalog item selection
   const handleSelectCatalogItem = (item: InventoryItem) => {
+    setSelectedCatalogItem(item);
+    if (item) {
+      const p = item.salePriceMode === 'INCLUSIVE' && item.salePriceInclusive !== undefined
+        ? item.salePriceInclusive
+        : item.salePrice;
+      setCatalogSalePrice(p !== undefined && p !== null ? String(p) : '');
+    } else {
+      setCatalogSalePrice('');
+    }
     setItemId(item.id);
     setName(item.name);
     setHsnSacCode(item.hsnSacCode || defaultHsn);
@@ -312,12 +393,21 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         incl = inclusiveFromExclusive(excl, gst);
       }
     } else {
+      const chosenTier = item.defaultPriceTier || 'RETAIL';
+      setPriceTier(chosenTier);
+      let tierPrice = item.salePrice || 0;
+      if (chosenTier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0) {
+        tierPrice = item.semiWholesalePrice;
+      } else if (chosenTier === 'WHOLESALE' && item.wholesalePrice && item.wholesalePrice > 0) {
+        tierPrice = item.wholesalePrice;
+      }
+
       itemMode = item.salePriceMode ?? 'EXCLUSIVE';
-      if (itemMode === 'INCLUSIVE' && item.salePriceInclusive !== undefined) {
-        incl = item.salePriceInclusive;
+      if (itemMode === 'INCLUSIVE') {
+        incl = (chosenTier === 'RETAIL' && item.salePriceInclusive !== undefined) ? item.salePriceInclusive : tierPrice;
         excl = exclusiveFromInclusive(incl, gst);
       } else {
-        excl = item.salePrice || 0;
+        excl = tierPrice;
         incl = inclusiveFromExclusive(excl, gst);
       }
     }
@@ -337,6 +427,32 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     setTimeout(() => {
       quantityInputRef.current?.focus();
     }, 50);
+  };
+
+  const handleSelectPriceTier = (tier: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE') => {
+    setPriceTier(tier);
+    if (!selectedCatalogItem) return;
+    let basePrice = selectedCatalogItem.salePrice || 0;
+    if (tier === 'SEMI_WHOLESALE' && selectedCatalogItem.semiWholesalePrice) {
+      basePrice = selectedCatalogItem.semiWholesalePrice;
+    } else if (tier === 'WHOLESALE' && selectedCatalogItem.wholesalePrice) {
+      basePrice = selectedCatalogItem.wholesalePrice;
+    }
+
+    if (!isGstActive) {
+      setUnitPrice(basePrice);
+      setUnitPriceInclusive(basePrice);
+      setPriceMode('EXCLUSIVE');
+      return;
+    }
+
+    if (priceMode === 'INCLUSIVE') {
+      setUnitPriceInclusive(basePrice);
+      setUnitPrice(exclusiveFromInclusive(basePrice, gstRate));
+    } else {
+      setUnitPrice(basePrice);
+      setUnitPriceInclusive(inclusiveFromExclusive(basePrice, gstRate));
+    }
   };
 
   const handleOpenCreateItem = (prefillName?: string) => {
@@ -676,6 +792,17 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     const qty = roundQuantity(parsedQuantity > 0 ? parsedQuantity : 1, 4);
     const discAmt = calculation.discountAmount > 0 ? calculation.discountAmount : undefined;
 
+    const subUnit = selectedCatalogItem?.subUnit;
+    const subUnitFactor = selectedCatalogItem?.subUnitFactor;
+    let subUnitQuantity: number | undefined = undefined;
+    if (subUnit && subUnitFactor && subUnitFactor > 0) {
+      if (unit === subUnit) {
+        subUnitQuantity = qty;
+      } else if (unit === selectedCatalogItem.unit) {
+        subUnitQuantity = qty * subUnitFactor;
+      }
+    }
+
     return {
       itemId: resolvedItemId || `CUSTOM-${Date.now()}`,
       name: name.trim(),
@@ -683,6 +810,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       hsnSacCode: isGstActive ? (hsnSacCode.trim() || defaultHsn) : '',
       quantity: qty,
       unit,
+      subUnit,
+      subUnitQuantity,
+      priceTier: mode !== 'purchase' ? priceTier : undefined,
       unitPrice: Number(unitPrice) || 0,
       unitPriceInclusive: isGstActive ? (Number(unitPriceInclusive) || 0) : (Number(unitPrice) || 0),
       priceMode: isGstActive ? priceMode : 'EXCLUSIVE',
@@ -694,11 +824,52 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     };
   };
 
+  const updateCatalogItemSalePriceIfChanged = () => {
+    if (!isPurchase) return;
+    const catalogTarget = selectedCatalogItem || (itemId ? itemsCatalog.find((i) => i.id === itemId) : null);
+    if (!catalogTarget) return;
+
+    if (!catalogSalePrice.trim()) return;
+    const newSp = Math.max(0, parseFloat(catalogSalePrice));
+    if (isNaN(newSp)) return;
+
+    const targetMode = catalogTarget.salePriceMode ?? 'EXCLUSIVE';
+    const targetGst = catalogTarget.gstRate ?? 18;
+
+    const currentRefPrice = targetMode === 'INCLUSIVE'
+      ? (catalogTarget.salePriceInclusive !== undefined ? catalogTarget.salePriceInclusive : catalogTarget.salePrice)
+      : catalogTarget.salePrice;
+
+    if (newSp === currentRefPrice) return;
+
+    let nextSalePrice = newSp;
+    let nextSalePriceInclusive: number | undefined;
+
+    if (targetMode === 'INCLUSIVE') {
+      nextSalePriceInclusive = newSp;
+      nextSalePrice = exclusiveFromInclusive(newSp, targetGst);
+    } else {
+      nextSalePrice = newSp;
+      nextSalePriceInclusive = inclusiveFromExclusive(newSp, targetGst);
+    }
+
+    const updatedItem: InventoryItem = {
+      ...catalogTarget,
+      salePrice: nextSalePrice,
+      salePriceInclusive: nextSalePriceInclusive,
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.saveItem(updatedItem, true);
+    onItemCreated?.(updatedItem);
+  };
+
   // Save and keep modal open for next product
   const handleSaveAndAddMore = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!name.trim()) return;
 
+    updateCatalogItemSalePriceIfChanged();
     onSaveItem(buildItemData());
     setJustAddedCount((prev) => prev + 1);
     resetForm();
@@ -712,6 +883,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     if (e) e.preventDefault();
     if (!name.trim()) return;
 
+    updateCatalogItemSalePriceIfChanged();
     onSaveItem(buildItemData());
     onClose();
   };
@@ -851,7 +1023,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                             {item.name}
                           </span>
                           <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
-                            <span>Stock: {item.currentStock} {item.unit}</span>
+                            <span>Stock: {item.currentStock} {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit}</span>
                             {item.mrp && <span>• MRP ₹{item.mrp}</span>}
                             {isGstActive && item.hsnSacCode && <span>• HSN {item.hsnSacCode}</span>}
                           </div>
@@ -950,9 +1122,9 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                 onChange={(e) => setUnit(e.target.value)}
                 className={`w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
               >
-                {COMMON_UNITS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
+                {availableUnits.map((u) => (
+                  <option key={u.code} value={u.code}>
+                    {u.code} ({u.label})
                   </option>
                 ))}
               </select>
@@ -1018,6 +1190,64 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     %
                   </span>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Price Tier Selector (shown when item has non-retail tiers configured) */}
+          {!isPurchase && selectedCatalogItem && ((selectedCatalogItem.semiWholesalePrice !== undefined && selectedCatalogItem.semiWholesalePrice > 0) || (selectedCatalogItem.wholesalePrice !== undefined && selectedCatalogItem.wholesalePrice > 0)) && (
+            <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                  Pricing Tier
+                </span>
+                <span className="text-[11px] text-on-surface-variant font-medium">
+                  Selected: <strong className="text-secondary">{priceTier === 'SEMI_WHOLESALE' ? 'Semi-Wholesale' : priceTier === 'WHOLESALE' ? 'Wholesale' : 'Retail'}</strong>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  aria-pressed={priceTier === 'RETAIL'}
+                  onClick={() => handleSelectPriceTier('RETAIL')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    priceTier === 'RETAIL'
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : 'bg-surface text-on-surface border border-outline-variant/30 hover:bg-surface-container-high'
+                  }`}
+                >
+                  Retail ({formatINR(selectedCatalogItem.salePrice || 0)})
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedCatalogItem.semiWholesalePrice || selectedCatalogItem.semiWholesalePrice <= 0}
+                  aria-pressed={priceTier === 'SEMI_WHOLESALE'}
+                  onClick={() => handleSelectPriceTier('SEMI_WHOLESALE')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    priceTier === 'SEMI_WHOLESALE'
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : selectedCatalogItem.semiWholesalePrice && selectedCatalogItem.semiWholesalePrice > 0
+                      ? 'bg-surface text-on-surface border border-outline-variant/30 hover:bg-surface-container-high cursor-pointer'
+                      : 'bg-surface-container-lowest text-outline-variant border border-outline-variant/10 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  Semi-Wholesale ({selectedCatalogItem.semiWholesalePrice ? formatINR(selectedCatalogItem.semiWholesalePrice) : 'N/A'})
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedCatalogItem.wholesalePrice || selectedCatalogItem.wholesalePrice <= 0}
+                  aria-pressed={priceTier === 'WHOLESALE'}
+                  onClick={() => handleSelectPriceTier('WHOLESALE')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    priceTier === 'WHOLESALE'
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : selectedCatalogItem.wholesalePrice && selectedCatalogItem.wholesalePrice > 0
+                      ? 'bg-surface text-on-surface border border-outline-variant/30 hover:bg-surface-container-high cursor-pointer'
+                      : 'bg-surface-container-lowest text-outline-variant border border-outline-variant/10 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  Wholesale ({selectedCatalogItem.wholesalePrice ? formatINR(selectedCatalogItem.wholesalePrice) : 'N/A'})
+                </button>
               </div>
             </div>
           )}
@@ -1182,6 +1412,41 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
               <p className="text-[11px] text-on-surface-variant/80 italic">
                 Inclusive price covers GST only. CESS is added on top.
+              </p>
+            </div>
+          )}
+
+          {/* Catalog Item Sale Price Updater (Purchase Mode) */}
+          {isPurchase && selectedCatalogItem && (
+            <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                  <span>Sale Price (₹)</span>
+                  <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold bg-orange-500/10 px-1.5 py-0.5 rounded">
+                    Updates catalog item
+                  </span>
+                </label>
+                <span className="text-[10px] text-on-surface-variant font-medium">
+                  Current: <strong className="font-mono text-on-surface">₹{selectedCatalogItem.salePriceMode === 'INCLUSIVE' && selectedCatalogItem.salePriceInclusive !== undefined ? selectedCatalogItem.salePriceInclusive : selectedCatalogItem.salePrice}</strong>
+                </span>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  aria-label="Sale Price"
+                  value={catalogSalePrice}
+                  onChange={(e) => setCatalogSalePrice(e.target.value)}
+                  placeholder="0.00"
+                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-lowest text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
+                />
+              </div>
+              <p className="text-[10px] text-on-surface-variant/80 italic">
+                Changing this value will update the item's sale price in your product catalog upon saving.
               </p>
             </div>
           )}
@@ -1471,8 +1736,10 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                     onChange={(e) => setNewItemUnit(e.target.value as UnitOfMeasurement)}
                     className="w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30 outline-none"
                   >
-                    {COMMON_UNITS.map((u) => (
-                      <option key={u} value={u}>{u}</option>
+                    {availableNewItemUnits.map((u) => (
+                      <option key={u.code} value={u.code}>
+                        {u.code} ({u.label})
+                      </option>
                     ))}
                   </select>
                 </div>

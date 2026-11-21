@@ -24,6 +24,7 @@ export interface UsePosCartReturn {
   updateCartInclusivePrice: (itemId: string, raw: number | string) => void;
   toggleCartPriceMode: (itemId: string) => void;
   updateCartPrice: (itemId: string, unitPrice: number) => void;
+  updateCartPriceTier: (itemId: string, tier: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE') => void;
   removeFromCart: (itemId: string) => void;
   clearCart: () => void;
 }
@@ -136,6 +137,39 @@ export function usePosCart(options: UsePosCartOptions = {}): UsePosCartReturn {
     updateCartExclusivePrice(itemId, unitPrice);
   }, [updateCartExclusivePrice]);
 
+  const updateCartPriceTier = useCallback((itemId: string, tier: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE') => {
+    setCart((prevCart) =>
+      prevCart.map((c) => {
+        if (c.item.id !== itemId) return c;
+        let basePrice = c.item.salePrice || 0;
+        if (tier === 'SEMI_WHOLESALE' && c.item.semiWholesalePrice && c.item.semiWholesalePrice > 0) {
+          basePrice = c.item.semiWholesalePrice;
+        } else if (tier === 'WHOLESALE' && c.item.wholesalePrice && c.item.wholesalePrice > 0) {
+          basePrice = c.item.wholesalePrice;
+        }
+
+        if (!isGstActive || isCompositionScheme) {
+          return {
+            ...c,
+            priceTier: tier,
+            unitPrice: basePrice,
+            unitPriceInclusive: basePrice,
+            priceMode: 'EXCLUSIVE',
+          };
+        }
+
+        const gst = Number(c.item.gstRate) || 0;
+        const mode = c.priceMode ?? 'EXCLUSIVE';
+        return {
+          ...c,
+          priceTier: tier,
+          unitPrice: mode === 'INCLUSIVE' ? exclusiveFromInclusive(basePrice, gst) : basePrice,
+          unitPriceInclusive: mode === 'INCLUSIVE' ? basePrice : inclusiveFromExclusive(basePrice, gst),
+        };
+      })
+    );
+  }, [isGstActive, isCompositionScheme]);
+
   const clearCart = useCallback(() => {
     setCart([]);
   }, []);
@@ -155,6 +189,7 @@ export function usePosCart(options: UsePosCartOptions = {}): UsePosCartReturn {
     updateCartInclusivePrice,
     toggleCartPriceMode,
     updateCartPrice,
+    updateCartPriceTier,
     removeFromCart,
     clearCart,
   }), [
@@ -168,6 +203,7 @@ export function usePosCart(options: UsePosCartOptions = {}): UsePosCartReturn {
     updateCartInclusivePrice,
     toggleCartPriceMode,
     updateCartPrice,
+    updateCartPriceTier,
     removeFromCart,
     clearCart,
   ]);

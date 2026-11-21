@@ -36,6 +36,9 @@ export interface InvoiceItemEntry {
   hsnSacCode: string;
   hsnCode?: string;                   // Optional alias for hsnSacCode (GSTR Table 12 compatibility)
   unit: UnitOfMeasurement;
+  subUnit?: string;
+  subUnitQuantity?: number;
+  priceTier?: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
   quantity: number;
   unitPrice: number;
   unitPriceInclusive?: number;

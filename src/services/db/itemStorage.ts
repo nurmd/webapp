@@ -9,6 +9,14 @@ import {
   findDuplicateItem,
   DuplicateEntityNameError,
 } from '../../core/utils/entityUniqueness.ts';
+import {
+  UnitSetting,
+  listUnits,
+  addUnit,
+  deactivateUnit,
+  activateUnit,
+  getUnit,
+} from './unitSettings.ts';
 
 /**
  * Inventory Items and Categories domain storage.
@@ -243,5 +251,36 @@ export class ItemStorage extends PartyStorage {
     this.set(STORAGE_KEYS.CATEGORIES, DEFAULT_ITEM_CATEGORIES);
     this.broadcastChange('category', 'save', 'all');
     this.notifyListeners();
+  }
+
+  // --- Units of Measurement Registry ---
+
+  listUnits(): UnitSetting[] {
+    return listUnits();
+  }
+
+  addUnit(code: string, label?: string): UnitSetting {
+    const unit = addUnit(code, label);
+    this.notifyListeners();
+    this.broadcastChange('unit', 'save', unit.code, unit);
+    return unit;
+  }
+
+  deactivateUnit(code: string): UnitSetting {
+    const unit = deactivateUnit(code);
+    this.notifyListeners();
+    this.broadcastChange('unit', 'save', unit.code, unit);
+    return unit;
+  }
+
+  activateUnit(code: string): UnitSetting {
+    const unit = activateUnit(code);
+    this.notifyListeners();
+    this.broadcastChange('unit', 'save', unit.code, unit);
+    return unit;
+  }
+
+  getUnit(code: string): UnitSetting | undefined {
+    return getUnit(code);
   }
 }

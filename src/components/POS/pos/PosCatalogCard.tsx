@@ -16,6 +16,13 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
   onAdd,
 }) => {
   const isLowStock = (item.currentStock || 0) <= (item.minStockAlert || 0);
+  const stockUnit = item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit;
+  const displayPrice =
+    item.defaultPriceTier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0
+      ? item.semiWholesalePrice
+      : item.defaultPriceTier === 'WHOLESALE' && item.wholesalePrice && item.wholesalePrice > 0
+      ? item.wholesalePrice
+      : item.salePrice;
 
   return (
     <div
@@ -36,7 +43,7 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
               : 'bg-slate-100 text-slate-600 border border-slate-200'
           }`}
         >
-          Stock: {item.currentStock}
+          Stock: {item.currentStock} {stockUnit}
         </span>
 
         {isGstActive && item.gstRate > 0 && (
@@ -63,7 +70,7 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
       <div className="mt-2.5 pt-2 border-t border-outline-variant/30 flex items-center justify-between">
         <div className="flex items-baseline gap-0.5">
           <span className="text-xs sm:text-sm font-black text-slate-900 font-tabular-data">
-            {formatINR(item.salePrice)}
+            {formatINR(displayPrice)}
           </span>
           <span className="text-[10px] text-slate-500">/{item.unit.toLowerCase()}</span>
         </div>
@@ -88,6 +95,14 @@ export const PosCatalogListRow: React.FC<PosCatalogCardProps> = ({
   isGstActive,
   onAdd,
 }) => {
+  const stockUnit = item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit;
+  const displayPrice =
+    item.defaultPriceTier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0
+      ? item.semiWholesalePrice
+      : item.defaultPriceTier === 'WHOLESALE' && item.wholesalePrice && item.wholesalePrice > 0
+      ? item.wholesalePrice
+      : item.salePrice;
+
   return (
     <div
       onClick={onAdd}
@@ -112,14 +127,14 @@ export const PosCatalogListRow: React.FC<PosCatalogCardProps> = ({
         <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
           <span>{item.category || 'General'}</span>
           <span>•</span>
-          <span>Stock: {item.currentStock} {item.unit}</span>
+          <span>Stock: {item.currentStock} {stockUnit}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
         <div className="text-right">
           <div className="text-xs font-bold text-slate-900 font-tabular-data">
-            {formatINR(item.salePrice)}
+            {formatINR(displayPrice)}
           </div>
           <div className="text-[10px] text-slate-500">/{item.unit.toLowerCase()}</div>
         </div>

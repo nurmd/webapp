@@ -3,7 +3,7 @@ import { InventoryItem, ItemPriceMode, UnitOfMeasurement, isItemDisabled } from 
 import { exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
-import { useItems } from '../../core/store/useDataStore.ts';
+import { useItems, useUnits } from '../../core/store/useDataStore.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import type { HsnItem } from '../../core/gst/hsnCatalog';
@@ -54,6 +54,22 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [currentStock, setCurrentStock] = useState<number>(0);
   const [minStockAlert, setMinStockAlert] = useState<number>(5);
   const [isDisabledState, setIsDisabledState] = useState(false);
+  const [subUnit, setSubUnit] = useState<string>('');
+  const [subUnitFactor, setSubUnitFactor] = useState<string>('');
+  const [wholesalePrice, setWholesalePrice] = useState<string>('');
+  const [semiWholesalePrice, setSemiWholesalePrice] = useState<string>('');
+  const [defaultPriceTier, setDefaultPriceTier] = useState<'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE'>('RETAIL');
+
+  const allRegisteredUnits = useUnits();
+  const registeredUnits = useMemo(() => {
+    const active = allRegisteredUnits.filter((u) => u.active);
+    if (unit && !active.some((u) => u.code === unit)) {
+      const match = allRegisteredUnits.find((u) => u.code === unit);
+      if (match) return [match, ...active];
+      return [{ code: unit, label: unit, kind: 'CUSTOM' as const, active: true }, ...active];
+    }
+    return active;
+  }, [unit, allRegisteredUnits]);
 
   const nameChanged = !editingItem || normalizeEntityName(name) !== normalizeEntityName(editingItem.name);
   const isDuplicateName = useMemo(() => {
@@ -110,6 +126,15 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setCurrentStock(editingItem.currentStock);
       setMinStockAlert(editingItem.minStockAlert);
       setIsDisabledState(isItemDisabled(editingItem));
+      setSubUnit(editingItem.subUnit || '');
+      setSubUnitFactor(editingItem.subUnitFactor ? String(editingItem.subUnitFactor) : '');
+      setWholesalePrice(
+        editingItem.wholesalePrice !== undefined && editingItem.wholesalePrice !== null ? String(editingItem.wholesalePrice) : ''
+      );
+      setSemiWholesalePrice(
+        editingItem.semiWholesalePrice !== undefined && editingItem.semiWholesalePrice !== null ? String(editingItem.semiWholesalePrice) : ''
+      );
+      setDefaultPriceTier(editingItem.defaultPriceTier || 'RETAIL');
     } else {
       setItemType('PRODUCT');
       setName('');
@@ -118,12 +143,17 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setHsn(isGstActive ? '844332' : '');
       setCategory('General');
       setUnit('PCS');
+      setSubUnit('');
+      setSubUnitFactor('');
       setSalePrice(0);
       setSalePriceInclusive(0);
       setSalePriceMode('EXCLUSIVE');
       setPurchasePrice(0);
       setPurchasePriceInclusive(0);
       setPurchasePriceMode('EXCLUSIVE');
+      setWholesalePrice('');
+      setSemiWholesalePrice('');
+      setDefaultPriceTier('RETAIL');
       setGstRate(18);
       setCessRate(0);
       setCurrentStock(0);
@@ -190,6 +220,30 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     e.preventDefault();
     if (!name.trim() || isDuplicateName) return;
 
+    if (subUnit.trim()) {
+      const factorNum = parseFloat(subUnitFactor);
+      if (isNaN(factorNum) || factorNum <= 0) {
+        showAppToast('Sub-unit conversion factor must be greater than 0');
+        return;
+      }
+    }
+
+    if (wholesalePrice.trim() !== '') {
+      const wp = parseFloat(wholesalePrice);
+      if (isNaN(wp) || wp < 0) {
+        showAppToast('Wholesale price cannot be negative');
+        return;
+      }
+    }
+
+    if (semiWholesalePrice.trim() !== '') {
+      const swp = parseFloat(semiWholesalePrice);
+      if (isNaN(swp) || swp < 0) {
+        showAppToast('Semi-wholesale price cannot be negative');
+        return;
+      }
+    }
+
     const itemToSave: InventoryItem = {
       id: editingItem ? editingItem.id : 'ITM-' + Date.now(),
       name: name.trim(),
@@ -198,12 +252,17 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       hsnSacCode: isGstActive ? (hsn.trim() || '844332') : (hsn.trim() || ''),
       category: category.trim() || 'General',
       unit: itemType === 'SERVICE' ? 'HOURS' : unit,
+      subUnit: subUnit.trim() ? subUnit.trim().toUpperCase() : undefined,
+      subUnitFactor: subUnit.trim() && parseFloat(subUnitFactor) > 0 ? parseFloat(subUnitFactor) : undefined,
       salePrice: Number(salePrice),
       salePriceInclusive: isGstActive ? round2(salePriceInclusive) : Number(salePrice),
       salePriceMode: isGstActive ? salePriceMode : 'EXCLUSIVE',
       purchasePrice: Number(purchasePrice),
       purchasePriceInclusive: isGstActive ? round2(purchasePriceInclusive) : Number(purchasePrice),
       purchasePriceMode: isGstActive ? purchasePriceMode : 'EXCLUSIVE',
+      wholesalePrice: wholesalePrice.trim() !== '' && !isNaN(parseFloat(wholesalePrice)) && parseFloat(wholesalePrice) >= 0 ? parseFloat(wholesalePrice) : undefined,
+      semiWholesalePrice: semiWholesalePrice.trim() !== '' && !isNaN(parseFloat(semiWholesalePrice)) && parseFloat(semiWholesalePrice) >= 0 ? parseFloat(semiWholesalePrice) : undefined,
+      defaultPriceTier: defaultPriceTier || 'RETAIL',
       gstRate: Number(gstRate),
       cessRate: Number(cessRate) || 0,
       currentStock: itemType === 'SERVICE' ? 9999 : roundQuantity(Number(currentStock), 4),
@@ -559,6 +618,68 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Multi-Tier Pricing (Retail / Semi-Wholesale / Wholesale) */}
+            <div className="pt-2 border-t border-outline-variant/20 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="font-label-sm text-xs font-bold text-on-surface uppercase tracking-wider">
+                  Tiered Sale Pricing (Optional)
+                </span>
+                <span className="text-[10px] text-outline font-semibold">Wholesale / Semi-Wholesale</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+                    Semi-Wholesale Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 95.00"
+                    aria-label="Semi-Wholesale Price"
+                    value={semiWholesalePrice}
+                    onChange={(e) => setSemiWholesalePrice(e.target.value)}
+                    className="w-full h-10 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+                    Wholesale Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 90.00"
+                    aria-label="Wholesale Price"
+                    value={wholesalePrice}
+                    onChange={(e) => setWholesalePrice(e.target.value)}
+                    className="w-full h-10 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono focus:outline-none focus:border-secondary"
+                  />
+                </div>
+              </div>
+              {(semiWholesalePrice || wholesalePrice) && (
+                <div className="flex items-center gap-2 mt-1">
+                  <label className="text-[11px] font-semibold text-on-surface-variant whitespace-nowrap">
+                    Default Price Tier:
+                  </label>
+                  <select
+                    value={defaultPriceTier}
+                    onChange={(e) => setDefaultPriceTier(e.target.value as any)}
+                    className="h-8 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-xs text-on-surface focus:outline-none focus:border-secondary"
+                  >
+                    <option value="RETAIL">Retail</option>
+                    {semiWholesalePrice && parseFloat(semiWholesalePrice) > 0 && (
+                      <option value="SEMI_WHOLESALE">Semi-Wholesale</option>
+                    )}
+                    {wholesalePrice && parseFloat(wholesalePrice) > 0 && (
+                      <option value="WHOLESALE">Wholesale</option>
+                    )}
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Section 3: Stock & Inventory Tracking */}
@@ -571,7 +692,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                    Current Stock
+                    Current Stock {subUnit ? `(${subUnit})` : `(${unit})`}
                   </label>
                   <input
                     type="text"
@@ -601,19 +722,17 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     onChange={(e) => setUnit(e.target.value as UnitOfMeasurement)}
                     className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                   >
-                    {['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'BOX', 'BAG', 'MTR', 'PKT', 'SET'].map(
-                      (u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      )
-                    )}
+                    {registeredUnits.map((u) => (
+                      <option key={u.code} value={u.code}>
+                        {u.code} ({u.label})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                    Min Alert
+                    Min Alert {subUnit ? `(${subUnit})` : `(${unit})`}
                   </label>
                   <input
                     type="number"
@@ -622,6 +741,63 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
                     className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                   />
+                </div>
+              </div>
+
+              {/* Sub-Unit and Factor Conversion */}
+              <div className="pt-2 border-t border-outline-variant/20 flex flex-col gap-2">
+                <span className="font-label-sm text-xs font-semibold text-on-surface">
+                  Sub-Unit &amp; Packaging Conversion (Optional)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+                      Sub-Unit
+                    </label>
+                    <select
+                      value={subUnit}
+                      aria-label="Sub-Unit"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSubUnit(val);
+                        if (!val) {
+                          setSubUnitFactor('');
+                        }
+                      }}
+                      className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                    >
+                      <option value="">None (No Sub-Unit)</option>
+                      {registeredUnits
+                        .filter((u) => u.code !== unit)
+                        .map((u) => (
+                          <option key={u.code} value={u.code}>
+                            {u.code} ({u.label})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {subUnit && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
+                        Conversion Factor (1 {unit} = ? {subUnit})
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-on-surface-variant font-mono whitespace-nowrap">1 {unit} =</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.0001"
+                          placeholder="e.g. 12 or 40"
+                          aria-label="Sub-Unit Factor"
+                          value={subUnitFactor}
+                          onChange={(e) => setSubUnitFactor(e.target.value)}
+                          className="flex-1 h-10 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono font-bold focus:outline-none focus:border-secondary"
+                        />
+                        <span className="text-xs text-on-surface-variant font-mono">{subUnit}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

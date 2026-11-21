@@ -492,6 +492,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
           hsnSacCode: it.hsnSacCode,
           quantity: it.quantity,
           unit: it.unit,
+          subUnit: it.subUnit,
+          subUnitQuantity: it.subUnitQuantity,
+          priceTier: it.priceTier,
           unitPrice: excl,
           unitPriceInclusive: incl,
           priceMode: mode,
@@ -636,14 +639,26 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         };
         setRows(updated);
       } else {
+        const tier = found.defaultPriceTier || 'RETAIL';
+        let tierPrice = found.salePrice || 0;
+        if (tier === 'SEMI_WHOLESALE' && found.semiWholesalePrice && found.semiWholesalePrice > 0) {
+          tierPrice = found.semiWholesalePrice;
+        } else if (tier === 'WHOLESALE' && found.wholesalePrice && found.wholesalePrice > 0) {
+          tierPrice = found.wholesalePrice;
+        }
+
         const mode = found.salePriceMode ?? 'EXCLUSIVE';
         const gst = found.gstRate ?? 18;
-        let excl = found.salePrice || 0;
-        let incl = found.salePriceInclusive !== undefined
+        let excl = tierPrice;
+        let incl = (mode === 'INCLUSIVE' && found.salePriceInclusive !== undefined && tier === 'RETAIL')
           ? found.salePriceInclusive
           : inclusiveFromExclusive(excl, gst);
-        if (mode === 'INCLUSIVE' && found.salePriceInclusive !== undefined) {
-          incl = found.salePriceInclusive;
+        if (mode === 'INCLUSIVE') {
+          if (tier === 'RETAIL' && found.salePriceInclusive !== undefined) {
+            incl = found.salePriceInclusive;
+          } else {
+            incl = tierPrice;
+          }
           excl = exclusiveFromInclusive(incl, gst);
         }
         setRows([
@@ -655,6 +670,9 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             hsnSacCode: isGstActive ? (found.hsnSacCode || '998313') : '',
             quantity: 1,
             unit: found.unit || 'PCS',
+            subUnit: found.subUnit,
+            subUnitQuantity: found.subUnit && found.subUnitFactor ? 1 * found.subUnitFactor : undefined,
+            priceTier: tier,
             unitPrice: excl,
             unitPriceInclusive: incl,
             priceMode: mode,

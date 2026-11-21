@@ -11,6 +11,9 @@ export interface RawLineItem {
   description?: string;
   hsnSacCode?: string;
   unit?: string;
+  subUnit?: string;
+  subUnitQuantity?: number;
+  priceTier?: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
   quantity?: number;
   unitPrice?: number;
   unitPriceInclusive?: number;
@@ -119,6 +122,9 @@ export function normalizeInvoiceLineItem(
     description: raw.description,
     hsnSacCode: ctx.isGstActive ? (raw.hsnSacCode || '') : '',
     unit: (raw.unit as UnitOfMeasurement) || 'PCS',
+    subUnit: raw.subUnit,
+    subUnitQuantity: raw.subUnitQuantity,
+    priceTier: raw.priceTier,
     quantity: Number(raw.quantity) || 0,
     unitPrice: excl,
     unitPriceInclusive: incl,
@@ -176,6 +182,9 @@ export function normalizePurchaseLineItem(
     description: raw.description,
     hsnSacCode: ctx.isGstActive ? (raw.hsnSacCode || '') : '',
     unit: (raw.unit as UnitOfMeasurement) || 'PCS',
+    subUnit: raw.subUnit,
+    subUnitQuantity: raw.subUnitQuantity,
+    priceTier: raw.priceTier,
     quantity: qty,
     unitPrice: excl,
     unitPriceInclusive: incl,

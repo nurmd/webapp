@@ -18,6 +18,7 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
   const itemDisabled = isItemDisabled(item);
   const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
   const isOut = item.currentStock <= 0;
+  const stockUnit = (item.subUnit && item.subUnitFactor && item.subUnitFactor > 0) ? item.subUnit : item.unit;
 
   return (
     <div
@@ -87,8 +88,8 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
               {isOut
                 ? 'Out of stock'
                 : isLow
-                ? `${formatQuantity(item.currentStock, 4)} ${item.unit} left`
-                : `${formatQuantity(item.currentStock, 4)} ${item.unit}`}
+                ? `${formatQuantity(item.currentStock, 4)} ${stockUnit} left`
+                : `${formatQuantity(item.currentStock, 4)} ${stockUnit}`}
             </span>
           </span>
         </div>

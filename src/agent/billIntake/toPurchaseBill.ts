@@ -9,11 +9,9 @@ import type { UnitOfMeasurement } from '../../models/item.ts';
 import type { ItcEligibility, PurchaseBill, PurchaseItemEntry } from '../../models/purchase.ts';
 import type { IntakeDraft, RawBillExtraction, ResolvedLine, ResolvedSupplier } from './types.ts';
 
-const UOM: UnitOfMeasurement[] = ['PCS', 'NOS', 'KGS', 'GMS', 'LTR', 'ML', 'MTR', 'BOX', 'PKT', 'SET', 'BAG', 'HOURS', 'DAYS'];
-
 function toUom(unit?: string): UnitOfMeasurement {
-  const u = String(unit || '').toUpperCase() as UnitOfMeasurement;
-  return UOM.includes(u) ? u : 'PCS';
+  const u = String(unit || '').trim().toUpperCase() as UnitOfMeasurement;
+  return u || 'PCS';
 }
 
 export interface BuildBillInput {

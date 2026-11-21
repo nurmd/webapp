@@ -9,3 +9,4 @@ export * from './syncStorage.ts';
 export * from './preMigrationBackup.ts';
 export * from './reconcileAndRepair.ts';
 export * from './migrateLegacySplits.ts';
+export * from './unitSettings.ts';

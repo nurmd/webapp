@@ -19,6 +19,7 @@ import { db, SyncedSettings } from '../../services/db.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { Party, PartyGroup, PartyCategory } from '../../models/party.ts';
 import { InventoryItem, ItemCategory, StockAdjustment } from '../../models/item.ts';
+import { UnitSetting } from '../../services/db/unitSettings.ts';
 import { Invoice } from '../../models/invoice.ts';
 import { PurchaseBill } from '../../models/purchase.ts';
 import { Expense } from '../../models/expense.ts';
@@ -82,6 +83,7 @@ export const getStockAdjustmentsSnapshot = createStableSnapshotGetter((): StockA
 export const getWalkInVirtualBalanceSnapshot = createStableSnapshotGetter(
   (): number => computeWalkInVirtualBalance(db.getInvoices())
 );
+export const getUnitsSnapshot = createStableSnapshotGetter((): UnitSetting[] => db.listUnits());
 
 // ---------------------------------------------------------------------------
 // 3. Domain-Specific Reactive Hooks
@@ -133,6 +135,14 @@ export function useItemCategories(): ItemCategory[] {
  */
 export function useItems(): InventoryItem[] {
   return useSyncExternalStore(subscribeToDataStore, getItemsSnapshot, getItemsSnapshot);
+}
+
+/**
+ * Subscribes to Unit of Measurement settings.
+ * Re-renders ONLY when units are added, activated, or deactivated.
+ */
+export function useUnits(): UnitSetting[] {
+  return useSyncExternalStore(subscribeToDataStore, getUnitsSnapshot, getUnitsSnapshot);
 }
 
 /**

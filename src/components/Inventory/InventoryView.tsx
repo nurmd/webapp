@@ -14,6 +14,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { countLowStockItems, isItemNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
+import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
 import { InventoryItemCard } from './InventoryItemCard.tsx';
 import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
@@ -313,7 +314,10 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
   };
 
   // Financial Metrics (Tactile Fintech Card)
-  const totalStockValue = items.reduce((s, i) => s + i.currentStock * i.purchasePrice, 0);
+  const totalStockValue = items.reduce(
+    (s, i) => s + convertQuantityFromBase(i.currentStock, i.unit, i) * (i.purchasePrice || 0),
+    0
+  );
   const lowStockCount = useMemo(() => countLowStockItems(items), [items]);
   const categories = useMemo(() => {
     const managed = itemCategories.map((c) => c.name);

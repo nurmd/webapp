@@ -13,6 +13,9 @@ export interface DocumentGridRow {
   hsnSacCode: string;
   quantity: number;
   unit: string;
+  subUnit?: string;
+  subUnitQuantity?: number;
+  priceTier?: 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
   unitPrice: number;
   unitPriceInclusive?: number;
   priceMode?: ItemPriceMode;

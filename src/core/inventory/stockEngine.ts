@@ -10,8 +10,95 @@ export interface StockLineItem {
   itemId?: string;
   name: string;
   quantity: number;
+  unit?: string;
+  subUnit?: string;
+  subUnitQuantity?: number;
   unitPrice?: number;
   [key: string]: unknown;
+}
+
+/**
+ * Converts a given quantity from a specified unit to the item's base unit.
+ * If 1 unit = factor subUnits (e.g. 1 DOZEN = 12 PCS, 1 BAG = 40 KG):
+ * - If fromUnit is main unit (DOZEN / BAG): baseQty = quantity * factor (2 DOZEN -> 24 PCS)
+ * - If fromUnit is sub-unit (PCS / KG): baseQty = quantity (24 PCS -> 24 PCS)
+ * If no sub-unit configured or factor <= 0, returns quantity directly.
+ */
+export function convertQuantityToBase(
+  quantity: number,
+  fromUnit: string | undefined,
+  item: Pick<InventoryItem, 'unit' | 'subUnit' | 'subUnitFactor'>
+): number {
+  const qty = typeof quantity === 'number' && !isNaN(quantity) ? quantity : 0;
+  const factor = item.subUnitFactor;
+  if (!item.subUnit || typeof factor !== 'number' || factor <= 0) {
+    return qty;
+  }
+
+  const cleanFrom = String(fromUnit || item.unit || '').trim().toUpperCase();
+  const cleanMain = String(item.unit || '').trim().toUpperCase();
+  const cleanSub = String(item.subUnit || '').trim().toUpperCase();
+
+  if (cleanFrom === cleanMain) {
+    return qty * factor;
+  }
+  if (cleanFrom === cleanSub) {
+    return qty;
+  }
+  return qty;
+}
+
+/**
+ * Converts a base quantity to a target unit.
+ * - If toUnit is main unit (DOZEN / BAG): targetQty = baseQty / factor (24 PCS -> 2 DOZEN)
+ * - If toUnit is sub-unit (PCS / KG): targetQty = baseQty (24 PCS -> 24 PCS)
+ */
+export function convertQuantityFromBase(
+  baseQuantity: number,
+  toUnit: string | undefined,
+  item: Pick<InventoryItem, 'unit' | 'subUnit' | 'subUnitFactor'>
+): number {
+  const baseQty = typeof baseQuantity === 'number' && !isNaN(baseQuantity) ? baseQuantity : 0;
+  const factor = item.subUnitFactor;
+  if (!item.subUnit || typeof factor !== 'number' || factor <= 0) {
+    return baseQty;
+  }
+
+  const cleanTo = String(toUnit || item.unit || '').trim().toUpperCase();
+  const cleanMain = String(item.unit || '').trim().toUpperCase();
+  const cleanSub = String(item.subUnit || '').trim().toUpperCase();
+
+  if (cleanTo === cleanMain) {
+    return baseQty / factor;
+  }
+  if (cleanTo === cleanSub) {
+    return baseQty;
+  }
+  return baseQty;
+}
+
+/**
+ * Resolves the effective base inventory quantity for a stock-moving line item.
+ * Always resolves in base units (e.g. PCS, KG).
+ */
+export function getLineBaseQuantity(
+  line: { quantity: number; unit?: string; subUnit?: string; subUnitQuantity?: number },
+  matchedItem?: InventoryItem
+): number {
+  const rawQty = typeof line.quantity === 'number' && !isNaN(line.quantity) ? line.quantity : 0;
+  if (!matchedItem) return rawQty;
+
+  const factor = matchedItem.subUnitFactor;
+  const subUnit = matchedItem.subUnit;
+  if (!subUnit || typeof factor !== 'number' || factor <= 0) {
+    return rawQty;
+  }
+
+  if (typeof line.subUnitQuantity === 'number' && !isNaN(line.subUnitQuantity) && line.subUnitQuantity > 0) {
+    return line.subUnitQuantity;
+  }
+
+  return convertQuantityToBase(rawQty, line.unit, matchedItem);
 }
 
 /**
@@ -84,7 +171,8 @@ export function applyInvoiceStockDecrement(
   for (const line of invoiceItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity, allowNegativeStock);
+      const baseQty = getLineBaseQuantity(line, match);
+      match.currentStock = calculateStockDecrement(match.currentStock, baseQty, allowNegativeStock);
       match.updatedAt = now;
     }
   }
@@ -107,7 +195,8 @@ export function restoreInvoiceStock(
   for (const line of invoiceItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockIncrement(match.currentStock, line.quantity);
+      const baseQty = getLineBaseQuantity(line, match);
+      match.currentStock = calculateStockIncrement(match.currentStock, baseQty);
       match.updatedAt = now;
     }
   }
@@ -146,7 +235,8 @@ export function applyPurchaseStockIncrement(
   for (const line of purchaseItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockIncrement(match.currentStock, line.quantity);
+      const baseQty = getLineBaseQuantity(line, match);
+      match.currentStock = calculateStockIncrement(match.currentStock, baseQty);
       if (typeof line.unitPrice === 'number' && line.unitPrice > 0) {
         match.purchasePrice = line.unitPrice;
       }
@@ -173,7 +263,8 @@ export function applyPurchaseStockDecrement(
   for (const line of purchaseItems) {
     const match = findMatchingItem(itemsList, line);
     if (match) {
-      match.currentStock = calculateStockDecrement(match.currentStock, line.quantity, allowNegativeStock);
+      const baseQty = getLineBaseQuantity(line, match);
+      match.currentStock = calculateStockDecrement(match.currentStock, baseQty, allowNegativeStock);
       match.updatedAt = now;
     }
   }

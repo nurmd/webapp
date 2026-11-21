@@ -31,6 +31,7 @@ export const STORAGE_KEYS = {
   LOCAL_PRINTING_SETTINGS: 'local_device_printing_settings', // Kept strictly device-local
   TOMBSTONES: 'gst_sync_tombstones',
   CONFLICTS: 'gst_sync_conflicts',
+  UNITS: 'gst_unit_settings',
 };
 
 export interface Tombstone {
