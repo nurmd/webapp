@@ -171,10 +171,12 @@ export const PartyKhataDuesCategory: React.FC<PartyKhataDuesCategoryProps> = ({
         (inv.partyId === activeParty.id || (inv.partyName && inv.partyName.toLowerCase() === activeParty.name.toLowerCase()))
     );
 
-    // Party Purchases
+    // Party Purchases (GRNs / purchase challans and purchase orders are not payable
+    // documents, so they must not create khata purchase/payment events)
     const pPurchases = purchases.filter(
       (pur) =>
         !pur.isCancelled &&
+        (pur.purchaseType === undefined || pur.purchaseType === 'BILL' || pur.purchaseType === 'RETURN') &&
         (pur.supplierId === activeParty.id || (pur.supplierName && pur.supplierName.toLowerCase() === activeParty.name.toLowerCase()))
     );
 

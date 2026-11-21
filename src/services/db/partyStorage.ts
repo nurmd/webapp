@@ -489,7 +489,18 @@ export class PartyStorage extends SettingsStorage {
       let allPaymentTotalsPaise = 0;
 
       for (const v of partyPayments) {
-        allPaymentTotalsPaise += toPaise(Number(v.totalAmount) || 0);
+        let grnAllocatedPaise = 0;
+        for (const alloc of v.paymentAllocations || []) {
+          if (alloc.documentType === 'PURCHASE' && alloc.documentId) {
+            const pur = purchases.find((pp) => pp.id === alloc.documentId);
+            if (pur && pur.purchaseType === 'CHALLAN') {
+              grnAllocatedPaise += toPaise(Number(alloc.amount) || 0);
+            }
+          }
+        }
+        const effectiveTotalPaise = Math.max(0, toPaise(Number(v.totalAmount) || 0) - grnAllocatedPaise);
+        if (effectiveTotalPaise <= 0) continue;
+        allPaymentTotalsPaise += effectiveTotalPaise;
         for (const alloc of v.paymentAllocations || []) {
           if (alloc.documentId?.startsWith('OPENING-BALANCE-')) {
             openingAllocatedPaise += toPaise(Number(alloc.amount) || 0);
@@ -651,6 +662,18 @@ export class PartyStorage extends SettingsStorage {
       if (matchedPartiesThisVoucher.size === 0) continue;
 
       const vTotalPaise = toPaise(Number(v.totalAmount) || 0);
+      let grnAllocatedPaise = 0;
+      for (const alloc of v.paymentAllocations || []) {
+        if (alloc.documentType === 'PURCHASE' && alloc.documentId) {
+          const pur = purchases.find((pp) => pp.id === alloc.documentId);
+          if (pur && pur.purchaseType === 'CHALLAN') {
+            grnAllocatedPaise += toPaise(Number(alloc.amount) || 0);
+          }
+        }
+      }
+      const effectiveVTotalPaise = Math.max(0, vTotalPaise - grnAllocatedPaise);
+      if (effectiveVTotalPaise <= 0) continue;
+
       let openingAllocatedPaise = 0;
       for (const alloc of v.paymentAllocations || []) {
         if (alloc.documentId?.startsWith('OPENING-BALANCE-')) {
@@ -668,7 +691,7 @@ export class PartyStorage extends SettingsStorage {
           acc.allReceiptTotalsPaise += vTotalPaise;
           acc.openingAllocatedReceiptsPaise += openingAllocatedPaise;
         } else if (isPayment && party.type !== 'CUSTOMER') {
-          acc.allPaymentTotalsPaise += vTotalPaise;
+          acc.allPaymentTotalsPaise += effectiveVTotalPaise;
           acc.openingAllocatedPaymentsPaise += openingAllocatedPaise;
         }
       }

@@ -127,6 +127,10 @@ export function computeCashFlowStatement(params: {
   // A. Operating Activities - Outflows from Purchases (Direct cash/bank payments)
   for (const pur of purchases) {
     if (pur.isCancelled) continue;
+    // GRNs (purchase challans) and Purchase Orders are non-payable documents; their stored
+    // payment amount must not surface as an operating cash outflow.
+    const purType = (pur as unknown as { purchaseType?: string }).purchaseType;
+    if (purType === 'CHALLAN' || purType === 'PO' || purType === 'PURCHASE_CHALLAN') continue;
     const paidPaise = typeof pur.paidAmount === 'number'
       ? readPaiseOr(pur, 'paidAmount')
       : (pur.paymentStatus === 'PAID' ? readPaiseOr(pur, 'grandTotal', 0) : 0);

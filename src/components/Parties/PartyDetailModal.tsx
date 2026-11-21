@@ -88,6 +88,7 @@ export interface PartyDetailModalProps {
   onEditPurchase?: (bill: PurchaseBill) => void;
   onCreateInvoice?: (party: Party) => void;
   onCreatePurchase?: (party: Party) => void;
+  onCreateGRN?: (party: Party) => void;
   onRefresh?: () => void;
   onOpenPaymentModal?: (flow: 'IN' | 'OUT', party: Party) => void;
 }
@@ -111,6 +112,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
   onEditPurchase,
   onCreateInvoice,
   onCreatePurchase,
+  onCreateGRN,
   onRefresh,
   onOpenPaymentModal,
 }) => {
@@ -896,6 +898,22 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Floating quick action: new GRN (goods receipt note) for this supplier, Orders tab only */}
+      {!isCustomer && activeTab === 'ORDERS' && onCreateGRN && (
+        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
+          <button
+            type="button"
+            data-testid="party-new-grn-fab"
+            onClick={() => onCreateGRN(effectiveParty)}
+            className="h-11 px-4 rounded-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-lg flex items-center gap-1.5 active:scale-95 transition-transform cursor-pointer border border-white/10"
+            title="Create a new Goods Receipt Note (purchase challan) for this supplier"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            <span>+ GRN</span>
+          </button>
+        </div>
+      )}
 
       {/* Payment / Opening Entry Preview Modal */}
       {selectedPaymentForView && (

@@ -202,6 +202,58 @@ describe('Suite 5: Cash/Bank Ledgers & Running Balances', () => {
     expect(summary.totalLiquidBalance).toBe(26000);
   });
 
+  it('TC-CSHB-08b: GRN (purchase challan) paid amount never moves cash/bank or appears in the passbook', () => {
+    const grn: Partial<PurchaseBill> = {
+      id: 'PCH-1',
+      billNumber: 'PCH-2026-0007',
+      purchaseType: 'CHALLAN',
+      paidAmount: 4200,
+      grandTotal: 4200,
+      paymentMode: 'NET_BANKING',
+      paymentStatus: 'PAID',
+      items: [],
+      date: '2026-10-01',
+    };
+    const summary = computeCashBankSummary({
+      ...baseParams,
+      purchases: [grn as PurchaseBill],
+    });
+    // Balance untouched by the GRN
+    expect(summary.totalCashBalance).toBe(5000);
+    expect(summary.totalBankBalance).toBe(25000);
+    expect(summary.totalLiquidBalance).toBe(30000);
+    // No purchase-payment ledger row derived from the GRN
+    const grnRows = summary.ledgerEntries.filter(
+      (e) => e.referenceNo === 'PCH-2026-0007' || e.description?.includes('PCH-2026-0007')
+    );
+    expect(grnRows).toHaveLength(0);
+  });
+
+  it('TC-CSHB-08c: Purchase Order paid amount never moves cash/bank or appears in the passbook', () => {
+    const po: Partial<PurchaseBill> = {
+      id: 'PO-1',
+      billNumber: 'PO-2026-0001',
+      purchaseType: 'PO',
+      paidAmount: 7300,
+      grandTotal: 7300,
+      paymentMode: 'NET_BANKING',
+      paymentStatus: 'PAID',
+      items: [],
+      date: '2026-10-01',
+    };
+    const summary = computeCashBankSummary({
+      ...baseParams,
+      purchases: [po as PurchaseBill],
+    });
+    expect(summary.totalCashBalance).toBe(5000);
+    expect(summary.totalBankBalance).toBe(25000);
+    expect(summary.totalLiquidBalance).toBe(30000);
+    const poRows = summary.ledgerEntries.filter(
+      (e) => e.referenceNo === 'PO-2026-0001' || e.description?.includes('PO-2026-0001')
+    );
+    expect(poRows).toHaveLength(0);
+  });
+
   it('TC-CSHB-09: Cash and bank expenses correctly decrease respective accounts', () => {
     const expCash: Partial<Expense> = {
       id: 'EXP-1',

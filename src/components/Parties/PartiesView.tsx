@@ -57,6 +57,7 @@ interface PartiesViewProps {
   onEditPurchase?: (bill: PurchaseBill) => void;
   onCreateInvoice?: (party: Party) => void;
   onCreatePurchase?: (party: Party) => void;
+  onCreateGRN?: (party: Party) => void;
   onRefresh?: () => void;
 }
 
@@ -76,6 +77,7 @@ const PartiesViewComponent: React.FC<PartiesViewProps> = ({
   onEditPurchase,
   onCreateInvoice,
   onCreatePurchase,
+  onCreateGRN,
   onRefresh,
 }) => {
   const company = useCompany();
@@ -478,6 +480,7 @@ const PartiesViewComponent: React.FC<PartiesViewProps> = ({
           onEditPurchase={onEditPurchase}
           onCreateInvoice={onCreateInvoice}
           onCreatePurchase={onCreatePurchase}
+          onCreateGRN={onCreateGRN}
           onRefresh={onRefresh}
         />
 

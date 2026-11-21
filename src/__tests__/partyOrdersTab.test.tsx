@@ -972,4 +972,55 @@ describe('Supplier Detail: Transactions / Orders tabs spec', () => {
     // Total orders list contains all 7 PO/GRN documents (including cancelled & converted)
     expect(hookResult!.partyOrders.length).toBe(7);
   });
+
+  it('Test E — supplier Orders tab exposes a +GRN floating action', async () => {
+    const supplier: Party = {
+      id: 'SUP-GRN-1',
+      name: 'GRN Supplier',
+      type: 'SUPPLIER',
+      phone: '9876500000',
+      billingAddress: 'Industrial Area, Pune',
+      stateCode: '27',
+      currentBalance: 0,
+      createdAt: '2026-04-01T00:00:00Z',
+      updatedAt: '2026-04-01T00:00:00Z',
+    };
+    db.saveParty(supplier);
+    const onCreateGRN = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <PartyDetailPage
+          party={supplier}
+          company={mockCompany}
+          invoices={[]}
+          purchases={[]}
+          vouchers={[]}
+          onBack={vi.fn()}
+          onEditParty={vi.fn()}
+          onRecordPayment={vi.fn()}
+          onCreateGRN={onCreateGRN}
+        />
+      );
+    });
+
+    // Hidden on the default Transactions tab
+    expect(container.querySelector('[data-testid="party-new-grn-fab"]')).toBeNull();
+
+    const ordersTab = container.querySelector('[data-testid="party-tab-orders"]') as HTMLButtonElement;
+    expect(ordersTab).not.toBeNull();
+    await act(async () => {
+      ordersTab.click();
+    });
+
+    const fab = container.querySelector('[data-testid="party-new-grn-fab"]') as HTMLButtonElement;
+    expect(fab).not.toBeNull();
+    expect(fab.textContent).toContain('+ GRN');
+
+    await act(async () => {
+      fab.click();
+    });
+    expect(onCreateGRN).toHaveBeenCalledTimes(1);
+    expect(onCreateGRN).toHaveBeenCalledWith(expect.objectContaining({ id: supplier.id }));
+  });
 });

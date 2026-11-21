@@ -277,6 +277,12 @@ export function computeCashBankSummary(params: {
   const orderedPurchases = [...purchases].sort(chronological);
   orderedPurchases.forEach((pur) => {
     if (!pur) return;
+    // Goods Receipt Notes (purchase challans) and Purchase Orders are not payable
+    // documents. Any payment amount stored on them is not a real cash/bank movement, so
+    // it must never produce a passbook entry or move the live balance. This keeps the
+    // Cash & Bank ledger in sync with the party passbook, which already excludes these.
+    const purType = (pur as unknown as { purchaseType?: string }).purchaseType;
+    if (purType === 'CHALLAN' || purType === 'PO' || purType === 'PURCHASE_CHALLAN') return;
     const paidPaise = typeof pur.paidAmount === 'number'
       ? readPaiseOr(pur, 'paidAmount')
       : (pur.paymentStatus === 'PAID' ? readPaiseOr(pur, 'grandTotal', 0) : 0);

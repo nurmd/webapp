@@ -809,6 +809,14 @@ export const App: React.FC = () => {
   const handleCreatePurchaseForParty = useCallback((party: Party) => {
     setEditingPurchase(null);
     setSelectedSupplierForPurchase(party);
+    setPurchaseModalDefaultType(undefined);
+    setIsTableGridPurchaseOpen(true);
+  }, []);
+
+  const handleCreateGRNForParty = useCallback((party: Party) => {
+    setEditingPurchase(null);
+    setSelectedSupplierForPurchase(party);
+    setPurchaseModalDefaultType('CHALLAN');
     setIsTableGridPurchaseOpen(true);
   }, []);
 
@@ -1718,6 +1726,7 @@ export const App: React.FC = () => {
             onEditPurchase={handleEditPurchase}
             onCreateInvoice={handleCreateInvoiceForParty}
             onCreatePurchase={handleCreatePurchaseForParty}
+            onCreateGRN={handleCreateGRNForParty}
             onRefresh={refreshData}
           />
         )}
