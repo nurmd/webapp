@@ -53,8 +53,9 @@ export function comparePassbookEntries(
     if (b.type === 'OPENING') return 1;
   }
 
-  const tsA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
-  const tsB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+  // Prefer the business transaction date; fall back to createdAt only when date is missing/invalid
+  const tsA = a.date ? new Date(a.date).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+  const tsB = b.date ? new Date(b.date).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
   const tA = isNaN(tsA) ? 0 : tsA;
   const tB = isNaN(tsB) ? 0 : tsB;
   const tsDiff = descending ? tB - tA : tA - tB;
@@ -64,6 +65,14 @@ export function comparePassbookEntries(
   if (descending) {
     if (a.type === 'OPENING') return 1;
     if (b.type === 'OPENING') return -1;
+  }
+
+  // Tie-break on the same business date by record creation time (createdAt), then id
+  const cA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const cB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  const cDiff = descending ? cB - cA : cA - cB;
+  if (cDiff !== 0 && !isNaN(cA) && !isNaN(cB)) {
+    return cDiff;
   }
 
   // On identical timestamps, bills before their payments (tie-breaker only)

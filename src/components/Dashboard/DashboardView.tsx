@@ -50,6 +50,38 @@ export type CashFlowDirection = 'IN' | 'OUT';
 export type TxTypeFilter = 'ALL' | 'SALES' | 'PURCHASES' | 'VOUCHERS' | 'EXPENSES' | 'VOUCHERS_EXPENSES';
 export type TxStatusFilter = 'ALL' | 'UNPAID' | 'PAID';
 
+// Short helper: prefer the business transaction date; fall back to createdAt only when date is missing/invalid.
+// When both are present, keep createdAt's time-of-day as a tie-break for same-day records.
+export function parseActivityTimestamp(dateStr?: string, createdAt?: string): number {
+  let base = NaN;
+  if (dateStr) {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) base = d.getTime();
+    else if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const parts = dateStr.trim().split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const parsed = new Date(year, month, day);
+        if (!isNaN(parsed.getTime())) base = parsed.getTime();
+      }
+    }
+  }
+  if (!isNaN(base) && createdAt) {
+    const c = new Date(createdAt);
+    if (!isNaN(c.getTime())) {
+      base += c.getHours() * 3600000 + c.getMinutes() * 60000 + c.getSeconds() * 1000 + c.getMilliseconds();
+    }
+  }
+  if (!isNaN(base)) return base;
+  if (createdAt) {
+    const c = new Date(createdAt);
+    if (!isNaN(c.getTime())) return c.getTime();
+  }
+  return 0;
+}
+
 export interface ActivityTransaction {
   id: string;
   rawId: string;
@@ -297,28 +329,7 @@ const DashboardViewComponent: React.FC<DashboardViewProps> = ({
   const allActivities = useMemo(() => {
     const feed: ActivityTransaction[] = [];
 
-    // Helper to reliably parse createdAt (authoritative for ordering) or fall back to business date (ISO, DD/MM/YYYY)
-    const parseDateToTimestamp = (dateStr?: string, createdAt?: string): number => {
-      if (createdAt) {
-        const c = new Date(createdAt);
-        if (!isNaN(c.getTime())) return c.getTime();
-      }
-      if (dateStr) {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) return d.getTime();
-        if (typeof dateStr === 'string' && dateStr.includes('/')) {
-          const parts = dateStr.trim().split('/');
-          if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year = parseInt(parts[2], 10);
-            const parsed = new Date(year, month, day);
-            if (!isNaN(parsed.getTime())) return parsed.getTime();
-          }
-        }
-      }
-      return 0;
-    };
+    const parseDateToTimestamp = parseActivityTimestamp;
 
     // A. Sales Invoices (Money In - Emerald)
     activeInvoices.forEach((inv) => {

@@ -169,7 +169,16 @@ export async function reconcileAndRepairLedgerAndInventory(): Promise<LedgerRepa
   // Sort oldest first: preserve original canonical voucher, reverse subsequent duplicate copies
   for (const [, vList] of activeSalesVouchersByRef.entries()) {
     if (vList.length > 1) {
-      vList.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      vList.sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : NaN;
+        const db_ = b.date ? new Date(b.date).getTime() : NaN;
+        const ta = !isNaN(da) ? da : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const tb = !isNaN(db_) ? db_ : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        if (ta !== tb) return ta - tb;
+        const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return ca - cb;
+      });
       const [, ...duplicates] = vList;
       for (const dup of duplicates) {
         const rev = createReversalVoucher({
@@ -185,7 +194,16 @@ export async function reconcileAndRepairLedgerAndInventory(): Promise<LedgerRepa
 
   for (const [, vList] of activePurchaseVouchersByRef.entries()) {
     if (vList.length > 1) {
-      vList.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      vList.sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : NaN;
+        const db_ = b.date ? new Date(b.date).getTime() : NaN;
+        const ta = !isNaN(da) ? da : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const tb = !isNaN(db_) ? db_ : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        if (ta !== tb) return ta - tb;
+        const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return ca - cb;
+      });
       const [, ...duplicates] = vList;
       for (const dup of duplicates) {
         const rev = createReversalVoucher({
@@ -201,7 +219,16 @@ export async function reconcileAndRepairLedgerAndInventory(): Promise<LedgerRepa
 
   for (const [, vList] of activeRcmVouchersByRef.entries()) {
     if (vList.length > 1) {
-      vList.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      vList.sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : NaN;
+        const db_ = b.date ? new Date(b.date).getTime() : NaN;
+        const ta = !isNaN(da) ? da : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const tb = !isNaN(db_) ? db_ : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        if (ta !== tb) return ta - tb;
+        const ca = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const cb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return ca - cb;
+      });
       const [, ...duplicates] = vList;
       for (const dup of duplicates) {
         const rev = createReversalVoucher({

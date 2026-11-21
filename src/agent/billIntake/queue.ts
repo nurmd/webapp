@@ -58,15 +58,21 @@ function prune(drafts: IntakeDraft[]): IntakeDraft[] {
   // Newest first, capped. Open drafts are pinned ahead of closed ones so a busy
   // day of imports can never push a review item out of the queue.
   const isOpen = (d: IntakeDraft) => d.status === 'QUEUED' || d.status === 'NEEDS_REVIEW' || d.status === 'APPROVED';
-  const open = shaped.filter(isOpen).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  const closed = shaped.filter((d) => !isOpen(d)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const txnDate = (d: IntakeDraft) => d.bill?.date || d.createdAt;
+  const open = shaped.filter(isOpen).sort((a, b) => (txnDate(a) < txnDate(b) ? 1 : txnDate(a) > txnDate(b) ? -1 : (a.createdAt < b.createdAt ? 1 : -1)));
+  const closed = shaped.filter((d) => !isOpen(d)).sort((a, b) => (txnDate(a) < txnDate(b) ? 1 : txnDate(a) > txnDate(b) ? -1 : (a.createdAt < b.createdAt ? 1 : -1)));
   const capClosed = Math.max(0, MAX_DRAFTS - open.length);
   return [...open, ...closed.slice(0, capClosed)];
 }
 
 export const intakeQueue = {
   list(): IntakeDraft[] {
-    return decode().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const txnDate = (d: IntakeDraft) => d.bill?.date || d.createdAt;
+    return decode().sort((a, b) => {
+      const da = txnDate(a), db_ = txnDate(b);
+      if (da !== db_) return da < db_ ? 1 : -1;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    });
   },
 
   get(id: string): IntakeDraft | undefined {

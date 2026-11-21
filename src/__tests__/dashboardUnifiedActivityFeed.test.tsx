@@ -1954,7 +1954,7 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
 
       expect(idxB).toBeGreaterThan(-1);
       expect(idxA).toBeGreaterThan(-1);
-      expect(idxB).toBeLessThan(idxA);
+      expect(idxA).toBeLessThan(idxB);
     });
 
     it('same-day precision: two records sharing one business date order by latest createdAt', () => {
@@ -2094,8 +2094,8 @@ describe('Dashboard Unified Business Activity Timeline Suite (R1, R2, R3)', () =
       const idxB = text.indexOf('INV-LBL-B');
       const idxA = text.indexOf('INV-LBL-A');
 
-      // Ordering: B renders above A
-      expect(idxB).toBeLessThan(idxA);
+      // Ordering: A renders above B (business date is authoritative)
+      expect(idxA).toBeLessThan(idxB);
 
       // Display: Row shows formatted business dates ('15/10/2026' and '25/10/2026'), NOT creation timestamps
       expect(text).toContain('15/10/2026');
