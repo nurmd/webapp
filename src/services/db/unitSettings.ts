@@ -9,10 +9,13 @@
 import { STORAGE_KEYS } from './storageEngine.ts';
 
 export interface UnitSetting {
+  id?: string;
   code: string;
   label: string;
   kind: 'STANDARD' | 'CUSTOM';
   active: boolean;
+  updatedAt?: string;
+  createdAt?: string;
 }
 
 export const STANDARD_UNIT_SEEDS: readonly UnitSetting[] = [
@@ -40,7 +43,18 @@ export function normalizeUnitCode(raw?: string): string {
 
 let inMemoryUnits: UnitSetting[] | null = null;
 let sortedCache: { src: UnitSetting[]; out: UnitSetting[] } | null = null;
+let fallbackMemoryStorage: string | null = null;
 const unitSubscribers = new Set<() => void>();
+
+function getStorage(): Storage | null {
+  if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
+    return window.localStorage;
+  }
+  if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+    return localStorage;
+  }
+  return null;
+}
 
 export function subscribeUnits(listener: () => void): () => void {
   unitSubscribers.add(listener);
@@ -64,9 +78,10 @@ function loadRawUnits(): UnitSetting[] {
     return inMemoryUnits;
   }
 
-  if (typeof localStorage !== 'undefined') {
+  const storage = getStorage();
+  if (storage) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY_UNITS);
+      const raw = storage.getItem(STORAGE_KEY_UNITS);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -77,6 +92,16 @@ function loadRawUnits(): UnitSetting[] {
     } catch {
       // Fallback to standard seeds
     }
+  } else if (fallbackMemoryStorage) {
+    try {
+      const parsed = JSON.parse(fallbackMemoryStorage);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        inMemoryUnits = parsed;
+        return inMemoryUnits;
+      }
+    } catch {
+      // Fallback
+    }
   }
 
   inMemoryUnits = STANDARD_UNIT_SEEDS.map((s) => ({ ...s }));
@@ -86,12 +111,15 @@ function loadRawUnits(): UnitSetting[] {
 function persistUnits(units: UnitSetting[]): void {
   inMemoryUnits = units;
   sortedCache = null;
-  if (typeof localStorage !== 'undefined') {
+  const storage = getStorage();
+  if (storage) {
     try {
-      localStorage.setItem(STORAGE_KEY_UNITS, JSON.stringify(units));
+      storage.setItem(STORAGE_KEY_UNITS, JSON.stringify(units));
     } catch {
       // Ignore localStorage write failures
     }
+  } else {
+    fallbackMemoryStorage = JSON.stringify(units);
   }
   notifyUnitSubscribers();
 }
@@ -113,6 +141,31 @@ export function listUnits(): UnitSetting[] {
 
   sortedCache = { src: all, out: sorted };
   return sorted;
+}
+
+/**
+ * Alias for listUnits() per synced collection pattern.
+ */
+export function getUnits(): UnitSetting[] {
+  return listUnits();
+}
+
+/**
+ * Persist raw units array (used by sync engine to apply remote mutations).
+ */
+export function setUnits(units: UnitSetting[]): void {
+  persistUnits(units);
+}
+
+/**
+ * Invalidate in-memory caches and reload units from storage.
+ * Called after sync writes units via the storage engine.
+ */
+export function reloadUnitsFromStorage(): void {
+  inMemoryUnits = null;
+  sortedCache = null;
+  loadRawUnits();
+  notifyUnitSubscribers();
 }
 
 /**
@@ -217,9 +270,11 @@ export function getUnit(code: string): UnitSetting | undefined {
 export function resetUnits(): void {
   inMemoryUnits = STANDARD_UNIT_SEEDS.map((s) => ({ ...s }));
   sortedCache = null;
-  if (typeof localStorage !== 'undefined') {
+  fallbackMemoryStorage = null;
+  const storage = getStorage();
+  if (storage) {
     try {
-      localStorage.removeItem(STORAGE_KEY_UNITS);
+      storage.removeItem(STORAGE_KEY_UNITS);
     } catch {}
   }
   notifyUnitSubscribers();

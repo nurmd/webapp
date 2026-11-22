@@ -12,6 +12,7 @@ export type AppTab =
   | 'parties'
   | 'cash_bank'
   | 'inventory'
+  | 'units_pricing'
   | 'expenses'
   | 'reports'
   | 'accounting'
@@ -81,6 +82,7 @@ export const Drawer: React.FC<DrawerProps> = React.memo(({
         { id: 'purchase_returns', label: 'Purchase Returns (Debit Note)', icon: 'assignment_turned_in' },
         { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
         { id: 'inventory', label: 'Inventory & Stock', icon: 'inventory_2' },
+        { id: 'units_pricing', label: 'Units & Multi-Tier Pricing', icon: 'straighten' },
       ],
     },
     {

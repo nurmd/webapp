@@ -89,6 +89,9 @@ const PurchasesHubView = React.lazy(() =>
 const InventoryView = React.lazy(() =>
   import('./components/Inventory/InventoryView.tsx').then((m) => ({ default: m.InventoryView }))
 );
+const UnitsPricingView = React.lazy(() =>
+  import('./components/Inventory/UnitsPricingView.tsx').then((m) => ({ default: m.UnitsPricingView }))
+);
 const PartiesView = React.lazy(() =>
   import('./components/Parties/PartiesView.tsx').then((m) => ({ default: m.PartiesView }))
 );
@@ -1710,6 +1713,15 @@ export const App: React.FC = () => {
             onScanBarcodeClick={handleScanBarcodeClick}
             onViewInvoice={setPreviewInvoice}
             onOpenSettings={handleInventoryOpenSettings}
+          />
+        )}
+
+        {activeTab === 'units_pricing' && (
+          <UnitsPricingView
+            items={items}
+            onSaveItem={handleSaveItem}
+            onOpenSettings={handleInventoryOpenSettings}
+            isGstActive={company.isGstEnabled !== false}
           />
         )}
 

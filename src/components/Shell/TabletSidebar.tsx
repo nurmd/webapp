@@ -75,6 +75,7 @@ export const TabletSidebar: React.FC<TabletSidebarProps> = React.memo(({
         { id: 'purchase_returns', label: 'Purchase Returns (DN)', icon: 'assignment_turned_in' },
         { id: 'parties', label: 'Parties & Ledger', icon: 'group' },
         { id: 'inventory', label: 'Inventory & Stock', icon: 'inventory_2' },
+        { id: 'units_pricing', label: 'Units & Multi-Tier Pricing', icon: 'straighten' },
       ],
     },
     {

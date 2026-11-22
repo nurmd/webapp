@@ -1533,9 +1533,10 @@ export class PouchService {
     }, delay);
   }
 
-  private async persistDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
-    const docId = `${type}:${doc.id}`;
-    const tombstoneId = `tombstone:${type}:${doc.id}`;
+  private async persistDoc<T extends { id?: string; code?: string }>(type: string, doc: T): Promise<void> {
+    const rawId = (doc as any).id || (doc as any).code;
+    const docId = `${type}:${rawId}`;
+    const tombstoneId = `tombstone:${type}:${rawId}`;
 
     // Clear any existing tombstone in PouchDB so entity is live
     try {
@@ -1596,7 +1597,7 @@ export class PouchService {
             id: conflictId,
             docId,
             docType: type,
-            entityId: doc.id,
+            entityId: (doc as any).id || (doc as any).code || docId,
             winningRev: latest._rev,
             conflictingRev: 'local-409',
             winningDoc: latest,
@@ -1625,10 +1626,11 @@ export class PouchService {
     this.refreshConflicts().catch(() => {});
   }
 
-  public async putDoc<T extends { id: string }>(type: string, doc: T): Promise<void> {
-    const docId = `${type}:${doc.id}`;
+  public async putDoc<T extends { id?: string; code?: string }>(type: string, doc: T): Promise<void> {
+    const rawId = (doc as any).id || (doc as any).code;
+    const docId = `${type}:${rawId}`;
     try {
-      await this.persistDoc(type, doc);
+      await this.persistDoc(type, doc as any);
     } catch (e: any) {
       console.error(`PouchDB putDoc error [${docId}]:`, e);
       const is409 = e && (e.status === 409 || e.name === 'conflict');
@@ -1636,7 +1638,7 @@ export class PouchService {
         enqueueWrite(this.activeDbName, {
           op: 'PUT',
           type,
-          id: doc.id,
+          id: rawId,
           doc,
           error: e?.message || String(e),
         });

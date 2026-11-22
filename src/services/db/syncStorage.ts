@@ -45,6 +45,7 @@ import {
   DEMO_VOUCHERS,
 } from '../demoData.ts';
 import { BackupRestoreStorage } from './backupRestoreStorage.ts';
+import { UnitSetting, reloadUnitsFromStorage } from './unitSettings.ts';
 
 /**
  * Synchronization and Demo Data lifecycle domain storage.
@@ -222,6 +223,7 @@ export class SyncStorage extends BackupRestoreStorage {
       STORAGE_KEYS.LOAN_TXNS,
       STORAGE_KEYS.PARTY_GROUPS,
       STORAGE_KEYS.PARTY_CATEGORIES,
+      STORAGE_KEYS.UNITS,
       STORAGE_KEYS.TOMBSTONES,
       STORAGE_KEYS.CONFLICTS,
       STORAGE_KEYS.SETTINGS,
@@ -265,6 +267,10 @@ export class SyncStorage extends BackupRestoreStorage {
           void this.prunePartyReferencesForDeletedEntity('category', id, false).catch((err) => {
             console.warn('Failed to prune party category references:', err);
           });
+          break;
+        }
+        case 'unit': {
+          this.setUnits(this.getUnits().filter((u) => u.code !== id));
           break;
         }
       }
@@ -398,6 +404,13 @@ export class SyncStorage extends BackupRestoreStorage {
           const idx = list.findIndex((c) => c.id === id);
           if (idx >= 0) list[idx] = data; else list.push(data);
           this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
+          break;
+        }
+        case 'unit': {
+          const list = [...this.getUnits()];
+          const idx = list.findIndex((u) => u.code === id);
+          if (idx >= 0) list[idx] = data; else list.push(data);
+          this.setUnits(list);
           break;
         }
       }
@@ -543,6 +556,11 @@ export class SyncStorage extends BackupRestoreStorage {
           void this.prunePartyReferencesForDeletedEntity('category', docId, true).catch((err) => {
             console.warn('Failed to prune incoming party category references:', err);
           });
+          break;
+        }
+        case 'unit': {
+          const list = this.getUnits().filter((u) => u.code !== docId);
+          this.setUnits(list);
           break;
         }
       }
@@ -713,6 +731,13 @@ export class SyncStorage extends BackupRestoreStorage {
         this.set(STORAGE_KEYS.PARTY_CATEGORIES, list);
         break;
       }
+      case 'unit': {
+        const list = [...this.getUnits()];
+        const idx = list.findIndex((u) => u.code === docId);
+        if (idx >= 0) list[idx] = data as UnitSetting; else list.push(data as UnitSetting);
+        this.setUnits(list);
+        break;
+      }
     }
     this.notifyListeners();
   }
@@ -725,7 +750,7 @@ export class SyncStorage extends BackupRestoreStorage {
     return hasOnlyDerivedDivergence(a, b);
   }
 
-  private reconcileCollection<T extends { id: string; updatedAt?: string; createdAt?: string }>(
+  private reconcileCollection<T extends { id?: string; code?: string; updatedAt?: string; createdAt?: string }>(
     entityType: string,
     storageKey: string,
     localItems: T[],
@@ -734,7 +759,8 @@ export class SyncStorage extends BackupRestoreStorage {
     const tombstones = this.getTombstones();
     const localMap = new Map<string, T>();
     (localItems || []).forEach((item) => {
-      if (item && item.id) localMap.set(item.id, item);
+      const id = (item as any)?.id || (item as any)?.code;
+      if (item && id) localMap.set(id, item);
     });
 
     const isFinancial = [
@@ -757,7 +783,7 @@ export class SyncStorage extends BackupRestoreStorage {
       const tombstone = tombstones[tombstoneKey];
 
       if (tombstone) {
-        const remoteItem = (remoteItems || []).find((r) => r && r.id === id);
+        const remoteItem = (remoteItems || []).find((r) => r && (((r as any).id === id) || ((r as any).code === id)));
         const remoteTime = remoteItem?.updatedAt || remoteItem?.createdAt || '';
         if (remoteItem && remoteTime && remoteTime > tombstone.deletedAt) {
           this.removeTombstone(entityType, id);
@@ -766,7 +792,7 @@ export class SyncStorage extends BackupRestoreStorage {
           pouch.deleteDoc(entityType, id)?.catch?.(() => {});
         }
       } else {
-        const remoteItem = (remoteItems || []).find((r) => r && r.id === id);
+        const remoteItem = (remoteItems || []).find((r) => r && (((r as any).id === id) || ((r as any).code === id)));
         if (!remoteItem) {
           // Local unsynced record: remote does not have it yet!
           // NEVER DELETE LOCAL UNSYNCED RECORDS
@@ -815,9 +841,9 @@ export class SyncStorage extends BackupRestoreStorage {
 
     // 2. Process remote items not yet in mergedMap
     for (const remoteItem of remoteItems || []) {
-      if (!remoteItem || !remoteItem.id) continue;
+      const id = remoteItem?.id || remoteItem?.code;
+      if (!remoteItem || !id) continue;
 
-      const id = remoteItem.id;
       if (mergedMap.has(id)) continue;
 
       const tombstoneKey = `${entityType}:${id}`;
@@ -837,10 +863,18 @@ export class SyncStorage extends BackupRestoreStorage {
     }
 
     const mergedList = Array.from(mergedMap.values());
-    this.set(storageKey, mergedList);
+    if (storageKey === STORAGE_KEYS.UNITS) {
+      this.setUnits(mergedList as any);
+    } else {
+      this.set(storageKey, mergedList);
+    }
 
     if (unsyncedToPush.length > 0 && typeof (pouch as any)?.putDoc === 'function') {
-      Promise.all(unsyncedToPush.map((item) => pouch.putDoc(entityType, item))).catch((err) => {
+      Promise.all(unsyncedToPush.map((item) => {
+        const id = (item as any).id || (item as any).code;
+        const doc = (item as any).id ? item : { ...item, id };
+        return pouch.putDoc(entityType, doc as any);
+      })).catch((err) => {
         console.warn(`Error pushing unsynced ${entityType} records to PouchDB:`, err);
       });
     }
@@ -866,6 +900,7 @@ export class SyncStorage extends BackupRestoreStorage {
         remoteLoanTxns,
         remotePartyGroups,
         remotePartyCategories,
+        remoteUnits,
         remoteTombstones,
       ] = await Promise.all([
         pouch.getAllDocs<SyncedSettings>('settings'),
@@ -883,6 +918,7 @@ export class SyncStorage extends BackupRestoreStorage {
         pouch.getAllDocs<LoanTransaction>('loan_txn'),
         pouch.getAllDocs<PartyGroup>('party_group'),
         pouch.getAllDocs<PartyCategory>('party_category'),
+        pouch.getAllDocs<UnitSetting>('unit'),
         typeof (pouch as any)?.getAllTombstones === 'function'
           ? (pouch as any).getAllTombstones()
           : Promise.resolve([]),
@@ -1003,6 +1039,13 @@ export class SyncStorage extends BackupRestoreStorage {
         this.getPartyCategories(),
         remotePartyCategories
       );
+      this.reconcileCollection(
+        'unit',
+        STORAGE_KEYS.UNITS,
+        this.getUnits(),
+        remoteUnits
+      );
+      reloadUnitsFromStorage();
 
       if (typeof (pouch as any)?.refreshConflicts === 'function') {
         await (pouch as any).refreshConflicts();

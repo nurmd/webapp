@@ -606,6 +606,7 @@ export class RbacService {
         'sales_returns',
         'cash_bank',
         'inventory',
+        'units_pricing',
         'menu',
         'print_settings',
       ];
@@ -632,6 +633,7 @@ export class RbacService {
         'expenses',
         'parties',
         'inventory',
+        'units_pricing',
         'menu',
         'print_settings',
       ];

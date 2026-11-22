@@ -12,6 +12,8 @@ import {
 import {
   UnitSetting,
   listUnits,
+  getUnits,
+  setUnits,
   addUnit,
   deactivateUnit,
   activateUnit,
@@ -259,24 +261,42 @@ export class ItemStorage extends PartyStorage {
     return listUnits();
   }
 
+  getUnits(): UnitSetting[] {
+    return getUnits();
+  }
+
+  setUnits(units: UnitSetting[]): void {
+    setUnits(units);
+    this.notifyListeners();
+  }
+
   addUnit(code: string, label?: string): UnitSetting {
     const unit = addUnit(code, label);
+    const unitDoc = { ...unit, id: unit.code };
+    this.removeTombstone('unit', unit.code);
+    this.backgroundPouchPut('unit', unitDoc);
     this.notifyListeners();
-    this.broadcastChange('unit', 'save', unit.code, unit);
+    this.broadcastChange('unit', 'save', unit.code, unitDoc);
     return unit;
   }
 
   deactivateUnit(code: string): UnitSetting {
     const unit = deactivateUnit(code);
+    const unitDoc = { ...unit, id: unit.code };
+    this.removeTombstone('unit', unit.code);
+    this.backgroundPouchPut('unit', unitDoc);
     this.notifyListeners();
-    this.broadcastChange('unit', 'save', unit.code, unit);
+    this.broadcastChange('unit', 'save', unit.code, unitDoc);
     return unit;
   }
 
   activateUnit(code: string): UnitSetting {
     const unit = activateUnit(code);
+    const unitDoc = { ...unit, id: unit.code };
+    this.removeTombstone('unit', unit.code);
+    this.backgroundPouchPut('unit', unitDoc);
     this.notifyListeners();
-    this.broadcastChange('unit', 'save', unit.code, unit);
+    this.broadcastChange('unit', 'save', unit.code, unitDoc);
     return unit;
   }
 

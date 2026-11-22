@@ -497,7 +497,7 @@ export const NavigationMenuHubView: React.FC<NavigationMenuHubViewProps> = ({
       subtitle: 'Wholesale, Semi-Wholesale & Retail multi-tier rates',
       icon: 'straighten',
       category: 'inventory',
-      action: () => onNavigate('inventory'),
+      action: () => onNavigate('units_pricing'),
       keywords: ['unit', 'pricing', 'tier', 'wholesale', 'mrp', 'rate'],
     },
     {
