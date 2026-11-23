@@ -7,6 +7,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
+import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
 
 export type LabelLayout = 'THERMAL_50x25' | 'THERMAL_38x25' | 'A4_24UP' | 'A4_30UP';
 
@@ -157,15 +158,19 @@ export const BarcodeLabelModal: React.FC<BarcodeLabelModalProps> = ({
                 <label className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
                   Quantity of Stickers
                 </label>
-                {activeItem && activeItem.currentStock > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(Math.min(Math.max(1, Math.round(activeItem.currentStock)), 200))}
-                    className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
-                  >
-                    Set to Stock ({Math.round(activeItem.currentStock)})
-                  </button>
-                )}
+                {activeItem && activeItem.currentStock > 0 && (() => {
+                  const stockInPrimary = convertQuantityFromBase(activeItem.currentStock, activeItem.unit, activeItem);
+                  const count = Math.min(Math.max(1, Math.round(stockInPrimary)), 200);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(count)}
+                      className="text-[10px] font-bold text-secondary hover:underline cursor-pointer"
+                    >
+                      Set to Stock ({Math.round(stockInPrimary)})
+                    </button>
+                  );
+                })()}
               </div>
               <div className="flex items-center gap-2">
                 <input

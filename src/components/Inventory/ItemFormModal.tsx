@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, ItemPriceMode, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
+import { convertQuantityFromBase, convertQuantityToBase } from '../../core/inventory/stockEngine.ts';
 import { db } from '../../services/db.ts';
 import { useItems, useUnits } from '../../core/store/useDataStore.ts';
 import { showAppToast } from '../../services/toast.ts';
@@ -123,8 +124,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       }
       setGstRate(editingItem.gstRate);
       setCessRate(editingItem.cessRate || 0);
-      setCurrentStock(editingItem.currentStock);
-      setMinStockAlert(editingItem.minStockAlert);
+      setUnit(editingItem.unit);
+      setCurrentStock(convertQuantityFromBase(editingItem.currentStock, editingItem.unit, editingItem));
+      setMinStockAlert(convertQuantityFromBase(editingItem.minStockAlert, editingItem.unit, editingItem));
       setIsDisabledState(isItemDisabled(editingItem));
       setSubUnit(editingItem.subUnit || '');
       setSubUnitFactor(editingItem.subUnitFactor ? String(editingItem.subUnitFactor) : '');
@@ -244,6 +246,18 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       }
     }
 
+    const isService = itemType === 'SERVICE';
+    const resolvedUnit = isService ? 'HOURS' : unit;
+    const resolvedSubUnit = subUnit.trim() ? subUnit.trim().toUpperCase() : undefined;
+    const resolvedSubUnitFactor = subUnit.trim() && parseFloat(subUnitFactor) > 0 ? parseFloat(subUnitFactor) : undefined;
+    const unitConfig = {
+      unit: resolvedUnit,
+      subUnit: resolvedSubUnit,
+      subUnitFactor: resolvedSubUnitFactor,
+    };
+    const finalCurrentStock = isService ? 9999 : roundQuantity(convertQuantityToBase(Number(currentStock) || 0, resolvedUnit, unitConfig), 4);
+    const finalMinStockAlert = isService ? 0 : roundQuantity(convertQuantityToBase(Number(minStockAlert) || 0, resolvedUnit, unitConfig), 4);
+
     const itemToSave: InventoryItem = {
       id: editingItem ? editingItem.id : 'ITM-' + Date.now(),
       name: name.trim(),
@@ -251,9 +265,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       barcode: barcode.trim() || undefined,
       hsnSacCode: isGstActive ? (hsn.trim() || '844332') : (hsn.trim() || ''),
       category: category.trim() || 'General',
-      unit: itemType === 'SERVICE' ? 'HOURS' : unit,
-      subUnit: subUnit.trim() ? subUnit.trim().toUpperCase() : undefined,
-      subUnitFactor: subUnit.trim() && parseFloat(subUnitFactor) > 0 ? parseFloat(subUnitFactor) : undefined,
+      unit: resolvedUnit,
+      subUnit: resolvedSubUnit,
+      subUnitFactor: resolvedSubUnitFactor,
       salePrice: Number(salePrice),
       salePriceInclusive: isGstActive ? round2(salePriceInclusive) : Number(salePrice),
       salePriceMode: isGstActive ? salePriceMode : 'EXCLUSIVE',
@@ -265,8 +279,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       defaultPriceTier: defaultPriceTier || 'RETAIL',
       gstRate: Number(gstRate),
       cessRate: Number(cessRate) || 0,
-      currentStock: itemType === 'SERVICE' ? 9999 : roundQuantity(Number(currentStock), 4),
-      minStockAlert: itemType === 'SERVICE' ? 0 : roundQuantity(Number(minStockAlert), 4),
+      currentStock: finalCurrentStock,
+      minStockAlert: finalMinStockAlert,
       isActive: !isDisabledState,
       isDisabled: isDisabledState,
       createdAt: editingItem ? editingItem.createdAt : new Date().toISOString(),
@@ -275,6 +289,19 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
     onSaveItem(itemToSave);
     onClose();
+  };
+
+  const handleUnitChange = (nextUnit: UnitOfMeasurement) => {
+    setUnit(nextUnit);
+    if (editingItem) {
+      const itemConfig = {
+        unit: nextUnit,
+        subUnit: subUnit.trim() ? subUnit.trim().toUpperCase() : undefined,
+        subUnitFactor: subUnit.trim() && parseFloat(subUnitFactor) > 0 ? parseFloat(subUnitFactor) : undefined,
+      };
+      setCurrentStock(convertQuantityFromBase(editingItem.currentStock, nextUnit, itemConfig));
+      setMinStockAlert(convertQuantityFromBase(editingItem.minStockAlert, nextUnit, itemConfig));
+    }
   };
 
   return (
@@ -692,7 +719,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                    Current Stock {subUnit ? `(${subUnit})` : `(${unit})`}
+                    Current Stock ({unit})
                   </label>
                   <input
                     type="text"
@@ -711,6 +738,11 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     }}
                     className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-bold focus:outline-none focus:border-secondary font-tabular-data"
                   />
+                  {subUnit && parseFloat(subUnitFactor) > 0 && (
+                    <span className="block text-[10px] text-on-surface-variant font-mono mt-0.5">
+                      = {formatQuantity((Number(currentStock) || 0) * parseFloat(subUnitFactor), 4)} {subUnit}
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -719,7 +751,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                   </label>
                   <select
                     value={unit}
-                    onChange={(e) => setUnit(e.target.value as UnitOfMeasurement)}
+                    onChange={(e) => handleUnitChange(e.target.value as UnitOfMeasurement)}
                     className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                   >
                     {registeredUnits.map((u) => (
@@ -732,7 +764,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
                 <div>
                   <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                    Min Alert {subUnit ? `(${subUnit})` : `(${unit})`}
+                    Min Alert ({unit})
                   </label>
                   <input
                     type="number"
@@ -741,6 +773,11 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     onChange={(e) => setMinStockAlert(parseFloat(e.target.value) || 0)}
                     className="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
                   />
+                  {subUnit && parseFloat(subUnitFactor) > 0 && (
+                    <span className="block text-[10px] text-on-surface-variant font-mono mt-0.5">
+                      = {formatQuantity((Number(minStockAlert) || 0) * parseFloat(subUnitFactor), 4)} {subUnit}
+                    </span>
+                  )}
                 </div>
               </div>
 

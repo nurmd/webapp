@@ -4,6 +4,7 @@ import { Expense, ExpenseCategory } from '../../../models/expense.ts';
 import { InventoryItem } from '../../../models/item.ts';
 import { computeAgingBreakdown, AgingBreakdownResult, AgingBucket } from '../../../core/accounting/aging.ts';
 import { DatePreset, getDateFilterBounds } from '../../../core/utils/dateFilters.ts';
+import { getLineBaseQuantity, convertQuantityFromBase } from '../../../core/inventory/stockEngine.ts';
 
 export const ALL_EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Rent & Utilities',
@@ -104,9 +105,11 @@ export function calculateBillProfit(
   let cogs = 0;
 
   for (const line of invoice.items || []) {
-    const matchedItem = line.itemId ? itemsMap.get(line.itemId) : undefined;
+    const matchedItem = line.itemId ? itemsMap.get(line.itemId) : (line.name ? itemsMap.get(line.name.toLowerCase()) : undefined);
     const costPrice = matchedItem?.purchasePrice ?? 0;
-    cogs += line.quantity * costPrice;
+    const baseQty = getLineBaseQuantity(line, matchedItem);
+    const primaryQty = matchedItem ? convertQuantityFromBase(baseQty, matchedItem.unit, matchedItem) : line.quantity;
+    cogs += primaryQty * costPrice;
   }
 
   cogs = Math.round(cogs * 100) / 100;
@@ -142,14 +145,17 @@ export function aggregateItemWiseSales(
 
     for (const line of inv.items || []) {
       const key = line.itemId || line.name;
-      const matched = line.itemId ? itemsMap.get(line.itemId) : undefined;
+      const matched = line.itemId ? itemsMap.get(line.itemId) : (line.name ? itemsMap.get(line.name.toLowerCase()) : undefined);
       const costPrice = matched?.purchasePrice ?? 0;
+      const baseQty = getLineBaseQuantity(line, matched);
+      const primaryQty = matched ? convertQuantityFromBase(baseQty, matched.unit, matched) : line.quantity;
+      const primaryStock = matched ? convertQuantityFromBase(matched.currentStock, matched.unit, matched) : 0;
 
       const existing = map.get(key) || {
         itemId: line.itemId || key,
         name: line.name || 'Unnamed Item',
         hsnCode: line.hsnSacCode || matched?.hsnSacCode || '-',
-        unit: line.unit || matched?.unit || 'PCS',
+        unit: matched?.unit || line.unit || 'PCS',
         quantitySold: 0,
         taxableRevenue: 0,
         taxAmount: 0,
@@ -157,16 +163,16 @@ export function aggregateItemWiseSales(
         totalCogs: 0,
         grossProfit: 0,
         marginPct: 0,
-        currentStock: matched?.currentStock ?? 0,
+        currentStock: primaryStock,
       };
 
       const lineTax = (line.cgstAmount || 0) + (line.sgstAmount || 0) + (line.utgstAmount || 0) + (line.igstAmount || 0) + (line.cessAmount || 0);
 
-      existing.quantitySold += multiplier * line.quantity;
+      existing.quantitySold += multiplier * primaryQty;
       existing.taxableRevenue += multiplier * line.taxableAmount;
       existing.taxAmount += multiplier * lineTax;
       existing.grossSalesAmount += multiplier * line.totalAmount;
-      existing.totalCogs += multiplier * (line.quantity * costPrice);
+      existing.totalCogs += multiplier * (primaryQty * costPrice);
 
       map.set(key, existing);
     }
@@ -207,7 +213,7 @@ export function aggregateStockValuation(items: InventoryItem[]): StockValuationS
   for (const item of items) {
     if (item.isDisabled || item.isActive === false) continue;
 
-    const stock = item.currentStock || 0;
+    const stock = convertQuantityFromBase(item.currentStock || 0, item.unit, item);
     totalQuantity += stock;
 
     if (stock > 0) {
@@ -216,10 +222,11 @@ export function aggregateStockValuation(items: InventoryItem[]): StockValuationS
     }
 
     const threshold = item.minStockAlert ?? 5;
-    if (stock <= 0) {
-      if (stock === 0) outOfStockCount++;
+    const baseStock = item.currentStock || 0;
+    if (baseStock <= 0) {
+      if (baseStock === 0) outOfStockCount++;
       else negativeStockCount++;
-    } else if (stock <= threshold) {
+    } else if (baseStock <= threshold) {
       lowStockCount++;
     }
   }
@@ -500,8 +507,11 @@ export function computeTradingProfitAndStockSummary(
       for (const line of inv.items) {
         const id = line.itemId || line.name?.toLowerCase();
         if (id) {
+          const matchedItem = (line.itemId ? itemsMap.get(line.itemId) : undefined) || (line.name ? itemsMap.get(line.name.toLowerCase()) : undefined);
+          const baseQty = getLineBaseQuantity(line, matchedItem);
+          const primaryQty = matchedItem ? convertQuantityFromBase(baseQty, matchedItem.unit, matchedItem) : (line.quantity || 0);
           const prev = itemSoldQtyMap.get(id) || 0;
-          itemSoldQtyMap.set(id, prev + (line.quantity || 0) * multiplier);
+          itemSoldQtyMap.set(id, prev + primaryQty * multiplier);
         }
       }
     }
@@ -521,8 +531,11 @@ export function computeTradingProfitAndStockSummary(
       for (const line of pur.items) {
         const id = line.itemId || line.name?.toLowerCase();
         if (id) {
+          const matchedItem = (line.itemId ? itemsMap.get(line.itemId) : undefined) || (line.name ? itemsMap.get(line.name.toLowerCase()) : undefined);
+          const baseQty = getLineBaseQuantity(line, matchedItem);
+          const primaryQty = matchedItem ? convertQuantityFromBase(baseQty, matchedItem.unit, matchedItem) : (line.quantity || 0);
           const prev = itemPurchasedQtyMap.get(id) || 0;
-          itemPurchasedQtyMap.set(id, prev + (line.quantity || 0));
+          itemPurchasedQtyMap.set(id, prev + primaryQty);
         }
       }
     }
@@ -537,7 +550,7 @@ export function computeTradingProfitAndStockSummary(
   for (const item of items) {
     if (item.isDisabled) continue;
 
-    const currentQty = Math.max(0, item.currentStock || 0);
+    const currentQty = Math.max(0, convertQuantityFromBase(item.currentStock || 0, item.unit, item));
     const purchaseCost = item.purchasePrice || 0;
 
     closingStockQuantity += currentQty;
@@ -656,7 +669,7 @@ export function computePerformanceTimeSeries(
     if (item.isDisabled) continue;
     itemsMap.set(item.id, item);
     if (item.name) itemsMap.set(item.name.toLowerCase(), item);
-    baseStockValue += (item.currentStock || 0) * (item.purchasePrice || 0);
+    baseStockValue += convertQuantityFromBase(item.currentStock || 0, item.unit, item) * (item.purchasePrice || 0);
   }
 
   // Generate bucket intervals based on granularity
@@ -780,7 +793,9 @@ export function computePerformanceTimeSeries(
       for (const it of inv.items || []) {
         const itemMaster = itemsMap.get(it.itemId) || itemsMap.get((it.name || '').toLowerCase());
         const unitCost = itemMaster?.purchasePrice ?? (it.unitPrice * 0.7);
-        cogs += (it.quantity || 0) * unitCost * mult;
+        const baseQty = getLineBaseQuantity(it, itemMaster);
+        const primaryQty = itemMaster ? convertQuantityFromBase(baseQty, itemMaster.unit, itemMaster) : (it.quantity || 0);
+        cogs += primaryQty * unitCost * mult;
       }
     }
 

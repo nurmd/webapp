@@ -4,6 +4,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { db } from '../../services/db.ts';
 import { auditTrail } from '../../services/auditTrail.ts';
 import { rbac } from '../../services/rbac.ts';
+import { getLineBaseQuantity, convertQuantityToBase, convertQuantityFromBase } from '../inventory/stockEngine.ts';
 
 export interface StockDiscrepancyRecord {
   itemId: string;
@@ -16,6 +17,12 @@ export interface StockDiscrepancyRecord {
   totalPurchased: number;
   totalSold: number;
   totalAdjusted: number;
+  recordedStockPrimary?: number;
+  computedStockPrimary?: number;
+  variancePrimary?: number;
+  totalPurchasedPrimary?: number;
+  totalSoldPrimary?: number;
+  totalAdjustedPrimary?: number;
   isNegativeStockViolation: boolean;
   isLowStock: boolean;
   isOutOfStock: boolean;
@@ -75,7 +82,7 @@ export function auditAllItemStock(options?: {
         const matchesId = line.itemId && line.itemId === itemId;
         const matchesName = line.name && line.name.trim().toLowerCase() === itemNameNorm;
         if (matchesId || matchesName) {
-          totalPurchased += Number(line.quantity) || 0;
+          totalPurchased += getLineBaseQuantity(line, item);
         }
       }
     }
@@ -87,7 +94,7 @@ export function auditAllItemStock(options?: {
         const matchesId = line.itemId && line.itemId === itemId;
         const matchesName = line.name && line.name.trim().toLowerCase() === itemNameNorm;
         if (matchesId || matchesName) {
-          totalSold += Number(line.quantity) || 0;
+          totalSold += getLineBaseQuantity(line, item);
         }
       }
     }
@@ -98,7 +105,7 @@ export function auditAllItemStock(options?: {
       (adj: StockAdjustment) => adj.itemId === itemId || (adj.itemName && adj.itemName.trim().toLowerCase() === itemNameNorm)
     );
     for (const adj of itemAdjustments) {
-      const q = Number(adj.quantity) || 0;
+      const q = convertQuantityToBase(Number(adj.quantity) || 0, item.unit, item);
       if (adj.type === 'STOCK_IN') {
         totalAdjusted += q;
       } else if (adj.type === 'STOCK_OUT' || adj.type === 'WASTAGE') {
@@ -140,6 +147,13 @@ export function auditAllItemStock(options?: {
     if (isOutOfStock) outOfStockCount++;
 
     if (Math.abs(variance) > 0.001 || isNegativeStockViolation) {
+      const recordedStockPrimary = convertQuantityFromBase(recordedStock, item.unit, item);
+      const computedStockPrimary = convertQuantityFromBase(computedStock, item.unit, item);
+      const variancePrimary = Number((recordedStockPrimary - computedStockPrimary).toFixed(4));
+      const totalPurchasedPrimary = convertQuantityFromBase(totalPurchased, item.unit, item);
+      const totalSoldPrimary = convertQuantityFromBase(totalSold, item.unit, item);
+      const totalAdjustedPrimary = convertQuantityFromBase(totalAdjusted, item.unit, item);
+
       discrepancies.push({
         itemId: item.id,
         itemName: item.name,
@@ -151,6 +165,12 @@ export function auditAllItemStock(options?: {
         totalPurchased,
         totalSold,
         totalAdjusted,
+        recordedStockPrimary,
+        computedStockPrimary,
+        variancePrimary,
+        totalPurchasedPrimary,
+        totalSoldPrimary,
+        totalAdjustedPrimary,
         isNegativeStockViolation,
         isLowStock,
         isOutOfStock,

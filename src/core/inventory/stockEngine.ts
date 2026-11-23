@@ -238,7 +238,15 @@ export function applyPurchaseStockIncrement(
       const baseQty = getLineBaseQuantity(line, match);
       match.currentStock = calculateStockIncrement(match.currentStock, baseQty);
       if (typeof line.unitPrice === 'number' && line.unitPrice > 0) {
-        match.purchasePrice = line.unitPrice;
+        const factor = match.subUnitFactor;
+        const hasSubUnit = match.subUnit && typeof factor === 'number' && factor > 0;
+        const cleanLineUnit = String(line.unit || '').trim().toUpperCase();
+        const cleanSubUnit = String(match.subUnit || '').trim().toUpperCase();
+        const unitPricePrimary =
+          hasSubUnit && cleanLineUnit === cleanSubUnit
+            ? line.unitPrice * (factor as number)
+            : line.unitPrice;
+        match.purchasePrice = unitPricePrimary;
       }
       match.updatedAt = now;
     }
@@ -300,10 +308,11 @@ export function applyStockAdjustmentRecord(
   const itemsList = catalogItems.map((item) => ({ ...item }));
   const match = itemsList.find((i) => i.id === adjustment.itemId);
   if (match) {
+    const baseQty = convertQuantityToBase(adjustment.quantity, match.unit, match);
     if (adjustment.type === 'STOCK_IN') {
-      match.currentStock = calculateStockIncrement(match.currentStock, adjustment.quantity);
+      match.currentStock = calculateStockIncrement(match.currentStock, baseQty);
     } else {
-      match.currentStock = calculateStockDecrement(match.currentStock, adjustment.quantity, allowNegativeStock);
+      match.currentStock = calculateStockDecrement(match.currentStock, baseQty, allowNegativeStock);
     }
     match.updatedAt = new Date().toISOString();
   }

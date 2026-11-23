@@ -1,6 +1,7 @@
 import React from 'react';
 import { InventoryItem } from '../../../models/item.ts';
-import { formatINR } from '../../../core/utils/formatters.ts';
+import { formatINR, formatQuantity } from '../../../core/utils/formatters.ts';
+import { convertQuantityFromBase } from '../../../core/inventory/stockEngine.ts';
 
 export interface PosCatalogCardProps {
   item: InventoryItem;
@@ -16,7 +17,9 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
   onAdd,
 }) => {
   const isLowStock = (item.currentStock || 0) <= (item.minStockAlert || 0);
-  const stockUnit = item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit;
+  const hasSubUnit = Boolean(item.subUnit && item.subUnitFactor && item.subUnitFactor > 0);
+  const primaryStock = convertQuantityFromBase(item.currentStock || 0, item.unit, item);
+  const stockDisplay = `${formatQuantity(primaryStock, 4)} ${item.unit}${hasSubUnit ? ` (${formatQuantity(item.currentStock || 0, 4)} ${item.subUnit})` : ''}`;
   const displayPrice =
     item.defaultPriceTier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0
       ? item.semiWholesalePrice
@@ -43,7 +46,7 @@ export const PosCatalogGridCard: React.FC<PosCatalogCardProps> = ({
               : 'bg-slate-100 text-slate-600 border border-slate-200'
           }`}
         >
-          Stock: {item.currentStock} {stockUnit}
+          Stock: {stockDisplay}
         </span>
 
         {isGstActive && item.gstRate > 0 && (
@@ -95,7 +98,9 @@ export const PosCatalogListRow: React.FC<PosCatalogCardProps> = ({
   isGstActive,
   onAdd,
 }) => {
-  const stockUnit = item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit;
+  const hasSubUnit = Boolean(item.subUnit && item.subUnitFactor && item.subUnitFactor > 0);
+  const primaryStock = convertQuantityFromBase(item.currentStock || 0, item.unit, item);
+  const stockDisplay = `${formatQuantity(primaryStock, 4)} ${item.unit}${hasSubUnit ? ` (${formatQuantity(item.currentStock || 0, 4)} ${item.subUnit})` : ''}`;
   const displayPrice =
     item.defaultPriceTier === 'SEMI_WHOLESALE' && item.semiWholesalePrice && item.semiWholesalePrice > 0
       ? item.semiWholesalePrice
@@ -127,7 +132,7 @@ export const PosCatalogListRow: React.FC<PosCatalogCardProps> = ({
         <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
           <span>{item.category || 'General'}</span>
           <span>•</span>
-          <span>Stock: {item.currentStock} {stockUnit}</span>
+          <span>Stock: {stockDisplay}</span>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import {
   StockDiscrepancyRecord,
 } from '../../core/audit/inventoryStockAuditor.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
+import { formatQuantity } from '../../core/utils/formatters.ts';
 
 export interface InventoryStockAuditorPanelProps {
   onRefreshParent?: () => void;
@@ -237,25 +238,25 @@ export const InventoryStockAuditorPanel: React.FC<InventoryStockAuditorPanelProp
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-on-surface-variant text-[11px]">
-                    <span>Purchased: {d.totalPurchased} {d.unit}</span>
-                    <span>Sold: {d.totalSold} {d.unit}</span>
-                    <span>Adjustments: {d.totalAdjusted} {d.unit}</span>
+                    <span>Purchased: {formatQuantity(d.totalPurchasedPrimary ?? d.totalPurchased, 4)} {d.unit}</span>
+                    <span>Sold: {formatQuantity(d.totalSoldPrimary ?? d.totalSold, 4)} {d.unit}</span>
+                    <span>Adjustments: {formatQuantity(d.totalAdjustedPrimary ?? d.totalAdjusted, 4)} {d.unit}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0 font-tabular-data">
                   <div className="text-right">
                     <span className="text-[10px] text-on-surface-variant uppercase font-semibold block">Recorded</span>
-                    <span className="font-bold text-xs text-on-surface">{d.recordedStock} {d.unit}</span>
+                    <span className="font-bold text-xs text-on-surface">{formatQuantity(d.recordedStockPrimary ?? d.recordedStock, 4)} {d.unit}</span>
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-on-surface-variant uppercase font-semibold block">Computed</span>
-                    <span className="font-bold text-xs text-primary">{d.computedStock} {d.unit}</span>
+                    <span className="font-bold text-xs text-primary">{formatQuantity(d.computedStockPrimary ?? d.computedStock, 4)} {d.unit}</span>
                   </div>
                   <div className="text-right px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
                     <span className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold block">Variance</span>
                     <span className="font-black text-xs text-amber-600 dark:text-amber-400">
-                      {d.variance > 0 ? `+${d.variance}` : d.variance} {d.unit}
+                      {(d.variancePrimary ?? d.variance) > 0 ? `+${formatQuantity(d.variancePrimary ?? d.variance, 4)}` : formatQuantity(d.variancePrimary ?? d.variance, 4)} {d.unit}
                     </span>
                   </div>
                 </div>

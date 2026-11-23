@@ -788,11 +788,13 @@ export class InvoicePurchaseStorage extends FinancialStorage {
     const currentItems = this.getItems();
     const item = currentItems.find((i) => i.id === adj.itemId);
     const prevStock = item?.currentStock ?? 0;
-    const delta = adj.type === 'STOCK_IN' ? adj.quantity : -adj.quantity;
-    const resultingStock = allowNegativeStock ? prevStock + delta : Math.max(0, prevStock + delta);
 
     const updatedItems = applyStockAdjustmentRecord(currentItems, adj, allowNegativeStock);
     this.persistStockUpdates(currentItems, updatedItems);
+
+    const updatedItem = updatedItems.find((i) => i.id === adj.itemId);
+    const resultingStock = updatedItem ? updatedItem.currentStock : prevStock;
+    const delta = resultingStock - prevStock;
 
     // MCA Audit Trail Hook
     const auditUser = this.getAuditUser();

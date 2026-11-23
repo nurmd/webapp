@@ -94,8 +94,8 @@ describe('Sub-Units and Multi-Tier Pricing UI Components', () => {
       });
 
       expect(container!.textContent).toContain('1 BAG = 50 KG');
-      expect(container!.textContent).toContain('100 KG');
-      expect(container!.textContent).toContain('(2 BAG)');
+      expect(container!.textContent).toContain('2 BAG');
+      expect(container!.textContent).toContain('(100 KG)');
       expect(container!.textContent).toContain('Price Tiers:');
       expect(container!.textContent).toContain('Retail:');
       expect(container!.textContent).toContain('Semi-Wholesale:');

@@ -14,7 +14,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { countLowStockItems, isItemNeedingRestock } from '../../core/utils/itemStatus.ts';
 import { useProgressiveWindow } from '../../core/utils/useProgressiveWindow.ts';
-import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
+import { convertQuantityFromBase, convertQuantityToBase, getLineBaseQuantity } from '../../core/inventory/stockEngine.ts';
 import { InventoryItemCard } from './InventoryItemCard.tsx';
 import { StockAdjustmentModal } from './StockAdjustmentModal.tsx';
 import { InventoryFilterSheet } from './InventoryFilterSheet.tsx';
@@ -215,7 +215,7 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
         for (const it of inv.items) {
           if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalSold += it.quantity || 0;
+            totalSold += getLineBaseQuantity(it, item);
             txnCount++;
           }
         }
@@ -226,7 +226,7 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
         for (const it of bill.items) {
           if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalPurchased += it.quantity || 0;
+            totalPurchased += getLineBaseQuantity(it, item);
             txnCount++;
           }
         }
@@ -235,8 +235,9 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
       for (const adj of allAdjustments) {
         if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity || 0;
-          else totalAdjusted -= adj.quantity || 0;
+          const adjBaseQty = convertQuantityToBase(adj.quantity || 0, item.unit, item);
+          if (adj.type === 'STOCK_IN') totalAdjusted += adjBaseQty;
+          else totalAdjusted -= adjBaseQty;
           txnCount++;
         }
       }
@@ -263,7 +264,7 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
         for (const it of inv.items) {
           if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalSold += it.quantity || 0;
+            totalSold += getLineBaseQuantity(it, item);
           }
         }
       }
@@ -272,15 +273,16 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
         for (const it of bill.items) {
           if (!it) continue;
           if (it.itemId === item.id || (it.name && it.name.trim().toLowerCase() === normName)) {
-            totalPurchased += it.quantity || 0;
+            totalPurchased += getLineBaseQuantity(it, item);
           }
         }
       }
       for (const adj of allAdjustments) {
         if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          if (adj.type === 'STOCK_IN') totalAdjusted += adj.quantity || 0;
-          else totalAdjusted -= adj.quantity || 0;
+          const adjBaseQty = convertQuantityToBase(adj.quantity || 0, item.unit, item);
+          if (adj.type === 'STOCK_IN') totalAdjusted += adjBaseQty;
+          else totalAdjusted -= adjBaseQty;
         }
       }
 

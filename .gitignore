@@ -45,4 +45,5 @@ lineage.proof
 # Markdown docs: ignore everything except README
 *.md
 !README.md
+!.agents/skills/*/SKILL.md
 coverage/

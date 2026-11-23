@@ -9,7 +9,7 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { calculateItemGst } from '../../core/gst/calculator.ts';
 import { calculateRateFromTotal, exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { findDuplicateItem } from '../../core/utils/entityUniqueness.ts';
-import { convertQuantityToBase } from '../../core/inventory/stockEngine.ts';
+import { convertQuantityToBase, convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
 import { useUnits } from '../../core/store/useDataStore.ts';
 
 export interface InvoiceItemData {
@@ -243,11 +243,22 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         const catalogMatch = itemsCatalog.find((i) => i.id === initialItem.itemId) || null;
         setSelectedCatalogItem(catalogMatch);
         setPriceTier(initialItem.priceTier || catalogMatch?.defaultPriceTier || 'RETAIL');
+        const initUnit = initialItem.unit || 'PCS';
+        setUnit(initUnit);
         if (catalogMatch) {
-          const p = catalogMatch.salePriceMode === 'INCLUSIVE' && catalogMatch.salePriceInclusive !== undefined
+          const targetMode = catalogMatch.salePriceMode ?? 'EXCLUSIVE';
+          const p = targetMode === 'INCLUSIVE' && catalogMatch.salePriceInclusive !== undefined
             ? catalogMatch.salePriceInclusive
             : catalogMatch.salePrice;
-          setCatalogSalePrice(p !== undefined && p !== null ? String(p) : '');
+          const factor = catalogMatch.subUnitFactor;
+          const isSubUnitLine = Boolean(
+            catalogMatch.subUnit &&
+            typeof factor === 'number' &&
+            factor > 0 &&
+            String(initUnit).trim().toUpperCase() === String(catalogMatch.subUnit).trim().toUpperCase()
+          );
+          const linePrice = isSubUnitLine && factor ? p / factor : p;
+          setCatalogSalePrice(linePrice !== undefined && linePrice !== null ? String(Number(linePrice.toFixed(4))) : '');
         } else {
           setCatalogSalePrice('');
         }
@@ -257,7 +268,6 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
         setDescription(initialItem.description || '');
         setHsnSacCode(initialItem.hsnSacCode || defaultHsn);
         setQuantity(initialItem.quantity !== undefined && initialItem.quantity !== null ? formatQuantity(initialItem.quantity, 4) : '');
-        setUnit(initialItem.unit || 'PCS');
         setMrp(initialItem.mrp);
 
         const mode = initialItem.priceMode ?? 'EXCLUSIVE';
@@ -365,18 +375,28 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
   // Handle catalog item selection
   const handleSelectCatalogItem = (item: InventoryItem) => {
     setSelectedCatalogItem(item);
+    const itemUnit = item.unit || 'PCS';
+    setUnit(itemUnit);
     if (item) {
-      const p = item.salePriceMode === 'INCLUSIVE' && item.salePriceInclusive !== undefined
+      const targetMode = item.salePriceMode ?? 'EXCLUSIVE';
+      const p = targetMode === 'INCLUSIVE' && item.salePriceInclusive !== undefined
         ? item.salePriceInclusive
         : item.salePrice;
-      setCatalogSalePrice(p !== undefined && p !== null ? String(p) : '');
+      const factor = item.subUnitFactor;
+      const isSubUnitLine = Boolean(
+        item.subUnit &&
+        typeof factor === 'number' &&
+        factor > 0 &&
+        String(itemUnit).trim().toUpperCase() === String(item.subUnit).trim().toUpperCase()
+      );
+      const linePrice = isSubUnitLine && factor ? p / factor : p;
+      setCatalogSalePrice(linePrice !== undefined && linePrice !== null ? String(Number(linePrice.toFixed(4))) : '');
     } else {
       setCatalogSalePrice('');
     }
     setItemId(item.id);
     setName(item.name);
     setHsnSacCode(item.hsnSacCode || defaultHsn);
-    setUnit(item.unit || 'PCS');
 
     const gst = item.gstRate ?? 18;
     let itemMode: ItemPriceMode = 'EXCLUSIVE';
@@ -562,6 +582,25 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
 
   const handleQuantityChange = (valStr: string) => {
     setQuantity(sanitizeQuantityInput(valStr, 4));
+  };
+
+  const handleUnitChange = (newUnit: string) => {
+    setUnit(newUnit);
+    if (selectedCatalogItem) {
+      const factor = selectedCatalogItem.subUnitFactor;
+      const isSubUnit = Boolean(
+        selectedCatalogItem.subUnit &&
+        typeof factor === 'number' &&
+        factor > 0 &&
+        String(newUnit).trim().toUpperCase() === String(selectedCatalogItem.subUnit).trim().toUpperCase()
+      );
+      const targetMode = selectedCatalogItem.salePriceMode ?? 'EXCLUSIVE';
+      const currentRefPrice = targetMode === 'INCLUSIVE' && selectedCatalogItem.salePriceInclusive !== undefined
+        ? selectedCatalogItem.salePriceInclusive
+        : selectedCatalogItem.salePrice;
+      const linePrice = isSubUnit && factor ? currentRefPrice / factor : currentRefPrice;
+      setCatalogSalePrice(linePrice !== undefined && linePrice !== null ? String(Number(linePrice.toFixed(4))) : '');
+    }
   };
 
   // Live item total calculation with exact decimal discount handling
@@ -840,17 +879,27 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
       ? (catalogTarget.salePriceInclusive !== undefined ? catalogTarget.salePriceInclusive : catalogTarget.salePrice)
       : catalogTarget.salePrice;
 
-    if (newSp === currentRefPrice) return;
+    const factor = catalogTarget.subUnitFactor;
+    const isSubUnitLine = Boolean(
+      catalogTarget.subUnit &&
+      typeof factor === 'number' &&
+      factor > 0 &&
+      String(unit || '').trim().toUpperCase() === String(catalogTarget.subUnit).trim().toUpperCase()
+    );
 
-    let nextSalePrice = newSp;
+    const newSpPrimary = isSubUnitLine && factor ? newSp * factor : newSp;
+
+    if (Math.abs(newSpPrimary - currentRefPrice) < 0.005) return;
+
+    let nextSalePrice = newSpPrimary;
     let nextSalePriceInclusive: number | undefined;
 
     if (targetMode === 'INCLUSIVE') {
-      nextSalePriceInclusive = newSp;
-      nextSalePrice = exclusiveFromInclusive(newSp, targetGst);
+      nextSalePriceInclusive = newSpPrimary;
+      nextSalePrice = exclusiveFromInclusive(newSpPrimary, targetGst);
     } else {
-      nextSalePrice = newSp;
-      nextSalePriceInclusive = inclusiveFromExclusive(newSp, targetGst);
+      nextSalePrice = newSpPrimary;
+      nextSalePriceInclusive = inclusiveFromExclusive(newSpPrimary, targetGst);
     }
 
     const updatedItem: InventoryItem = {
@@ -1023,7 +1072,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
                             {item.name}
                           </span>
                           <div className="flex items-center gap-1.5 text-[10px] text-on-surface-variant truncate mt-0.5">
-                            <span>Stock: {item.currentStock} {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit}</span>
+                            <span>Stock: {formatQuantity(convertQuantityFromBase(item.currentStock, item.unit, item), 4)} {item.unit}{item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? ` (${formatQuantity(item.currentStock, 4)} ${item.subUnit})` : ''}</span>
                             {item.mrp && <span>• MRP ₹{item.mrp}</span>}
                             {isGstActive && item.hsnSacCode && <span>• HSN {item.hsnSacCode}</span>}
                           </div>
@@ -1119,7 +1168,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
               <label className="text-xs font-bold text-on-surface-variant">Unit</label>
               <select
                 value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                onChange={(e) => handleUnitChange(e.target.value)}
                 className={`w-full px-2.5 py-2 rounded-xl bg-surface-container-low text-xs sm:text-sm font-semibold text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all h-[38px]`}
               >
                 {availableUnits.map((u) => (
@@ -1417,39 +1466,54 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
           )}
 
           {/* Catalog Item Sale Price Updater (Purchase Mode) */}
-          {isPurchase && selectedCatalogItem && (
-            <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
-                  <span>Sale Price (₹)</span>
-                  <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold bg-orange-500/10 px-1.5 py-0.5 rounded">
-                    Updates catalog item
+          {isPurchase && selectedCatalogItem && (() => {
+            const factor = selectedCatalogItem.subUnitFactor;
+            const isSubUnitLine = Boolean(
+              selectedCatalogItem.subUnit &&
+              typeof factor === 'number' &&
+              factor > 0 &&
+              String(unit || '').trim().toUpperCase() === String(selectedCatalogItem.subUnit).trim().toUpperCase()
+            );
+            const activeUnitLabel = isSubUnitLine ? selectedCatalogItem.subUnit : selectedCatalogItem.unit;
+            const rawCurrentPrice = selectedCatalogItem.salePriceMode === 'INCLUSIVE' && selectedCatalogItem.salePriceInclusive !== undefined
+              ? selectedCatalogItem.salePriceInclusive
+              : selectedCatalogItem.salePrice;
+            const currentPriceInLineUnit = isSubUnitLine ? rawCurrentPrice / (factor as number) : rawCurrentPrice;
+
+            return (
+              <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-on-surface-variant flex items-center gap-1.5">
+                    <span>Sale Price (per {activeUnitLabel})</span>
+                    <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold bg-orange-500/10 px-1.5 py-0.5 rounded">
+                      Updates catalog item
+                    </span>
+                  </label>
+                  <span className="text-[10px] text-on-surface-variant font-medium">
+                    Current: <strong className="font-mono text-on-surface">₹{Number(currentPriceInLineUnit.toFixed(4))} / {activeUnitLabel}</strong>
                   </span>
-                </label>
-                <span className="text-[10px] text-on-surface-variant font-medium">
-                  Current: <strong className="font-mono text-on-surface">₹{selectedCatalogItem.salePriceMode === 'INCLUSIVE' && selectedCatalogItem.salePriceInclusive !== undefined ? selectedCatalogItem.salePriceInclusive : selectedCatalogItem.salePrice}</strong>
-                </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    aria-label="Sale Price"
+                    value={catalogSalePrice}
+                    onChange={(e) => setCatalogSalePrice(e.target.value)}
+                    placeholder="0.00"
+                    className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-lowest text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
+                  />
+                </div>
+                <p className="text-[10px] text-on-surface-variant/80 italic">
+                  Changing this value will update the item's sale price in your product catalog upon saving.
+                </p>
               </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-outline">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  aria-label="Sale Price"
-                  value={catalogSalePrice}
-                  onChange={(e) => setCatalogSalePrice(e.target.value)}
-                  placeholder="0.00"
-                  className={`w-full pl-7 pr-3 py-2 rounded-xl bg-surface-container-lowest text-xs sm:text-sm font-black text-on-surface border border-outline-variant/30 ${simpleFocusClass} transition-all`}
-                />
-              </div>
-              <p className="text-[10px] text-on-surface-variant/80 italic">
-                Changing this value will update the item's sale price in your product catalog upon saving.
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 5. Discount: Both Percentage (%) and Amount (₹) */}
           <div className="grid grid-cols-2 gap-3">

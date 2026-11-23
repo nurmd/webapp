@@ -7,6 +7,7 @@ import {
   aggregateStockValuation,
   StockValuationSummary,
 } from '../utils/reportAggregations.ts';
+import { convertQuantityFromBase } from '../../../core/inventory/stockEngine.ts';
 import { exportReportToCsv, printReportDocument, ReportPdfConfig } from '../utils/reportExportUtils.ts';
 import { Package, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
 
@@ -59,9 +60,17 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
 
     // Sort: low stock first in low stock view, or by valuation in valuation view
     if (subReport === 'low_stock') {
-      return [...list].sort((a, b) => (a.currentStock || 0) - (b.currentStock || 0));
+      return [...list].sort((a, b) => {
+        const aStock = convertQuantityFromBase(a.currentStock || 0, a.unit, a);
+        const bStock = convertQuantityFromBase(b.currentStock || 0, b.unit, b);
+        return aStock - bStock;
+      });
     }
-    return [...list].sort((a, b) => (b.currentStock * (b.purchasePrice || 0)) - (a.currentStock * (a.purchasePrice || 0)));
+    return [...list].sort((a, b) => {
+      const aVal = convertQuantityFromBase(a.currentStock || 0, a.unit, a) * (a.purchasePrice || 0);
+      const bVal = convertQuantityFromBase(b.currentStock || 0, b.unit, b) * (b.purchasePrice || 0);
+      return bVal - aVal;
+    });
   }, [activeItems, subReport, q]);
 
   // Export handlers
@@ -82,7 +91,7 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
     ];
 
     const rows = filteredItems.map((i) => {
-      const stock = i.currentStock || 0;
+      const stock = convertQuantityFromBase(i.currentStock || 0, i.unit, i);
       const costVal = stock * (i.purchasePrice || 0);
       const saleVal = stock * (i.salePrice || 0);
       const profit = saleVal - costVal;
@@ -90,7 +99,7 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
       let status = 'Normal';
       if (stock < 0) status = 'Negative Stock';
       else if (stock === 0) status = 'Out of Stock';
-      else if (i.minStockAlert !== undefined && stock <= i.minStockAlert) status = 'Low Stock Alert';
+      else if (i.minStockAlert !== undefined && i.currentStock <= i.minStockAlert) status = 'Low Stock Alert';
 
       return [
         i.name,
@@ -107,8 +116,8 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
       ];
     });
 
-    const totalCost = filteredItems.reduce((s, i) => s + (i.currentStock * (i.purchasePrice || 0)), 0);
-    const totalSale = filteredItems.reduce((s, i) => s + (i.currentStock * (i.salePrice || 0)), 0);
+    const totalCost = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.purchasePrice || 0)), 0);
+    const totalSale = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.salePrice || 0)), 0);
     const totalProfit = totalSale - totalCost;
 
     exportReportToCsv(
@@ -121,8 +130,8 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
 
   const handleExportPdf = () => {
     const isLowStock = subReport === 'low_stock';
-    const totalCost = filteredItems.reduce((s, i) => s + (i.currentStock * (i.purchasePrice || 0)), 0);
-    const totalSale = filteredItems.reduce((s, i) => s + (i.currentStock * (i.salePrice || 0)), 0);
+    const totalCost = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.purchasePrice || 0)), 0);
+    const totalSale = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.salePrice || 0)), 0);
     const totalProfit = totalSale - totalCost;
     const avgMargin = totalSale > 0 ? (totalProfit / totalSale) * 100 : 0;
 
@@ -143,14 +152,14 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
       ],
       headers: ['Item Name', 'Category', 'HSN Code', 'Stock', 'Unit', 'Buy Price (₹)', 'Sell Price (₹)', 'Valuation @ Cost (₹)', 'Valuation @ Sale (₹)', 'Status'],
       rows: filteredItems.map((i) => {
-        const stock = i.currentStock || 0;
+        const stock = convertQuantityFromBase(i.currentStock || 0, i.unit, i);
         const costVal = stock * (i.purchasePrice || 0);
         const saleVal = stock * (i.salePrice || 0);
 
         let status = 'Normal';
         if (stock < 0) status = 'Negative';
         else if (stock === 0) status = 'Out of Stock';
-        else if (i.minStockAlert !== undefined && stock <= i.minStockAlert) status = 'Low Stock';
+        else if (i.minStockAlert !== undefined && i.currentStock <= i.minStockAlert) status = 'Low Stock';
 
         return [
           i.name,
@@ -221,7 +230,7 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
                 </tr>
               ) : (
                 filteredItems.map((item) => {
-                  const stock = item.currentStock || 0;
+                  const stock = convertQuantityFromBase(item.currentStock || 0, item.unit, item);
                   const buyPrice = item.purchasePrice || 0;
                   const sellPrice = item.salePrice || 0;
                   const costValuation = stock * buyPrice;
@@ -229,9 +238,9 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
                   const potentialProfit = saleValuation - costValuation;
                   const marginPct = saleValuation > 0 ? (potentialProfit / saleValuation) * 100 : 0;
 
-                  const isLow = item.minStockAlert !== undefined && stock <= item.minStockAlert && stock > 0;
-                  const isOut = stock === 0;
-                  const isNeg = stock < 0;
+                  const isLow = item.minStockAlert !== undefined && item.currentStock <= item.minStockAlert && item.currentStock > 0;
+                  const isOut = item.currentStock === 0;
+                  const isNeg = item.currentStock < 0;
 
                   return (
                     <tr key={item.id} className="hover:bg-surface-container-lowest transition-colors">
@@ -283,18 +292,18 @@ export const InventoryStockCategory: React.FC<InventoryStockCategoryProps> = ({
               <tfoot className="bg-surface-container-high font-bold border-t border-outline-variant/50">
                 <tr>
                   <td colSpan={3} className="p-3">TOTAL ({filteredItems.length} items)</td>
-                  <td className="p-3 text-right font-mono">{filteredItems.reduce((s, i) => s + (i.currentStock || 0), 0)}</td>
+                  <td className="p-3 text-right font-mono">{filteredItems.reduce((s, i) => s + convertQuantityFromBase(i.currentStock || 0, i.unit, i), 0)}</td>
                   <td colSpan={2}></td>
                   <td className="p-3 text-right text-primary">
-                    {formatINR(filteredItems.reduce((s, i) => s + ((i.currentStock || 0) * (i.purchasePrice || 0)), 0))}
+                    {formatINR(filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.purchasePrice || 0)), 0))}
                   </td>
                   <td className="p-3 text-right text-on-surface">
-                    {formatINR(filteredItems.reduce((s, i) => s + ((i.currentStock || 0) * (i.salePrice || 0)), 0))}
+                    {formatINR(filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.salePrice || 0)), 0))}
                   </td>
                   <td className="p-3 text-right text-emerald-700 dark:text-emerald-400">
                     {(() => {
-                      const totalCost = filteredItems.reduce((s, i) => s + ((i.currentStock || 0) * (i.purchasePrice || 0)), 0);
-                      const totalSale = filteredItems.reduce((s, i) => s + ((i.currentStock || 0) * (i.salePrice || 0)), 0);
+                      const totalCost = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.purchasePrice || 0)), 0);
+                      const totalSale = filteredItems.reduce((s, i) => s + (convertQuantityFromBase(i.currentStock || 0, i.unit, i) * (i.salePrice || 0)), 0);
                       const profit = totalSale - totalCost;
                       return totalSale > 0 ? `${((profit / totalSale) * 100).toFixed(1)}%` : '0%';
                     })()}

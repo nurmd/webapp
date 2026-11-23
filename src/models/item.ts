@@ -82,6 +82,10 @@ export interface StockAdjustment {
   itemId: string;
   itemName: string;
   type: StockAdjustmentType;
+  /**
+   * Quantity to adjust. Stored in the item's primary unit (`item.unit`) at the time of entry.
+   * Converted to base unit via `convertQuantityToBase` before updating `item.currentStock`.
+   */
   quantity: number;
   date: string;
   reason: string;

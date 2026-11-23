@@ -105,6 +105,14 @@ gst-billing-app/
   - Controlled by `db.getAllowNegativeStock()` and `allowNegativeStock` parameter.
   - **When disabled (`false`)**: Decrement operations clamp available stock at `0` to prevent negative quantities.
   - **When enabled (`true`)**: Decrements drop past zero (e.g. `10 - 15 = -5`).
+- **Units & Sub-Unit Semantics** (see `.agents/skills/vyapar-inventory-units/SKILL.md`):
+  - `item.unit` is the user-facing **billing/primary unit** (e.g. `BAG`); `item.subUnit` is the **stock unit** (e.g. `KG`); `item.subUnitFactor` = stock units per primary unit (`1 BAG = 40 KG` → `40`).
+  - `currentStock` and `minStockAlert` are stored in the **stock (sub) unit**. Prices (`salePrice`, `purchasePrice`, tiers) are per **primary unit**.
+  - Conversion helpers: `convertQuantityToBase` / `convertQuantityFromBase` / `getLineBaseQuantity(line, item)`. Aggregations (reconcile, stock audit, COGS, valuation) must use `getLineBaseQuantity` for transaction lines — never raw `line.quantity` against `currentStock`.
+  - `StockAdjustment.quantity` is entered/stored in the **primary unit**; `applyStockAdjustmentRecord` converts to base before mutating stock.
+  - Purchase price updates normalise the line price to per-primary-unit (`40 KG @ ₹10` → `purchasePrice 400/BAG`). The purchase modal's catalog Sale Price field stays in the active line unit and is recomputed on unit change; catalog writes compare with a `< 0.005` tolerance.
+  - UI displays primary quantity first with a stock-unit hint (`2.5 BAG (100 KG)`), formatted via `formatQuantity(value, 4)`.
+  - `StockDiscrepancyRecord` keeps base-unit fields for reconciliation plus `*Primary` fields (`recordedStockPrimary`, `computedStockPrimary`, `variancePrimary`, …) for display in `InventoryStockAuditorPanel`.
 
 ### C. Double-Entry Accounting & Ledger (`src/core/accounting/`, `src/components/Parties/usePartyPassbook.ts`, `src/core/utils/systemParties.ts`)
 - **Signed Party Balances**:

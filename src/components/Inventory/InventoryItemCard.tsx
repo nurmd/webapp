@@ -1,6 +1,7 @@
 import React from 'react';
 import { InventoryItem, isItemDisabled } from '../../models/item.ts';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
+import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
 
 export interface InventoryItemCardProps {
   item: InventoryItem;
@@ -18,7 +19,9 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
   const itemDisabled = isItemDisabled(item);
   const isLow = item.currentStock <= item.minStockAlert && item.currentStock > 0;
   const isOut = item.currentStock <= 0;
-  const stockUnit = (item.subUnit && item.subUnitFactor && item.subUnitFactor > 0) ? item.subUnit : item.unit;
+  const hasSubUnit = Boolean(item.subUnit && item.subUnitFactor && item.subUnitFactor > 0);
+  const primaryStock = convertQuantityFromBase(item.currentStock, item.unit, item);
+  const subHint = hasSubUnit ? ` (${formatQuantity(item.currentStock, 4)} ${item.subUnit})` : '';
 
   return (
     <div
@@ -88,8 +91,8 @@ export const InventoryItemCard: React.FC<InventoryItemCardProps> = ({
               {isOut
                 ? 'Out of stock'
                 : isLow
-                ? `${formatQuantity(item.currentStock, 4)} ${stockUnit} left`
-                : `${formatQuantity(item.currentStock, 4)} ${stockUnit}`}
+                ? `${formatQuantity(primaryStock, 4)} ${item.unit}${subHint} left`
+                : `${formatQuantity(primaryStock, 4)} ${item.unit}${subHint}`}
             </span>
           </span>
         </div>

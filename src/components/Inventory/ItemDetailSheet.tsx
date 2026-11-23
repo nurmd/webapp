@@ -5,7 +5,7 @@ import { PurchaseBill } from '../../models/purchase.ts';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { formatINR, formatQuantity } from '../../core/utils/formatters.ts';
 import { isItemInBills } from '../../core/utils/itemStatus.ts';
-import { convertQuantityFromBase } from '../../core/inventory/stockEngine.ts';
+import { convertQuantityFromBase, convertQuantityToBase, getLineBaseQuantity } from '../../core/inventory/stockEngine.ts';
 import {
   useCompany,
   useInvoices,
@@ -30,6 +30,7 @@ export interface ItemTransactionRecord {
   referenceNo: string;
   partyName?: string;
   quantity: number;
+  subUnitQuantity?: number;
   unit: string;
   unitPrice?: number;
   totalAmount?: number;
@@ -154,6 +155,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             referenceNo: inv.invoiceNumber || 'INV',
             partyName: inv.partyName || 'Cash / Retail Customer',
             quantity: it.quantity,
+            subUnitQuantity: it.subUnitQuantity,
             unit: it.unit || item.unit,
             unitPrice: it.unitPrice,
             totalAmount: it.totalAmount,
@@ -185,6 +187,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
             referenceNo: bill.billNumber || 'BILL',
             partyName: bill.supplierName || 'Vendor / Supplier',
             quantity: it.quantity,
+            subUnitQuantity: it.subUnitQuantity,
             unit: it.unit || item.unit,
             unitPrice: it.unitPrice,
             totalAmount: it.totalAmount,
@@ -253,16 +256,17 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
     let totalAdjustedQty = 0;
 
     for (const t of itemTransactions) {
+      const baseQty = getLineBaseQuantity(t, item || undefined);
       if (t.type === 'SALE') {
-        totalSoldQty += t.quantity;
+        totalSoldQty += baseQty;
         totalSoldAmount += t.totalAmount || 0;
       } else if (t.type === 'PURCHASE') {
-        totalPurchasedQty += t.quantity;
+        totalPurchasedQty += baseQty;
         totalPurchasedAmount += t.totalAmount || 0;
       } else if (t.isInward) {
-        totalAdjustedQty += t.quantity;
+        totalAdjustedQty += baseQty;
       } else {
-        totalAdjustedQty -= t.quantity;
+        totalAdjustedQty -= baseQty;
       }
     }
 
@@ -316,10 +320,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                   ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                   : 'bg-secondary-container text-on-secondary-container'
               }`}>
-                {formatQuantity(item.currentStock, 4)} {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? item.subUnit : item.unit}
+                {formatQuantity(convertQuantityFromBase(item.currentStock, item.unit, item), 4)} {item.unit}
                 {item.subUnit && item.subUnitFactor && item.subUnitFactor > 0 ? (
                   <span className="text-[10px] opacity-75 font-normal ml-1">
-                    ({formatQuantity(convertQuantityFromBase(item.currentStock, item.unit, item), 2)} {item.unit})
+                    ({formatQuantity(item.currentStock, 4)} {item.subUnit})
                   </span>
                 ) : null}
               </span>
@@ -386,7 +390,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
                   )}
                 </div>
                 <span className="text-[11px] text-on-surface-variant block mt-0.5 truncate">
-                  Catalog: <strong className="text-on-surface">{formatQuantity(item.currentStock, 4)}</strong> • Transactions: <strong className="text-on-surface">{formatQuantity(netTxnStock, 4)} {item.unit}</strong>
+                  Catalog: <strong className="text-on-surface">{formatQuantity(convertQuantityFromBase(item.currentStock, item.unit, item), 4)} {item.unit}</strong> • Transactions: <strong className="text-on-surface">{formatQuantity(convertQuantityFromBase(netTxnStock, item.unit, item), 4)} {item.unit}</strong>
                 </span>
               </div>
             </div>
@@ -398,7 +402,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
               title="Correct stock to match transaction total"
             >
               <span className="material-symbols-outlined text-[15px]">done_all</span>
-              <span>Sync to {netTxnStock}</span>
+              <span>Sync to {formatQuantity(convertQuantityFromBase(netTxnStock, item.unit, item), 4)} {item.unit}</span>
             </button>
           </div>
         )}
