@@ -80,22 +80,30 @@ export function convertQuantityFromBase(
 /**
  * Resolves the effective base inventory quantity for a stock-moving line item.
  * Always resolves in base units (e.g. PCS, KG).
+ *
+ * Snapshot priority:
+ * A recorded line snapshot (`subUnitQuantity` > 0) takes precedence over current item
+ * configuration. This guarantees historical transactions retain their exact base quantity
+ * even if the catalog item's subUnit or subUnitFactor is later modified or removed.
  */
 export function getLineBaseQuantity(
   line: { quantity: number; unit?: string; subUnit?: string; subUnitQuantity?: number },
   matchedItem?: InventoryItem
 ): number {
-  const rawQty = typeof line.quantity === 'number' && !isNaN(line.quantity) ? line.quantity : 0;
+  const rawQty = typeof line.quantity === 'number' && Number.isFinite(line.quantity) ? line.quantity : 0;
+
+  // 1. Snapshot priority: valid finite subUnitQuantity > 0 takes absolute precedence
+  if (typeof line.subUnitQuantity === 'number' && Number.isFinite(line.subUnitQuantity) && line.subUnitQuantity > 0) {
+    return line.subUnitQuantity;
+  }
+
+  // 2. Fall back to converting via matched item if available and subUnit configured
   if (!matchedItem) return rawQty;
 
   const factor = matchedItem.subUnitFactor;
   const subUnit = matchedItem.subUnit;
   if (!subUnit || typeof factor !== 'number' || factor <= 0) {
     return rawQty;
-  }
-
-  if (typeof line.subUnitQuantity === 'number' && !isNaN(line.subUnitQuantity) && line.subUnitQuantity > 0) {
-    return line.subUnitQuantity;
   }
 
   return convertQuantityToBase(rawQty, line.unit, matchedItem);
@@ -299,6 +307,7 @@ export function revertPurchaseStockAdjustment(
 /**
  * Applies a manual stock adjustment record (STOCK_IN, STOCK_OUT, WASTAGE, CORRECTION).
  * Returns a new array with updated items (pure, immutable).
+ * Prefers adjustment.baseQuantity snapshot when present and finite.
  */
 export function applyStockAdjustmentRecord(
   catalogItems: InventoryItem[],
@@ -308,7 +317,10 @@ export function applyStockAdjustmentRecord(
   const itemsList = catalogItems.map((item) => ({ ...item }));
   const match = itemsList.find((i) => i.id === adjustment.itemId);
   if (match) {
-    const baseQty = convertQuantityToBase(adjustment.quantity, match.unit, match);
+    const baseQty =
+      typeof adjustment.baseQuantity === 'number' && Number.isFinite(adjustment.baseQuantity)
+        ? adjustment.baseQuantity
+        : convertQuantityToBase(adjustment.quantity, match.unit, match);
     if (adjustment.type === 'STOCK_IN') {
       match.currentStock = calculateStockIncrement(match.currentStock, baseQty);
     } else {
@@ -318,6 +330,116 @@ export function applyStockAdjustmentRecord(
   }
 
   return itemsList;
+}
+
+function matchesMovementItem(
+  line: { itemId?: string; name?: string },
+  targetId: string,
+  targetNormName: string
+): boolean {
+  if (line.itemId && line.itemId === targetId) return true;
+  if (line.name) {
+    const lineNorm = line.name.normalize('NFC').trim().toLowerCase();
+    if (lineNorm && lineNorm === targetNormName) return true;
+  }
+  return false;
+}
+
+/**
+ * Checks whether an item has any historical stock movements.
+ * Returns true if any non-cancelled sales invoice line, purchase line (including CHALLAN/GRN),
+ * or stock adjustment matches the item's ID or NFC-normalized case-insensitive name.
+ */
+export function itemHasStockMovements(
+  item: { id: string; name: string },
+  invoices: Array<{ isCancelled?: boolean; orderStatus?: string; challanStatus?: string; items?: Array<{ itemId?: string; name?: string }> }>,
+  purchases: Array<{ isCancelled?: boolean; challanStatus?: string; items?: Array<{ itemId?: string; name?: string }> }>,
+  adjustments: Array<{ itemId?: string; itemName?: string }>
+): boolean {
+  if (!item || !item.id) return false;
+  const targetId = item.id;
+  const targetNormName = (item.name || '').normalize('NFC').trim().toLowerCase();
+
+  // 1. Invoices (exclude cancelled sales documents)
+  for (const inv of invoices || []) {
+    if (inv.isCancelled || inv.orderStatus === 'CANCELLED' || inv.challanStatus === 'CANCELLED') continue;
+    for (const line of inv.items || []) {
+      if (matchesMovementItem(line, targetId, targetNormName)) return true;
+    }
+  }
+
+  // 2. Purchases (including CHALLAN / GRN, exclude cancelled)
+  for (const pur of purchases || []) {
+    if (pur.isCancelled || pur.challanStatus === 'CANCELLED') continue;
+    for (const line of pur.items || []) {
+      if (matchesMovementItem(line, targetId, targetNormName)) return true;
+    }
+  }
+
+  // 3. Stock adjustments
+  for (const adj of adjustments || []) {
+    if (adj.itemId === targetId) return true;
+    if (adj.itemName) {
+      const adjNorm = adj.itemName.normalize('NFC').trim().toLowerCase();
+      if (adjNorm && adjNorm === targetNormName) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether an item's primary unit may be renamed.
+ * Allowed when:
+ * 1. The item has no sub-unit configured, OR
+ * 2. Every matched movement line carries a valid subUnitQuantity snapshot (and adjustments have finite baseQuantity).
+ */
+export function canRenameItemUnit(
+  item: { id: string; name: string; subUnit?: string; subUnitFactor?: number },
+  invoices: Array<{ isCancelled?: boolean; orderStatus?: string; challanStatus?: string; items?: Array<{ itemId?: string; name?: string; subUnitQuantity?: number }> }>,
+  purchases: Array<{ isCancelled?: boolean; challanStatus?: string; items?: Array<{ itemId?: string; name?: string; subUnitQuantity?: number }> }>,
+  adjustments?: Array<{ itemId?: string; itemName?: string; baseQuantity?: number }>
+): boolean {
+  if (!item || !item.id) return true;
+  // If item has no sub-unit, renaming primary unit is always allowed
+  if (!item.subUnit || !item.subUnitFactor || item.subUnitFactor <= 0) {
+    return true;
+  }
+
+  const targetId = item.id;
+  const targetNormName = (item.name || '').normalize('NFC').trim().toLowerCase();
+
+  for (const inv of invoices || []) {
+    if (inv.isCancelled || inv.orderStatus === 'CANCELLED' || inv.challanStatus === 'CANCELLED') continue;
+    for (const line of inv.items || []) {
+      if (matchesMovementItem(line, targetId, targetNormName)) {
+        if (typeof line.subUnitQuantity !== 'number' || !Number.isFinite(line.subUnitQuantity) || line.subUnitQuantity <= 0) {
+          return false;
+        }
+      }
+    }
+  }
+
+  for (const pur of purchases || []) {
+    if (pur.isCancelled || pur.challanStatus === 'CANCELLED') continue;
+    for (const line of pur.items || []) {
+      if (matchesMovementItem(line, targetId, targetNormName)) {
+        if (typeof line.subUnitQuantity !== 'number' || !Number.isFinite(line.subUnitQuantity) || line.subUnitQuantity <= 0) {
+          return false;
+        }
+      }
+    }
+  }
+
+  for (const adj of adjustments || []) {
+    if (adj.itemId === targetId || (adj.itemName && adj.itemName.normalize('NFC').trim().toLowerCase() === targetNormName)) {
+      if (typeof adj.baseQuantity !== 'number' || !Number.isFinite(adj.baseQuantity)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   applyPurchaseStockDecrement,
   revertPurchaseStockAdjustment,
   applyStockAdjustmentRecord,
+  convertQuantityToBase,
   findMatchingItem,
 } from '../../core/inventory/stockEngine.ts';
 import {
@@ -777,22 +778,34 @@ export class InvoicePurchaseStorage extends FinancialStorage {
   }
 
   saveStockAdjustment(adj: StockAdjustment): void {
-    const list = [...this.getStockAdjustments()];
-    list.unshift(adj);
-    this.set(STORAGE_KEYS.ADJUSTMENTS, list);
-    this.backgroundPouchPut('adjustment', adj);
-    this.broadcastChange('adjustment', 'save', adj.id, adj);
-
-    // Update item stock using pure domain stockEngine
-    const allowNegativeStock = this.getAllowNegativeStock();
     const currentItems = this.getItems();
     const item = currentItems.find((i) => i.id === adj.itemId);
     const prevStock = item?.currentStock ?? 0;
 
-    const updatedItems = applyStockAdjustmentRecord(currentItems, adj, allowNegativeStock);
+    const baseQuantity =
+      typeof adj.baseQuantity === 'number' && Number.isFinite(adj.baseQuantity)
+        ? adj.baseQuantity
+        : item
+          ? convertQuantityToBase(adj.quantity, item.unit, item)
+          : adj.quantity;
+
+    const adjWithSnapshot: StockAdjustment = {
+      ...adj,
+      baseQuantity,
+    };
+
+    const list = [...this.getStockAdjustments()];
+    list.unshift(adjWithSnapshot);
+    this.set(STORAGE_KEYS.ADJUSTMENTS, list);
+    this.backgroundPouchPut('adjustment', adjWithSnapshot);
+    this.broadcastChange('adjustment', 'save', adjWithSnapshot.id, adjWithSnapshot);
+
+    // Update item stock using pure domain stockEngine
+    const allowNegativeStock = this.getAllowNegativeStock();
+    const updatedItems = applyStockAdjustmentRecord(currentItems, adjWithSnapshot, allowNegativeStock);
     this.persistStockUpdates(currentItems, updatedItems);
 
-    const updatedItem = updatedItems.find((i) => i.id === adj.itemId);
+    const updatedItem = updatedItems.find((i) => i.id === adjWithSnapshot.itemId);
     const resultingStock = updatedItem ? updatedItem.currentStock : prevStock;
     const delta = resultingStock - prevStock;
 
@@ -804,11 +817,11 @@ export class InvoicePurchaseStorage extends FinancialStorage {
         userName: auditUser.userName,
         userRole: auditUser.userRole,
         actionType: 'STOCK_ADJUSTMENT',
-        documentId: adj.id,
+        documentId: adjWithSnapshot.id,
         documentType: 'ITEM',
         previousSnapshot: item ? { itemId: item.id, itemName: item.name, currentStock: prevStock, unit: item.unit } : undefined,
-        newSnapshot: { ...JSON.parse(JSON.stringify(adj)), previousStock: prevStock, resultingStock },
-        summary: `Stock adjustment (${adj.type}): ${adj.quantity} units for "${adj.itemName}". Reason: ${adj.reason || 'None'}`,
+        newSnapshot: { ...JSON.parse(JSON.stringify(adjWithSnapshot)), previousStock: prevStock, resultingStock },
+        summary: `Stock adjustment (${adjWithSnapshot.type}): ${adjWithSnapshot.quantity} units for "${adjWithSnapshot.itemName}". Reason: ${adjWithSnapshot.reason || 'None'}`,
       })
       .catch((err) => console.error('Audit log failed for saveStockAdjustment:', err));
   }

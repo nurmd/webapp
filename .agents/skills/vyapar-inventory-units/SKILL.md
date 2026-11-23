@@ -17,30 +17,42 @@ description: >-
 - A transaction line's `quantity` is in the line's own `unit`; `subUnitQuantity` is its
   stock-unit snapshot.
 
-## Conversion helpers (`src/core/inventory/stockEngine.ts`)
+## Conversion helpers (`src/core/inventory/stockEngine.ts` & `src/core/gst/uqc.ts`)
 - `convertQuantityToBase(qty, fromUnit, item)` -> stock unit.
 - `convertQuantityFromBase(qty, toUnit, item)` -> primary unit.
-- `getLineBaseQuantity(line, item)` -> stock-unit quantity of a transaction line.
+- `getLineBaseQuantity(line, item)` -> stock-unit quantity of a transaction line (snapshot priority: checks line `subUnitQuantity` first).
+- `itemHasStockMovements(item, invoices, purchases, adjustments)` -> checks if movements exist.
+- `canRenameItemUnit(item, invoices, purchases, adjustments)` -> checks if primary unit can be renamed safely.
+- `toUqc(unit?: string)` -> standardizes unit to GST UQC code (e.g. DOZEN->DOZ, PKT->PAC, HOURS->OTH).
 
 ## Rules
 1. **Display** in the primary unit with the stock unit as a secondary hint:
    `2.5 BAG (100 KG)`. The stock unit must never be the headline.
 2. **Input** in the primary unit; convert with `convertQuantityToBase` before persisting.
 3. **Aggregations** (reconcile, audit, COGS, stock value, sold/purchased totals) must use
-   `getLineBaseQuantity` for lines and `convertQuantityToBase` for adjustments. Never mix a
-   raw `line.quantity` with `currentStock`.
+   `getLineBaseQuantity` for lines and prefer `adj.baseQuantity` (fallback to `convertQuantityToBase`) for adjustments.
+   Never mix a raw `line.quantity` with `currentStock`.
 4. **Stock value** = `convertQuantityFromBase(currentStock, unit, item) * purchasePrice`
    (price per primary unit).
-5. **Stock adjustments**: `StockAdjustment.quantity` is in the primary unit; the stock engine
-   converts it.
-6. **Purchase price update**: normalise the line price to the primary unit (multiply by the
+5. **Stock adjustments**: `StockAdjustment.quantity` is in the primary unit; `StockAdjustment.baseQuantity`
+   stores the stock-unit snapshot at entry time. The stock engine uses `baseQuantity` when finite.
+6. **Snapshot Priority (P1)**: `getLineBaseQuantity` checks `line.subUnitQuantity` (finite > 0)
+   before checking item sub-unit/factor. Historical transaction quantities remain invariant even if
+   catalog sub-unit configuration is modified.
+7. **Conversion Lock (P2)**: Modifying or adding `subUnit` or `subUnitFactor` on an item with existing
+   stock movements throws `UnitConversionLockedError` (bypassable via `allowUnitConversionChange: true`).
+   Renaming primary `unit` requires the item to have no sub-unit or all matched lines to carry valid snapshots.
+   `ItemFormModal` disables the inputs and displays a lock hint.
+8. **Purchase price update**: normalise the line price to the primary unit (multiply by the
    factor when the line unit is the sub-unit).
-7. **Format** every displayed quantity with `formatQuantity(value, 4)`; never interpolate a
+9. **Format** every displayed quantity with `formatQuantity(value, 4)`; never interpolate a
    raw JS number.
-8. **Sale-price update from a purchase line**: keep the field in the active line unit,
-   recompute it when the line unit changes, and compare with a tolerance (< 0.005) to avoid
-   floating-point rewrite loops.
-9. **Low stock** compares stock unit to stock unit (`currentStock <= minStockAlert`).
+10. **Sale-price update from a purchase line**: keep the field in the active line unit,
+    recompute it when the line unit changes, and compare with a tolerance (< 0.005) to avoid
+    floating-point rewrite loops.
+11. **Low stock** compares stock unit to stock unit (`currentStock <= minStockAlert`).
+12. **GST UQC Mapping (P4)**: In GSTR-1 Table 12 and e-Invoices, map item units using `toUqc(item.unit)`
+    with fallback to `OTH` for service HSN (starts with '99') and `NOS` for goods.
 
 ## Checklist before touching stock code
 - [ ] grep `currentStock` and confirm each read is converted or compared in stock units.

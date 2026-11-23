@@ -211,6 +211,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           );
       if (isMatch) {
         const isInward = adj.type === 'STOCK_IN';
+        const adjBaseQty =
+          typeof adj.baseQuantity === 'number' && Number.isFinite(adj.baseQuantity)
+            ? adj.baseQuantity
+            : undefined;
         list.push({
           id: `adj-${adj.id}-${idx}`,
           type: adj.type,
@@ -218,6 +222,7 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
           referenceNo: `ADJ-${String(adj.id || '').slice(-4)}`,
           partyName: adj.adjustedBy || 'Inventory Manager',
           quantity: adj.quantity,
+          subUnitQuantity: adjBaseQty,
           unit: item.unit,
           unitPrice: item.purchasePrice || 0,
           totalAmount: adj.quantity * (item.purchasePrice || 0),
@@ -256,7 +261,10 @@ export const ItemDetailSheet: React.FC<ItemDetailSheetProps> = ({
     let totalAdjustedQty = 0;
 
     for (const t of itemTransactions) {
-      const baseQty = getLineBaseQuantity(t, item || undefined);
+      const baseQty =
+        typeof t.subUnitQuantity === 'number' && Number.isFinite(t.subUnitQuantity)
+          ? t.subUnitQuantity
+          : getLineBaseQuantity(t, item || undefined);
       if (t.type === 'SALE') {
         totalSoldQty += baseQty;
         totalSoldAmount += t.totalAmount || 0;

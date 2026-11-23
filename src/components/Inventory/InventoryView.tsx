@@ -235,7 +235,10 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
       for (const adj of allAdjustments) {
         if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          const adjBaseQty = convertQuantityToBase(adj.quantity || 0, item.unit, item);
+          const adjBaseQty =
+            typeof adj.baseQuantity === 'number' && Number.isFinite(adj.baseQuantity)
+              ? adj.baseQuantity
+              : convertQuantityToBase(adj.quantity || 0, item.unit, item);
           if (adj.type === 'STOCK_IN') totalAdjusted += adjBaseQty;
           else totalAdjusted -= adjBaseQty;
           txnCount++;
@@ -280,7 +283,10 @@ const InventoryViewComponent: React.FC<InventoryViewProps> = ({
       for (const adj of allAdjustments) {
         if (!adj) continue;
         if (adj.itemId === item.id || (adj.itemName && adj.itemName.trim().toLowerCase() === normName)) {
-          const adjBaseQty = convertQuantityToBase(adj.quantity || 0, item.unit, item);
+          const adjBaseQty =
+            typeof adj.baseQuantity === 'number' && Number.isFinite(adj.baseQuantity)
+              ? adj.baseQuantity
+              : convertQuantityToBase(adj.quantity || 0, item.unit, item);
           if (adj.type === 'STOCK_IN') totalAdjusted += adjBaseQty;
           else totalAdjusted -= adjBaseQty;
         }

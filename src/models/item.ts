@@ -87,8 +87,30 @@ export interface StockAdjustment {
    * Converted to base unit via `convertQuantityToBase` before updating `item.currentStock`.
    */
   quantity: number;
+  /**
+   * Stock-unit (base) quantity snapshot at the time of entry.
+   * Protects historical stock adjustment audits against future factor/unit changes.
+   */
+  baseQuantity?: number;
   date: string;
   reason: string;
   adjustedBy?: string;
   createdAt: string;
 }
+
+/**
+ * Error thrown when an item unit, sub-unit, or conversion factor modification is rejected
+ * because existing transaction movements (invoices, purchases, adjustments) depend on it.
+ */
+export class UnitConversionLockedError extends Error {
+  readonly itemId?: string;
+  readonly itemName?: string;
+
+  constructor(message: string, itemId?: string, itemName?: string) {
+    super(message);
+    this.name = 'UnitConversionLockedError';
+    this.itemId = itemId;
+    this.itemName = itemName;
+  }
+}
+

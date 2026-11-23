@@ -58,6 +58,7 @@ import { withWalkInCustomerBalance, isSystemParty } from './core/utils/systemPar
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
 import { findDuplicateItem, findDuplicateParty } from './core/utils/entityUniqueness.ts';
+import { UnitConversionLockedError } from './models/item.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
 import { StorageQuotaBanner } from './components/Common/StorageQuotaBanner.tsx';
 import { preloadAllModalsOnIdle } from './core/utils/modalPreload.ts';
@@ -1281,9 +1282,18 @@ export const App: React.FC = () => {
     const dup = findDuplicateItem(item.name, db.getItems(), item.id);
     if (dup) {
       showToast('An item with this name already exists in inventory');
-      return;
+      return false;
     }
-    db.saveItem(item);
+    try {
+      db.saveItem(item);
+      return true;
+    } catch (err) {
+      if (err instanceof UnitConversionLockedError) {
+        showToast(err.message);
+        return false;
+      }
+      throw err;
+    }
   }, [showToast]);
 
   const handleDeleteItem = useCallback((id: string) => {

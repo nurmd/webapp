@@ -1,5 +1,6 @@
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
+import { toUqc } from './uqc.ts';
 
 export interface Gstr1JsonPayload {
   gstin: string;
@@ -455,7 +456,7 @@ export function generateGstr1Json(
         hsnMap[key] = {
           hsn_sc: hsn,
           desc: item.name,
-          uqc: item.unit || (hsn.startsWith('99') ? 'OTH' : 'NOS'),
+          uqc: toUqc(item.unit) ?? (hsn.startsWith('99') ? 'OTH' : 'NOS'),
           qty: 0,
           val: 0,
           txval: 0,

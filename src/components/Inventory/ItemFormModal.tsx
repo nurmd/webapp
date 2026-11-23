@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, ItemPriceMode, UnitOfMeasurement, isItemDisabled } from '../../models/item.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive, round2 } from '../../core/gst/pricing.ts';
 import { roundQuantity, sanitizeQuantityInput, formatQuantity } from '../../core/utils/formatters.ts';
-import { convertQuantityFromBase, convertQuantityToBase } from '../../core/inventory/stockEngine.ts';
+import { convertQuantityFromBase, convertQuantityToBase, itemHasStockMovements, canRenameItemUnit } from '../../core/inventory/stockEngine.ts';
 import { db } from '../../services/db.ts';
 import { useItems, useUnits } from '../../core/store/useDataStore.ts';
 import { showAppToast } from '../../services/toast.ts';
@@ -17,7 +17,7 @@ export interface ItemFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   editingItem: InventoryItem | null;
-  onSaveItem: (item: InventoryItem) => void;
+  onSaveItem: (item: InventoryItem) => boolean | void;
   isGstActive?: boolean;
   existingItems?: InventoryItem[];
 }
@@ -78,6 +78,16 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     const itemsList = existingItems ?? storeItems;
     return Boolean(findDuplicateItem(name, itemsList, editingItem?.id));
   }, [name, existingItems, storeItems, editingItem, nameChanged]);
+
+  const movementsExist = useMemo(() => {
+    if (!editingItem) return false;
+    return itemHasStockMovements(editingItem, db.getInvoices(), db.getPurchases(), db.getStockAdjustments());
+  }, [editingItem]);
+
+  const isUnitRenameLocked = useMemo(() => {
+    if (!editingItem) return false;
+    return !canRenameItemUnit(editingItem, db.getInvoices(), db.getPurchases(), db.getStockAdjustments());
+  }, [editingItem]);
 
   useEffect(() => {
     if (isDuplicateName) {
@@ -287,8 +297,10 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    onSaveItem(itemToSave);
-    onClose();
+    const saved = onSaveItem(itemToSave);
+    if (saved !== false) {
+      onClose();
+    }
   };
 
   const handleUnitChange = (nextUnit: UnitOfMeasurement) => {
@@ -746,13 +758,16 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-label-sm text-xs font-semibold text-on-surface mb-1">
-                    Unit
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-label-sm text-xs font-semibold text-on-surface">
+                      Unit
+                    </label>
+                  </div>
                   <select
+                    disabled={isUnitRenameLocked}
                     value={unit}
                     onChange={(e) => handleUnitChange(e.target.value as UnitOfMeasurement)}
-                    className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                    className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {registeredUnits.map((u) => (
                       <option key={u.code} value={u.code}>
@@ -760,6 +775,11 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                       </option>
                     ))}
                   </select>
+                  {isUnitRenameLocked && (
+                    <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-medium mt-1">
+                      Conversion locked — stock movements exist. Create a new item to change units.
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -783,15 +803,23 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
               {/* Sub-Unit and Factor Conversion */}
               <div className="pt-2 border-t border-outline-variant/20 flex flex-col gap-2">
-                <span className="font-label-sm text-xs font-semibold text-on-surface">
-                  Sub-Unit &amp; Packaging Conversion (Optional)
-                </span>
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <span className="font-label-sm text-xs font-semibold text-on-surface">
+                    Sub-Unit &amp; Packaging Conversion (Optional)
+                  </span>
+                  {movementsExist && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                      Conversion locked — stock movements exist. Create a new item to change units.
+                    </span>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-semibold text-on-surface-variant mb-1">
                       Sub-Unit
                     </label>
                     <select
+                      disabled={movementsExist}
                       value={subUnit}
                       aria-label="Sub-Unit"
                       onChange={(e) => {
@@ -801,7 +829,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                           setSubUnitFactor('');
                         }
                       }}
-                      className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary"
+                      className="w-full h-10 px-2 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs focus:outline-none focus:border-secondary disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       <option value="">None (No Sub-Unit)</option>
                       {registeredUnits
@@ -822,6 +850,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs text-on-surface-variant font-mono whitespace-nowrap">1 {unit} =</span>
                         <input
+                          disabled={movementsExist}
                           type="number"
                           step="any"
                           min="0.0001"
@@ -829,7 +858,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                           aria-label="Sub-Unit Factor"
                           value={subUnitFactor}
                           onChange={(e) => setSubUnitFactor(e.target.value)}
-                          className="flex-1 h-10 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono font-bold focus:outline-none focus:border-secondary"
+                          className="flex-1 h-10 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 text-on-surface text-xs font-mono font-bold focus:outline-none focus:border-secondary disabled:opacity-60 disabled:cursor-not-allowed"
                         />
                         <span className="text-xs text-on-surface-variant font-mono">{subUnit}</span>
                       </div>

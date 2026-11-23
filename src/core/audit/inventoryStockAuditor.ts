@@ -105,7 +105,10 @@ export function auditAllItemStock(options?: {
       (adj: StockAdjustment) => adj.itemId === itemId || (adj.itemName && adj.itemName.trim().toLowerCase() === itemNameNorm)
     );
     for (const adj of itemAdjustments) {
-      const q = convertQuantityToBase(Number(adj.quantity) || 0, item.unit, item);
+      const q =
+        typeof adj.baseQuantity === 'number' && Number.isFinite(adj.baseQuantity)
+          ? adj.baseQuantity
+          : convertQuantityToBase(Number(adj.quantity) || 0, item.unit, item);
       if (adj.type === 'STOCK_IN') {
         totalAdjusted += q;
       } else if (adj.type === 'STOCK_OUT' || adj.type === 'WASTAGE') {

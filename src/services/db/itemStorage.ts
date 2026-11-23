@@ -1,7 +1,7 @@
-import { InventoryItem, ItemCategory, DEFAULT_ITEM_CATEGORIES } from '../../models/item.ts';
+import { InventoryItem, ItemCategory, DEFAULT_ITEM_CATEGORIES, UnitConversionLockedError } from '../../models/item.ts';
 import { pouch } from '../pouchdb.ts';
 import { auditTrail } from '../auditTrail.ts';
-import { isLowStock } from '../../core/inventory/stockEngine.ts';
+import { isLowStock, itemHasStockMovements, canRenameItemUnit } from '../../core/inventory/stockEngine.ts';
 import { STORAGE_KEYS, DEFAULT_ITEMS } from './storageEngine.ts';
 import { PartyStorage } from './partyStorage.ts';
 import {
@@ -30,11 +30,19 @@ export class ItemStorage extends PartyStorage {
     return this.get<InventoryItem[]>(STORAGE_KEYS.ITEMS, DEFAULT_ITEMS);
   }
 
-  saveItem(item: InventoryItem, allowDuplicateName?: boolean | { allowDuplicateName?: boolean }): void {
+  saveItem(
+    item: InventoryItem,
+    allowDuplicateName?: boolean | { allowDuplicateName?: boolean; allowUnitConversionChange?: boolean }
+  ): void {
     const skipDuplicateCheck =
       typeof allowDuplicateName === 'boolean'
         ? allowDuplicateName
         : Boolean(allowDuplicateName?.allowDuplicateName);
+
+    const allowUnitConversionChange =
+      typeof allowDuplicateName === 'object' && allowDuplicateName !== null
+        ? Boolean(allowDuplicateName.allowUnitConversionChange)
+        : false;
 
     const list = [...this.getItems()];
     const idx = list.findIndex((i) => i.id === item.id);
@@ -50,6 +58,37 @@ export class ItemStorage extends PartyStorage {
           if (duplicate) {
             throw new DuplicateEntityNameError('item', item.name, duplicate.id);
           }
+        }
+      }
+    }
+
+    if (prevItem && !allowUnitConversionChange) {
+      const prevSubUnit = (prevItem.subUnit || '').trim();
+      const nextSubUnit = (item.subUnit || '').trim();
+      const prevFactor = typeof prevItem.subUnitFactor === 'number' && prevItem.subUnitFactor > 0 ? prevItem.subUnitFactor : 0;
+      const nextFactor = typeof item.subUnitFactor === 'number' && item.subUnitFactor > 0 ? item.subUnitFactor : 0;
+
+      const subUnitChanged = prevSubUnit !== nextSubUnit || prevFactor !== nextFactor;
+      if (subUnitChanged) {
+        if (itemHasStockMovements(prevItem, this.getInvoices(), this.getPurchases(), this.getStockAdjustments())) {
+          throw new UnitConversionLockedError(
+            `Cannot modify sub-unit or factor for item "${item.name}" because stock movements already exist. Create a new item to change units.`,
+            item.id,
+            item.name
+          );
+        }
+      }
+
+      const prevUnit = (prevItem.unit || '').trim();
+      const nextUnit = (item.unit || '').trim();
+      const unitChanged = prevUnit !== nextUnit;
+      if (unitChanged) {
+        if (!canRenameItemUnit(prevItem, this.getInvoices(), this.getPurchases(), this.getStockAdjustments())) {
+          throw new UnitConversionLockedError(
+            `Cannot rename unit for item "${item.name}" because existing stock movements do not carry sub-unit snapshots.`,
+            item.id,
+            item.name
+          );
         }
       }
     }

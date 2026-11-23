@@ -6,6 +6,9 @@ import {
   applyPurchaseStockIncrement,
   convertQuantityToBase,
   convertQuantityFromBase,
+  getLineBaseQuantity,
+  itemHasStockMovements,
+  canRenameItemUnit,
 } from '../core/inventory/stockEngine.ts';
 import { auditAllItemStock, reconcileItemStock } from '../core/audit/inventoryStockAuditor.ts';
 import {
@@ -18,11 +21,14 @@ import { PosCatalogGridCard, PosCatalogListRow } from '../components/POS/pos/Pos
 import { InvoiceItemModal } from '../components/Invoicing/InvoiceItemModal.tsx';
 import { InventoryStockAuditorPanel } from '../components/Audit/InventoryStockAuditorPanel.tsx';
 import { BarcodeLabelModal } from '../components/Inventory/BarcodeLabelModal.tsx';
+import { ItemFormModal } from '../components/Inventory/ItemFormModal.tsx';
 import { db } from '../services/db.ts';
-import type { InventoryItem, StockAdjustment } from '../models/item.ts';
+import { UnitConversionLockedError, type InventoryItem, type StockAdjustment } from '../models/item.ts';
 import type { Invoice } from '../models/invoice.ts';
 import type { PurchaseBill } from '../models/purchase.ts';
 import type { CompanyProfile } from '../models/company.ts';
+import { toUqc } from '../core/gst/uqc.ts';
+import { generateGstr1Json } from '../core/gst/gstrExport.ts';
 
 const mockCompany = {
   id: 'CMP-1',
@@ -719,5 +725,344 @@ describe('Sub-Unit Regression Fixes (Audit Prompt Invariants)', () => {
     const qtyInput = container?.querySelector('input[type="number"]') as HTMLInputElement;
     expect(qtyInput).toBeDefined();
     expect(qtyInput.value).toBe('3');
+  });
+
+  // ==========================================
+  // PHASE 2: UNIT-HISTORY HARDENING & GST UQC
+  // ==========================================
+
+  // P1: Snapshot priority survives item redefinition
+  describe('P1: Snapshot priority in getLineBaseQuantity', () => {
+    it('line {quantity: 10, unit: "BAG", subUnitQuantity: 400} + item with subUnit removed returns 400', () => {
+      const itemWithSubUnitRemoved = createBagItem({
+        unit: 'BAG',
+        subUnit: undefined,
+        subUnitFactor: undefined,
+      });
+      const line = { quantity: 10, unit: 'BAG', subUnitQuantity: 400 };
+      expect(getLineBaseQuantity(line, itemWithSubUnitRemoved)).toBe(400);
+    });
+
+    it('same line + item factor changed 40 -> 50 returns 400 (snapshot wins)', () => {
+      const itemWithFactor50 = createBagItem({
+        unit: 'BAG',
+        subUnit: 'KG',
+        subUnitFactor: 50,
+      });
+      const line = { quantity: 10, unit: 'BAG', subUnitQuantity: 400 };
+      expect(getLineBaseQuantity(line, itemWithFactor50)).toBe(400);
+    });
+
+    it('line without snapshot + factor 50 returns 500 (current-factor conversion)', () => {
+      const itemWithFactor50 = createBagItem({
+        unit: 'BAG',
+        subUnit: 'KG',
+        subUnitFactor: 50,
+      });
+      const line = { quantity: 10, unit: 'BAG' };
+      expect(getLineBaseQuantity(line, itemWithFactor50)).toBe(500);
+    });
+  });
+
+  // P2: Lock stock-unit / factor changes once movements exist
+  describe('P2: Unit conversion lock & movement protection', () => {
+    it('db.saveItem throws UnitConversionLockedError on factor change when movements exist', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-LOCK', subUnitFactor: 40 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([
+        {
+          id: 'INV-1',
+          isCancelled: false,
+          items: [{ itemId: bagItem.id, name: bagItem.name, quantity: 2, subUnitQuantity: 80 }],
+        } as unknown as Invoice,
+      ]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+
+      expect(() => {
+        db.saveItem({ ...bagItem, subUnitFactor: 50 });
+      }).toThrow(UnitConversionLockedError);
+    });
+
+    it('db.saveItem throws UnitConversionLockedError when adding subUnit to item with movements', () => {
+      const plainItem = createBagItem({ id: 'ITM-P2-PLAIN', unit: 'BOX', subUnit: undefined, subUnitFactor: undefined });
+      vi.spyOn(db, 'getItems').mockReturnValue([plainItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([
+        {
+          id: 'PUR-1',
+          isCancelled: false,
+          items: [{ itemId: plainItem.id, name: plainItem.name, quantity: 5 }],
+        } as unknown as PurchaseBill,
+      ]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+
+      expect(() => {
+        db.saveItem({ ...plainItem, subUnit: 'PCS', subUnitFactor: 10 });
+      }).toThrow(UnitConversionLockedError);
+    });
+
+    it('db.saveItem allows conversion change with allowUnitConversionChange: true bypass', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-BYPASS', subUnitFactor: 40 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([
+        {
+          id: 'INV-1',
+          isCancelled: false,
+          items: [{ itemId: bagItem.id, name: bagItem.name, quantity: 2, subUnitQuantity: 80 }],
+        } as unknown as Invoice,
+      ]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+      vi.spyOn(db, 'set' as any).mockImplementation(() => {});
+
+      expect(() => {
+        db.saveItem({ ...bagItem, subUnitFactor: 50 }, { allowUnitConversionChange: true });
+      }).not.toThrow();
+    });
+
+    it('db.saveItem allows conversion change when no movements exist', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-NO-MOVEMENTS', subUnitFactor: 40 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+      vi.spyOn(db, 'set' as any).mockImplementation(() => {});
+
+      expect(() => {
+        db.saveItem({ ...bagItem, subUnitFactor: 50 });
+      }).not.toThrow();
+    });
+
+    it('unit rename: allowed when every matched movement line carries subUnitQuantity snapshot', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-RENAME', unit: 'BAG', subUnit: 'KG', subUnitFactor: 40 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([
+        {
+          id: 'INV-1',
+          isCancelled: false,
+          items: [{ itemId: bagItem.id, name: bagItem.name, quantity: 1, subUnitQuantity: 40 }],
+        } as unknown as Invoice,
+      ]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+      vi.spyOn(db, 'set' as any).mockImplementation(() => {});
+
+      expect(() => {
+        db.saveItem({ ...bagItem, unit: 'SACK' });
+      }).not.toThrow();
+    });
+
+    it('unit rename: locked when any matched movement line lacks subUnitQuantity snapshot', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-RENAME-LOCKED', unit: 'BAG', subUnit: 'KG', subUnitFactor: 40 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+      vi.spyOn(db, 'getInvoices').mockReturnValue([
+        {
+          id: 'INV-1',
+          isCancelled: false,
+          items: [{ itemId: bagItem.id, name: bagItem.name, quantity: 1 }], // missing subUnitQuantity snapshot
+        } as unknown as Invoice,
+      ]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+
+      expect(() => {
+        db.saveItem({ ...bagItem, unit: 'SACK' });
+      }).toThrow(UnitConversionLockedError);
+    });
+
+    it('ItemFormModal disables sub-unit & factor inputs with lock hint when movements exist', () => {
+      const bagItem = createBagItem({ id: 'ITM-P2-UI-LOCK', unit: 'BAG', subUnit: 'KG', subUnitFactor: 40 });
+      vi.spyOn(db, 'getInvoices').mockReturnValue([
+        {
+          id: 'INV-1',
+          isCancelled: false,
+          items: [{ itemId: bagItem.id, name: bagItem.name, quantity: 2, subUnitQuantity: 80 }],
+        } as unknown as Invoice,
+      ]);
+      vi.spyOn(db, 'getPurchases').mockReturnValue([]);
+      vi.spyOn(db, 'getStockAdjustments').mockReturnValue([]);
+
+      act(() => {
+        root?.render(
+          <ItemFormModal
+            isOpen={true}
+            onClose={vi.fn()}
+            editingItem={bagItem}
+            onSaveItem={vi.fn()}
+          />
+        );
+      });
+
+      const subUnitSelect = container?.querySelector('select[aria-label="Sub-Unit"]') as HTMLSelectElement;
+      const factorInput = container?.querySelector('input[aria-label="Sub-Unit Factor"]') as HTMLInputElement;
+
+      expect(subUnitSelect).toBeDefined();
+      expect(subUnitSelect.disabled).toBe(true);
+      expect(factorInput).toBeDefined();
+      expect(factorInput.disabled).toBe(true);
+
+      const modalText = container?.textContent || '';
+      expect(modalText).toContain('Conversion locked — stock movements exist. Create a new item to change units.');
+    });
+  });
+
+  // P3: StockAdjustment.baseQuantity snapshot
+  describe('P3: StockAdjustment.baseQuantity snapshot', () => {
+    it('10 BAG @ factor 40 saves baseQuantity: 400', () => {
+      const bagItem = createBagItem({ id: 'ITM-P3-ADJ', unit: 'BAG', subUnit: 'KG', subUnitFactor: 40, currentStock: 0 });
+      vi.spyOn(db, 'getItems').mockReturnValue([bagItem]);
+
+      const adj: StockAdjustment = {
+        id: 'ADJ-P3-1',
+        itemId: bagItem.id,
+        itemName: bagItem.name,
+        type: 'STOCK_IN',
+        quantity: 10,
+        date: '2026-11-23',
+        reason: 'Initial load',
+        createdAt: '2026-11-23T10:00:00Z',
+      };
+
+      db.saveStockAdjustment(adj);
+
+      const storedAdjustments = db.getStockAdjustments();
+      const savedAdj = storedAdjustments.find((a) => a.id === adj.id);
+      expect(savedAdj?.baseQuantity).toBe(400);
+    });
+
+    it('auditor totals use adjustment snapshot even if item factor later changes', () => {
+      const bagItem = createBagItem({
+        id: 'ITM-P3-AUDIT',
+        unit: 'BAG',
+        subUnit: 'KG',
+        subUnitFactor: 40,
+        currentStock: 0, // 0 recorded stock vs 400 computed creates discrepancy record
+      });
+
+      const snapshotAdj: StockAdjustment = {
+        id: 'ADJ-P3-SNAP',
+        itemId: bagItem.id,
+        itemName: bagItem.name,
+        type: 'STOCK_IN',
+        quantity: 10,
+        baseQuantity: 400, // recorded at factor 40
+        date: '2026-11-23',
+        reason: 'Snapshot test',
+        createdAt: '2026-11-23T10:00:00Z',
+      };
+
+      // Item factor later redefined to 50
+      const redefinedItem = { ...bagItem, subUnitFactor: 50 };
+
+      const auditReport = auditAllItemStock({
+        items: [redefinedItem],
+        invoices: [],
+        purchases: [],
+        adjustments: [snapshotAdj],
+      });
+      const record = auditReport.discrepancies.find((r) => r.itemId === bagItem.id);
+
+      expect(record).toBeDefined();
+      // Computed stock must be derived from baseQuantity snapshot (400), not recomputed via new factor 50 (500)
+      expect(record?.computedStock).toBe(400);
+      expect(record?.totalAdjusted).toBe(400);
+    });
+  });
+
+  // P4: GST UQC mapping
+  describe('P4: GST UQC mapping', () => {
+    it('toUqc correctly maps standard aliases to valid UQC codes', () => {
+      expect(toUqc('DOZEN')).toBe('DOZ');
+      expect(toUqc('PKT')).toBe('PAC');
+      expect(toUqc('PACKET')).toBe('PAC');
+      expect(toUqc('PACK')).toBe('PAC');
+      expect(toUqc('HOURS')).toBe('OTH');
+      expect(toUqc('HOUR')).toBe('OTH');
+      expect(toUqc('DAYS')).toBe('OTH');
+      expect(toUqc('KG')).toBe('KGS');
+      expect(toUqc('KGS')).toBe('KGS');
+      expect(toUqc('PCS')).toBe('PCS');
+      expect(toUqc('NOS')).toBe('NOS');
+      expect(toUqc('UNKNOWN_UNIT_XYZ')).toBeUndefined();
+    });
+
+    it('gstrExport generates correct UQC with goods fallback to NOS and service HSN 99 to OTH', () => {
+      const mockInvoices: Invoice[] = [
+        {
+          id: 'INV-GST-1',
+          invoiceNumber: 'INV-001',
+          date: '2026-10-15',
+          partyId: 'PTY-1',
+          partyName: 'ABC Corp',
+          partyGstin: '29ABCDE1234F1Z5',
+          partyStateCode: '29',
+          items: [
+            {
+              itemId: 'ITM-DOZ',
+              name: 'Dozen Eggs',
+              quantity: 5,
+              unit: 'DOZEN',
+              unitPrice: 60,
+              gstRate: 5,
+              hsnSacCode: '0407',
+              taxableAmount: 300,
+              cgstAmount: 7.5,
+              sgstAmount: 7.5,
+              igstAmount: 0,
+              cessAmount: 0,
+              totalAmount: 315,
+            },
+            {
+              itemId: 'ITM-SRV',
+              name: 'Consulting Service',
+              quantity: 1,
+              unit: 'CUSTOM_SERVICE', // unknown unit
+              unitPrice: 1000,
+              gstRate: 18,
+              hsnSacCode: '998311', // Service HSN starts with 99
+              taxableAmount: 1000,
+              cgstAmount: 90,
+              sgstAmount: 90,
+              igstAmount: 0,
+              cessAmount: 0,
+              totalAmount: 1180,
+            },
+            {
+              itemId: 'ITM-GOODS-UNKNOWN',
+              name: 'Mystery Widget',
+              quantity: 2,
+              unit: 'MYSTERY_UNIT', // unknown unit
+              unitPrice: 200,
+              gstRate: 12,
+              hsnSacCode: '8415', // Goods HSN
+              taxableAmount: 400,
+              cgstAmount: 24,
+              sgstAmount: 24,
+              igstAmount: 0,
+              cessAmount: 0,
+              totalAmount: 448,
+            },
+          ],
+          grandTotal: 1943,
+          isCancelled: false,
+        } as unknown as Invoice,
+      ];
+
+      const gstrJson = generateGstr1Json(mockCompany, mockInvoices, '102026');
+      const hsnSection = gstrJson.hsn?.data || [];
+
+      const eggEntry = hsnSection.find((h) => h.hsn_sc === '0407');
+      expect(eggEntry).toBeDefined();
+      expect(eggEntry?.uqc).toBe('DOZ');
+
+      const srvEntry = hsnSection.find((h) => h.hsn_sc === '998311');
+      expect(srvEntry).toBeDefined();
+      expect(srvEntry?.uqc).toBe('OTH');
+
+      const goodsEntry = hsnSection.find((h) => h.hsn_sc === '8415');
+      expect(goodsEntry).toBeDefined();
+      expect(goodsEntry?.uqc).toBe('NOS');
+    });
   });
 });
