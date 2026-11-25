@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { InventoryItem, UnitOfMeasurement, ItemPriceMode } from '../../models/item.ts';
 import { formatINR, formatQuantity, roundQuantity, sanitizeQuantityInput } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { HsnAutocompleteInput } from '../Common/HsnAutocompleteInput';
 import type { HsnItem } from '../../core/gst/hsnCatalog';
@@ -562,6 +563,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     };
 
     db.saveItem(createdItem);
+    notifyDocumentSaved({ kind: 'Item' });
     onItemCreated?.(createdItem);
     handleSelectCatalogItem(createdItem);
     setIsCreateItemModalOpen(false);
@@ -910,6 +912,7 @@ export const InvoiceItemModal: React.FC<InvoiceItemModalProps> = ({
     };
 
     db.saveItem(updatedItem, true);
+    notifyDocumentSaved({ kind: 'Item' });
     onItemCreated?.(updatedItem);
   };
 

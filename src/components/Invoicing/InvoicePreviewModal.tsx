@@ -16,6 +16,7 @@ const ThermalPrintModal = React.lazy(() =>
   import('../Printing/ThermalPrintModal.tsx').then((m) => ({ default: m.ThermalPrintModal }))
 );
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
+import { getThermalPaperWidth } from '../../services/printSettingsService.ts';
 import { printCurrentPage, generatePdfNative } from '../../core/utils/printBridge.ts';
 import { useModalPreloadOnMount, preloadThermalPrintModal } from '../../core/utils/modalPreload.ts';
 import {
@@ -116,13 +117,7 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
     }
   }, [viewMode, propInvoice]);
 
-  const [thermalWidth] = useState<32 | 48>(() => {
-    const defaultPrint = localStorage.getItem('defaultPrintOption');
-    if (defaultPrint === 'Thermal-58mm') return 32;
-    if (defaultPrint === 'Thermal-80mm') return 48;
-    const existing = localStorage.getItem('printer_paper_width');
-    return existing ? (Number(existing) as 32 | 48) : 48;
-  });
+  const [thermalWidth] = useState<32 | 48>(() => getThermalPaperWidth());
   const [isThermalModalOpen, setIsThermalModalOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [copyType] = useState<InvoiceCopyType>('ORIGINAL FOR RECIPIENT');

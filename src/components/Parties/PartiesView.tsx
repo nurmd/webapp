@@ -8,6 +8,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { computePartyDues } from '../../core/accounting/partyDues.ts';
 import { getPaymentReminderWhatsAppUrl, getPartyTotalBalanceDue } from '../../core/utils/upiAndShare.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import {
   useCompany,
   usePartyGroups,
@@ -423,6 +424,7 @@ const PartiesViewComponent: React.FC<PartiesViewProps> = ({
         voucher.paymentAllocations = resolvedAllocations;
         voucher.allocationMode = resolvedMode;
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Receipt', number: receiptNumber, amount });
       } else {
         const voucher = createPaymentOutVoucher({
           voucherNumber: paymentNumber,
@@ -442,6 +444,7 @@ const PartiesViewComponent: React.FC<PartiesViewProps> = ({
         voucher.paymentAllocations = resolvedAllocations;
         voucher.allocationMode = resolvedMode;
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Voucher', number: paymentNumber, amount });
       }
       onRefresh?.();
       return true;

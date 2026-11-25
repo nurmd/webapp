@@ -13,6 +13,7 @@ import {
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
 import { useInvoices } from '../../core/store/useDataStore.ts';
@@ -174,6 +175,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
     setIsConverting(true);
     try {
       const newInv = await convertDocumentToTaxInvoice(doc, company);
+      notifyDocumentSaved({ kind: 'Delivery Challan', number: doc.invoiceNumber });
       showAppToast(`Challan #${doc.invoiceNumber} converted to Tax Invoice #${newInv.invoiceNumber}`);
       setConfirmConvertDoc(null);
       if (onRefresh) onRefresh();
@@ -194,6 +196,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       await db.saveInvoice(updated);
+      notifyDocumentSaved({ kind: 'Delivery Challan', number: doc.invoiceNumber });
       showAppToast(`Challan #${doc.invoiceNumber} marked as ${newStatus}`);
       if (onRefresh) onRefresh();
     } catch (err) {
@@ -212,6 +215,7 @@ export const DeliveryChallansView: React.FC<DeliveryChallansViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       await db.saveInvoice(updated);
+      notifyDocumentSaved({ kind: 'Delivery Challan', number: doc.invoiceNumber });
       showAppToast(`Delivery Challan #${doc.invoiceNumber} cancelled.`);
       setDocToCancel(null);
       if (onRefresh) onRefresh();

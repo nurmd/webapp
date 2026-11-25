@@ -7,6 +7,12 @@ import {
 } from '../../../core/utils/invoiceNumber.ts';
 import { db } from '../../../services/db.ts';
 import { printSettingsService, AppPrintSettings } from '../../../services/printSettingsService.ts';
+import {
+  getDefaultPaymentMode,
+  setDefaultPaymentMode,
+  SALES_PAYMENT_MODES,
+} from '../../../services/paymentSettingsService.ts';
+import { PaymentMode } from '../../../models/invoice.ts';
 import { showAppToast } from '../../../services/toast.ts';
 
 export interface BillingInvoicesTabProps {
@@ -71,6 +77,16 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
 
   // Print settings (A4 / Thermal fields and toggles)
   const [printSettings, setPrintSettings] = useState<AppPrintSettings>(() => printSettingsService.getSettings());
+
+  // Default payment mode for new sales invoices
+  const [defaultPaymentMode, setDefaultPaymentModeState] = useState<PaymentMode>(() => getDefaultPaymentMode());
+
+  const handleDefaultPaymentModeChange = (mode: PaymentMode) => {
+    setDefaultPaymentModeState(mode);
+    setDefaultPaymentMode(mode);
+    const label = SALES_PAYMENT_MODES.find((m) => m.value === mode)?.label || mode;
+    showAppToast(`Default payment mode set to ${label}`);
+  };
 
   // Bank & UPI inline editor state
   const [isEditingBank, setIsEditingBank] = useState(false);
@@ -840,6 +856,45 @@ export const BillingInvoicesTab: React.FC<BillingInvoicesTabProps> = ({
             </button>
           </div>
         )}
+      </section>
+
+      {/* 7b. Default payment mode */}
+      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center text-on-surface flex-shrink-0">
+            <span className="material-symbols-outlined text-[22px]">payments</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-label-md text-sm font-bold text-on-surface">Default payment mode</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-surface-container-high text-on-surface-variant">
+                Device Local
+              </span>
+            </div>
+            <p className="font-body-sm text-xs text-on-surface-variant mt-0.5">
+              Pre-selected tender on a new sales invoice. The amount still starts at ₹0 (unpaid).
+            </p>
+          </div>
+        </div>
+
+        <div className="relative self-start sm:self-auto shrink-0">
+          <select
+            data-testid="default-payment-mode-select"
+            aria-label="Default payment mode"
+            value={defaultPaymentMode}
+            onChange={(e) => handleDefaultPaymentModeChange(e.target.value as PaymentMode)}
+            className="h-9 pl-3 pr-8 rounded-xl bg-surface-container text-xs font-bold text-on-surface border border-outline-variant/30 outline-none focus:border-secondary transition-colors cursor-pointer appearance-none"
+          >
+            {SALES_PAYMENT_MODES.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+          <span className="material-symbols-outlined text-[16px] text-outline absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+            arrow_drop_down
+          </span>
+        </div>
       </section>
 
       {/* 8. Automated WhatsApp & SMS Reminders */}

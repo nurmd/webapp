@@ -11,6 +11,7 @@ import {
 import { formatINR, formatDate } from '../../core/utils/formatters.ts';
 import { buildPaymentVoucherWhatsAppMessage } from '../../core/utils/whatsAppMessageBuilders.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import {
   useCompany,
   useParties,
@@ -299,6 +300,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
 
       try {
         db.savePaymentVoucher(updatedVoucher);
+        notifyDocumentSaved({
+          kind: 'Payment Voucher',
+          number: updatedVoucher.voucherNumber,
+          amount: updatedVoucher.totalAmount,
+        });
       } catch (err: any) {
         alert(err.message || 'Failed to save voucher.');
         return;
@@ -343,6 +349,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         currentBalance: party.currentBalance - delta,
         updatedAt: new Date().toISOString(),
       });
+      notifyDocumentSaved({
+        kind: 'Invoice',
+        number: updatedInv.invoiceNumber,
+        amount: updatedInv.grandTotal,
+      });
     }
     // 3. Purchase payment edit (pay-pur)
     else if (editingLedgerEntry.id.startsWith('pay-pur-') && editingLedgerEntry.rawPurchase) {
@@ -383,6 +394,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         currentBalance: party.currentBalance + delta,
         updatedAt: new Date().toISOString(),
       });
+      notifyDocumentSaved({
+        kind: 'Purchase Bill',
+        number: updatedPur.billNumber,
+        amount: updatedPur.grandTotal,
+      });
     }
     // 4. Sales invoice entry edit (sale-)
     else if (editingLedgerEntry.type === 'SALE' && editingLedgerEntry.rawInvoice) {
@@ -405,6 +421,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         currentBalance: party.currentBalance + delta,
         updatedAt: new Date().toISOString(),
       });
+      notifyDocumentSaved({
+        kind: 'Invoice',
+        number: updatedInv.invoiceNumber,
+        amount: updatedInv.grandTotal,
+      });
     }
     // 5. Purchase bill entry edit (pur-)
     else if (editingLedgerEntry.type === 'PURCHASE' && editingLedgerEntry.rawPurchase) {
@@ -426,6 +447,11 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         ...party,
         currentBalance: party.currentBalance - delta,
         updatedAt: new Date().toISOString(),
+      });
+      notifyDocumentSaved({
+        kind: 'Purchase Bill',
+        number: updatedPur.billNumber,
+        amount: updatedPur.grandTotal,
       });
     }
     // 6. Opening balance edit
@@ -452,6 +478,7 @@ export const VoucherEditorModal: React.FC<VoucherEditorModalProps> = ({
         };
         db.saveParty(updatedParty);
         db.recalculatePartyBalance(party.id);
+        notifyDocumentSaved({ kind: 'Party' });
       }
     }
 

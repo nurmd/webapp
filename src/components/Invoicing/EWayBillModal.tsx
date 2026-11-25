@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
@@ -74,6 +75,7 @@ export const EWayBillModal: React.FC<EWayBillModalProps> = ({
 
     try {
       await db.saveInvoice(updatedInvoice);
+      notifyDocumentSaved({ kind: 'E-Way Details', number: invoice.invoiceNumber });
       if (onInvoiceUpdated) {
         onInvoiceUpdated(updatedInvoice);
       }

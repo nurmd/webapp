@@ -13,6 +13,7 @@ import {
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertPurchaseChallan, convertPurchaseChallanToBill } from '../../core/utils/documentConversion.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
 import { usePurchases } from '../../core/store/useDataStore.ts';
@@ -199,6 +200,7 @@ export const PurchaseChallansView: React.FC<PurchaseChallansViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       db.savePurchase(updated);
+      notifyDocumentSaved({ kind: 'Delivery Challan (inward)', number: challan.billNumber });
       showAppToast(`Purchase Challan #${challan.billNumber} cancelled. Inward stock reverted.`);
       setDocToCancel(null);
       if (onRefresh) onRefresh();

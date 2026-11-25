@@ -58,6 +58,39 @@ import { withWalkInCustomerBalance, isSystemParty } from './core/utils/systemPar
 import { initBackNavigation, useBackNavigation } from './core/utils/backNavigation.ts';
 import { isItemInBills, getActiveItems, getItemsNeedingRestock } from './core/utils/itemStatus.ts';
 import { findDuplicateItem, findDuplicateParty } from './core/utils/entityUniqueness.ts';
+import { SaveConfirmationOverlay } from './components/Common/SaveConfirmationOverlay.tsx';
+import { notifyDocumentSaved } from './services/saveConfirmation.ts';
+
+function getInvoiceKindLabel(invoiceType: InvoiceType): string {
+  switch (invoiceType) {
+    case 'CREDIT_NOTE':
+      return 'Credit Note';
+    case 'DEBIT_NOTE':
+      return 'Debit Note';
+    case 'SALES_ORDER':
+      return 'Sales Order';
+    case 'ESTIMATE':
+      return 'Estimate';
+    case 'DELIVERY_CHALLAN':
+      return 'Delivery Challan';
+    default:
+      return 'Invoice';
+  }
+}
+
+function getPurchaseKindLabel(purchaseType?: PurchaseBill['purchaseType']): string {
+  switch (purchaseType) {
+    case 'RETURN':
+    case ('PURCHASE_RETURN' as PurchaseBill['purchaseType']):
+      return 'Purchase Return';
+    case 'PO':
+      return 'Purchase Order';
+    case 'CHALLAN':
+      return 'Delivery Challan (inward)';
+    default:
+      return 'Purchase Bill';
+  }
+}
 import { UnitConversionLockedError } from './models/item.ts';
 import { ConfirmDeleteModal } from './components/Common/ConfirmDeleteModal.tsx';
 import { StorageQuotaBanner } from './components/Common/StorageQuotaBanner.tsx';
@@ -580,6 +613,11 @@ export const App: React.FC = () => {
 
     try {
       db.saveInvoice(newInvoice);
+      notifyDocumentSaved({
+        kind: getInvoiceKindLabel(newInvoice.invoiceType),
+        number: newInvoice.invoiceNumber,
+        amount: newInvoice.grandTotal,
+      });
     } catch (err: any) {
       showToast(err.message || 'Cannot save invoice.');
       return;
@@ -910,6 +948,11 @@ export const App: React.FC = () => {
     const isPurUnpaidOrCancelled = isPurchaseReturn || isPurchaseOrder || isPurchaseChallan || newBill.isCancelled || (newBill.paidAmount || 0) <= 0 || isPurCredit;
 
     db.savePurchase(newBill);
+    notifyDocumentSaved({
+      kind: getPurchaseKindLabel(newBill.purchaseType),
+      number: newBill.billNumber,
+      amount: newBill.grandTotal,
+    });
 
     // Auto-create Double-Entry Accounting Voucher for Purchase (only for inward bills, not purchase orders or challans)
     const existingVoucher = db.getVouchers().find(
@@ -1124,6 +1167,7 @@ export const App: React.FC = () => {
 
   const handleSaveExpense = useCallback((newExpense: Expense) => {
     db.saveExpense(newExpense);
+    notifyDocumentSaved({ kind: 'Expense', amount: newExpense.amount });
   }, []);
 
   const handleDeleteExpense = useCallback((id: string) => {
@@ -1152,6 +1196,7 @@ export const App: React.FC = () => {
       return;
     }
     db.saveParty(party);
+    notifyDocumentSaved({ kind: 'Party' });
   }, [showToast]);
 
   const handleRecordPartyPayment = useCallback((
@@ -1223,6 +1268,7 @@ export const App: React.FC = () => {
         voucher.allocationMode = resolvedMode;
 
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Receipt', number: receiptNumber, amount });
       } else {
         const voucher = createPaymentOutVoucher({
           voucherNumber: paymentNumber,
@@ -1244,6 +1290,7 @@ export const App: React.FC = () => {
         voucher.allocationMode = resolvedMode;
 
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Voucher', number: paymentNumber, amount });
       }
       return true;
     } catch (err: any) {
@@ -1286,6 +1333,7 @@ export const App: React.FC = () => {
     }
     try {
       db.saveItem(item);
+      notifyDocumentSaved({ kind: 'Item' });
       return true;
     } catch (err) {
       if (err instanceof UnitConversionLockedError) {
@@ -1321,6 +1369,7 @@ export const App: React.FC = () => {
 
   const handleSaveAdjustment = useCallback((adj: StockAdjustment) => {
     db.saveStockAdjustment(adj);
+    notifyDocumentSaved({ kind: 'Stock Adjustment' });
   }, []);
 
   const handleSaveCompany = useCallback((updated: CompanyProfile) => {
@@ -1330,10 +1379,12 @@ export const App: React.FC = () => {
       return;
     }
     db.saveCompany(updated);
+    notifyDocumentSaved({ kind: 'Company Profile' });
   }, [activeUser.role]);
 
   const handleSaveBankAccount = useCallback((account: BankAccount) => {
     db.saveBankAccount(account);
+    notifyDocumentSaved({ kind: 'Bank Account' });
   }, []);
 
   const handleDeleteBankAccount = useCallback((id: string) => {
@@ -1357,6 +1408,7 @@ export const App: React.FC = () => {
 
   const handleSaveCashBankTxn = useCallback((txn: CashBankTransaction) => {
     db.saveCashBankTransaction(txn);
+    notifyDocumentSaved({ kind: 'Cash/Bank Transaction', amount: txn.amount });
   }, []);
 
   const handleDeleteCashBankTxn = useCallback((id: string) => {
@@ -2005,6 +2057,9 @@ export const App: React.FC = () => {
           />
         </React.Suspense>
       )}
+
+      {/* Save Confirmation Overlay */}
+      <SaveConfirmationOverlay />
 
       {/* Floating Status Toast Notification */}
       {toastMessage && (

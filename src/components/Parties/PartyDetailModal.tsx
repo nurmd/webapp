@@ -8,6 +8,7 @@ import { Voucher, PaymentAllocation } from '../../core/accounting/voucherTypes.t
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import {
   useParties,
   useInvoices,
@@ -345,6 +346,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
         voucher.paymentAllocations = resolvedAllocations;
         voucher.allocationMode = resolvedMode;
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Receipt', number: receiptNumber, amount });
       } else {
         const voucher = createPaymentOutVoucher({
           voucherNumber: paymentNumber,
@@ -364,6 +366,7 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
         voucher.paymentAllocations = resolvedAllocations;
         voucher.allocationMode = resolvedMode;
         db.savePaymentVoucher(voucher);
+        notifyDocumentSaved({ kind: 'Payment Voucher', number: paymentNumber, amount });
       }
       onRefresh?.();
       return true;
@@ -419,6 +422,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
         };
         db.saveInvoice(updatedInv);
         db.recalculatePartyBalance(effectiveParty.id);
+        notifyDocumentSaved({
+          kind: 'Invoice',
+          number: updatedInv.invoiceNumber,
+          amount: updatedInv.grandTotal,
+        });
       } else if (entry.id.startsWith('pay-pur-') && entry.rawPurchase) {
         const pur = entry.rawPurchase;
         const amt = entry.debit;
@@ -433,6 +441,11 @@ export const PartyDetailModal: React.FC<PartyDetailModalProps> = ({
         };
         db.savePurchase(updatedPur);
         db.recalculatePartyBalance(effectiveParty.id);
+        notifyDocumentSaved({
+          kind: 'Purchase Bill',
+          number: updatedPur.billNumber,
+          amount: updatedPur.grandTotal,
+        });
       } else if (entry.isOpening || entry.type === 'OPENING') {
         db.clearPartyOpeningBalance(effectiveParty.id);
       }

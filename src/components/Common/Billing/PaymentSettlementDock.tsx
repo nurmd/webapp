@@ -56,7 +56,10 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
   const defaultBank = activeBankAccounts.find((b) => (b as any).isDefault) || activeBankAccounts[0];
   const defaultBankId = defaultBank?.id || 'ACC_BANK';
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2">
+    <div
+      data-testid="payment-settlement-dock"
+      className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-2.5 sm:p-3 shadow-2xs flex flex-col gap-2"
+    >
       {/* Header with Title and Auto-Identified Status */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
@@ -156,19 +159,6 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
               </div>
             )}
 
-            {/* Plus button next to it for split payment modes */}
-            {index === 0 && (
-              <button
-                type="button"
-                onClick={onAddSplitMode}
-                title="Add split payment mode"
-                className="h-8 px-2 sm:px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs flex items-center gap-1 border border-outline-variant/30 transition-all cursor-pointer shrink-0"
-              >
-                <span className="material-symbols-outlined text-[16px] text-secondary">add</span>
-                <span className="hidden sm:inline">Split</span>
-              </button>
-            )}
-
             {/* Remove button for secondary splits */}
             {index > 0 && (
               <button
@@ -183,17 +173,16 @@ export const PaymentSettlementDock: React.FC<PaymentSettlementDockProps> = ({
             )}
           </div>
         ))}
-        {paymentSplits.length > 1 && paymentSplits.length < 5 && (
-          <div className="flex justify-end pt-0.5">
-            <button
-              type="button"
-              onClick={onAddSplitMode}
-              className="text-[11px] font-bold text-secondary hover:text-secondary/80 flex items-center gap-1 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[14px]">add_circle</span>
-              <span>Add another tender mode</span>
-            </button>
-          </div>
+        {paymentSplits.length < 5 && (
+          <button
+            type="button"
+            onClick={onAddSplitMode}
+            data-testid="add-payment-mode-btn"
+            className="self-end h-8 px-2.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-bold text-xs flex items-center gap-1 border border-outline-variant/30 transition-all cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px] text-secondary">add</span>
+            <span>Add payment mode</span>
+          </button>
         )}
       </div>
     </div>

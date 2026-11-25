@@ -132,7 +132,7 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
     expect(container.textContent).not.toContain('WhatsApp');
   });
 
-  it('TC-BILL-01: Bill body does not display inline Payment Settlement Dock', () => {
+  it('TC-BILL-01: Standard sales invoice displays inline Payment Settlement dock, while special docs (Sales Order) do not', () => {
     act(() => {
       root.render(
         <TableGridInvoiceModal
@@ -146,14 +146,35 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       );
     });
 
-    // Main bill body should not contain inline Payment Settlement dock
+    // Standard sales invoice should contain inline Payment Settlement dock
     const paymentSettlementHeader = Array.from(container.querySelectorAll('span')).find(
       (s) => s.textContent === 'Payment Settlement'
     );
-    expect(paymentSettlementHeader).toBeFalsy();
+    expect(paymentSettlementHeader).toBeTruthy();
+
+    // Special document (SALES_ORDER) should NOT contain inline Payment Settlement dock
+    act(() => {
+      root.render(
+        <TableGridInvoiceModal
+          key="sales-order"
+          company={mockCompany}
+          parties={[mockParty]}
+          itemsCatalog={[mockItem]}
+          initialParty={mockParty}
+          defaultInvoiceType="SALES_ORDER"
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+    });
+
+    const specialDocHeader = Array.from(container.querySelectorAll('span')).find(
+      (s) => s.textContent === 'Payment Settlement'
+    );
+    expect(specialDocHeader).toBeFalsy();
   });
 
-  it('TC-BILL-02: Save & Print preserves existing paid invoice details and triggers print option', () => {
+  it('TC-BILL-02: Save Invoice preserves existing paid invoice details from inline settlement dock', () => {
     let savedInvoice: Invoice | null = null;
     let savedOptions: { openPrint?: boolean } | undefined = undefined;
 
@@ -226,14 +247,19 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       );
     });
 
-    // Find and click "Save & Print" button
+    // Save & Print is removed for standard sales invoices; click "Save Invoice"
     const saveAndPrintBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Save & Print')
     );
-    expect(saveAndPrintBtn).toBeTruthy();
+    expect(saveAndPrintBtn).toBeUndefined();
+
+    const saveInvoiceBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save Invoice')
+    );
+    expect(saveInvoiceBtn).toBeTruthy();
 
     act(() => {
-      saveAndPrintBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      saveInvoiceBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onSave).toHaveBeenCalled();
@@ -245,10 +271,10 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
     expect(savedInvoice!.balanceAmount).toBe(0);
     expect(savedInvoice!.paymentSplits).toEqual([{ id: 's1', mode: 'CASH', amount: 2832 }]);
     expect(savedInvoice!.notes).toBe('Paid in full');
-    expect(savedOptions).toEqual({ openPrint: true });
+    expect(savedOptions).toBeUndefined();
   });
 
-  it('TC-BILL-02B: Save & Print saves a NEW invoice as UNPAID and triggers print option', () => {
+  it('TC-BILL-02B: Save Invoice saves a NEW invoice as UNPAID when inline amount is 0', () => {
     let savedInvoice: Invoice | null = null;
     let savedOptions: { openPrint?: boolean } | undefined = undefined;
 
@@ -293,24 +319,24 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       );
     });
 
-    // Find and click "Save & Print" button
-    const saveAndPrintBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Save & Print')
+    // Find and click "Save Invoice" button (Save & Print is removed for standard sales invoices)
+    const saveInvoiceBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save Invoice')
     );
-    expect(saveAndPrintBtn).toBeTruthy();
+    expect(saveInvoiceBtn).toBeTruthy();
 
     act(() => {
-      saveAndPrintBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      saveInvoiceBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onSave).toHaveBeenCalled();
     expect(savedInvoice).not.toBeNull();
-    // New invoices without payment override default to unpaid credit
+    // New invoices default to ₹0 / UNPAID credit
     expect(savedInvoice!.paymentStatus).toBe('UNPAID');
     expect(savedInvoice!.paymentMode).toBe('CREDIT');
     expect(savedInvoice!.paidAmount).toBe(0);
     expect(savedInvoice!.balanceAmount).toBe(savedInvoice!.grandTotal);
-    expect(savedOptions).toEqual({ openPrint: true });
+    expect(savedOptions).toBeUndefined();
   });
 
   it('TC-BILL-02C: Save Invoice preserves paidAmount, paymentStatus, paymentMode, paymentSplits, and balanceAmount for an existing invoice', () => {
@@ -497,7 +523,9 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
     expect(savedInvoice!.paidAmount).toBe(1416);
     expect(savedInvoice!.paymentStatus).toBe('PAID');
     expect(savedInvoice!.paymentMode).toBe('CASH');
-    expect(savedInvoice!.paymentSplits).toBeUndefined();
+    expect(savedInvoice!.paymentSplits).toEqual([
+      expect.objectContaining({ mode: 'CASH', amount: 1416 }),
+    ]);
     expect(savedInvoice!.balanceAmount).toBe(0);
     expect(savedInvoice!.notes).toBe('Paid without explicit splits');
     expect(savedOptions).toBeUndefined();
@@ -511,7 +539,7 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
     expect(stored!.balanceAmount).toBe(0);
   });
 
-  it('TC-BILL-03: Pay & Save opens payment modal to configure split payments and saves settled invoice', () => {
+  it('TC-BILL-03: Inline Payment Settlement configures split payments and saves settled invoice', () => {
     let savedInvoice: Invoice | null = null;
     const onSave = vi.fn((inv: Invoice) => {
       savedInvoice = inv;
@@ -579,37 +607,31 @@ describe('Invoice Payment Modal & Action Dock Flow', () => {
       );
     });
 
-    // Click "Pay & Save"
+    // Pay & Save is removed for standard sales invoices; inline Payment Settlement is rendered directly
     const payAndSaveBtn = Array.from(container.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Pay & Save')
     );
-    expect(payAndSaveBtn).toBeTruthy();
+    expect(payAndSaveBtn).toBeUndefined();
 
-    act(() => {
-      payAndSaveBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    // Payment Settlement modal is now open!
     expect(container.textContent).toContain('Payment Settlement');
-    expect(container.textContent).toContain('Payment Tender Breakdown');
 
-    // Inside Payment Modal, click "+ Add Tender"
-    const addTenderBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('+ Add Tender')
+    // Click "Add payment mode" in the inline Payment Settlement dock
+    const addModeBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Add payment mode')
     );
-    expect(addTenderBtn).toBeTruthy();
+    expect(addModeBtn).toBeTruthy();
     act(() => {
-      addTenderBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      addModeBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    // Click "Confirm & Save"
-    const confirmAndSaveBtn = Array.from(container.querySelectorAll('button')).find((b) =>
-      b.textContent?.includes('Confirm & Save')
+    // Click "Save Invoice"
+    const saveInvoiceBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Save Invoice')
     );
-    expect(confirmAndSaveBtn).toBeTruthy();
+    expect(saveInvoiceBtn).toBeTruthy();
 
     act(() => {
-      confirmAndSaveBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      saveInvoiceBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(onSave).toHaveBeenCalled();

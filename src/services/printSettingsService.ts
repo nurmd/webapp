@@ -81,7 +81,9 @@ export const DEFAULT_A4_SETTINGS: A4PrintSettings = {
 };
 
 export const DEFAULT_THERMAL_SETTINGS: ThermalPrintSettings = {
-  paperWidth: 32,
+  // 80mm / 3" roll is the default so image previews and shares never render a
+  // narrower 58mm receipt unless the user explicitly chose 58mm.
+  paperWidth: 48,
   receiptTitle: 'TAX INVOICE',
   customStoreName: '',
   showAddress: true,
@@ -106,10 +108,43 @@ export const DEFAULT_THERMAL_SETTINGS: ThermalPrintSettings = {
 
 const STORAGE_KEY = 'app_custom_print_settings';
 
+/**
+ * Resolves the thermal paper width from the two places it can be written.
+ *
+ * `printer_paper_width` is written by BOTH the Settings screen
+ * (`saveSettings`) and the thermal print dialog, so it is the freshest value.
+ * `app_custom_print_settings.thermal.paperWidth` can be stale (for example when
+ * the user last changed the size in the print dialog only), so it must never
+ * override a valid legacy value. This ordering bug is what made share-as-image
+ * render a 58mm receipt after the user had selected 80mm.
+ */
+function resolvePaperWidth(
+  legacyWidth: number,
+  canonicalWidth?: number,
+  defaultFormat?: string
+): 32 | 48 {
+  if (legacyWidth === 48 || legacyWidth === 32) return legacyWidth;
+  if (canonicalWidth === 48 || canonicalWidth === 32) return canonicalWidth;
+  if (defaultFormat === 'Thermal-58mm') return 32;
+  return 48;
+}
+
+/**
+ * Single source of truth for thermal paper width across every preview, print
+ * and share surface. Never read `printer_paper_width` directly from a component.
+ */
+export function getThermalPaperWidth(): 32 | 48 {
+  try {
+    return printSettingsService.getSettings().thermal.paperWidth;
+  } catch {
+    return 48;
+  }
+}
+
 export const printSettingsService = {
   getSettings(): AppPrintSettings {
     const rawDefault = localStorage.getItem('defaultPrintOption');
-    const legacyWidth = Number(localStorage.getItem('printer_paper_width')) as 32 | 48;
+    const legacyWidth = Number(localStorage.getItem('printer_paper_width'));
 
     let defaultFormat: 'A4' | 'Thermal-58mm' | 'Thermal-80mm' = 'A4';
     if (rawDefault === 'Thermal-58mm' || rawDefault === 'Thermal-80mm' || rawDefault === 'A4') {
@@ -124,13 +159,16 @@ export const printSettingsService = {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        const resolvedFormat = parsed.defaultFormat || defaultFormat;
         return {
-          defaultFormat: parsed.defaultFormat || defaultFormat,
+          defaultFormat: resolvedFormat,
           a4: { ...DEFAULT_A4_SETTINGS, ...parsed.a4 },
           thermal: {
             ...DEFAULT_THERMAL_SETTINGS,
-            paperWidth: legacyWidth === 48 || parsed.thermal?.paperWidth === 48 ? 48 : 32,
             ...parsed.thermal,
+            // Must stay after the spread: a stale canonical value would otherwise
+            // win over the freshly-written legacy key.
+            paperWidth: resolvePaperWidth(legacyWidth, parsed.thermal?.paperWidth, resolvedFormat),
           },
         };
       }
@@ -143,7 +181,7 @@ export const printSettingsService = {
       a4: { ...DEFAULT_A4_SETTINGS },
       thermal: {
         ...DEFAULT_THERMAL_SETTINGS,
-        paperWidth: legacyWidth === 48 ? 48 : 32,
+        paperWidth: resolvePaperWidth(legacyWidth, undefined, defaultFormat),
       },
     };
   },

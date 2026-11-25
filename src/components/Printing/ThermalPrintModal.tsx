@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { Invoice } from '../../models/invoice.ts';
 import { CompanyProfile } from '../../models/company.ts';
 import {
@@ -8,7 +9,7 @@ import {
   buildThermalReceiptBinary,
   printViaWebBluetooth,
 } from '../../core/printer/escposBinary.ts';
-import { printSettingsService } from '../../services/printSettingsService.ts';
+import { printSettingsService, getThermalPaperWidth } from '../../services/printSettingsService.ts';
 import { useParties } from '../../core/store/useDataStore.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { printCurrentPage } from '../../core/utils/printBridge.ts';
@@ -42,17 +43,7 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
     return true;
   }, true, 30);
 
-  const [width, setWidth] = useState<32 | 48>(() => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const val = Number(localStorage.getItem('printer_paper_width'));
-        if (val === 32 || val === 48) return val;
-      }
-    } catch {
-      // Fallback
-    }
-    return 32;
-  });
+  const [width, setWidth] = useState<32 | 48>(() => getThermalPaperWidth());
   const [isPrinting, setIsPrinting] = useState(false);
   const [isSharingImage, setIsSharingImage] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -211,17 +202,25 @@ export const ThermalPrintModal: React.FC<ThermalPrintModalProps> = ({
   const handleShareImage = async () => {
     setIsSharingImage(true);
     try {
+      // The printable width can change in Settings while this modal is mounted.
+      // Resolve it once and make the preview DOM match before capturing.
+      const shareWidth: 32 | 48 = getThermalPaperWidth();
+      if (shareWidth !== width) {
+        flushSync(() => setWidth(shareWidth));
+      }
+      const shareText = buildThermalReceiptText(invoice, company, shareWidth);
+
       let blob: Blob | null = null;
       if (thermalPreviewRef.current) {
         try {
-          blob = await renderThermalPreviewImage(thermalPreviewRef.current, previewText, width);
+          blob = await renderThermalPreviewImage(thermalPreviewRef.current, shareText, shareWidth);
         } catch (err: any) {
           console.warn('[share] dom capture failed:', err);
           blob = null;
         }
       }
       if (!blob) {
-        blob = await renderThermalReceiptImage(previewText, width);
+        blob = await renderThermalReceiptImage(shareText, shareWidth);
       }
 
       const fileName = `Receipt-${invoice.invoiceNumber || 'Document'}.png`;

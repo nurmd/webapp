@@ -4,6 +4,7 @@ import { UnitsManagementCard } from './UnitsManagementCard.tsx';
 import { ItemFormModal } from './ItemFormModal.tsx';
 import { formatINR } from '../../core/utils/formatters.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { useUnits } from '../../core/store/useDataStore.ts';
 
 export interface UnitsPricingViewProps {
@@ -116,6 +117,7 @@ export const UnitsPricingView: React.FC<UnitsPricingViewProps> = ({
         onSaveItem(item);
       } else {
         db.saveItem(item);
+        notifyDocumentSaved({ kind: 'Item' });
       }
       handleModalClose();
     },

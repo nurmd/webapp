@@ -12,7 +12,7 @@ import {
 import { ThermalReceiptPreview } from '../Printing/ThermalReceiptPreview.tsx';
 import { printDocument } from '../../core/utils/printBridge.ts';
 import { useBackNavigation } from '../../core/utils/backNavigation.ts';
-import { printSettingsService } from '../../services/printSettingsService.ts';
+import { printSettingsService, getThermalPaperWidth } from '../../services/printSettingsService.ts';
 
 export interface PaymentReceiptSlipModalProps {
   entry: PassbookEntry;
@@ -36,7 +36,7 @@ export const PaymentReceiptSlipModal: React.FC<PaymentReceiptSlipModalProps> = (
 
   const [width, setWidth] = useState<32 | 48>(() => {
     if (defaultWidth === 32 || defaultWidth === 48) return defaultWidth;
-    return 32;
+    return getThermalPaperWidth();
   });
 
   const source: PaymentSlipSource = useMemo(() => {

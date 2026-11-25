@@ -21,7 +21,21 @@ export async function renderThermalPreviewImage(
     if (!node) {
       throw new Error('Target node is missing for thermal preview capture');
     }
-    const blob = await toBlob(node, { cacheBust: true, pixelRatio: 2 });
+
+    // html-to-image sizes the capture from the node's *used* box. When a preview
+    // is a flex child it can be shrunk to the container width while its
+    // monospace lines overflow to the right, so the PNG is clipped at the right
+    // edge. Passing the node's full box explicitly keeps every column.
+    const nodeWidth = Math.max(node.offsetWidth, node.scrollWidth);
+    const nodeHeight = Math.max(node.offsetHeight, node.scrollHeight);
+    const options: { cacheBust: boolean; pixelRatio: number; width?: number; height?: number } = {
+      cacheBust: true,
+      pixelRatio: 2,
+    };
+    if (nodeWidth > 0) options.width = nodeWidth;
+    if (nodeHeight > 0) options.height = nodeHeight;
+
+    const blob = await toBlob(node, options);
     if (!blob || blob.size < 1024) {
       if (fallbackText) {
         console.warn(`[share] dom capture produced suspicious/small blob (${blob?.size ?? 0} bytes), falling back to canvas`);

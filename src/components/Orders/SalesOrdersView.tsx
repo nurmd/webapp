@@ -13,6 +13,7 @@ import {
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertToInvoice, convertDocumentToTaxInvoice } from '../../core/utils/documentConversion.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
 import { useInvoices } from '../../core/store/useDataStore.ts';
@@ -124,6 +125,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
   const handleConvertSalesOrder = async (doc: Invoice) => {
     try {
       const newInv = await convertDocumentToTaxInvoice(doc, company);
+      notifyDocumentSaved({ kind: 'Sales Order', number: doc.invoiceNumber });
       showAppToast(`Sales Order #${doc.invoiceNumber} converted to Tax Invoice #${newInv.invoiceNumber}`);
       if (onRefresh) onRefresh();
     } catch (err: any) {
@@ -141,6 +143,7 @@ export const SalesOrdersView: React.FC<SalesOrdersViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       await db.saveInvoice(updated);
+      notifyDocumentSaved({ kind: 'Sales Order', number: order.invoiceNumber });
       showAppToast(`Sales Order #${order.invoiceNumber} cancelled.`);
       if (onRefresh) onRefresh();
     } catch (err) {

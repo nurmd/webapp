@@ -100,3 +100,13 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes save-confirm-pop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-save-confirm { animation: save-confirm-pop 0.32s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-save-confirm { animation: none; }
+}

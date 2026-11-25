@@ -3,7 +3,7 @@ import { CompanyProfile } from '../../models/company.ts';
 import { Party } from '../../models/party.ts';
 import { InventoryItem } from '../../models/item.ts';
 import { Invoice, InvoiceItemEntry, InvoiceType, PaymentMode, PaymentStatus, PaymentSplit } from '../../models/invoice.ts';
-import { normalizeInvoiceLineItem, RawLineItem } from '../../core/invoicing/lineItemEngine.ts';
+import { normalizeInvoiceLineItem, RawLineItem, derivePaymentStatus } from '../../core/invoicing/lineItemEngine.ts';
 import { SYSTEM_WALK_IN_PARTY_ID, SYSTEM_WALK_IN_PARTY_NAME } from '../../core/utils/systemParties.ts';
 import { exclusiveFromInclusive, inclusiveFromExclusive } from '../../core/gst/pricing.ts';
 import { parseSplitsFromInvoice, formatSplitNotes } from '../../core/accounting/paymentSplitUtils.ts';
@@ -34,15 +34,30 @@ import { useBackNavigation } from '../../core/utils/backNavigation.ts';
 import { InvoiceHeaderMeta } from './components/InvoiceHeaderMeta.tsx';
 import { InvoiceLineItemsGrid, GridRow } from './components/InvoiceLineItemsGrid.tsx';
 import { DocumentTotalsSummary } from '../Common/Billing/DocumentTotalsSummary.tsx';
+import { PaymentSettlementDock } from '../Common/Billing/PaymentSettlementDock.tsx';
 import { InvoicePaymentModal } from './components/InvoicePaymentModal.tsx';
 import { InvoiceActionDock } from './components/InvoiceActionDock.tsx';
 import { InvoiceNumberDateModal } from './components/InvoiceNumberDateModal.tsx';
 import { DueDatePresetModal } from '../Common/Billing/DueDatePresetModal.tsx';
 import { BillDiscountModal } from '../Common/Billing/BillDiscountModal.tsx';
 import { draftService, InvoiceDraft } from '../../services/draftService.ts';
+import { getDefaultPaymentMode, SALES_PAYMENT_MODES } from '../../services/paymentSettingsService.ts';
 import { showAppToast } from '../../services/toast.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 
 export type { GridRow };
+
+export const SPECIAL_INVOICE_TYPES: ReadonlyArray<InvoiceType> = [
+  'SALES_ORDER',
+  'ESTIMATE',
+  'DELIVERY_CHALLAN',
+  'CREDIT_NOTE',
+  'DEBIT_NOTE',
+];
+
+export function isSpecialInvoiceType(invoiceType: InvoiceType): boolean {
+  return SPECIAL_INVOICE_TYPES.includes(invoiceType);
+}
 
 interface TableGridInvoiceModalProps {
   company: CompanyProfile;
@@ -110,6 +125,7 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     const partyToUse = existing || newParty;
     if (!existing) {
       db.saveParty(newParty);
+      notifyDocumentSaved({ kind: 'Party' });
       setLocalParties((prev) => [newParty, ...prev.filter((p) => p.id !== newParty.id)]);
     }
     setSelectedParty(partyToUse);
@@ -599,6 +615,93 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
   }, [isGstActive, company.isCompositionScheme, selectedParty?.gstin, calcSummary.isIntraState, finalGrandTotal]);
 
   const effectiveInvoiceType = manualInvoiceType || autoDetectedInvoiceType;
+  const isSpecialDoc = isSpecialInvoiceType(effectiveInvoiceType);
+
+  const [paymentSplits, setPaymentSplits] = useState<PaymentSplit[]>(() => {
+    if (initialInvoice) return parseSplitsFromInvoice(initialInvoice, finalGrandTotal);
+    return [{ id: '1', mode: getDefaultPaymentMode(), amount: 0 }];
+  });
+
+  const totalPaid = useMemo(() => {
+    return paymentSplits.reduce((sum, s) => {
+      if (s.mode === 'CREDIT') return sum;
+      return sum + (Number(s.amount) || 0);
+    }, 0);
+  }, [paymentSplits]);
+
+  const balanceDue = useMemo(() => {
+    return Math.max(0, Number((finalGrandTotal - totalPaid).toFixed(2)));
+  }, [finalGrandTotal, totalPaid]);
+
+  const autoPaymentStatus: PaymentStatus = useMemo(() => {
+    return derivePaymentStatus(finalGrandTotal, totalPaid);
+  }, [finalGrandTotal, totalPaid]);
+
+  const handleAddSplitMode = () => {
+    const existingModes = new Set(paymentSplits.map((s) => s.mode));
+    const candidateModes: PaymentMode[] = ['NET_BANKING', 'UPI', 'CASH', 'CARD', 'CHEQUE'];
+    const nextMode = candidateModes.find((m) => !existingModes.has(m)) || 'NET_BANKING';
+
+    const currentNonCreditTotal = paymentSplits.reduce(
+      (acc, s) => (s.mode === 'CREDIT' ? acc : acc + (Number(s.amount) || 0)),
+      0
+    );
+    const remaining = Math.max(0, Number((finalGrandTotal - currentNonCreditTotal).toFixed(2)));
+
+    if (paymentSplits.length === 1 && paymentSplits[0].mode === 'CREDIT') {
+      setPaymentSplits([
+        { id: '1', mode: 'NET_BANKING', amount: 0 },
+        { id: String(Date.now()), mode: 'CREDIT', amount: 0 },
+      ]);
+      return;
+    }
+
+    setPaymentSplits([
+      ...paymentSplits,
+      {
+        id: String(Date.now()),
+        mode: nextMode,
+        amount: remaining,
+      },
+    ]);
+  };
+
+  const handleUpdateSplitMode = (id: string, newMode: PaymentMode) => {
+    if (newMode === 'SPLIT') {
+      handleAddSplitMode();
+      return;
+    }
+    setPaymentSplits((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        if (newMode === 'CREDIT') {
+          return { ...s, mode: newMode, amount: 0 };
+        }
+        return { ...s, mode: newMode };
+      })
+    );
+  };
+
+  const handleUpdateSplitAmount = (id: string, newAmount: number) => {
+    setPaymentSplits((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, amount: Math.max(0, newAmount) } : s))
+    );
+  };
+
+  const handleUpdateSplitAccount = (id: string, accountId: string, accountName: string) => {
+    setPaymentSplits((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, accountId, accountName } : s))
+    );
+  };
+
+  const handleRemoveSplit = (id: string) => {
+    const updated = paymentSplits.filter((s) => s.id !== id);
+    if (updated.length === 0) {
+      setPaymentSplits([{ id: String(Date.now()), mode: getDefaultPaymentMode(), amount: 0 }]);
+      return;
+    }
+    setPaymentSplits(updated);
+  };
 
   // Barcode scan handler
   const handleBarcodeScanned = (scannedCode: string) => {
@@ -744,8 +847,8 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
       finalNotes = undefined;
     }
 
-    const isSpecialDoc = ['SALES_ORDER', 'ESTIMATE', 'DELIVERY_CHALLAN', 'CREDIT_NOTE', 'DEBIT_NOTE'].includes(effectiveInvoiceType);
-    const resolvedInvoiceType = (company.isCompositionScheme && !isSpecialDoc) ? 'B2CS' : effectiveInvoiceType;
+    const isSpecialDocForSave = isSpecialInvoiceType(effectiveInvoiceType);
+    const resolvedInvoiceType = (company.isCompositionScheme && !isSpecialDocForSave) ? 'B2CS' : effectiveInvoiceType;
 
     return {
       id: initialInvoice ? initialInvoice.id : `INV-${Date.now()}`,
@@ -1120,21 +1223,62 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
     setPreviewInvoiceData(unpaidInvoice);
   }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice, effectiveInvoiceType]);
 
-  // "Save Invoice" from Action Dock: saves bill directly as UNPAID (Credit)
+  const buildPaymentOverride = useCallback(() => {
+    const nonCreditSplits = paymentSplits.filter((s) => s.mode !== 'CREDIT' && (Number(s.amount) || 0) > 0);
+    let resolvedPaymentMode: PaymentMode;
+    if (autoPaymentStatus === 'UNPAID' || nonCreditSplits.length === 0) {
+      resolvedPaymentMode = 'CREDIT';
+    } else if (nonCreditSplits.length === 1 && balanceDue <= 0.01) {
+      resolvedPaymentMode = nonCreditSplits[0].mode;
+    } else {
+      resolvedPaymentMode = 'SPLIT';
+    }
+
+    const savedSplits: PaymentSplit[] =
+      autoPaymentStatus === 'UNPAID'
+        ? [{ id: 'split-credit', mode: 'CREDIT', amount: balanceDue }]
+        : paymentSplits.map((s) => ({
+            id: s.id,
+            mode: s.mode,
+            amount: s.mode === 'CREDIT' ? balanceDue : Number(s.amount) || 0,
+            accountId: s.accountId,
+            accountName: s.accountName,
+            reference: s.reference || s.referenceNo,
+            referenceNo: s.referenceNo || s.reference,
+          }));
+
+    const isMultiTender = nonCreditSplits.length > 1;
+    const splitNote = isMultiTender ? formatSplitNotes(paymentSplits, balanceDue) : '';
+    const paymentNotes = splitNote || initialInvoice?.notes;
+
+    return {
+      paymentMode: resolvedPaymentMode,
+      paymentStatus: autoPaymentStatus,
+      paidAmount: totalPaid,
+      balanceAmount: balanceDue,
+      paymentSplits: savedSplits,
+      paymentNotes,
+    };
+  }, [paymentSplits, autoPaymentStatus, balanceDue, totalPaid, initialInvoice?.notes]);
+
+  // "Save Invoice" from Action Dock: saves bill with inline payment settlement (or default unpaid for special docs)
   const handleSaveInvoiceDirect = useCallback(() => {
     if (!validateInvoice()) return;
-    const unpaidInvoice = constructInvoiceObject();
+    const savedInvoice = isSpecialDoc
+      ? constructInvoiceObject()
+      : constructInvoiceObject(buildPaymentOverride());
     if (!initialInvoice) {
       draftService.clearInvoiceDraft(effectiveInvoiceType);
     }
-    onSave(unpaidInvoice);
-  }, [validateInvoice, constructInvoiceObject, onSave, initialInvoice, effectiveInvoiceType]);
+    onSave(savedInvoice);
+  }, [validateInvoice, isSpecialDoc, constructInvoiceObject, buildPaymentOverride, onSave, initialInvoice, effectiveInvoiceType]);
 
-  // "Pay & Save" from Action Dock: opens Payment Modal
+  // "Pay & Save" from Action Dock: opens Payment Modal (special docs only)
   const handleOpenPaymentModal = useCallback(() => {
+    if (!isSpecialDoc) return;
     if (!validateInvoice()) return;
     setIsPaymentModalOpen(true);
-  }, [validateInvoice]);
+  }, [isSpecialDoc, validateInvoice]);
 
   // Confirm payment callback from InvoicePaymentModal
   const handleConfirmPayment = useCallback(
@@ -1310,15 +1454,30 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
             accentColor="secondary"
           />
 
+          {!isSpecialDoc && (
+            <PaymentSettlementDock
+              paymentSplits={paymentSplits}
+              autoPaymentStatus={autoPaymentStatus}
+              balanceDue={balanceDue}
+              onUpdateSplitMode={handleUpdateSplitMode}
+              onUpdateSplitAmount={handleUpdateSplitAmount}
+              onUpdateSplitAccount={handleUpdateSplitAccount}
+              onAddSplitMode={handleAddSplitMode}
+              onRemoveSplit={handleRemoveSplit}
+              paymentModes={SALES_PAYMENT_MODES}
+            />
+          )}
+
           <div className="h-28 sm:h-32" aria-hidden="true" />
         </div>
       </main>
 
       <InvoiceActionDock
         finalGrandTotal={finalGrandTotal}
-        onSaveAndPrint={handleSaveAndPrint}
+        onSaveAndPrint={isSpecialDoc ? handleSaveAndPrint : undefined}
         onSaveInvoice={handleSaveInvoiceDirect}
-        onPayAndSave={handleOpenPaymentModal}
+        onPayAndSave={isSpecialDoc ? handleOpenPaymentModal : undefined}
+        hidePrintAndPay={!isSpecialDoc}
         invoiceType={effectiveInvoiceType}
       />
 
@@ -1365,10 +1524,10 @@ export const TableGridInvoiceModal: React.FC<TableGridInvoiceModalProps> = ({
         onScan={handleBarcodeScanned}
       />
 
-      {/* Payment Settlement Modal */}
-      {isPaymentModalOpen && (
+      {/* Payment Settlement Modal (special docs only) */}
+      {isPaymentModalOpen && isSpecialDoc && (
         <InvoicePaymentModal
-          isOpen={isPaymentModalOpen}
+          isOpen={isPaymentModalOpen && isSpecialDoc}
           onClose={() => setIsPaymentModalOpen(false)}
           finalGrandTotal={finalGrandTotal}
           invoiceNumber={invoiceNumber}

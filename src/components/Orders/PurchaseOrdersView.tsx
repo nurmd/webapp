@@ -13,6 +13,7 @@ import {
 import { DateFilterModal } from '../Common/DateFilterModal.tsx';
 import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal.tsx';
 import { canConvertPurchaseOrder, convertPurchaseOrderToBill } from '../../core/utils/documentConversion.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import { showAppToast } from '../../services/toast.ts';
 import { db } from '../../services/db.ts';
 import { usePurchases } from '../../core/store/useDataStore.ts';
@@ -124,6 +125,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
   const handleConvertPo = async (po: PurchaseBill) => {
     try {
       const newBill = await convertPurchaseOrderToBill(po, company);
+      notifyDocumentSaved({ kind: 'Purchase Order', number: po.billNumber });
       showAppToast(`PO #${po.billNumber} inwarded as Purchase Bill #${newBill.billNumber}. Stock updated.`);
       if (onRefresh) onRefresh();
     } catch (err: any) {
@@ -141,6 +143,7 @@ export const PurchaseOrdersView: React.FC<PurchaseOrdersViewProps> = ({
         updatedAt: new Date().toISOString(),
       };
       await db.savePurchase(updated);
+      notifyDocumentSaved({ kind: 'Purchase Order', number: po.billNumber });
       showAppToast(`Purchase Order #${po.billNumber} cancelled.`);
       if (onRefresh) onRefresh();
     } catch (err) {

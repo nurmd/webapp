@@ -29,6 +29,16 @@ import {
 } from '../../core/utils/paymentReceiptText.ts';
 import { ThermalReceiptPreview } from '../Printing/ThermalReceiptPreview.tsx';
 
+/**
+ * WhatsApp sharing always renders a 3" (80mm) receipt image.
+ *
+ * The shared PNG is viewed on a phone, not printed, so it must not depend on the
+ * shop's roll size: a 58mm setting previously produced a narrow 576px image whose
+ * text clipped at the right edge. A fixed 48-column width is readable on every
+ * device and is independent of `printer_paper_width`.
+ */
+const SHARE_IMAGE_PAPER_WIDTH: 32 | 48 = 48;
+
 export interface WhatsAppShareModalProps {
   isOpen?: boolean;
   onClose: () => void;
@@ -137,17 +147,6 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
   const [phoneError, setPhoneError] = useState<string>('');
   const [isSharingImage, setIsSharingImage] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [paperWidth, setPaperWidth] = useState<32 | 48>(() => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const val = Number(localStorage.getItem('printer_paper_width'));
-        if (val === 32 || val === 48) return val;
-      }
-    } catch {
-      // Fallback
-    }
-    return 32;
-  });
   const thermalPreviewRef = useRef<HTMLDivElement>(null);
 
   // Re-sync phone if defaultPhone changes
@@ -258,18 +257,9 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
         }
       }
 
-      let width: 32 | 48 = 32;
-      try {
-        if (typeof localStorage !== 'undefined') {
-          const val = Number(localStorage.getItem('printer_paper_width'));
-          if (val === 32 || val === 48) {
-            width = val;
-          }
-        }
-      } catch {
-        // Fallback to 32
-      }
-      setPaperWidth(width);
+      // Fixed 3" image. The preview DOM is always rendered at this width, so the
+      // captured text and the captured box cannot disagree.
+      const width: 32 | 48 = SHARE_IMAGE_PAPER_WIDTH;
 
       let blob: Blob | null = null;
       let fileName = 'Receipt-Document.png';
@@ -608,8 +598,8 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 )}
 
                 {isImageMode ? (
-                  <span className="text-xs text-on-surface-variant font-mono">
-                    {paperWidth} cols
+                  <span className="text-xs text-on-surface-variant font-mono" data-testid="share-paper-width">
+                    80mm (3") · {SHARE_IMAGE_PAPER_WIDTH} cols
                   </span>
                 ) : (
                   <button
@@ -632,8 +622,8 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
                 <div className="max-h-[40vh] overflow-y-auto overflow-x-auto border border-outline-variant/30 rounded-2xl p-3 bg-surface-container-low/50 flex justify-start items-start shadow-inner">
                   <ThermalReceiptPreview
                     ref={thermalPreviewRef}
-                    previewText={buildThermalReceiptText(invoice, company, paperWidth)}
-                    width={paperWidth}
+                    previewText={buildThermalReceiptText(invoice, company, SHARE_IMAGE_PAPER_WIDTH)}
+                    width={SHARE_IMAGE_PAPER_WIDTH}
                   />
                 </div>
               ) : (

@@ -4,13 +4,14 @@ import { InvoiceType } from '../../../models/invoice.ts';
 
 export interface InvoiceActionDockProps {
   finalGrandTotal: number;
-  onSaveAndPrint: () => void;
+  onSaveAndPrint?: () => void;
   onSaveInvoice: () => void;
-  onPayAndSave: () => void;
+  onPayAndSave?: () => void;
   onSaveDraft?: () => void;
   /** Optional legacy alias for tests */
   onPrintThermal?: () => void;
   invoiceType?: InvoiceType;
+  hidePrintAndPay?: boolean;
 }
 
 export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
@@ -21,6 +22,7 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
   onSaveDraft,
   onPrintThermal,
   invoiceType,
+  hidePrintAndPay = false,
 }) => {
   const isSalesOrder = invoiceType === 'SALES_ORDER';
   const isCreditNote = invoiceType === 'CREDIT_NOTE';
@@ -77,15 +79,17 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={onSaveAndPrint || onPrintThermal}
-            className="h-10 px-3 sm:px-4 rounded-xl bg-surface-container font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 active:scale-95 shrink-0"
-            title={isSalesOrder ? 'Save Sales Order and Print Preview' : 'Save bill as Unpaid and Print Thermal Receipt'}
-          >
-            <span className="material-symbols-outlined text-[18px]">print</span>
-            <span>Save &amp; Print</span>
-          </button>
+          {!hidePrintAndPay && (
+            <button
+              type="button"
+              onClick={() => (onSaveAndPrint || onPrintThermal)?.()}
+              className="h-10 px-3 sm:px-4 rounded-xl bg-surface-container font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5 hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/30 active:scale-95 shrink-0"
+              title={isSalesOrder ? 'Save Sales Order and Print Preview' : 'Save bill as Unpaid and Print Thermal Receipt'}
+            >
+              <span className="material-symbols-outlined text-[18px]">print</span>
+              <span>Save &amp; Print</span>
+            </button>
+          )}
         </div>
 
         {/* Right: Save Draft + Save Invoice (Unpaid/Credit) + Pay & Save */}
@@ -113,16 +117,18 @@ export const InvoiceActionDock: React.FC<InvoiceActionDockProps> = ({
             <span>{saveButtonLabel}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onPayAndSave}
-            data-testid="invoice-pay-save-btn"
-            className="h-10 px-2.5 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex-1 sm:flex-initial shrink-0"
-            title={isSalesOrder ? 'Record booking advance and save' : 'Open Payment Modal to settle tender and save'}
-          >
-            <span className="material-symbols-outlined text-[18px]">payments</span>
-            <span>{payButtonLabel}</span>
-          </button>
+          {!hidePrintAndPay && (
+            <button
+              type="button"
+              onClick={() => onPayAndSave?.()}
+              data-testid="invoice-pay-save-btn"
+              className="h-10 px-2.5 sm:px-5 rounded-xl bg-secondary text-on-secondary font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm hover:bg-secondary/90 active:scale-95 transition-all cursor-pointer flex-1 sm:flex-initial shrink-0"
+              title={isSalesOrder ? 'Record booking advance and save' : 'Open Payment Modal to settle tender and save'}
+            >
+              <span className="material-symbols-outlined text-[18px]">payments</span>
+              <span>{payButtonLabel}</span>
+            </button>
+          )}
         </div>
       </div>
     </aside>

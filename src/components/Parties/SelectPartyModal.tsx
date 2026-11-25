@@ -5,6 +5,7 @@ import { formatINR } from '../../core/utils/formatters.ts';
 import { getStateList } from '../../core/gst/stateCodes.ts';
 import { validateGstin } from '../../core/gst/validator.ts';
 import { db } from '../../services/db.ts';
+import { notifyDocumentSaved } from '../../services/saveConfirmation.ts';
 import {
   useCompany,
   useInvoices,
@@ -193,6 +194,7 @@ export const SelectPartyModal: React.FC<SelectPartyModalProps> = ({
     };
 
     db.saveParty(newParty);
+    notifyDocumentSaved({ kind: 'Party' });
     onSelectParty(newParty);
     setIsAddingNew(false);
     onClose();
