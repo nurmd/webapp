@@ -131,14 +131,14 @@ export const PartyOrdersTable: React.FC<PartyOrdersTableProps> = ({
                       >
                         {statusBadgeText}
                       </span>
-
-                      {/* Converted bill reference badge */}
-                      {order.convertedToBillNumber && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-primary/10 text-primary">
-                          Billed → #{order.convertedToBillNumber}
-                        </span>
-                      )}
                     </div>
+
+                    {/* Line 2 (middle): Converted bill reference on its own line */}
+                    {order.convertedToBillNumber && (
+                      <p className="text-[10px] font-semibold text-primary truncate">
+                        Billed → #{order.convertedToBillNumber.replace(/^#/, '')}
+                      </p>
+                    )}
 
                     <p className="text-[10px] text-on-surface-variant truncate">
                       {order.date} • {itemLabel}
