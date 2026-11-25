@@ -1,15 +1,15 @@
 {
-  "version": "1.2.92",
+  "version": "1.2.93",
   "name": "Vyapar Books PRO",
-  "buildTime": "2026-11-23T13:56:11.313Z",
+  "buildTime": "2026-11-25T13:51:44.390Z",
   "repository": "nurmd/webapp",
   "channel": "stable",
   "releaseNotes": [
+    "WhatsApp share sizing, inline sales payment, save confirmation",
+    "phase 2 unit-history hardening + GST UQC mapping",
     "sub-unit stock math, primary-unit display and purchase price normalisation",
     "dedicated Units & Multi-Tier Pricing page + cross-device units sync",
     "units (custom + sub-units) + multi-tier pricing + sale price field in purchase invoice item modal",
-    "keep supplier +GRN FAB visible above bottom nav and show single plus",
-    "order transactions by business transaction date instead of createdAt across the app",
-    "v1.2.87 - exclude GRN/PO from cash & bank ledger, cash flow, and party khata; add +GRN FAB on supplier Orders tab"
+    "keep supplier +GRN FAB visible above bottom nav and show single plus"
   ]
 }
